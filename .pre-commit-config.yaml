@@ -57,7 +57,7 @@ repos:
         pass_filenames: false
 
       - id: go-version-consistency
-        name: Verify Go and base-image versions match
+        name: Verify Go toolchain and bootstrap-image versions
         entry: bash bin/check-go-version-consistency
         language: system
         always_run: true

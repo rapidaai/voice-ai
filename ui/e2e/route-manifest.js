@@ -88,7 +88,8 @@ const routeJourneys = [
     id: 'dashboard.home',
     path: '/dashboard',
     auth: true,
-    expectText: 'Welcome back, E2E!',
+    expectText: 'Project overview',
+    readyText: 'Top assistants',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {

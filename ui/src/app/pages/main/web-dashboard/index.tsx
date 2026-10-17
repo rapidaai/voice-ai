@@ -1,536 +1,1233 @@
-import { useGlobalNavigation } from '@/hooks/use-global-navigator';
-import { useCurrentCredential } from '@/hooks/use-credential';
 import {
-  GhostButton,
-  PrimaryButton,
-  SecondaryButton,
-  TertiaryButton,
-} from '@/app/components/ui/primitives';
-import { ArrowUpRight } from '@carbon/icons-react';
-import { Link, SkeletonPlaceholder, SkeletonText, Tile } from '@carbon/react';
-import { useEffect, useState, type ReactNode } from 'react';
+  ArrowRight,
+  CheckmarkFilled,
+  Renew,
+  WarningAltFilled,
+} from '@carbon/icons-react';
+import {
+  Button,
+  DataTable,
+  InlineNotification,
+  SkeletonPlaceholder,
+  SkeletonText,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Tag,
+  Tile,
+} from '@carbon/react';
+import {
+  DashboardAssistantHealth,
+  DashboardFailureCode,
+  DashboardSectionState,
+  DashboardUsageComponent,
+} from '@rapidaai/react';
+import type {
+  DashboardRecentFailure,
+  DashboardUsageSection,
+  ProjectDashboard,
+  ProjectDashboardAnalytics,
+} from '@rapidaai/react';
+import { Timestamp } from 'google-protobuf/google/protobuf/timestamp_pb';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
-const DASHBOARD_DESIGN_URL =
-  'https://cdn-01.rapida.ai/web/rapida-dashboard-v1.json';
+import { Dropdown } from '@/app/components/ui/primitives';
+import { getProjectDashboardRange } from '@/clients/dashboard.client';
+import { useCurrentCredential } from '@/hooks/use-credential';
 
-type DashboardButtonKind = 'primary' | 'secondary' | 'tertiary' | 'ghost';
+type DashboardRange = '30d' | '7d' | '24h';
 
-type DashboardHeroAction = {
+type DashboardMetric = {
   label: string;
-  kind: DashboardButtonKind;
-  intent?: 'createAssistant';
-  href?: string;
-  external?: boolean;
+  value: string;
+  unit?: string;
+  comparison: string;
+  comparisonTone?: 'danger';
 };
 
-type DashboardCard = {
-  title: string;
-  description: string;
-  action: string;
-  href: string;
-  external?: boolean;
+type DashboardBreakdown = {
+  label: string;
+  value: string;
+  width: number;
 };
 
-type DashboardSection = {
-  title: string;
-  layout: 'feature-grid' | 'resource-grid';
-  cards: DashboardCard[];
+type DashboardRangeOption = {
+  id: DashboardRange;
+  text: string;
 };
 
-type DashboardNewsItem = {
-  date: string;
-  title: string;
-  description: string;
+type AutoRefreshOption = {
+  id: string;
+  text: string;
 };
 
-type DashboardDesign = {
-  welcome: {
-    prefix: string;
-    fallbackName: string;
-  };
-  hero: {
-    title: string;
-    description: string;
-    actions: DashboardHeroAction[];
-  };
-  sections: DashboardSection[];
-  news: {
-    title: string;
-    readMoreHref: string;
-    items: DashboardNewsItem[];
-  };
-};
-
-const dashboardButtonKinds: DashboardButtonKind[] = [
-  'primary',
-  'secondary',
-  'tertiary',
-  'ghost',
+const dashboardRangeOptions: DashboardRangeOption[] = [
+  { id: '30d', text: 'Last 30 days' },
+  { id: '7d', text: 'Last 7 days' },
+  { id: '24h', text: 'Last 24 hours' },
 ];
 
-const dashboardSectionLayouts: DashboardSection['layout'][] = [
-  'feature-grid',
-  'resource-grid',
+const autoRefreshOptions: AutoRefreshOption[] = [
+  { id: '0', text: 'Off' },
+  { id: '5', text: 'Every 5 min' },
+  { id: '10', text: 'Every 10 min' },
+  { id: '30', text: 'Every 30 min' },
 ];
 
-const dashboardHeroActionButtonByKind: Record<
-  DashboardButtonKind,
-  typeof PrimaryButton
-> = {
-  primary: PrimaryButton,
-  secondary: SecondaryButton,
-  tertiary: TertiaryButton,
-  ghost: GhostButton,
-};
+const assistantTableHeaders = [
+  { key: 'assistant', header: 'Assistant' },
+  { key: 'conversations', header: 'Conversations' },
+  { key: 'successRate', header: 'Success rate' },
+  { key: 'latency', header: 'Average latency' },
+  { key: 'health', header: 'Health' },
+  { key: 'lastActive', header: 'Last active' },
+];
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+const failureTableHeaders = [
+  { key: 'assistant', header: 'Assistant' },
+  { key: 'reason', header: 'Reason' },
+  { key: 'details', header: 'Details' },
+  { key: 'occurredAt', header: 'Occurred at' },
+];
+
+const numberFormatter = new Intl.NumberFormat();
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+function toTimestamp(date: Date) {
+  const timestamp = new Timestamp();
+  timestamp.setSeconds(Math.floor(date.getTime() / 1000));
+  timestamp.setNanos((date.getTime() % 1000) * 1_000_000);
+  return timestamp;
 }
 
-function isString(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0;
+export function getDashboardStartDate(range: DashboardRange, endDate: Date) {
+  const durationMs = {
+    '24h': 24 * 60 * 60 * 1000,
+    '7d': 7 * 24 * 60 * 60 * 1000,
+    '30d': 30 * 24 * 60 * 60 * 1000,
+  }[range];
+  return new Date(endDate.getTime() - durationMs);
 }
 
-function isOptionalBoolean(value: unknown): value is boolean | undefined {
-  return value === undefined || typeof value === 'boolean';
+function timestampDate(timestamp?: Timestamp) {
+  return timestamp ? timestamp.toDate() : null;
 }
 
-function isOptionalString(value: unknown): value is string | undefined {
-  return value === undefined || isString(value);
+function signedValue(value: number, suffix: string) {
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${value.toFixed(1)}${suffix}`;
 }
 
-function isDashboardButtonKind(value: unknown): value is DashboardButtonKind {
+export function formatDashboardDuration(durationMs: number) {
+  const totalSeconds = Math.round(durationMs / 1000);
+  if (totalSeconds < 60) return `${totalSeconds} sec`;
+
+  const totalMinutes = Math.round(durationMs / 60_000);
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes ? `${hours} hr ${minutes} min` : `${hours} hr`;
+}
+
+function formatDate(timestamp?: Timestamp) {
+  const date = timestampDate(timestamp);
+  return date ? dateFormatter.format(date) : 'Not available';
+}
+
+export function dashboardActivityLabel(
+  timestamp: Timestamp | undefined,
+  range: DashboardRange,
+) {
+  const date = timestampDate(timestamp);
+  if (!date) return '';
+  if (range === '24h')
+    return new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(date);
+  if (range === '7d')
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+    }).format(date);
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+  }).format(date);
+}
+
+function componentLabel(component: number) {
+  const labels: Record<number, string> = {
+    [DashboardUsageComponent.DASHBOARD_USAGE_COMPONENT_STT]: 'Speech to text',
+    [DashboardUsageComponent.DASHBOARD_USAGE_COMPONENT_TTS]: 'Text to speech',
+    [DashboardUsageComponent.DASHBOARD_USAGE_COMPONENT_LLM]: 'Language model',
+    [DashboardUsageComponent.DASHBOARD_USAGE_COMPONENT_VAD]:
+      'Voice activity detection',
+    [DashboardUsageComponent.DASHBOARD_USAGE_COMPONENT_EOS]: 'End of speech',
+    [DashboardUsageComponent.DASHBOARD_USAGE_COMPONENT_DENOISING]:
+      'Noise reduction',
+  };
+  return labels[component] || 'Other';
+}
+
+function failureLabel(code: number) {
+  const labels: Record<number, string> = {
+    [DashboardFailureCode.DASHBOARD_FAILURE_CODE_AUTHENTICATION]:
+      'Authentication',
+    [DashboardFailureCode.DASHBOARD_FAILURE_CODE_CONFIGURATION]:
+      'Configuration',
+    [DashboardFailureCode.DASHBOARD_FAILURE_CODE_PROVIDER]: 'Provider',
+    [DashboardFailureCode.DASHBOARD_FAILURE_CODE_NETWORK]: 'Network',
+    [DashboardFailureCode.DASHBOARD_FAILURE_CODE_CANCELLED]: 'Cancelled',
+    [DashboardFailureCode.DASHBOARD_FAILURE_CODE_NO_ANSWER]: 'No answer',
+    [DashboardFailureCode.DASHBOARD_FAILURE_CODE_REJECTED]: 'Rejected',
+    [DashboardFailureCode.DASHBOARD_FAILURE_CODE_UNKNOWN]: 'Unknown',
+  };
+  return labels[code] || 'Unknown';
+}
+
+function assistantTagType(health: number) {
+  if (
+    health ===
+    DashboardAssistantHealth.DASHBOARD_ASSISTANT_HEALTH_NEEDS_ATTENTION
+  )
+    return 'red' as const;
+  if (health === DashboardAssistantHealth.DASHBOARD_ASSISTANT_HEALTH_WATCH)
+    return 'warm-gray' as const;
+  if (health === DashboardAssistantHealth.DASHBOARD_ASSISTANT_HEALTH_HEALTHY)
+    return 'green' as const;
+  return 'gray' as const;
+}
+
+function assistantHealthLabel(health: number) {
+  if (
+    health ===
+    DashboardAssistantHealth.DASHBOARD_ASSISTANT_HEALTH_NEEDS_ATTENTION
+  )
+    return 'Needs attention';
+  if (health === DashboardAssistantHealth.DASHBOARD_ASSISTANT_HEALTH_WATCH)
+    return 'Watch';
+  if (health === DashboardAssistantHealth.DASHBOARD_ASSISTANT_HEALTH_HEALTHY)
+    return 'Healthy';
+  return 'No data';
+}
+
+function PanelHeader({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle: string;
+  action?: ReactNode;
+}) {
   return (
-    typeof value === 'string' &&
-    dashboardButtonKinds.includes(value as DashboardButtonKind)
+    <header className="flex min-h-[76px] items-start justify-between gap-4 border-b border-[var(--cds-border-subtle-01)] px-6 py-4">
+      <div>
+        <h2 className="text-lg font-semibold text-[var(--cds-text-primary)]">
+          {title}
+        </h2>
+        <p className="mt-1 text-xs text-[var(--cds-text-secondary)]">
+          {subtitle}
+        </p>
+      </div>
+      {action}
+    </header>
   );
 }
 
-function isDashboardHeroAction(value: unknown): value is DashboardHeroAction {
-  if (!isRecord(value)) return false;
-
+function MetricCard({ metric }: { metric: DashboardMetric }) {
   return (
-    isString(value.label) &&
-    isDashboardButtonKind(value.kind) &&
-    (value.intent === undefined || value.intent === 'createAssistant') &&
-    isOptionalString(value.href) &&
-    isOptionalBoolean(value.external)
+    <article
+      data-dashboard-kpi
+      className="flex h-40 flex-col justify-between bg-[var(--cds-layer)] p-6"
+    >
+      <div>
+        <h2 className="text-sm font-medium text-[var(--cds-text-secondary)]">
+          {metric.label}
+        </h2>
+        <p className="mt-4 text-4xl font-light leading-none tracking-tight tabular-nums text-[var(--cds-text-primary)]">
+          {metric.value}
+          {metric.unit && (
+            <span className="ml-1 text-base font-normal tracking-normal text-[var(--cds-text-secondary)]">
+              {metric.unit}
+            </span>
+          )}
+        </p>
+      </div>
+      <p
+        className={`text-xs font-semibold ${
+          metric.comparisonTone === 'danger'
+            ? 'text-[var(--cds-support-error)]'
+            : 'text-[var(--cds-text-secondary)]'
+        }`}
+      >
+        {metric.comparison}
+      </p>
+    </article>
   );
 }
 
-function isDashboardCard(value: unknown): value is DashboardCard {
-  if (!isRecord(value)) return false;
+function ActivityPanel({
+  analytics,
+  range,
+  rangeLabel,
+}: {
+  analytics: ProjectDashboardAnalytics;
+  range: DashboardRange;
+  rangeLabel: string;
+}) {
+  const summary = analytics.getSummary();
+  const sessions = summary?.getSessions()?.getValue() || 0;
+  const failures = summary?.getFailedsessions()?.getValue() || 0;
+  const activity = analytics.getActivityList().map(bucket => ({
+    label: dashboardActivityLabel(bucket.getFromdate(), range),
+    sessions: bucket.getSessions(),
+    failed: bucket.getFailedsessions(),
+  }));
 
   return (
-    isString(value.title) &&
-    isString(value.description) &&
-    isString(value.action) &&
-    isString(value.href) &&
-    isOptionalBoolean(value.external)
+    <section className="h-full bg-[var(--cds-layer)]">
+      <PanelHeader
+        title="Conversation activity"
+        subtitle="Sessions and failures during the selected period"
+        action={
+          <div className="flex shrink-0 flex-col gap-1 text-xs text-[var(--cds-text-secondary)] sm:flex-row sm:gap-4">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 bg-[var(--cds-interactive)]" />
+              Sessions
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 bg-[var(--cds-support-error)]" />
+              Failed
+            </span>
+          </div>
+        }
+      />
+      {activity.length ? (
+        <div
+          className="h-[320px] min-w-0 px-6 pb-6 pt-6"
+          role="img"
+          aria-label={`Conversation activity showing ${numberFormatter.format(
+            sessions,
+          )} sessions and ${numberFormatter.format(
+            failures,
+          )} failures over ${rangeLabel}`}
+        >
+          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+            <AreaChart
+              data={activity}
+              margin={{ top: 16, right: 24, left: 0, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient
+                  id="projectActivityGradient"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="0%"
+                    stopColor="var(--cds-interactive)"
+                    stopOpacity={0.24}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="var(--cds-interactive)"
+                    stopOpacity={0.02}
+                  />
+                </linearGradient>
+              </defs>
+              <CartesianGrid
+                stroke="var(--cds-border-subtle-01)"
+                vertical={false}
+              />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: 'var(--cds-text-secondary)' }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                width={42}
+                tick={{ fontSize: 11, fill: 'var(--cds-text-secondary)' }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <Tooltip
+                contentStyle={{
+                  border: '1px solid var(--cds-border-subtle-01)',
+                  background: 'var(--cds-layer-01)',
+                  color: 'var(--cds-text-primary)',
+                  fontSize: 12,
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="sessions"
+                name="Sessions"
+                stroke="var(--cds-interactive)"
+                fill="url(#projectActivityGradient)"
+                strokeWidth={2}
+                activeDot={{ r: 4 }}
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="failed"
+                name="Failed"
+                stroke="var(--cds-support-error)"
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+                isAnimationActive={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <EmptyContent
+          title="No activity yet"
+          description="Conversation activity will appear after this project handles sessions."
+        />
+      )}
+    </section>
   );
 }
 
-function isDashboardSection(value: unknown): value is DashboardSection {
-  if (!isRecord(value)) return false;
+function HealthPanel({ analytics }: { analytics: ProjectDashboardAnalytics }) {
+  const health = analytics.getHealth();
+  const projectState = analytics.getProjectstate();
+  const recentFailures = analytics.getRecentfailuresList().length;
+  const assistantCount = projectState?.getAssistantcount() || 0;
+  const healthyAssistants = health?.getHealthyassistants() || 0;
+  const threshold = health?.getSlowsessionthresholdms() || 0;
 
   return (
-    isString(value.title) &&
-    typeof value.layout === 'string' &&
-    dashboardSectionLayouts.includes(
-      value.layout as DashboardSection['layout'],
-    ) &&
-    Array.isArray(value.cards) &&
-    value.cards.every(isDashboardCard)
+    <section className="h-full bg-[var(--cds-layer)] lg:border-l lg:border-[var(--cds-border-subtle-01)]">
+      <PanelHeader
+        title="Health summary"
+        subtitle="Signals that may need attention"
+      />
+      <ul className="divide-y divide-[var(--cds-border-subtle-01)] px-6">
+        <li className="flex min-h-[106px] items-start gap-4 py-5">
+          <WarningAltFilled
+            size={24}
+            aria-hidden="true"
+            className="mt-0.5 shrink-0 text-[var(--cds-support-error)]"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Failed sessions</p>
+            <p className="mt-2 text-xs text-[var(--cds-text-secondary)]">
+              {numberFormatter.format(recentFailures)} recent{' '}
+              {recentFailures === 1 ? 'failure' : 'failures'}
+            </p>
+          </div>
+          <span className="text-2xl font-light tabular-nums">
+            {numberFormatter.format(health?.getFailedsessions() || 0)}
+          </span>
+        </li>
+        <li className="flex min-h-[106px] items-start gap-4 py-5">
+          <WarningAltFilled
+            size={24}
+            aria-hidden="true"
+            className="mt-0.5 shrink-0 text-[var(--cds-support-warning)]"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Slow sessions</p>
+            <p className="mt-2 text-xs text-[var(--cds-text-secondary)]">
+              Response latency above {numberFormatter.format(threshold)} ms
+            </p>
+          </div>
+          <span className="text-2xl font-light tabular-nums">
+            {numberFormatter.format(health?.getSlowsessions() || 0)}
+          </span>
+        </li>
+        <li className="flex min-h-[106px] items-start gap-4 py-5">
+          <CheckmarkFilled
+            size={24}
+            aria-hidden="true"
+            className="mt-0.5 shrink-0 text-[var(--cds-support-success)]"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Healthy assistants</p>
+            <p className="mt-2 text-xs text-[var(--cds-text-secondary)]">
+              Based on success rate and latency
+            </p>
+          </div>
+          <span className="text-2xl font-light tabular-nums">
+            {healthyAssistants} of {assistantCount}
+          </span>
+        </li>
+      </ul>
+    </section>
   );
 }
 
-function isDashboardNewsItem(value: unknown): value is DashboardNewsItem {
-  if (!isRecord(value)) return false;
-
+function EmptyContent({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description: string;
+  action?: ReactNode;
+}) {
   return (
-    isString(value.date) && isString(value.title) && isString(value.description)
+    <div className="flex min-h-[220px] flex-col items-center justify-center px-6 py-12 text-center">
+      <WarningAltFilled
+        size={40}
+        aria-hidden="true"
+        className="text-[var(--cds-text-disabled)]"
+      />
+      <h3 className="mt-4 text-base font-semibold text-[var(--cds-text-primary)]">
+        {title}
+      </h3>
+      <p className="mt-1 max-w-sm text-sm text-[var(--cds-text-secondary)]">
+        {description}
+      </p>
+      {action}
+    </div>
   );
 }
 
-function isDashboardDesign(value: unknown): value is DashboardDesign {
-  if (!isRecord(value)) return false;
-
-  const { welcome, hero, sections, news } = value;
-
+function StatePanel({
+  title,
+  subtitle,
+  state,
+}: {
+  title: string;
+  subtitle: string;
+  state: number;
+}) {
+  const isEmpty = state === DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY;
+  const unavailableTitle =
+    title === 'Analytics'
+      ? 'Analytics are unavailable'
+      : `${title} is unavailable`;
   return (
-    isRecord(welcome) &&
-    isString(welcome.prefix) &&
-    isString(welcome.fallbackName) &&
-    isRecord(hero) &&
-    isString(hero.title) &&
-    isString(hero.description) &&
-    Array.isArray(hero.actions) &&
-    hero.actions.every(isDashboardHeroAction) &&
-    Array.isArray(sections) &&
-    sections.every(isDashboardSection) &&
-    isRecord(news) &&
-    isString(news.title) &&
-    isString(news.readMoreHref) &&
-    Array.isArray(news.items) &&
-    news.items.every(isDashboardNewsItem)
+    <Tile className="h-full border! border-[var(--cds-border-subtle-01)]! p-0!">
+      <PanelHeader title={title} subtitle={subtitle} />
+      <EmptyContent
+        title={isEmpty ? `No ${title.toLowerCase()} yet` : unavailableTitle}
+        description={
+          isEmpty
+            ? 'Data will appear here after the project starts handling sessions.'
+            : 'This section could not be loaded. Other available dashboard data is still shown.'
+        }
+      />
+    </Tile>
   );
 }
 
-function DashboardFrame({ children }: { children: ReactNode }) {
+function BreakdownPanel({
+  title,
+  subtitle,
+  values,
+}: {
+  title: string;
+  subtitle: string;
+  values: DashboardBreakdown[];
+}) {
   return (
-    <div className="min-h-0 flex-1 overflow-auto bg-white px-4 py-5 text-[#161616] dark:bg-[#161616] dark:text-[#f4f4f4] md:px-6">
-      <div className="mx-auto flex max-w-[1500px] flex-col gap-5">
-        {children}
+    <Tile className="h-full border! border-[var(--cds-border-subtle-01)]! p-0!">
+      <PanelHeader title={title} subtitle={subtitle} />
+      {values.length ? (
+        <div className="grid gap-6 p-6 sm:grid-cols-2">
+          {values.map(value => (
+            <div key={value.label}>
+              <div className="mb-2 flex items-center justify-between gap-4 text-sm">
+                <span>{value.label}</span>
+                <span className="font-semibold tabular-nums">
+                  {value.value}
+                </span>
+              </div>
+              <div className="h-1 bg-[var(--cds-border-subtle-01)]">
+                <div
+                  data-dashboard-bar
+                  className="h-full bg-[var(--cds-interactive)]"
+                  style={{ width: `${value.width}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyContent
+          title="No component usage yet"
+          description="Usage will appear after assistants process voice sessions."
+        />
+      )}
+    </Tile>
+  );
+}
+
+function RecentFailuresTable({
+  failures,
+}: {
+  failures: DashboardRecentFailure[];
+}) {
+  const rows = failures.map((failure, index) => ({
+    id: failure.getConversationid() || `failure-${index}`,
+    assistant: failure.getAssistantname() || 'Unknown assistant',
+    reason: failureLabel(failure.getFailurecode()),
+    details: `${failure.getChannel() || 'Unknown'} · ${formatDashboardDuration(
+      failure.getDurationms(),
+    )}`,
+    occurredAt: formatDate(failure.getOccurredat()),
+  }));
+  const failureRoutes = new Map(
+    failures.map(failure => [
+      failure.getConversationid(),
+      failure.getAssistantid() && failure.getConversationid()
+        ? `/deployment/assistant/${encodeURIComponent(
+            failure.getAssistantid(),
+          )}/sessions/${encodeURIComponent(failure.getConversationid())}`
+        : '',
+    ]),
+  );
+
+  return (
+    <Tile className="h-full border! border-[var(--cds-border-subtle-01)]! p-0!">
+      <PanelHeader
+        title="Recent failures"
+        subtitle="Latest sessions that need investigation"
+      />
+      {rows.length ? (
+        <DataTable rows={rows} headers={failureTableHeaders}>
+          {({ rows, headers, getHeaderProps, getRowProps, getTableProps }) => (
+            <TableContainer>
+              <div className="overflow-x-auto">
+                <Table
+                  {...getTableProps()}
+                  aria-label="Recent failures"
+                  className="min-w-[440px]"
+                  size="md"
+                  tabIndex={0}
+                >
+                  <caption className="sr-only">
+                    Recent failed sessions for the selected period
+                  </caption>
+                  <TableHead>
+                    <TableRow>
+                      {headers.map(header => (
+                        <TableHeader
+                          {...getHeaderProps({ header })}
+                          key={header.key}
+                        >
+                          {header.header}
+                        </TableHeader>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {rows.map(row => (
+                      <TableRow {...getRowProps({ row })} key={row.id}>
+                        {row.cells.map(cell => (
+                          <TableCell key={cell.id}>
+                            {cell.info.header === 'assistant' &&
+                            failureRoutes.get(row.id) ? (
+                              <a
+                                href={failureRoutes.get(row.id)}
+                                className="font-semibold text-[var(--cds-link-primary)] hover:underline focus:underline"
+                              >
+                                {cell.value}
+                              </a>
+                            ) : cell.info.header === 'reason' ? (
+                              <Tag size="sm" type="red">
+                                {cell.value}
+                              </Tag>
+                            ) : (
+                              cell.value
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </TableContainer>
+          )}
+        </DataTable>
+      ) : (
+        <EmptyContent
+          title="No recent failures"
+          description="No failed sessions were returned for this period."
+        />
+      )}
+    </Tile>
+  );
+}
+
+function AssistantsTable({
+  analytics,
+}: {
+  analytics: ProjectDashboardAnalytics;
+}) {
+  const rows = analytics.getAssistantsList().map(assistant => ({
+    id: assistant.getAssistantid(),
+    assistant: assistant.getName() || 'Unnamed assistant',
+    conversations: numberFormatter.format(assistant.getSessions()),
+    successRate: assistant.hasSuccessratepercent()
+      ? `${assistant.getSuccessratepercent().toFixed(1)}%`
+      : 'Not available',
+    latency: assistant.hasResponselatencyms()
+      ? `${numberFormatter.format(assistant.getResponselatencyms())} ms`
+      : 'Not available',
+    health: assistantHealthLabel(assistant.getHealth()),
+    lastActive: formatDate(assistant.getLastactivityat()),
+  }));
+  const successTones = new Map(
+    analytics
+      .getAssistantsList()
+      .map(assistant => [
+        assistant.getAssistantid(),
+        assistantTagType(assistant.getHealth()),
+      ]),
+  );
+
+  return (
+    <Tile className="border! border-[var(--cds-border-subtle-01)]! p-0!">
+      <PanelHeader
+        title="Top assistants"
+        subtitle="Assistants ranked by conversation volume"
+        action={
+          <Button
+            kind="ghost"
+            size="sm"
+            renderIcon={ArrowRight}
+            href="/deployment/assistant"
+          >
+            View all assistants
+          </Button>
+        }
+      />
+      {rows.length ? (
+        <DataTable rows={rows} headers={assistantTableHeaders}>
+          {({ rows, headers, getHeaderProps, getRowProps, getTableProps }) => (
+            <TableContainer>
+              <div className="overflow-x-auto">
+                <Table
+                  {...getTableProps()}
+                  aria-label="Top assistants"
+                  className="min-w-[760px]"
+                  size="md"
+                  tabIndex={0}
+                >
+                  <caption className="sr-only">
+                    Top assistants ranked by conversation volume for the
+                    selected period
+                  </caption>
+                  <TableHead>
+                    <TableRow>
+                      {headers.map(header => (
+                        <TableHeader
+                          {...getHeaderProps({ header })}
+                          key={header.key}
+                        >
+                          {header.header}
+                        </TableHeader>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {rows.map(row => (
+                      <TableRow {...getRowProps({ row })} key={row.id}>
+                        {row.cells.map(cell => (
+                          <TableCell key={cell.id}>
+                            {cell.info.header === 'health' ? (
+                              <Tag
+                                size="sm"
+                                type={successTones.get(row.id) || 'gray'}
+                                className={
+                                  cell.value === 'Watch'
+                                    ? 'bg-[var(--cds-support-warning)]! text-[var(--cds-text-primary)]!'
+                                    : undefined
+                                }
+                              >
+                                {cell.value}
+                              </Tag>
+                            ) : cell.info.header === 'assistant' ? (
+                              <a
+                                href={`/deployment/assistant/${encodeURIComponent(
+                                  row.id,
+                                )}`}
+                                className="font-semibold text-[var(--cds-link-primary)] hover:underline focus:underline"
+                              >
+                                {cell.value}
+                              </a>
+                            ) : (
+                              cell.value
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </TableContainer>
+          )}
+        </DataTable>
+      ) : (
+        <EmptyContent
+          title="No assistant activity yet"
+          description="Assistant rankings will appear after sessions are recorded."
+        />
+      )}
+    </Tile>
+  );
+}
+
+function DashboardLoading() {
+  return (
+    <div
+      className="col-span-full"
+      role="status"
+      aria-label="Loading project dashboard"
+    >
+      <span className="sr-only">Loading project dashboard</span>
+      <div className="grid grid-cols-1 gap-px border border-[var(--cds-border-subtle-01)] bg-[var(--cds-border-subtle-01)] md:grid-cols-2 xl:grid-cols-4">
+        {[0, 1, 2, 3].map(item => (
+          <div
+            className="h-40 bg-[var(--cds-layer)] p-6"
+            key={item}
+            aria-hidden="true"
+          >
+            <SkeletonText width="45%" />
+            <SkeletonText className="mt-6" width="70%" heading />
+            <SkeletonText className="mt-6" width="80%" />
+          </div>
+        ))}
+      </div>
+      <div className="mb-6 grid border-x border-b border-[var(--cds-border-subtle-01)] lg:grid-cols-16">
+        <div className="h-[396px] bg-[var(--cds-layer)] p-6 lg:col-span-11">
+          <SkeletonText width="30%" heading />
+          <SkeletonText width="45%" />
+          <SkeletonPlaceholder className="mt-8 h-[260px]! w-full!" />
+        </div>
+        <div className="h-[396px] border-t border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer)] p-6 lg:col-span-5 lg:border-l lg:border-t-0">
+          <SkeletonText width="55%" heading />
+          <SkeletonText width="75%" />
+          <SkeletonText className="mt-10" width="100%" />
+          <SkeletonText className="mt-12" width="100%" />
+          <SkeletonText className="mt-12" width="100%" />
+        </div>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {[0, 1].map(item => (
+          <div
+            className="h-[260px] border border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer)] p-6"
+            key={item}
+            aria-hidden="true"
+          >
+            <SkeletonText width="35%" heading />
+            <SkeletonText width="55%" />
+            <SkeletonPlaceholder className="mt-8 h-[140px]! w-full!" />
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-function Title({
-  isLoading,
-  welcomePrefix,
-  firstName,
-}: {
-  isLoading: boolean;
-  welcomePrefix?: string;
-  firstName?: string;
-}) {
-  if (isLoading) {
-    return <SkeletonText heading width="280px" className="!mb-1" />;
-  }
+function buildMetrics(analytics: ProjectDashboardAnalytics) {
+  const summary = analytics.getSummary();
+  const sessions = summary?.getSessions();
+  const successRate = summary?.getSuccessrate();
+  const latency = summary?.getResponselatency();
+  const failed = summary?.getFailedsessions();
 
-  return (
-    <h1 className="text-[1.75rem] font-semibold leading-tight tracking-normal">
-      {welcomePrefix}, {firstName}!
-    </h1>
-  );
+  const sessionComparison = sessions?.hasChangepercent()
+    ? `${signedValue(sessions.getChangepercent(), '%')} from previous period`
+    : 'No comparison available';
+  const successComparison = successRate?.hasChangepoints()
+    ? `${signedValue(successRate.getChangepoints(), ' points')} from previous period`
+    : 'No comparison available';
+  const latencyChange = latency?.hasChangems() ? latency.getChangems() : null;
+  const latencyComparison =
+    latencyChange === null
+      ? 'No comparison available'
+      : latencyChange < 0
+        ? `${numberFormatter.format(Math.abs(latencyChange))} ms faster than previous period`
+        : latencyChange > 0
+          ? `${numberFormatter.format(latencyChange)} ms slower than previous period`
+          : 'No change from previous period';
+  const failureComparison = failed?.hasSharepercent()
+    ? `${failed.getSharepercent().toFixed(1)}% of project sessions`
+    : 'Share unavailable';
+
+  return [
+    {
+      label: 'Sessions',
+      value: numberFormatter.format(sessions?.getValue() || 0),
+      comparison: sessionComparison,
+    },
+    {
+      label: 'Success rate',
+      value: successRate?.hasValuepercent()
+        ? `${successRate.getValuepercent().toFixed(1)}%`
+        : 'Not available',
+      comparison: successComparison,
+    },
+    {
+      label: 'Avg latency',
+      value: latency?.hasValuems()
+        ? numberFormatter.format(latency.getValuems())
+        : 'Not available',
+      unit: latency?.hasValuems() ? 'ms' : undefined,
+      comparison: latencyComparison,
+    },
+    {
+      label: 'Failed sessions',
+      value: numberFormatter.format(failed?.getValue() || 0),
+      comparison: failureComparison,
+      comparisonTone: 'danger' as const,
+    },
+  ];
 }
 
-function Hero({
-  isLoading,
-  hero,
-  onHeroAction,
-}: {
-  isLoading: boolean;
-  hero?: DashboardDesign['hero'];
-  onHeroAction: (action: DashboardHeroAction) => void;
-}) {
-  if (isLoading) {
-    return (
-      <Tile className="min-h-[180px]! overflow-hidden! rounded-none! border-0! bg-primary/10! p-8! dark:bg-primary/10!">
-        <div className="max-w-[620px]">
-          <SkeletonText heading width="72%" className="!mb-3" />
-          <SkeletonText
-            paragraph
-            lineCount={3}
-            width="100%"
-            className="!mb-6"
-          />
-          <div className="flex flex-wrap gap-3">
-            <SkeletonPlaceholder className="!h-10 !w-[220px]" />
-            <SkeletonPlaceholder className="!h-10 !w-[148px]" />
-          </div>
-        </div>
-      </Tile>
-    );
-  }
-
-  if (!hero) return null;
-
-  return (
-    <Tile className="relative min-h-[180px]! overflow-hidden! rounded-none! border-0! bg-primary/10! p-0! dark:bg-primary/10!">
-      <div className="absolute inset-0 bg-[linear-gradient(100deg,color-mix(in_oklab,var(--color-primary)_12%,white)_0%,color-mix(in_oklab,var(--color-primary)_8%,white)_44%,color-mix(in_oklab,var(--color-primary)_22%,white)_72%,color-mix(in_oklab,var(--color-primary)_42%,white)_100%)] dark:bg-[linear-gradient(100deg,color-mix(in_oklab,var(--color-primary)_22%,#161616)_0%,color-mix(in_oklab,var(--color-primary)_16%,#161616)_48%,color-mix(in_oklab,var(--color-primary)_30%,#161616)_100%)]" />
-      <div className="absolute right-0 top-0 hidden h-full w-[58%] overflow-hidden md:block">
-        <div className="absolute right-[18%] top-[-28%] h-[160%] w-[34%] rotate-[22deg] bg-primary/10 dark:bg-white/10" />
-        <div className="absolute right-[38%] top-[-20%] h-[150%] w-[26%] rotate-[22deg] bg-primary/10 dark:bg-white/10" />
-        <div className="absolute right-0 top-0 h-full w-[18%] bg-primary/10 dark:bg-white/10" />
-      </div>
-      <div className="relative z-[1] max-w-[620px] px-8 py-8">
-        <h2 className="text-lg font-semibold leading-6">{hero.title}</h2>
-        <p className="mt-4 text-base leading-6 text-[#262626] dark:text-[#f4f4f4]">
-          {hero.description}
-        </p>
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          {hero.actions.map(action => {
-            const HeroActionButton =
-              dashboardHeroActionButtonByKind[action.kind];
-
-            return (
-              <HeroActionButton
-                key={action.label}
-                size="md"
-                href={action.href}
-                target={action.external ? '_blank' : undefined}
-                rel={action.external ? 'noopener noreferrer' : undefined}
-                onClick={action.intent ? () => onHeroAction(action) : undefined}
-              >
-                {action.label}
-              </HeroActionButton>
-            );
-          })}
-        </div>
-      </div>
-    </Tile>
+function buildUsage(usage: DashboardUsageSection) {
+  const components = usage.getComponentsList();
+  const maxDuration = Math.max(
+    ...components.map(component => component.getDurationms()),
+    1,
   );
-}
-
-function FeatureCard({
-  isLoading,
-  layout,
-  card,
-}: {
-  isLoading: boolean;
-  layout: DashboardSection['layout'];
-  card?: DashboardCard;
-}) {
-  if (isLoading || !card) {
-    return (
-      <Tile className="flex! min-h-[184px]! flex-col! rounded-none! border! border-[#e0e0e0]! bg-white! p-6! dark:border-[#393939]! dark:bg-[#262626]!">
-        <SkeletonText heading width="70%" className="!mb-4" />
-        <SkeletonText paragraph lineCount={3} width="100%" className="!mb-6" />
-        <SkeletonPlaceholder className="!mt-auto !h-8 !w-[140px]" />
-      </Tile>
-    );
-  }
-
-  return (
-    <Tile className="flex! h-full! min-h-[184px]! flex-col! rounded-none! border! border-[#e0e0e0]! bg-white! p-6! dark:border-[#393939]! dark:bg-[#262626]!">
-      <h3 className="text-base font-semibold">{card.title}</h3>
-      <p className="mt-4 flex-1 text-sm leading-5 text-[#393939] dark:text-[#c6c6c6]">
-        {card.description}
-      </p>
-      <div className="mt-auto pt-6">
-        {layout === 'feature-grid' ? (
-          <TertiaryButton size="sm" href={card.href}>
-            {card.action}
-          </TertiaryButton>
-        ) : (
-          <Link
-            href={card.href}
-            target={card.external ? '_blank' : undefined}
-            rel={card.external ? 'noopener noreferrer' : undefined}
-            className="inline-flex! items-center! gap-1! text-sm!"
-          >
-            {card.action}
-            {card.external && <ArrowUpRight size={12} />}
-          </Link>
-        )}
-      </div>
-    </Tile>
-  );
-}
-
-function SectionCards({
-  isLoading,
-  section,
-  className,
-}: {
-  isLoading: boolean;
-  section?: DashboardSection;
-  className?: string;
-}) {
-  if (isLoading) {
-    return (
-      <section className={className}>
-        <SkeletonText heading width="220px" className="!mb-4" />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:auto-rows-fr">
-          {[0, 1, 2].map(cardIndex => (
-            <FeatureCard
-              key={cardIndex}
-              isLoading
-              layout={section?.layout ?? 'feature-grid'}
-            />
-          ))}
-        </div>
-      </section>
-    );
-  }
-
-  if (!section) return null;
-
-  return (
-    <section className={className}>
-      <h2 className="mb-4 text-lg font-semibold">{section.title}</h2>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:auto-rows-fr">
-        {section.cards.map(card => (
-          <FeatureCard
-            key={card.title}
-            isLoading={false}
-            layout={section.layout}
-            card={card}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function HelpAndResource({
-  isLoading,
-  section,
-}: {
-  isLoading: boolean;
-  section?: DashboardSection;
-}) {
-  return (
-    <SectionCards isLoading={isLoading} section={section} className="mt-6" />
-  );
-}
-
-function News({
-  isLoading,
-  news,
-}: {
-  isLoading: boolean;
-  news?: DashboardDesign['news'];
-}) {
-  if (isLoading) {
-    return (
-      <>
-        <SkeletonText heading width="170px" className="!mb-4" />
-        <Tile className="min-h-[446px]! rounded-none! border-0! bg-[#e8e8e8]! p-7! dark:bg-[#262626]!">
-          <div className="flex flex-col gap-8">
-            {[0, 1, 2].map(item => (
-              <article key={`news-${item}`}>
-                <SkeletonText width="90px" className="!mb-3" />
-                <SkeletonText heading width="86%" className="!mb-2" />
-                <SkeletonText
-                  paragraph
-                  lineCount={2}
-                  width="100%"
-                  className="!mb-3"
-                />
-                <SkeletonPlaceholder className="!h-4 !w-[84px]" />
-              </article>
-            ))}
-          </div>
-        </Tile>
-      </>
-    );
-  }
-
-  if (!news) return null;
-
-  return (
-    <>
-      <h2 className="mb-4 text-lg font-semibold">{news.title}</h2>
-      <Tile className="flex min-h-[446px] flex-col rounded-none border-0 bg-[#e8e8e8] p-7 dark:bg-[#262626]">
-        <div className="flex flex-col gap-8">
-          {news.items.map(item => (
-            <article key={`${item.date}-${item.title}`}>
-              <p className="text-xs font-medium text-[#525252] dark:text-[#c6c6c6]">
-                {item.date}
-              </p>
-              <h3 className="mt-2 text-sm font-semibold leading-5">
-                {item.title}
-              </h3>
-              <p className="mt-2 text-sm leading-5 text-[#393939] dark:text-[#c6c6c6]">
-                {item.description}
-              </p>
-              <Link
-                href={news.readMoreHref}
-                className="mt-3! inline-flex! items-center! gap-1! text-sm!"
-              >
-                Read more <ArrowUpRight size={12} />
-              </Link>
-            </article>
-          ))}
-        </div>
-      </Tile>
-    </>
-  );
+  return components.map(component => ({
+    label: componentLabel(component.getComponent()),
+    value: formatDashboardDuration(component.getDurationms()),
+    width:
+      component.getDurationms() === 0
+        ? 0
+        : Math.max(4, (component.getDurationms() / maxDuration) * 100),
+  }));
 }
 
 export const HomePage = () => {
-  const navigation = useGlobalNavigation();
-  const { user } = useCurrentCredential();
-  const [dashboardDesign, setDashboardDesign] =
-    useState<DashboardDesign | null>(null);
-  const [hasLoadError, setHasLoadError] = useState(false);
+  const [selectedRange, setSelectedRange] = useState<DashboardRange>('30d');
+  const [selectedAutoRefresh, setSelectedAutoRefresh] =
+    useState<AutoRefreshOption>(autoRefreshOptions[0]);
+  const [dashboardState, setDashboardState] = useState<{
+    contextKey: string;
+    data: ProjectDashboard;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [refreshError, setRefreshError] = useState(false);
+  const requestId = useRef(0);
+  const dashboardContextKey = useRef('');
+  const dashboardRef = useRef<{
+    contextKey: string;
+    data: ProjectDashboard;
+  } | null>(null);
+  const { authId, projectId, token } = useCurrentCredential();
+  const currentContextKey = `${projectId}:${selectedRange}`;
+  const isContextPending = dashboardContextKey.current !== currentContextKey;
+  const dashboard =
+    dashboardState?.contextKey === currentContextKey
+      ? dashboardState.data
+      : null;
 
-  const handleHeroAction = (action: DashboardHeroAction) => {
-    if (action.intent === 'createAssistant') {
-      navigation.goToCreateAssistant();
+  const fetchDashboard = useCallback(() => {
+    requestId.current += 1;
+    const currentRequestId = requestId.current;
+    const contextKey = `${projectId}:${selectedRange}`;
+    const isNewContext = dashboardContextKey.current !== contextKey;
+
+    if (isNewContext) {
+      dashboardContextKey.current = contextKey;
+      dashboardRef.current = null;
+      setDashboardState(null);
     }
-  };
+    if (isNewContext || !dashboardRef.current) setLoading(true);
+    setLoadError(false);
+    setRefreshError(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch(DASHBOARD_DESIGN_URL, { cache: 'no-store' })
+    if (!authId || !projectId || !token) {
+      setLoading(false);
+      setLoadError(true);
+      return;
+    }
+
+    const toDate = new Date();
+    getProjectDashboardRange({
+      fromDate: toTimestamp(getDashboardStartDate(selectedRange, toDate)),
+      toDate: toTimestamp(toDate),
+      assistantLimit: 3,
+      recentFailureLimit: 5,
+      auth: { projectId, token, userId: authId },
+    })
       .then(response => {
-        if (!response.ok) throw new Error('Unable to load dashboard design');
-        return response.json();
-      })
-      .then(data => {
-        if (!isDashboardDesign(data)) {
-          throw new Error('Invalid dashboard design');
-        }
-
-        if (!cancelled) {
-          setHasLoadError(false);
-          setDashboardDesign(data);
-        }
+        if (currentRequestId !== requestId.current) return;
+        const data = response.getData();
+        if (!response.getSuccess() || !data)
+          throw new Error('Dashboard response did not include data');
+        const nextDashboard = { contextKey, data };
+        dashboardRef.current = nextDashboard;
+        setDashboardState(nextDashboard);
       })
       .catch(() => {
-        if (!cancelled) setHasLoadError(true);
+        if (currentRequestId !== requestId.current) return;
+        if (dashboardRef.current?.contextKey === contextKey)
+          setRefreshError(true);
+        else setLoadError(true);
+      })
+      .finally(() => {
+        if (currentRequestId === requestId.current) setLoading(false);
       });
+  }, [authId, projectId, selectedRange, token]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
 
-  const isLoading = !dashboardDesign && !hasLoadError;
-  const featureSection = dashboardDesign?.sections.find(
-    section => section.layout === 'feature-grid',
+  useEffect(
+    () => () => {
+      requestId.current += 1;
+    },
+    [],
   );
-  const helpAndResourceSection = dashboardDesign?.sections.find(
-    section => section.layout === 'resource-grid',
+
+  useEffect(() => {
+    const minutes = Number(selectedAutoRefresh.id);
+    if (!minutes) return undefined;
+    const interval = window.setInterval(fetchDashboard, minutes * 60 * 1000);
+    return () => window.clearInterval(interval);
+  }, [fetchDashboard, selectedAutoRefresh]);
+
+  const selectedRangeOption = dashboardRangeOptions.find(
+    option => option.id === selectedRange,
   );
-
-  if (hasLoadError && !dashboardDesign) {
-    return (
-      <DashboardFrame>
-        <Tile className="min-h-[180px]! rounded-none! border! border-[#e0e0e0]! bg-white! p-6! dark:border-[#393939]! dark:bg-[#262626]!">
-          <h1 className="text-[1.75rem] font-semibold leading-tight tracking-normal">
-            Dashboard unavailable
-          </h1>
-          <p className="mt-4 max-w-[620px] text-sm leading-5 text-[#525252] dark:text-[#c6c6c6]">
-            The dashboard design could not be loaded.
-          </p>
-        </Tile>
-      </DashboardFrame>
-    );
-  }
-
-  const firstName =
-    user?.name?.trim().split(/\s+/)[0] || dashboardDesign?.welcome.fallbackName;
+  const analyticsSection = dashboard?.getAnalytics();
+  const analytics =
+    analyticsSection?.getState() ===
+    DashboardSectionState.DASHBOARD_SECTION_STATE_READY
+      ? analyticsSection.getData()
+      : undefined;
+  const usage = dashboard?.getUsage();
+  const isUsageReady =
+    usage?.getState() === DashboardSectionState.DASHBOARD_SECTION_STATE_READY;
+  const metrics = useMemo(
+    () => (analytics ? buildMetrics(analytics) : []),
+    [analytics],
+  );
+  const componentUsage = useMemo(
+    () => (usage && isUsageReady ? buildUsage(usage) : []),
+    [isUsageReady, usage],
+  );
 
   return (
-    <DashboardFrame>
-      <Title
-        isLoading={isLoading}
-        welcomePrefix={dashboardDesign?.welcome.prefix}
-        firstName={firstName}
-      />
-      <Hero
-        isLoading={isLoading}
-        hero={dashboardDesign?.hero}
-        onHeroAction={handleHeroAction}
-      />
+    <main
+      data-dashboard-page
+      className="min-h-0 flex-1 overflow-auto bg-[var(--cds-background)] text-[var(--cds-text-primary)]"
+    >
+      <div
+        data-dashboard-content
+        className="mx-auto grid max-w-[1584px] grid-cols-4 gap-x-4 px-4 py-6 md:grid-cols-8 md:px-8 lg:grid-cols-16"
+      >
+        <div className="col-span-full mb-6">
+          <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-[var(--cds-text-secondary)]">
+                  Dashboard
+                </p>
+                {dashboard?.getPartial() && (
+                  <Tag size="sm" type="warm-gray">
+                    Partial data
+                  </Tag>
+                )}
+              </div>
+              <h1 className="text-2xl font-semibold text-[var(--cds-text-primary)]">
+                Project overview
+              </h1>
+              <p className="mt-1 text-sm text-[var(--cds-text-secondary)]">
+                Monitor sessions, reliability, latency, and assistant health.
+              </p>
+            </div>
 
-      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
-        <main className="min-w-0">
-          <SectionCards isLoading={isLoading} section={featureSection} />
-          <HelpAndResource
-            isLoading={isLoading}
-            section={helpAndResourceSection}
-          />
-        </main>
-        <aside className="min-w-0">
-          <News isLoading={isLoading} news={dashboardDesign?.news} />
-        </aside>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Dropdown<DashboardRangeOption>
+                id="dashboard-range"
+                aria-label="Date range"
+                titleText=""
+                hideLabel
+                label="Date range"
+                items={dashboardRangeOptions}
+                selectedItem={selectedRangeOption}
+                itemToString={item => item?.text || ''}
+                onChange={({ selectedItem }) => {
+                  if (selectedItem) setSelectedRange(selectedItem.id);
+                }}
+                size="sm"
+                className="min-w-[160px]"
+              />
+              <Dropdown<AutoRefreshOption>
+                id="dashboard-auto-refresh"
+                aria-label="Auto-refresh"
+                titleText=""
+                hideLabel
+                label="Auto-refresh"
+                items={autoRefreshOptions}
+                selectedItem={selectedAutoRefresh}
+                itemToString={item => item?.text || ''}
+                onChange={({ selectedItem }) => {
+                  if (selectedItem) setSelectedAutoRefresh(selectedItem);
+                }}
+                size="sm"
+                className="min-w-[140px]"
+              />
+            </div>
+          </section>
+        </div>
+
+        {refreshError && !isContextPending && (
+          <div className="col-span-full mb-4">
+            <InlineNotification
+              kind="warning"
+              lowContrast
+              hideCloseButton
+              title="Refresh failed"
+              subtitle="Showing the last successfully loaded dashboard data."
+            />
+          </div>
+        )}
+
+        {(loading || isContextPending) && !dashboard ? (
+          <DashboardLoading />
+        ) : loadError && !dashboard ? (
+          <Tile className="col-span-full border! border-[var(--cds-border-subtle-01)]! p-0!">
+            <EmptyContent
+              title="Could not load project dashboard"
+              description="Check your connection and try loading the dashboard again."
+              action={
+                <Button
+                  kind="primary"
+                  size="sm"
+                  className="mt-6"
+                  renderIcon={Renew}
+                  onClick={fetchDashboard}
+                >
+                  Try again
+                </Button>
+              }
+            />
+          </Tile>
+        ) : dashboard ? (
+          <>
+            {analytics ? (
+              <>
+                <div
+                  data-dashboard-kpi-strip
+                  className="col-span-full grid grid-cols-1 gap-px border border-[var(--cds-border-subtle-01)] bg-[var(--cds-border-subtle-01)] md:grid-cols-2 xl:grid-cols-4"
+                >
+                  {metrics.map(metric => (
+                    <MetricCard key={metric.label} metric={metric} />
+                  ))}
+                </div>
+
+                <div className="col-span-full mb-6 grid border-x border-b border-[var(--cds-border-subtle-01)] lg:grid-cols-16">
+                  <div className="min-w-0 lg:col-span-11">
+                    <ActivityPanel
+                      analytics={analytics}
+                      range={selectedRange}
+                      rangeLabel={
+                        selectedRangeOption?.text || 'the selected period'
+                      }
+                    />
+                  </div>
+                  <div className="border-t border-[var(--cds-border-subtle-01)] lg:col-span-5 lg:border-t-0">
+                    <HealthPanel analytics={analytics} />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="col-span-full mb-6">
+                <StatePanel
+                  title="Analytics"
+                  subtitle="Sessions, reliability, and assistant health"
+                  state={
+                    analyticsSection?.getState() ||
+                    DashboardSectionState.DASHBOARD_SECTION_STATE_UNAVAILABLE
+                  }
+                />
+              </div>
+            )}
+
+            <div className="col-span-full mb-6 min-w-0 xl:col-span-8">
+              {usage && isUsageReady ? (
+                <BreakdownPanel
+                  title="Component usage"
+                  subtitle="Processing time used by voice and AI components"
+                  values={componentUsage}
+                />
+              ) : (
+                <StatePanel
+                  title="Component usage"
+                  subtitle="Processing time used by voice and AI components"
+                  state={
+                    usage?.getState() ||
+                    DashboardSectionState.DASHBOARD_SECTION_STATE_UNAVAILABLE
+                  }
+                />
+              )}
+            </div>
+
+            <div className="col-span-full mb-6 min-w-0 xl:col-span-8">
+              {analytics ? (
+                <RecentFailuresTable
+                  failures={analytics.getRecentfailuresList()}
+                />
+              ) : (
+                <StatePanel
+                  title="Recent failures"
+                  subtitle="Latest sessions that need investigation"
+                  state={
+                    analyticsSection?.getState() ||
+                    DashboardSectionState.DASHBOARD_SECTION_STATE_UNAVAILABLE
+                  }
+                />
+              )}
+            </div>
+
+            {analytics && (
+              <div className="col-span-full mb-6">
+                <AssistantsTable analytics={analytics} />
+              </div>
+            )}
+          </>
+        ) : null}
       </div>
-    </DashboardFrame>
+    </main>
   );
 };

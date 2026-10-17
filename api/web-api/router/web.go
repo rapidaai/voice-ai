@@ -5,6 +5,7 @@ import (
 	"google.golang.org/grpc"
 
 	webApi "github.com/rapidaai/api/web-api/api"
+	webDashboardApi "github.com/rapidaai/api/web-api/api/dashboard"
 	webProxyApi "github.com/rapidaai/api/web-api/api/proxy"
 	"github.com/rapidaai/api/web-api/config"
 	"github.com/rapidaai/pkg/commons"
@@ -53,6 +54,7 @@ func WebApiRoute(
 	protos.RegisterConnectServiceServer(S, webApi.NewConnectGRPC(Cfg, &Cfg.OAuthConfig, Logger, Postgres))
 	protos.RegisterNotificationServiceServer(S, webApi.NewNotificationGRPC(Cfg, Logger, Postgres, Redis))
 	protos.RegisterProductUsageServiceServer(S, webApi.NewProductUsageGRPC(Logger, Postgres))
+	protos.RegisterDashboardServiceServer(S, webDashboardApi.NewDashboardGRPC(Cfg, Logger, Postgres, Redis))
 }
 
 func ProxyApiRoute(Cfg *config.WebAppConfig,

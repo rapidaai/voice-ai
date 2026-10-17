@@ -25,7 +25,7 @@ type webProductUsageGRPCApi struct {
 func NewProductUsageGRPC(logger commons.Logger, postgres connectors.PostgresConnector) protos.ProductUsageServiceServer {
 	return &webProductUsageGRPCApi{
 		logger:              logger,
-		productUsageService: internal_productusage_service.NewProductUsageService(postgres),
+		productUsageService: internal_productusage_service.NewProductUsageService(postgres, logger),
 	}
 }
 

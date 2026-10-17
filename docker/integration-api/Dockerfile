@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # Build stage
 FROM rapidaai/rapida-golang:1.25.13-alpine AS builder
+ENV GOTOOLCHAIN=auto
 
 WORKDIR /app
 

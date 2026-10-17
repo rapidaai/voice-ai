@@ -1,212 +1,414 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-import { HomePage } from '@/app/pages/main/web-dashboard';
+import {
+  DashboardAssistantHealth,
+  DashboardFailureCode,
+  DashboardSectionState,
+  DashboardUsageComponent,
+} from '@rapidaai/react';
 
-const mockGoToCreateAssistant = jest.fn();
-const dashboardDesign = {
-  welcome: {
-    prefix: 'Welcome',
-    fallbackName: 'Prashant',
-  },
-  hero: {
-    title: 'Product Highlight: Voice AI Assistants',
-    description:
-      'Design, ground, deploy, and monitor real-time AI assistants across voice, web, API, and debugger channels from one workspace.',
-    actions: [
-      {
-        label: 'Create first voice agent',
-        kind: 'primary',
-        intent: 'createAssistant',
-      },
-      {
-        label: 'Talk to us',
-        kind: 'secondary',
-        href: 'https://cal.com/prashant-srivastav-u8duzh/30min',
-        external: true,
-      },
-    ],
-  },
-  sections: [
-    {
-      title: 'Explore Features',
-      layout: 'feature-grid',
-      cards: [
-        {
-          title: 'AI Assistants',
-          description:
-            'Build branded voice agents with prompts, tools, guardrails, and versioned provider configuration.',
-          action: 'Create assistant',
-          href: '/deployment/assistant/create-assistant',
-        },
-        {
-          title: 'Deployments',
-          description:
-            'Publish assistants to phone calls, web widgets, API endpoints, and debugger environments.',
-          action: 'Manage deployments',
-          href: '/deployment/assistant',
-        },
-        {
-          title: 'Connect your provider',
-          description:
-            'Connect LLM, speech-to-text, text-to-speech, storage, telemetry, and credential providers.',
-          action: 'Manage providers',
-          href: '/integration/models',
-        },
-      ],
-    },
-    {
-      title: 'Help and Resources',
-      layout: 'resource-grid',
-      cards: [
-        {
-          title: 'Documentation',
-          description:
-            'Explore product guides, API references, and setup docs for building with Rapida Voice AI.',
-          action: 'View docs',
-          href: 'https://doc.rapida.ai/',
-          external: true,
-        },
-        {
-          title: 'GitHub repository',
-          description:
-            'Review the open-source Voice AI repository, SDKs, examples, and implementation references.',
-          action: 'Open GitHub',
-          href: 'https://github.com/rapidaai/voice-ai',
-          external: true,
-        },
-        {
-          title: 'Pricing',
-          description:
-            'Compare plans and usage options for assistants, telephony, deployments, and platform features.',
-          action: 'View pricing',
-          href: 'https://www.rapida.ai/pricing',
-          external: true,
-        },
-      ],
-    },
-  ],
-  news: {
-    title: "What's new",
-    readMoreHref: '/observability/conversation',
-    items: [
-      {
-        date: '5/21/2026',
-        title: 'AgentKit and WebSocket assistant templates are ready',
-        description:
-          'Start from an AgentKit or WebSocket template, then configure model providers, tools, and deployment channels from one flow.',
-      },
-      {
-        date: '5/18/2026',
-        title: 'Conversation telemetry now links messages to traces',
-        description:
-          'Open a conversation message and inspect latency, tool calls, provider events, and execution metadata without leaving observability.',
-      },
-      {
-        date: '5/18/2026',
-        title: 'Knowledge connectors support cloud document sources',
-        description:
-          'Connect Google Drive, OneDrive, SharePoint, Confluence, GitHub, and Notion sources to keep assistant knowledge current.',
-      },
-    ],
-  },
+import {
+  dashboardActivityLabel,
+  formatDashboardDuration,
+  getDashboardStartDate,
+  HomePage,
+} from '@/app/pages/main/web-dashboard';
+import { getProjectDashboardRange } from '@/clients/dashboard.client';
+
+jest.mock('@/clients/dashboard.client', () => ({
+  getProjectDashboardRange: jest.fn(),
+}));
+
+let mockCurrentCredential = {
+  authId: 'user-1',
+  projectId: 'project-1',
+  token: 'token-1',
 };
 
 jest.mock('@/hooks/use-credential', () => ({
-  useCurrentCredential: () => ({ user: { id: 'user-1', name: 'Prashant' } }),
+  useCurrentCredential: () => mockCurrentCredential,
 }));
 
-jest.mock('@/hooks/use-global-navigator', () => ({
-  useGlobalNavigation: () => ({
-    goToCreateAssistant: mockGoToCreateAssistant,
-  }),
-}));
+const mockGetProjectDashboardRange =
+  getProjectDashboardRange as jest.MockedFunction<
+    typeof getProjectDashboardRange
+  >;
 
-jest.mock('@carbon/react', () => ({
-  Button: ({
-    children,
-    href,
-    onClick,
-    className,
-    renderIcon,
-    iconDescription,
-    hasIconOnly,
-    ...props
-  }: any) =>
-    href ? (
-      <a href={href} className={className} {...props}>
-        {children}
-      </a>
-    ) : (
-      <button onClick={onClick} className={className} {...props}>
-        {children}
-      </button>
-    ),
-  Link: ({ children, href, className, ...props }: any) => (
-    <a href={href} className={className} {...props}>
-      {children}
-    </a>
-  ),
-  Tile: ({ children, className }: any) => (
-    <section className={className}>{children}</section>
-  ),
-  SkeletonText: ({ className }: any) => <div className={className} />,
-  SkeletonPlaceholder: ({ className }: any) => <div className={className} />,
-}));
+const timestamp = (value: string) => ({
+  toDate: () => new Date(value),
+});
+
+const comparison = (value: number, change: number) => ({
+  getValue: () => value,
+  getPreviousvalue: () => value - change,
+  hasChangepercent: () => true,
+  getChangepercent: () => change,
+});
+
+function dashboardResponse({
+  sessions = 12486,
+  analyticsState = DashboardSectionState.DASHBOARD_SECTION_STATE_READY,
+  usageState = DashboardSectionState.DASHBOARD_SECTION_STATE_READY,
+  partial = false,
+  failureDurationMs = 94000,
+}: {
+  sessions?: number;
+  analyticsState?: number;
+  usageState?: number;
+  partial?: boolean;
+  failureDurationMs?: number;
+} = {}) {
+  const analytics = {
+    getProjectstate: () => ({
+      getAssistantcount: () => 3,
+      getHasassistants: () => true,
+      getHasactivity: () => true,
+    }),
+    getSummary: () => ({
+      getSessions: () => comparison(sessions, 14.2),
+      getSuccessrate: () => ({
+        hasValuepercent: () => true,
+        getValuepercent: () => 94.8,
+        hasChangepoints: () => true,
+        getChangepoints: () => 2.1,
+      }),
+      getResponselatency: () => ({
+        hasValuems: () => true,
+        getValuems: () => 684,
+        hasChangems: () => true,
+        getChangems: () => -58,
+      }),
+      getFailedsessions: () => ({
+        getValue: () => 649,
+        hasSharepercent: () => true,
+        getSharepercent: () => 5.2,
+      }),
+    }),
+    getActivityList: () => [
+      {
+        getFromdate: () => timestamp('2026-10-16T00:00:00Z'),
+        getSessions: () => 428,
+        getFailedsessions: () => 18,
+      },
+      {
+        getFromdate: () => timestamp('2026-10-17T00:00:00Z'),
+        getSessions: () => 486,
+        getFailedsessions: () => 21,
+      },
+    ],
+    getHealth: () => ({
+      getFailedsessions: () => 649,
+      getSlowsessions: () => 27,
+      getSlowsessionthresholdms: () => 1000,
+      getHealthyassistants: () => 1,
+      getWatchassistants: () => 1,
+      getNeedsattentionassistants: () => 1,
+      getNodataassistants: () => 0,
+    }),
+    getAssistantsList: () => [
+      {
+        getAssistantid: () => 'assistant-1',
+        getName: () => 'Support bot',
+        getSessions: () => 5392,
+        hasSuccessratepercent: () => true,
+        getSuccessratepercent: () => 97.2,
+        hasResponselatencyms: () => true,
+        getResponselatencyms: () => 612,
+        getLastactivityat: () => timestamp('2026-10-17T08:28:00Z'),
+        getHealth: () =>
+          DashboardAssistantHealth.DASHBOARD_ASSISTANT_HEALTH_HEALTHY,
+      },
+    ],
+    getRecentfailuresList: () => [
+      {
+        getConversationid: () => 'conversation-1',
+        getAssistantid: () => 'assistant-1',
+        getAssistantname: () => 'Support bot',
+        getOccurredat: () => timestamp('2026-10-17T08:25:00Z'),
+        getChannel: () => 'Phone',
+        getDurationms: () => failureDurationMs,
+        getFailurecode: () =>
+          DashboardFailureCode.DASHBOARD_FAILURE_CODE_PROVIDER,
+      },
+    ],
+  };
+
+  const dashboard = {
+    getPartial: () => partial,
+    getAnalytics: () => ({
+      getState: () => analyticsState,
+      getData: () =>
+        analyticsState === DashboardSectionState.DASHBOARD_SECTION_STATE_READY
+          ? analytics
+          : undefined,
+    }),
+    getUsage: () => ({
+      getState: () => usageState,
+      getComponentsList: () => [
+        {
+          getComponent: () =>
+            DashboardUsageComponent.DASHBOARD_USAGE_COMPONENT_STT,
+          getDurationms: () => 7200000,
+        },
+        {
+          getComponent: () =>
+            DashboardUsageComponent.DASHBOARD_USAGE_COMPONENT_LLM,
+          getDurationms: () => 5400000,
+        },
+      ],
+    }),
+  };
+
+  return {
+    getSuccess: () => true,
+    getData: () => dashboard,
+  } as never;
+}
 
 describe('Dashboard HomePage', () => {
+  beforeAll(() => {
+    Element.prototype.scrollIntoView = jest.fn();
+  });
+
+  afterAll(() => {
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
-    global.fetch = jest.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(dashboardDesign),
-      }),
-    ) as jest.Mock;
+    mockCurrentCredential = {
+      authId: 'user-1',
+      projectId: 'project-1',
+      token: 'token-1',
+    };
+    mockGetProjectDashboardRange.mockResolvedValue(dashboardResponse());
   });
 
-  it('renders the welcome dashboard structure from the hosted design', async () => {
-    render(<HomePage />);
-
-    await waitFor(() =>
-      expect(
-        screen.getByRole('heading', { name: 'Welcome, Prashant!' }),
-      ).toBeInTheDocument(),
-    );
+  it('renders the project dashboard from the public dashboard API', async () => {
+    const { container } = render(<HomePage />);
 
     expect(
-      screen.getByText('Product Highlight: Voice AI Assistants'),
+      screen.getByRole('heading', { name: 'Project overview' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Explore Features')).toBeInTheDocument();
-    expect(screen.getByText('AI Assistants')).toBeInTheDocument();
-    expect(screen.getByText('Deployments')).toBeInTheDocument();
-    expect(screen.getByText('Connect your provider')).toBeInTheDocument();
-    expect(screen.getByText('Help and Resources')).toBeInTheDocument();
-    expect(screen.getByText('Documentation')).toBeInTheDocument();
-    expect(screen.getByText('GitHub repository')).toBeInTheDocument();
-    expect(screen.getByText('Pricing')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Talk to us' })).toHaveAttribute(
-      'href',
-      'https://cal.com/prashant-srivastav-u8duzh/30min',
+    expect(await screen.findByText('12,486')).toBeInTheDocument();
+    expect(screen.getByText('94.8%')).toBeInTheDocument();
+    expect(screen.getByText('Component usage')).toBeInTheDocument();
+    expect(screen.getByText('Recent failures')).toBeInTheDocument();
+    expect(screen.getByText('Top assistants')).toBeInTheDocument();
+    expect(screen.getByText('Healthy')).toBeInTheDocument();
+    const supportLinks = screen.getAllByRole('link', { name: 'Support bot' });
+    expect(supportLinks.map(link => link.getAttribute('href'))).toEqual(
+      expect.arrayContaining([
+        '/deployment/assistant/assistant-1',
+        '/deployment/assistant/assistant-1/sessions/conversation-1',
+      ]),
     );
-    expect(screen.getByText("What's new")).toBeInTheDocument();
-    expect(screen.getAllByText(/Read more/i)).toHaveLength(3);
+    expect(screen.queryByText('Sample data')).not.toBeInTheDocument();
+    expect(container.querySelectorAll('[data-dashboard-kpi]')).toHaveLength(4);
+    expect(container.querySelectorAll('[data-dashboard-bar]')).toHaveLength(2);
+    expect(mockGetProjectDashboardRange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assistantLimit: 3,
+        recentFailureLimit: 5,
+        auth: {
+          projectId: 'project-1',
+          token: 'token-1',
+          userId: 'user-1',
+        },
+      }),
+    );
   });
 
-  it('keeps the banner create action wired to assistant creation', async () => {
+  it('shows a layout skeleton while the first request is pending', () => {
+    mockGetProjectDashboardRange.mockReturnValue(new Promise(() => {}));
+
     render(<HomePage />);
 
-    await waitFor(() =>
-      expect(
-        screen.getByRole('button', { name: 'Create first voice agent' }),
-      ).toBeInTheDocument(),
+    expect(
+      screen.getByRole('status', { name: 'Loading project dashboard' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Top assistants')).not.toBeInTheDocument();
+  });
+
+  it('shows a retry action when the initial request fails', async () => {
+    mockGetProjectDashboardRange
+      .mockRejectedValueOnce(new Error('unavailable'))
+      .mockResolvedValueOnce(dashboardResponse());
+
+    render(<HomePage />);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Could not load project dashboard',
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByText('12,486')).toBeInTheDocument();
+    expect(mockGetProjectDashboardRange).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders the available section when the response is partial', async () => {
+    mockGetProjectDashboardRange.mockResolvedValue(
+      dashboardResponse({
+        analyticsState:
+          DashboardSectionState.DASHBOARD_SECTION_STATE_UNAVAILABLE,
+        partial: true,
+      }),
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Create first voice agent' }),
+    render(<HomePage />);
+
+    expect(await screen.findByText('Component usage')).toBeInTheDocument();
+    expect(screen.getByText('Analytics are unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Partial data')).toBeInTheDocument();
+  });
+
+  it('keeps analytics visible when usage is unavailable', async () => {
+    mockGetProjectDashboardRange.mockResolvedValue(
+      dashboardResponse({
+        usageState: DashboardSectionState.DASHBOARD_SECTION_STATE_UNAVAILABLE,
+        partial: true,
+      }),
     );
 
-    expect(mockGoToCreateAssistant).toHaveBeenCalledTimes(1);
+    render(<HomePage />);
+
+    expect(await screen.findByText('12,486')).toBeInTheDocument();
+    expect(
+      screen.getByText('Component usage is unavailable'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Top assistants')).toBeInTheDocument();
+  });
+
+  it('renders explicit empty states for an inactive project', async () => {
+    mockGetProjectDashboardRange.mockResolvedValue(
+      dashboardResponse({
+        analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+        usageState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+      }),
+    );
+
+    render(<HomePage />);
+
+    expect(await screen.findByText('No analytics yet')).toBeInTheDocument();
+    expect(screen.getByText('No component usage yet')).toBeInTheDocument();
+    expect(screen.getByText('No recent failures yet')).toBeInTheDocument();
+  });
+
+  it('ignores a stale response after the date range changes', async () => {
+    let resolveFirst: (value: never) => void = () => undefined;
+    const firstRequest = new Promise<never>(resolve => {
+      resolveFirst = resolve;
+    });
+    mockGetProjectDashboardRange
+      .mockReturnValueOnce(firstRequest)
+      .mockResolvedValueOnce(dashboardResponse({ sessions: 3248 }));
+
+    render(<HomePage />);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Date range' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Last 7 days' }));
+
+    expect(await screen.findByText('3,248')).toBeInTheDocument();
+    await act(async () => {
+      resolveFirst(dashboardResponse({ sessions: 12486 }));
+      await firstRequest;
+    });
+    expect(screen.getByText('3,248')).toBeInTheDocument();
+    expect(screen.queryByText('12,486')).not.toBeInTheDocument();
+  });
+
+  it('hides old project data before the next project request completes', async () => {
+    const { rerender } = render(<HomePage />);
+    expect(await screen.findByText('12,486')).toBeInTheDocument();
+
+    let resolveNext: (value: never) => void = () => undefined;
+    const nextRequest = new Promise<never>(resolve => {
+      resolveNext = resolve;
+    });
+    mockGetProjectDashboardRange.mockReturnValueOnce(nextRequest);
+    mockCurrentCredential = {
+      authId: 'user-1',
+      projectId: 'project-2',
+      token: 'token-2',
+    };
+
+    rerender(<HomePage />);
+
+    expect(screen.queryByText('12,486')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('status', { name: 'Loading project dashboard' }),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      resolveNext(dashboardResponse({ sessions: 212 }));
+      await nextRequest;
+    });
+    expect(await screen.findByText('212')).toBeInTheDocument();
+  });
+
+  it('formats exact ranges, bucket labels, and duration carry correctly', () => {
+    const endDate = new Date('2026-03-08T12:00:00-04:00');
+    expect(
+      endDate.getTime() - getDashboardStartDate('24h', endDate).getTime(),
+    ).toBe(24 * 60 * 60 * 1000);
+    expect(
+      endDate.getTime() - getDashboardStartDate('7d', endDate).getTime(),
+    ).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(formatDashboardDuration(7_180_000)).toBe('2 hr');
+
+    const firstBucket = timestamp('2026-10-17T08:00:00Z') as never;
+    const secondBucket = timestamp('2026-10-17T08:30:00Z') as never;
+    expect(dashboardActivityLabel(firstBucket, '24h')).not.toBe(
+      dashboardActivityLabel(secondBucket, '24h'),
+    );
+    expect(dashboardActivityLabel(firstBucket, '7d')).not.toBe(
+      dashboardActivityLabel(timestamp('2026-10-17T12:00:00Z') as never, '7d'),
+    );
+  });
+
+  it('keeps the last dashboard when an automatic refresh fails', async () => {
+    let refresh: TimerHandler = () => undefined;
+    const interval = jest
+      .spyOn(window, 'setInterval')
+      .mockImplementation(handler => {
+        refresh = handler;
+        return 1 as unknown as ReturnType<typeof window.setInterval>;
+      });
+
+    render(<HomePage />);
+    expect(await screen.findByText('12,486')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Auto-refresh' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Every 5 min' }));
+    mockGetProjectDashboardRange.mockRejectedValueOnce(
+      new Error('refresh unavailable'),
+    );
+
+    await act(async () => {
+      if (typeof refresh === 'function') await refresh();
+    });
+
+    expect(await screen.findByText('Refresh failed')).toBeInTheDocument();
+    expect(screen.getByText('12,486')).toBeInTheDocument();
+    interval.mockRestore();
+  });
+
+  it('provides accessible chart and table descriptions', async () => {
+    render(<HomePage />);
+
+    expect(
+      await screen.findByRole('img', {
+        name: 'Conversation activity showing 12,486 sessions and 649 failures over Last 30 days',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('table', { name: 'Recent failures' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('table', { name: 'Top assistants' }),
+    ).toBeInTheDocument();
   });
 });

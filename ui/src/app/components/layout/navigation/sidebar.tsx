@@ -23,7 +23,7 @@ export function SidebarNavigation() {
   const isLoading = loading && loadingType === 'block';
 
   return (
-    <Aside className="relative shrink-0 flex flex-col">
+    <Aside className="shrink-0 flex flex-col">
       <div
         className={cn(
           'h-12 flex shrink-0 items-center border-b border-border-subtle px-3',

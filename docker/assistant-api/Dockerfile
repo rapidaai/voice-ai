@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
 FROM rapidaai/rapida-golang:1.25.13-bookworm@sha256:9199ed993f2b4d10f44d265d85436fbad0015031107f27e50c538a60df3ead8d AS native-toolchain
+ENV GOTOOLCHAIN=auto
 
 WORKDIR /app
 

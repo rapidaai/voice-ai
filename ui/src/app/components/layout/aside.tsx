@@ -30,9 +30,11 @@ export function Aside({
         'flex flex-col shrink-0 z-12',
         'bg-shell text-foreground',
         'border-r border-border-subtle',
-        'no-scrollbar overflow-y-auto',
+        'no-scrollbar overflow-y-auto overflow-x-hidden',
         'group',
-        open ? 'w-64' : 'w-12',
+        open
+          ? 'absolute inset-y-0 left-0 w-64 shadow-lg md:relative md:inset-auto md:shadow-none'
+          : 'relative w-12',
         'h-full transition-[width] duration-200 ease-in-out',
         className,
       )}

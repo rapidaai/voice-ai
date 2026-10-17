@@ -9,10 +9,12 @@ import (
 	"time"
 
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
+	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
+	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -27,14 +29,16 @@ type Service interface {
 	CreateProductUsage(context.Context, *types.Authentication, *protos.CreateProductUsageRequest) (*internal_entity.ProductUsage, error)
 	GetProductUsages(context.Context, *types.Authentication, string, []*protos.Criteria, *protos.Paginate) (int64, []*internal_entity.ProductUsage, error)
 	GetOrganizationUsages(context.Context, *types.Authentication, []*protos.Criteria, *protos.Paginate) (int64, []*internal_entity.ProductUsage, error)
+	GetDashboardUsage(context.Context, *types.Authentication, time.Time, time.Time) (*protos.DashboardUsageSection, error)
 }
 
 type productUsageService struct {
 	postgres connectors.PostgresConnector
+	logger   commons.Logger
 }
 
-func NewProductUsageService(postgres connectors.PostgresConnector) Service {
-	return &productUsageService{postgres: postgres}
+func NewProductUsageService(postgres connectors.PostgresConnector, logger commons.Logger) Service {
+	return &productUsageService{postgres: postgres, logger: logger}
 }
 
 func (service *productUsageService) CreateProductUsage(ctx context.Context, auth *types.Authentication, input *protos.CreateProductUsageRequest) (*internal_entity.ProductUsage, error) {
@@ -269,6 +273,84 @@ func (service *productUsageService) GetOrganizationUsages(ctx context.Context, a
 		return count, nil, result.Error
 	}
 	return count, usages, nil
+}
+
+func (service *productUsageService) GetDashboardUsage(ctx context.Context, auth *types.Authentication, fromDate, toDate time.Time) (*protos.DashboardUsageSection, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrProjectMismatch, err)
+	}
+	if !fromDate.Before(toDate) {
+		return nil, fmt.Errorf("%w: dashboard range must have positive duration", ErrInvalidRequest)
+	}
+
+	type usageTotal struct {
+		UsageType string
+		Total     int64
+	}
+	var totals []usageTotal
+	if err = service.postgres.DB(ctx).
+		Model(&internal_entity.ProductUsage{}).
+		Select("usage_type, SUM(usages) AS total").
+		Where(
+			"organization_id = ? AND project_id = ? AND status = ? AND unit = ? AND occurred_at >= ? AND occurred_at < ?",
+			projectContext.OrganizationID,
+			projectContext.ProjectID,
+			type_enums.RECORD_ACTIVE,
+			types.ProductUsageUnitNanosecond,
+			fromDate.UTC(),
+			toDate.UTC(),
+		).
+		Group("usage_type").
+		Scan(&totals).Error; err != nil {
+		return nil, err
+	}
+
+	components := []struct {
+		usageType string
+		component protos.DashboardUsageComponent
+	}{
+		{string(types.ProductUsageSTTDuration), protos.DashboardUsageComponent_DASHBOARD_USAGE_COMPONENT_STT},
+		{string(types.ProductUsageTTSDuration), protos.DashboardUsageComponent_DASHBOARD_USAGE_COMPONENT_TTS},
+		{string(types.ProductUsageLLMDuration), protos.DashboardUsageComponent_DASHBOARD_USAGE_COMPONENT_LLM},
+		{string(types.ProductUsageVADDuration), protos.DashboardUsageComponent_DASHBOARD_USAGE_COMPONENT_VAD},
+		{string(types.ProductUsageEOSDuration), protos.DashboardUsageComponent_DASHBOARD_USAGE_COMPONENT_EOS},
+		{string(types.ProductUsageDenoiseDuration), protos.DashboardUsageComponent_DASHBOARD_USAGE_COMPONENT_DENOISING},
+	}
+	supportedTypes := make(map[string]struct{}, len(components))
+	for _, definition := range components {
+		supportedTypes[definition.usageType] = struct{}{}
+	}
+	totalByType := make(map[string]int64, len(totals))
+	for _, total := range totals {
+		if _, ok := supportedTypes[total.UsageType]; !ok {
+			if service.logger != nil {
+				service.logger.Warnf("ignoring unsupported dashboard product usage type %q", total.UsageType)
+			}
+			continue
+		}
+		totalByType[total.UsageType] = total.Total
+	}
+	if len(totalByType) == 0 {
+		return &protos.DashboardUsageSection{State: protos.DashboardSectionState_DASHBOARD_SECTION_STATE_EMPTY}, nil
+	}
+
+	section := &protos.DashboardUsageSection{State: protos.DashboardSectionState_DASHBOARD_SECTION_STATE_READY}
+	for _, definition := range components {
+		nanoseconds := totalByType[definition.usageType]
+		if nanoseconds < 0 {
+			nanoseconds = 0
+		}
+		durationMilliseconds, err := utils.Int64ToUint64(nanoseconds / int64(time.Millisecond))
+		if err != nil {
+			return nil, fmt.Errorf("convert %s dashboard usage duration: %w", definition.usageType, err)
+		}
+		section.Components = append(section.Components, &protos.DashboardComponentUsage{
+			Component:  definition.component,
+			DurationMs: durationMilliseconds,
+		})
+	}
+	return section, nil
 }
 
 func buildProductUsage(auth *types.Authentication, projectContext types.ProjectContext, input *protos.CreateProductUsageRequest) (internal_entity.ProductUsage, error) {

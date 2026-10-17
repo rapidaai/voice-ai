@@ -69,7 +69,7 @@ func newProductUsageServiceTest(t *testing.T) (Service, *gorm.DB) {
 		(101, 10, 'ACTIVE'),
 		(200, 20, 'ACTIVE'),
 		(300, 10, 'ARCHIEVE')`).Error)
-	return NewProductUsageService(&productUsageTestPostgres{db: database}), database
+	return NewProductUsageService(&productUsageTestPostgres{db: database}, nil), database
 }
 
 func productUsageAuth(authType types.AuthType, organizationID, projectID, actorID uint64) *types.Authentication {
@@ -118,6 +118,37 @@ func insertProductUsage(t *testing.T, database *gorm.DB, organizationID, project
 	}
 	require.NoError(t, database.Create(&usage).Error)
 	return usage
+}
+
+func TestGetDashboardUsageScopesRangeAndTenant(t *testing.T) {
+	service, database := newProductUsageServiceTest(t)
+	fromDate := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	toDate := fromDate.Add(24 * time.Hour)
+	insertProductUsage(t, database, 10, 100, string(types.ProductUsageSTTDuration), int64(2*time.Second), fromDate)
+	insertProductUsage(t, database, 10, 100, string(types.ProductUsageSTTDuration), int64(500*time.Millisecond), toDate.Add(-time.Second))
+	insertProductUsage(t, database, 10, 101, string(types.ProductUsageSTTDuration), int64(9*time.Second), fromDate)
+	insertProductUsage(t, database, 20, 200, string(types.ProductUsageSTTDuration), int64(9*time.Second), fromDate)
+	insertProductUsage(t, database, 10, 100, string(types.ProductUsageSTTDuration), int64(9*time.Second), toDate)
+
+	section, err := service.GetDashboardUsage(context.Background(), productUsageAuth(types.AuthTypeProject, 10, 100, 100), fromDate, toDate)
+	require.NoError(t, err)
+	require.Equal(t, protos.DashboardSectionState_DASHBOARD_SECTION_STATE_READY, section.GetState())
+	require.Len(t, section.GetComponents(), 6)
+	require.Equal(t, uint64(2500), section.GetComponents()[0].GetDurationMs())
+}
+
+func TestGetDashboardUsageReturnsEmptyAndRejectsInvalidRange(t *testing.T) {
+	service, database := newProductUsageServiceTest(t)
+	fromDate := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	auth := productUsageAuth(types.AuthTypeProject, 10, 100, 100)
+	insertProductUsage(t, database, 10, 100, "unsupported_duration", int64(time.Second), fromDate)
+
+	section, err := service.GetDashboardUsage(context.Background(), auth, fromDate, fromDate.Add(time.Hour))
+	require.NoError(t, err)
+	require.Equal(t, protos.DashboardSectionState_DASHBOARD_SECTION_STATE_EMPTY, section.GetState())
+
+	_, err = service.GetDashboardUsage(context.Background(), auth, fromDate, fromDate)
+	require.ErrorIs(t, err, ErrInvalidRequest)
 }
 
 func TestCreateProductUsageGeneratesIDAndAllowsRepeatedEvents(t *testing.T) {

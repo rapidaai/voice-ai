@@ -112,7 +112,7 @@
     "@popperjs/core": "2.11.8",
     "@protobuf-ts/plugin": "2.9.4",
     "@protobuf-ts/runtime": "2.9.4",
-    "@rapidaai/react": "1.1.88",
+    "@rapidaai/react": "1.1.90",
     "@sentry/react": "7.101.1",
     "@tailwindcss/cli": "4.2.1",
     "@tailwindcss/postcss": "4.2.1",
