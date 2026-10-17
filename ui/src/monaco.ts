@@ -1,5 +1,6 @@
 import { loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
+import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/basic-languages/html/html.contribution';
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution';
 import 'monaco-editor/esm/vs/basic-languages/twig/twig.contribution';

@@ -132,7 +132,13 @@ describe('PromptEditor', () => {
     expect(editor).toHaveAttribute('data-height', '320px');
     expect(editor).toHaveAttribute('data-theme', 'vs');
     expect(editor).toHaveAttribute('data-readonly', 'true');
+    expect(editor).toHaveClass('prompt-editor');
     expect(editor).toHaveClass('prompt-shell');
+    expect(mockEditorProps.options.fontFamily).toBe(
+      "'IBM Plex Sans', sans-serif",
+    );
+    expect(mockEditorProps.options.lineDecorationsWidth).toBe(8);
+    expect(mockEditorProps.options.padding).toEqual({ top: 8, bottom: 8 });
     expect(mockEditor.setValue).toHaveBeenCalledWith('Hello');
 
     fireEvent.change(editor, { target: { value: 'Updated' } });
@@ -231,7 +237,7 @@ describe('PromptEditor', () => {
 
     const domNode = widget.getDomNode();
     expect(domNode.innerText).toBe('Write a prompt');
-    expect(domNode).toHaveStyle({ color: 'var(--cds-text-secondary)' });
+    expect(domNode).toHaveClass('prompt-editor-placeholder');
     expect(widget.getDomNode()).toBe(domNode);
 
     domNode.click();

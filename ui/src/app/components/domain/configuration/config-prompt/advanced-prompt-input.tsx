@@ -68,7 +68,7 @@ function AdvancedPromptInput({
           'bg-light-background dark:bg-gray-950',
           isFocus && 'border-primary',
           'after:content-[""] after:absolute after:inset-0 after:pointer-events-none after:z-[1]',
-          'after:outline-solid after:outline-[1.5px] after:outline-transparent after:outline-offset-[-1.5px]',
+          'after:outline-solid after:outline-2 after:outline-transparent after:outline-offset-[-2px]',
           'focus-within:after:outline-primary',
           isFocus && 'after:outline-primary!',
           isExpand ? 'h-full z-50' : '',
@@ -77,8 +77,8 @@ function AdvancedPromptInput({
       >
         <div
           className={cn(
-            'flex items-stretch',
-            'border-b border-gray-300 dark:border-gray-700',
+            'flex h-10 items-stretch bg-[var(--cds-field)]',
+            'border-b border-[var(--cds-border-strong)]',
           )}
         >
           <div className="min-w-0 flex-1">
@@ -129,10 +129,7 @@ function AdvancedPromptInput({
         </div>
 
         <PromptEditor
-          className={cn(
-            'min-h-[200px]',
-            isExpand ? 'py-2 px-4 h-screen' : 'py-1 px-2',
-          )}
+          className={cn('min-h-[200px]', isExpand && 'h-screen')}
           placeholder={`Write your prompt here. enter {{variable}} to insert a variable.`}
           value={value}
           onFocus={setFocus}

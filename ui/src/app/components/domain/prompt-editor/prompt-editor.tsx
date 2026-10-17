@@ -1,12 +1,17 @@
 import { useEffect, useRef } from 'react';
 import Editor, { OnChange, OnMount } from '@monaco-editor/react';
 import { useTheme } from '@/theme/theme-provider';
+import { cn } from '@/utils';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import '@/monaco';
 import {
   extractPromptVariableQuery,
   getPromptVariableSuggestions,
 } from '@/app/components/domain/prompt-editor/suggestions';
+import {
+  MONACO_EDITOR_CONTENT_PADDING,
+  MONACO_EDITOR_VERTICAL_PADDING,
+} from '@/app/components/ui/editor/monaco-editor-spacing';
 
 export type PromptEditorProps = {
   value?: string;
@@ -133,7 +138,7 @@ const PromptEditor = ({
       width="100%"
       height={height}
       language="twig"
-      className={className}
+      className={cn('prompt-editor', className)}
       value={value}
       onMount={handleEditorDidMount}
       onChange={handleChange}
@@ -146,9 +151,11 @@ const PromptEditor = ({
         lineNumbers: 'off',
         tabSize: 2,
         fontSize: 15,
+        fontFamily: "'IBM Plex Sans', sans-serif",
         glyphMargin: false,
         folding: false,
-        lineDecorationsWidth: 0,
+        lineDecorationsWidth: MONACO_EDITOR_CONTENT_PADDING,
+        padding: MONACO_EDITOR_VERTICAL_PADDING,
         scrollbar: {
           vertical: 'hidden',
           horizontal: 'hidden',
@@ -189,8 +196,7 @@ class PlaceholderContentWidget {
     if (!this.domNode) {
       this.domNode = document.createElement('div');
       this.domNode.innerText = this.placeholder;
-      this.domNode.className = 'relative!';
-      this.domNode.style.color = 'var(--cds-text-secondary)';
+      this.domNode.className = 'prompt-editor-placeholder relative!';
       this.domNode.style.pointerEvents = 'auto';
       this.domNode.style.cursor = 'text';
       this.domNode.onclick = () => {

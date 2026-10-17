@@ -265,6 +265,56 @@ li::marker {
   display: none !important;
 }
 
+.prompt-editor .monaco-editor,
+.prompt-editor.monaco-editor {
+  outline: none;
+}
+
+.prompt-editor .suggest-widget,
+.prompt-editor .suggest-details {
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.prompt-editor-placeholder {
+  color: var(--cds-text-placeholder);
+}
+
+.json-editor-surface::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  pointer-events: none;
+  content: '';
+}
+
+.json-editor-surface:focus-within::after {
+  outline-color: var(--cds-focus);
+}
+
+.json-editor .monaco-editor,
+.json-editor.monaco-editor,
+.code-highlighting-editor .monaco-editor,
+.code-highlighting-editor.monaco-editor {
+  outline: none;
+}
+
+.json-editor .suggest-widget,
+.json-editor .suggest-details {
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.prompt-editor .margin,
+.json-editor .margin,
+.code-highlighting-editor .margin {
+  background: transparent !important;
+}
+
+.json-editor-placeholder {
+  color: var(--cds-text-placeholder);
+}
+
 .cm-editor {
   outline: none !important;
 }
@@ -361,6 +411,12 @@ li::marker {
 
 [data-color-mode='dark'] .monaco-editor .margin {
   background: var(--cds-background) !important;
+}
+
+[data-color-mode='dark'] .prompt-editor .margin,
+[data-color-mode='dark'] .json-editor .margin,
+[data-color-mode='dark'] .code-highlighting-editor .margin {
+  background: transparent !important;
 }
 
 [data-color-mode='dark'] .ͼ1 .cm-cursor,

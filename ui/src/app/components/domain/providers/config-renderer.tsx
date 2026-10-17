@@ -360,7 +360,7 @@ export function ConfigRenderer({
         return (
           <div className={cn(colSpanClass)} key={param.key}>
             <FieldLabelRow param={param} htmlFor={jsonId} />
-            <div className="mt-1 w-full min-w-0 overflow-hidden bg-[var(--cds-field)] border-b-2 border-b-[var(--cds-border-strong)] p-2">
+            <div className="mt-1 w-full min-w-0">
               {param.editor === 'websocket_dsl_json' ? (
                 <WebsocketDslEditor
                   provider={

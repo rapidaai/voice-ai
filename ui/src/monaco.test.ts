@@ -15,6 +15,10 @@ jest.mock('monaco-editor/esm/vs/editor/editor.api', () => ({
   ...mockMonaco,
 }));
 jest.mock(
+  'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController',
+  () => mockLanguageLoads.push('suggest-controller'),
+);
+jest.mock(
   'monaco-editor/esm/vs/basic-languages/html/html.contribution',
   () => mockLanguageLoads.push('html'),
 );
@@ -66,6 +70,7 @@ describe('Monaco setup', () => {
       monaco: expect.objectContaining(mockMonaco),
     });
     expect(mockLanguageLoads).toEqual([
+      'suggest-controller',
       'html',
       'javascript',
       'twig',
