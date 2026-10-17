@@ -33,6 +33,12 @@ const {
 } = require('./mocks/clients/workspace');
 
 const COLOR_MODES = ['light', 'dark'];
+const SCREENSHOT_VIEWPORTS = [
+  { name: 'sm', width: 640, height: 900 },
+  { name: 'lg', width: 1024, height: 900 },
+  { name: 'xl', width: 1280, height: 900 },
+  { name: '2xl', width: 1536, height: 960 },
+];
 
 const authState = {
   state: {
@@ -96,9 +102,11 @@ async function gotoJourney(page, journey) {
   if (journey.readyText) {
     await expect(page.locator('body')).toContainText(journey.readyText);
   }
-  await expect(page.locator('body')).not.toContainText(
-    "Sorry we couldn't find this page.",
-  );
+  if (!journey.allowNotFound) {
+    await expect(page.locator('body')).not.toContainText(
+      "Sorry we couldn't find this page.",
+    );
+  }
 }
 
 async function setColorMode(page, colorMode) {
@@ -172,6 +180,7 @@ module.exports = {
   test,
   expect,
   COLOR_MODES,
+  SCREENSHOT_VIEWPORTS,
   ASSISTANT_LIST_PATH,
   ACTIVITY_LIST_PATHS,
   AUTHENTICATION_PATHS,

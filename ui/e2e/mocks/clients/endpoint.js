@@ -10,6 +10,8 @@ const ENDPOINT_LIST_PATH = '**/endpoint_api.EndpointService/GetAllEndpoint';
 const ENDPOINT_DETAIL_PATH = '**/endpoint_api.EndpointService/GetEndpoint';
 const ENDPOINT_LOG_LIST_PATH =
   '**/endpoint_api.EndpointService/GetAllEndpointLog';
+const ENDPOINT_VERSION_LIST_PATH =
+  '**/endpoint_api.EndpointService/GetAllEndpointProviderModel';
 const ENDPOINT_ID = '2301664620831571968';
 const ENDPOINT_PROVIDER_MODEL_ID = '2301664620831571999';
 const EMPTY_ENDPOINT_LIST_RESPONSE = Buffer.concat([
@@ -116,6 +118,7 @@ const ENDPOINT_LOG_LIST_RESPONSE = Buffer.concat([
     ]),
   ),
 ]);
+const EMPTY_ENDPOINT_VERSION_LIST_RESPONSE = protobufBoolean(2, true);
 
 async function installEndpointClientMock(page) {
   await page.route(ENDPOINT_LIST_PATH, route => {
@@ -130,11 +133,16 @@ async function installEndpointClientMock(page) {
     if (route.request().method() !== 'POST') return route.fallback();
     return fulfillGrpcWeb(route, ENDPOINT_LOG_LIST_RESPONSE);
   });
+  await page.route(ENDPOINT_VERSION_LIST_PATH, route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    return fulfillGrpcWeb(route, EMPTY_ENDPOINT_VERSION_LIST_RESPONSE);
+  });
 }
 
 module.exports = {
   ENDPOINT_DETAIL_PATH,
   ENDPOINT_LIST_PATH,
   ENDPOINT_LOG_LIST_PATH,
+  ENDPOINT_VERSION_LIST_PATH,
   installEndpointClientMock,
 };

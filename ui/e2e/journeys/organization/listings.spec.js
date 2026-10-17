@@ -72,3 +72,39 @@ test('user listing shows a transport request error', async ({ page }) => {
     ),
   ).toBeVisible();
 });
+
+test('organization user listing opens the invite subjourney and validates input', async ({
+  page,
+}) => {
+  await gotoJourney(page, journey('users'));
+
+  await page
+    .getByRole('button', { name: 'Invite user', exact: true })
+    .first()
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Invite user to organization' }),
+  ).toBeVisible();
+
+  await page
+    .getByRole('button', { name: 'Invite user', exact: true })
+    .last()
+    .click();
+  await expect(
+    page.getByText('Please provide a valid email to invite user.'),
+  ).toBeVisible();
+});
+
+test('project listing opens the create project subjourney', async ({
+  page,
+}) => {
+  await gotoJourney(page, journey('projects'));
+
+  await page
+    .getByRole('button', { name: 'Create new project', exact: true })
+    .first()
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Create a project' }),
+  ).toBeVisible();
+});

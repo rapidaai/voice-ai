@@ -241,9 +241,15 @@ describe('Dashboard HomePage', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: 'Could not load project dashboard',
+        name: 'Project dashboard is unavailable',
       }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('Check your connection and try again.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Project overview' }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
     expect(await screen.findByText('12,486')).toBeInTheDocument();

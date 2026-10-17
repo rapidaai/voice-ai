@@ -1,7 +1,7 @@
 import { ProtectedBox } from '@/app/components/layout/container/protected-box';
 import { Microphone, Globe, ChartLine } from '@carbon/icons-react';
 import React from 'react';
-import { Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import {
   OnboardingCreateOrganizationPage,
   OnboardingCreateProjectPage,
@@ -155,6 +155,7 @@ export function OnbaordingRoute() {
           </ProtectedBox>
         }
       >
+        <Route index element={<Navigate to="organization" replace />} />
         <Route
           key="organization"
           path="organization"

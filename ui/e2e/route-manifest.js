@@ -42,6 +42,22 @@ const routeRoots = [
 
 const routeJourneys = [
   {
+    id: 'navigation.root',
+    path: '/',
+    auth: false,
+    expectText: 'Sign in',
+    readyText: 'Sign in with GitHub',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'auth.root',
+    path: '/auth',
+    auth: false,
+    expectText: 'Sign in',
+    readyText: 'Sign in with GitHub',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
     id: 'auth.signin',
     path: '/auth/signin',
     auth: false,
@@ -95,6 +111,13 @@ const routeJourneys = [
   {
     id: 'deployment.assistant',
     path: '/deployment/assistant',
+    auth: true,
+    expectText: 'Assistants',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.root',
+    path: '/deployment',
     auth: true,
     expectText: 'Assistants',
     checks: ['smoke', 'a11y', 'screenshot'],
@@ -205,6 +228,29 @@ const routeJourneys = [
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
+    id: 'deployment.endpointLogs',
+    path: '/deployment/endpoint/2301664620831571968/logs',
+    auth: true,
+    expectText: 'Filter table',
+    readyText: 'vrsn_2301664620831571999',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.endpointVersions',
+    path: '/deployment/endpoint/2301664620831571968/versions',
+    auth: true,
+    expectText: 'No versions found',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.createEndpointVersion',
+    path: '/deployment/endpoint/2301664620831571968/create-endpoint-version',
+    auth: true,
+    expectText: 'Create a new version of this endpoint.',
+    readyText: 'Configure instruction',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
     id: 'integration.projectCredential',
     path: '/integration/project-credential',
     auth: true,
@@ -298,10 +344,41 @@ const routeJourneys = [
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
+    id: 'onboarding.root',
+    path: '/onboarding',
+    auth: true,
+    expectText: 'Set up your organization',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
     id: 'onboarding.project',
     path: '/onboarding/project',
     auth: true,
     expectText: 'Create your first project',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'navigation.globalNotFound',
+    path: '/missing-journey',
+    auth: false,
+    expectText: "Sorry we couldn't find this page.",
+    allowNotFound: true,
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'navigation.deploymentNotFound',
+    path: '/deployment/missing-journey',
+    auth: true,
+    expectText: "Sorry we couldn't find this page.",
+    allowNotFound: true,
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'navigation.staticNotFound',
+    path: '/static/missing-journey',
+    auth: false,
+    expectText: "Sorry we couldn't find this page.",
+    allowNotFound: true,
     checks: ['smoke', 'a11y', 'screenshot'],
   },
 ];
@@ -360,11 +437,7 @@ const sourceRouteInventory = {
   'deployment.tsx': [
     {
       path: '/',
-      journey: 'deployment.endpoint',
-    },
-    {
-      path: '',
-      journey: 'deployment.endpoint',
+      journey: 'deployment.assistant',
     },
     { path: 'endpoint', journey: 'deployment.endpoint' },
     {
@@ -385,7 +458,7 @@ const sourceRouteInventory = {
     },
     {
       path: 'create-endpoint-version',
-      deferredReason: 'Endpoint version fixtures are not available yet.',
+      journey: 'deployment.createEndpointVersion',
     },
     {
       path: ':tab',
@@ -631,7 +704,7 @@ const sourceRouteInventory = {
     },
   ],
   'static.tsx': [
-    { path: 'privacy-policy', count: 2, journey: 'static.privacy' },
+    { path: 'privacy-policy', journey: 'static.privacy' },
     { path: 'terms-conditions', journey: 'static.terms' },
   ],
 };

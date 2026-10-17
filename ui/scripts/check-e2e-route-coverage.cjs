@@ -5,9 +5,11 @@ const {
   routeJourneys,
   sourceRouteInventory,
 } = require('../e2e/route-manifest');
+const { journeySubjourneys } = require('../e2e/journey-catalog');
 
 const appRouteFile = path.join(__dirname, '..', 'src', 'app', 'index.tsx');
 const routeDir = path.join(__dirname, '..', 'src', 'app', 'routes');
+const e2eDir = path.join(__dirname, '..', 'e2e');
 const devConfigFile = path.join(
   __dirname,
   '..',
@@ -134,6 +136,34 @@ function checkJourneyDecisions(journeys) {
   };
 }
 
+function checkSubjourneyDecisions(subjourneys, journeyIds) {
+  const allowedStatuses = new Set(['covered', 'deferred', 'disabled']);
+  const ids = subjourneys.map(subjourney => subjourney.id);
+
+  return {
+    duplicateSubjourneys: ids.filter((id, index) => ids.indexOf(id) !== index),
+    subjourneysWithUnknownStatus: subjourneys
+      .filter(subjourney => !allowedStatuses.has(subjourney.status))
+      .map(subjourney => subjourney.id),
+    subjourneysWithUnknownParent: subjourneys
+      .filter(
+        subjourney =>
+          subjourney.parentJourney && !journeyIds.has(subjourney.parentJourney),
+      )
+      .map(subjourney => `${subjourney.id} -> ${subjourney.parentJourney}`),
+    coveredSubjourneysWithoutEvidence: subjourneys
+      .filter(
+        subjourney => subjourney.status === 'covered' && !subjourney.evidence,
+      )
+      .map(subjourney => subjourney.id),
+    deferredSubjourneysWithoutReason: subjourneys
+      .filter(
+        subjourney => subjourney.status !== 'covered' && !subjourney.reason,
+      )
+      .map(subjourney => subjourney.id),
+  };
+}
+
 function checkRouteCoverage() {
   const appRoots = readAppRouteRoots();
   const config = readJSON(devConfigFile);
@@ -185,6 +215,17 @@ function checkRouteCoverage() {
     )
     .map(journey => journey.id);
   const journeyDecisionIssues = checkJourneyDecisions(routeJourneys);
+  const subjourneyDecisionIssues = checkSubjourneyDecisions(
+    journeySubjourneys,
+    journeyIds,
+  );
+  const coveredSubjourneysWithMissingEvidence = journeySubjourneys
+    .filter(subjourney => subjourney.status === 'covered')
+    .filter(
+      subjourney =>
+        !fs.existsSync(path.join(e2eDir, subjourney.evidence || '')),
+    )
+    .map(subjourney => `${subjourney.id} -> ${subjourney.evidence}`);
   const discoveredRouteSources = readRouteSourceEntries();
   const inventory = inventoryEntries();
   const inventorySourceKeys = new Map(
@@ -234,6 +275,8 @@ function checkRouteCoverage() {
     misroutedRootJourneys,
     journeysWithoutAssertions,
     ...journeyDecisionIssues,
+    ...subjourneyDecisionIssues,
+    coveredSubjourneysWithMissingEvidence,
     missingSourceRoutes,
     unknownSourceRoutes,
     sourceRouteCountMismatches,
@@ -260,6 +303,12 @@ if (require.main === module) {
     result.journeysWithoutScreenshotDecision.length > 0 ||
     result.journeysWithUnknownChecks.length > 0 ||
     result.journeysWithConflictingDecisions.length > 0 ||
+    result.duplicateSubjourneys.length > 0 ||
+    result.subjourneysWithUnknownStatus.length > 0 ||
+    result.subjourneysWithUnknownParent.length > 0 ||
+    result.coveredSubjourneysWithoutEvidence.length > 0 ||
+    result.coveredSubjourneysWithMissingEvidence.length > 0 ||
+    result.deferredSubjourneysWithoutReason.length > 0 ||
     result.missingSourceRoutes.length > 0 ||
     result.unknownSourceRoutes.length > 0 ||
     result.sourceRouteCountMismatches.length > 0 ||
@@ -273,6 +322,7 @@ if (require.main === module) {
 
 module.exports = {
   checkJourneyDecisions,
+  checkSubjourneyDecisions,
   checkRouteCoverage,
   readAppRouteRoots,
 };

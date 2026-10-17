@@ -72,17 +72,12 @@ export function DeploymentRoute() {
         {/* disvoer  */}
         {/* endpoint  */}
         <Route
-          key={'/endpoint/'}
-          path={''}
-          element={<DeploymentEndpointPage />}
-        />
-        <Route
           key={'/deployment/endpoint'}
           path={'endpoint'}
           element={<DeploymentEndpointPage />}
         />
 
-        <Route index element={<Navigate to="assistant/" replace />} />
+        <Route index element={<Navigate to="assistant" replace />} />
         <Route
           path={'endpoint/create-endpoint'}
           element={<DeploymentCreateEndpointPage />}

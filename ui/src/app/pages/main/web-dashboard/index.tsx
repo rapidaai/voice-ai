@@ -52,6 +52,7 @@ import {
   YAxis,
 } from 'recharts';
 
+import { EmptyState } from '@/app/components/ui/feedback';
 import { Dropdown } from '@/app/components/ui/primitives';
 import { getProjectDashboardRange } from '@/clients/dashboard.client';
 import { useCurrentCredential } from '@/hooks/use-credential';
@@ -1046,6 +1047,26 @@ export const HomePage = () => {
     [isUsageReady, usage],
   );
 
+  if (loadError && !dashboard) {
+    return (
+      <main
+        data-dashboard-page
+        className="flex min-h-0 flex-1 overflow-auto bg-[var(--cds-background)] text-[var(--cds-text-primary)]"
+      >
+        <div data-dashboard-content className="flex min-h-full flex-1">
+          <EmptyState
+            icon={WarningAltFilled}
+            title="Project dashboard is unavailable"
+            subtitle="Check your connection and try again."
+            action="Try again"
+            actionIcon={Renew}
+            onAction={fetchDashboard}
+          />
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main
       data-dashboard-page
@@ -1125,24 +1146,6 @@ export const HomePage = () => {
 
         {(loading || isContextPending) && !dashboard ? (
           <DashboardLoading />
-        ) : loadError && !dashboard ? (
-          <Tile className="col-span-full border! border-[var(--cds-border-subtle-01)]! p-0!">
-            <EmptyContent
-              title="Could not load project dashboard"
-              description="Check your connection and try loading the dashboard again."
-              action={
-                <Button
-                  kind="primary"
-                  size="sm"
-                  className="mt-6"
-                  renderIcon={Renew}
-                  onClick={fetchDashboard}
-                >
-                  Try again
-                </Button>
-              }
-            />
-          </Tile>
         ) : dashboard ? (
           <>
             {analytics ? (
