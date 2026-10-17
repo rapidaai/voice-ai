@@ -19,6 +19,9 @@ for (const journey of journeysWithCheck('screenshot')) {
         'data-color-mode',
         colorMode,
       );
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+      });
 
       await expect(page).toHaveScreenshot(
         screenshotBaselinePath(journey, colorMode),
