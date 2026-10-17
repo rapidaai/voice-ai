@@ -62,7 +62,7 @@ test('keeps the deployment output contract in the Vite build', () => {
   assert.match(viteConfig, /static\/js/);
 });
 
-test('preserves the selected app mode for direct NODE_ENV reads', async () => {
+test('keeps production NODE_ENV separate from the selected app mode', async () => {
   const { resolveConfig } = await import('vite');
   const configFile = resolve(uiRoot, 'vite.config.ts');
   const developmentConfig = await resolveConfig(
@@ -78,12 +78,22 @@ test('preserves the selected app mode for direct NODE_ENV reads', async () => {
 
   assert.equal(
     developmentConfig.define['process.env.NODE_ENV'],
-    JSON.stringify('development'),
+    JSON.stringify('production'),
   );
+  assert.deepEqual(JSON.parse(developmentConfig.define['process.env']), {
+    MODE: 'development',
+    NODE_ENV: 'production',
+    VITE_MODE: 'development',
+  });
   assert.equal(
     productionConfig.define['process.env.NODE_ENV'],
     JSON.stringify('production'),
   );
+  assert.deepEqual(JSON.parse(productionConfig.define['process.env']), {
+    MODE: 'production',
+    NODE_ENV: 'production',
+    VITE_MODE: 'production',
+  });
 });
 
 test('registers every language used by the Monaco editors', () => {

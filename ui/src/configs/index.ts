@@ -4,6 +4,7 @@ import { ConnectionConfig } from '@rapidaai/react';
 import type { ThemeManifest } from '@/theme/types';
 import devConfig from './config.development.json';
 import prodConfig from './config.production.json';
+import { getRuntimeEnv } from './runtime-env';
 
 export interface SentryAnalyticsConfig {
   dsn: string;
@@ -57,7 +58,7 @@ const productionConfig: RapidaConfig = {
 };
 
 export const getConfig = (
-  environment = process.env.NODE_ENV || 'development',
+  environment = getRuntimeEnv().mode,
 ): RapidaConfig =>
   environment === 'production' ? productionConfig : developmentConfig;
 

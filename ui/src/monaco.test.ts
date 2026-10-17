@@ -1,7 +1,11 @@
 const mockLoaderConfig = jest.fn();
 const mockLanguageLoads: string[] = [];
 const mockMonaco = { editor: {}, languages: {} };
-const mockWorkerClass = class Worker {};
+const mockEditorWorkerClass = class EditorWorker {};
+const mockJsonWorkerClass = class JsonWorker {};
+const mockCssWorkerClass = class CssWorker {};
+const mockHtmlWorkerClass = class HtmlWorker {};
+const mockTypeScriptWorkerClass = class TypeScriptWorker {};
 
 jest.mock('@monaco-editor/react', () => ({
   loader: { config: mockLoaderConfig },
@@ -38,9 +42,12 @@ jest.mock(
   'monaco-editor/esm/vs/language/typescript/monaco.contribution',
   () => mockLanguageLoads.push('typescript-service'),
 );
-jest.mock('monaco-editor/esm/vs/editor/editor.worker?worker', () => ({
-  __esModule: true,
-  default: mockWorkerClass,
+jest.mock('./monaco-workers', () => ({
+  CssWorker: mockCssWorkerClass,
+  EditorWorker: mockEditorWorkerClass,
+  HtmlWorker: mockHtmlWorkerClass,
+  JsonWorker: mockJsonWorkerClass,
+  TypeScriptWorker: mockTypeScriptWorkerClass,
 }));
 
 require('./monaco');
@@ -71,19 +78,19 @@ describe('Monaco setup', () => {
 
   it('routes language workers and falls back to the editor worker', () => {
     expect(monacoEnvironment.getWorker('', 'json')).toBeInstanceOf(
-      mockWorkerClass,
+      mockJsonWorkerClass,
     );
     expect(monacoEnvironment.getWorker('', 'scss')).toBeInstanceOf(
-      mockWorkerClass,
+      mockCssWorkerClass,
     );
     expect(monacoEnvironment.getWorker('', 'html')).toBeInstanceOf(
-      mockWorkerClass,
+      mockHtmlWorkerClass,
     );
     expect(monacoEnvironment.getWorker('', 'javascript')).toBeInstanceOf(
-      mockWorkerClass,
+      mockTypeScriptWorkerClass,
     );
     expect(monacoEnvironment.getWorker('', 'unknown')).toBeInstanceOf(
-      mockWorkerClass,
+      mockEditorWorkerClass,
     );
   });
 });

@@ -1,5 +1,6 @@
 import productionProvider from './provider.production.json';
 import developmentProvider from './provider.development.json';
+import { getRuntimeEnv } from '@/configs/runtime-env';
 import { getProviderAsset } from '@/providers/provider-assets';
 
 export interface IntegrationProvider extends RapidaProvider { }
@@ -73,7 +74,7 @@ export const CONJUNCTION_BOUNDARIES = [
 ];
 
 export const allProvider = (): RapidaProvider[] => {
-  const env = process.env.NODE_ENV || 'development';
+  const env = getRuntimeEnv().mode;
   return env === 'production' ? productionProvider : developmentProvider;
 };
 

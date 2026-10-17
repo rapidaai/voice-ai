@@ -9,8 +9,11 @@ const rootDirectory = path.dirname(
   fileURLToPath(import.meta.url),
 );
 
-export default defineConfig(({ mode }) => {
-  const processEnv = getClientProcessEnv(mode);
+export default defineConfig(({ command, mode }) => {
+  const processEnv = getClientProcessEnv(
+    mode,
+    command === 'build' ? 'production' : 'development',
+  );
 
   return {
     base: '/',

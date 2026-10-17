@@ -7,21 +7,23 @@ import 'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution'
 import 'monaco-editor/esm/vs/language/html/monaco.contribution';
 import 'monaco-editor/esm/vs/language/json/monaco.contribution';
 import 'monaco-editor/esm/vs/language/typescript/monaco.contribution';
-import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
-import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
-import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
-import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
-import typeScriptWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
+import {
+  CssWorker,
+  EditorWorker,
+  HtmlWorker,
+  JsonWorker,
+  TypeScriptWorker,
+} from './monaco-workers';
 
 const monacoEnvironment = {
   getWorker(_moduleId: string, label: string): Worker {
-    if (label === 'json') return new jsonWorker();
-    if (['css', 'scss', 'less'].includes(label)) return new cssWorker();
-    if (['html', 'handlebars', 'razor'].includes(label)) return new htmlWorker();
+    if (label === 'json') return new JsonWorker();
+    if (['css', 'scss', 'less'].includes(label)) return new CssWorker();
+    if (['html', 'handlebars', 'razor'].includes(label)) return new HtmlWorker();
     if (['typescript', 'javascript'].includes(label)) {
-      return new typeScriptWorker();
+      return new TypeScriptWorker();
     }
-    return new editorWorker();
+    return new EditorWorker();
   },
 };
 
