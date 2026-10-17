@@ -24,6 +24,7 @@ module.exports = defineConfig({
   },
   use: {
     baseURL,
+    timezoneId: 'UTC',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

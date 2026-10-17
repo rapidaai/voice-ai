@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ThemeProvider } from '@/theme/theme-provider';
 import developmentConfig from '@/configs/config.development.json';
 import { ThemeManifest } from '@/theme/types';

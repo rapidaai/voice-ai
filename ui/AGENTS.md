@@ -4,7 +4,7 @@ The repository-level `AGENTS.md` remains authoritative. These rules add UI-speci
 for work under this directory.
 
 - Read `DEVELOPMENT.md` and `TESTING.md` before changing UI behavior or test infrastructure.
-- Keep React, CRACO, Yarn, Jest, Testing Library, Storybook, and Playwright as the established stack.
+- Keep React, Vite, Yarn, Jest, Testing Library, Storybook, and Playwright as the established stack.
 - Define loading, empty, error, permission, responsive, light-theme, and dark-theme behavior when
   they apply to the changed experience.
 - Add or update a focused Jest test for component and state behavior. Include a happy path and the

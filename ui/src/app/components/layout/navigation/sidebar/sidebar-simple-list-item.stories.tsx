@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Dashboard } from '@carbon/icons-react';
 import { MemoryRouter } from 'react-router-dom';
 import { SidebarProvider } from '@/context/sidebar-context';

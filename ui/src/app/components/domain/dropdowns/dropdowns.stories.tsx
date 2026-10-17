@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Stack } from '@carbon/react';
 import { CredentialDropdownView } from './credential-dropdown';
 import { EndpointDropdownView } from './endpoint-dropdown';

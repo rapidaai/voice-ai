@@ -3,6 +3,7 @@ import { cn } from '@/utils';
 import type { HTMLAttributes } from 'react';
 import { memo } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
+import '@/monaco';
 import { CopyButton } from '@/app/components/ui/primitives/buttons/copy-button';
 
 export interface CodeHighlightingProps extends HTMLAttributes<HTMLDivElement> {

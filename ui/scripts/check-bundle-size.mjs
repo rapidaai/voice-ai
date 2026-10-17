@@ -37,13 +37,27 @@ export const inspectBundleSize = (
   buildDirectory,
   budgets = DEFAULT_BUNDLE_BUDGETS,
 ) => {
-  const manifestPath = resolve(buildDirectory, 'asset-manifest.json');
+  const manifestPath = resolve(buildDirectory, '.vite', 'manifest.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  const entrypoints = Array.isArray(manifest.entrypoints)
-    ? manifest.entrypoints
-    : [];
+  const assetPaths = new Set();
+  const visitedEntries = new Set();
+  const collectEntryAssets = entryKey => {
+    if (visitedEntries.has(entryKey)) return;
+    visitedEntries.add(entryKey);
+    const entry = manifest[entryKey];
+    if (!entry) return;
+    if (entry.file) assetPaths.add(entry.file);
+    for (const stylesheet of entry.css ?? []) assetPaths.add(stylesheet);
+    for (const importedEntry of entry.imports ?? []) {
+      collectEntryAssets(importedEntry);
+    }
+  };
 
-  const assets = entrypoints.map(relativePath => ({
+  for (const [entryKey, entry] of Object.entries(manifest)) {
+    if (entry.isEntry) collectEntryAssets(entryKey);
+  }
+
+  const assets = [...assetPaths].sort().map(relativePath => ({
     path: relativePath,
     gzipBytes: getGzipSize(resolve(buildDirectory, relativePath)),
   }));

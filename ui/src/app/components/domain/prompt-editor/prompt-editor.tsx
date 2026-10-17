@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import Editor, { OnChange, OnMount } from '@monaco-editor/react';
 import { useTheme } from '@/theme/theme-provider';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
+import '@/monaco';
 import {
   extractPromptVariableQuery,
   getPromptVariableSuggestions,

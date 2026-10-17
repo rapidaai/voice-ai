@@ -13,7 +13,7 @@ yarn install --frozen-lockfile
 yarn build:css
 ```
 
-Start the application or Storybook:
+Start the Vite application or Storybook:
 
 ```bash
 yarn start:dev

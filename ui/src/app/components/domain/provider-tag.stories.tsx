@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Stack } from '@carbon/react';
 import { ProviderTag } from './provider-tag';
 
