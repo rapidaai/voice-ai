@@ -39,13 +39,23 @@ func (c *scopeAuthInternalClient) WithScopeToken(ctx context.Context, _, _ strin
 
 type scopeAuthGRPCClient struct {
 	web_api.AuthenticationServiceClient
-	response *web_api.ScopedAuthenticationResponse
-	calls    int
+	authorizeResponse *web_api.AuthenticateResponse
+	response          *web_api.ScopedAuthenticationResponse
+	calls             int
+}
+
+func (c *scopeAuthGRPCClient) Authorize(context.Context, *web_api.AuthorizeRequest, ...grpc.CallOption) (*web_api.AuthenticateResponse, error) {
+	c.calls++
+	return c.authorizeResponse, nil
 }
 
 func (c *scopeAuthGRPCClient) ScopeAuthorize(context.Context, *web_api.ScopeAuthorizeRequest, ...grpc.CallOption) (*web_api.ScopedAuthenticationResponse, error) {
 	c.calls++
 	return c.response, nil
+}
+
+func (c *scopeAuthInternalClient) WithToken(ctx context.Context, _ string, _ uint64) context.Context {
+	return ctx
 }
 
 func testLogger(t *testing.T) commons.Logger {
@@ -147,5 +157,41 @@ func TestScopeAuthorizeRejectsRemoteProjectWithoutActor(t *testing.T) {
 	}
 	if internal.ttl != 0 {
 		t.Fatalf("invalid response was cached with TTL %v", internal.ttl)
+	}
+}
+
+func TestAuthorizeReturnsRemoteError(t *testing.T) {
+	internal := &scopeAuthInternalClient{retrieved: &connectors.RedisResponse{Err: context.Canceled}}
+	grpcClient := &scopeAuthGRPCClient{authorizeResponse: &web_api.AuthenticateResponse{
+		Error: &web_api.Error{HumanMessage: "authorization rejected"},
+	}}
+	client := &authServiceClient{
+		InternalClient: internal,
+		cfg:            &config.AppConfig{},
+		logger:         testLogger(t),
+		authClient:     grpcClient,
+	}
+
+	_, err := client.Authorize(context.Background(), "token", 42)
+	if err == nil || !strings.Contains(err.Error(), "authorization rejected") {
+		t.Fatalf("Authorize() error = %v", err)
+	}
+}
+
+func TestScopeAuthorizeReturnsRemoteError(t *testing.T) {
+	internal := &scopeAuthInternalClient{retrieved: &connectors.RedisResponse{Err: context.Canceled}}
+	grpcClient := &scopeAuthGRPCClient{response: &web_api.ScopedAuthenticationResponse{
+		Error: &web_api.Error{HumanMessage: "scope rejected"},
+	}}
+	client := &authServiceClient{
+		InternalClient: internal,
+		cfg:            &config.AppConfig{Secret: "cache-secret"},
+		logger:         testLogger(t),
+		authClient:     grpcClient,
+	}
+
+	_, err := client.ScopeAuthorize(context.Background(), "token", "project")
+	if err == nil || !strings.Contains(err.Error(), "scope rejected") {
+		t.Fatalf("ScopeAuthorize() error = %v", err)
 	}
 }

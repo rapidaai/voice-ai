@@ -80,6 +80,30 @@ func TestInternalClientCacheWithTTLRejectsNonPositiveTTL(t *testing.T) {
 	}
 }
 
+func TestInternalClientCacheRejectsUnsupportedValue(t *testing.T) {
+	logger, err := commons.NewApplicationLogger(commons.EnableConsole(true), commons.EnableFile(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	redisConnector := &recordingRedisConnector{}
+	client := &internalClient{logger: logger, redis: redisConnector}
+
+	if response := client.Cache(context.Background(), "cache-key", make(chan int)); response != nil {
+		t.Fatalf("Cache() response = %+v, want nil", response)
+	}
+	if redisConnector.command != "" {
+		t.Fatalf("Cache() command = %q, want no Redis call", redisConnector.command)
+	}
+
+	response := client.CacheWithTTL(context.Background(), "cache-key", make(chan int), time.Minute)
+	if response == nil || !response.HasError() {
+		t.Fatalf("CacheWithTTL() response = %+v, want marshal error", response)
+	}
+	if redisConnector.command != "" {
+		t.Fatalf("CacheWithTTL() command = %q, want no Redis call", redisConnector.command)
+	}
+}
+
 func TestInternalClientCreateServiceScopeToken(t *testing.T) {
 	client := actorAwareInternalClient(t)
 	actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 5}

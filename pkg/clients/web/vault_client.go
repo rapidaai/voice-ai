@@ -84,7 +84,7 @@ func (client *vaultServiceClient) GetOauth2Credential(c context.Context,
 	// Handle error response from vault service
 	if res.GetError() != nil {
 		errMsg := fmt.Sprintf("Failed to get credentials from vault service: %s", res.GetError().HumanMessage)
-		client.logger.Errorf(errMsg)
+		client.logger.Errorf("%s", errMsg)
 		return nil, errors.New(errMsg)
 	}
 	// Log benchmarking information
