@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Metadata } from '@rapidaai/react';
 import { ConfigureAudioInputProvider } from '../configure-audio-input';
 
@@ -113,7 +114,8 @@ describe('ConfigureAudioInputProvider design integration', () => {
     jest.clearAllMocks();
   });
 
-  it('uses microphone-only params when switching STT provider', () => {
+  it('uses microphone-only params when switching STT provider', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const inputParameters = [
       createMetadata('listen.model', 'nova-3'),
       createMetadata('microphone.eos.fallback_timeout', '900'),
@@ -151,7 +153,7 @@ describe('ConfigureAudioInputProvider design integration', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'change stt' }));
+    await user.click(screen.getByRole('button', { name: 'change stt' }));
 
     expect(mockGetDefaultMicrophoneConfig).toHaveBeenCalledTimes(1);
     const microphoneOnly = mockGetDefaultMicrophoneConfig.mock
@@ -178,7 +180,8 @@ describe('ConfigureAudioInputProvider design integration', () => {
     });
   });
 
-  it('advanced VAD/EOS/noise controls call the expected defaulting functions', () => {
+  it('advanced VAD/EOS/noise controls call the expected defaulting functions', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const inputParameters = [
       createMetadata('listen.model', 'nova-3'),
       createMetadata('microphone.vad.provider', 'silero_vad'),
@@ -217,12 +220,12 @@ describe('ConfigureAudioInputProvider design integration', () => {
       />,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: /show advanced settings/i }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'change vad' }));
-    fireEvent.click(screen.getByRole('button', { name: 'change noise' }));
-    fireEvent.click(screen.getByRole('button', { name: 'change eos' }));
+    await user.click(screen.getByRole('button', { name: 'change vad' }));
+    await user.click(screen.getByRole('button', { name: 'change noise' }));
+    await user.click(screen.getByRole('button', { name: 'change eos' }));
 
     expect(mockGetDefaultVADConfig).toHaveBeenCalledWith(
       'firered_vad',
@@ -261,7 +264,8 @@ describe('ConfigureAudioInputProvider design integration', () => {
     });
   });
 
-  it('toggles advanced STT settings visibility', () => {
+  it('toggles advanced STT settings visibility', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <ConfigureAudioInputProvider
         audioInputConfig={{ provider: 'deepgram', parameters: [] }}
@@ -271,7 +275,7 @@ describe('ConfigureAudioInputProvider design integration', () => {
 
     expect(screen.queryByRole('button', { name: 'change vad' })).toBeNull();
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: /show advanced settings/i }),
     );
     expect(
@@ -284,7 +288,7 @@ describe('ConfigureAudioInputProvider design integration', () => {
       screen.getByRole('button', { name: 'change noise' }),
     ).toBeInTheDocument();
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: /hide advanced settings/i }),
     );
     expect(screen.queryByRole('button', { name: 'change vad' })).toBeNull();

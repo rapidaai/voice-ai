@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { AccessSecurityPage } from './index';
@@ -65,7 +66,8 @@ describe('AccessSecurityPage', () => {
     expect(screen.getByTestId('support-link-icon')).toBeInTheDocument();
   });
 
-  it('shows two-factor authentication as a disabled Carbon toggle', () => {
+  it('shows two-factor authentication as a disabled Carbon toggle', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<AccessSecurityPage />);
 
     const toggle = screen.getByRole('switch', {
@@ -76,7 +78,7 @@ describe('AccessSecurityPage', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(toggle).toHaveAttribute('data-design-system-toggle-size', 'sm');
 
-    fireEvent.click(toggle);
+    await user.click(toggle);
 
     expect(toggle).toHaveAttribute('aria-checked', 'true');
   });

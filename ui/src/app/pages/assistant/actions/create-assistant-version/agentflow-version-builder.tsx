@@ -4319,7 +4319,7 @@ export function AgentflowVersionBuilder({
                   ? 'Collapse components'
                   : 'Expand components'
               }
-              className="flex h-10 w-full cursor-pointer items-center px-4 text-gray-400 transition-colors duration-100 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-400"
+              className="flex h-10 w-full cursor-pointer items-center px-4 text-[var(--cds-text-secondary)] transition-colors duration-100 hover:bg-gray-100 hover:text-[var(--cds-text-primary)] dark:hover:bg-gray-800"
             >
               <span className="shrink-0">
                 {componentListLocked ? (
@@ -4396,6 +4396,7 @@ export function AgentflowVersionBuilder({
             zoomOnPinch
             nodesDraggable={!canvasLocked}
             nodesConnectable
+            nodesFocusable={false}
             edgesUpdatable
             edgeUpdaterRadius={16}
             elementsSelectable
@@ -4516,13 +4517,13 @@ export function AgentflowVersionBuilder({
               <div className="mx-1 h-5 border-l border-gray-200 dark:border-gray-800" />
               <Tooltip align="top" description="Cancel">
                 <Button
-                  kind="danger--ghost"
+                  kind="ghost"
                   size="sm"
                   hasIconOnly
                   renderIcon={Close}
                   iconDescription="Cancel"
                   onClick={() => showDialog(goBack)}
-                  className="!h-8 !min-h-8 !w-8 !p-0 hover:!bg-red-600 hover:!text-white"
+                  className="!h-8 !min-h-8 !w-8 !p-0 !text-[var(--cds-support-error)] hover:!bg-red-600 hover:!text-white"
                 />
               </Tooltip>
               <Tooltip

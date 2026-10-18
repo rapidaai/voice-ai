@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import CheckboxCard from '../checkbox-card';
@@ -55,7 +56,8 @@ describe('CheckboxCard', () => {
     expect(radio).toHaveAttribute('value', 'hybrid');
   });
 
-  it('keeps the existing input change handler contract', () => {
+  it('keeps the existing input change handler contract', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const selectedValues: string[] = [];
 
     render(
@@ -69,7 +71,7 @@ describe('CheckboxCard', () => {
       </CheckboxCard>,
     );
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Semantic Search' }));
+    await user.click(screen.getByRole('radio', { name: 'Semantic Search' }));
 
     expect(selectedValues).toEqual(['semantic']);
   });

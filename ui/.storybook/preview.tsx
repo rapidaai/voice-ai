@@ -1,11 +1,12 @@
 import React from 'react';
 import { Theme as CarbonTheme } from '@carbon/react';
-import type { Preview } from '@storybook/react-webpack5';
+import type { Preview } from '@storybook/react-vite';
 import { HelmetProvider } from 'react-helmet-async';
 import developmentConfig from '../src/configs/config.development.json';
 import { ThemeProvider } from '../src/theme/theme-provider';
 import type { ResolvedThemeMode, ThemeManifest } from '../src/theme/types';
 import '../src/styles/global-styles';
+import '../src/monaco';
 
 const theme = developmentConfig.theme as ThemeManifest;
 

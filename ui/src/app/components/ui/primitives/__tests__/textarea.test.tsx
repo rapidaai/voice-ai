@@ -1,8 +1,9 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import { Textarea } from '../textarea';
+import userEvent from '@testing-library/user-event';
 
 jest.mock('@carbon/react', () => {
   const React = require('react');
@@ -40,7 +41,8 @@ jest.mock('@carbon/react', () => {
 });
 
 describe('Textarea', () => {
-  it('renders the Carbon textarea with the existing row alias', () => {
+  it('renders the Carbon textarea with the existing row alias', async () => {
+    const user = userEvent.setup();
     const onChange = jest.fn();
 
     render(
@@ -62,7 +64,9 @@ describe('Textarea', () => {
     expect(textarea).toHaveClass('w-full');
     expect(textarea).toHaveClass('max-w-160');
 
-    fireEvent.change(textarea, { target: { value: 'Customer support bot' } });
+    await user.click(textarea);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Customer support bot'));
 
     expect(onChange).toHaveBeenCalledTimes(1);
   });

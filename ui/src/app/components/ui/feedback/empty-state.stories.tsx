@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Add, Search } from '@carbon/icons-react';
 import { Button } from '@carbon/react';
 import { EmptyState } from './empty-state';

@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import {
@@ -213,7 +214,8 @@ describe('tools index', () => {
     expect(err).toBe('Condition must be a valid JSON array.');
   });
 
-  it('renders BuildinTool and updates source condition + action', () => {
+  it('renders BuildinTool and updates source condition + action', async () => {
+    const user = userEvent.setup();
     const onChangeBuildinTool = jest.fn();
     const onChangeConfig = jest.fn();
 
@@ -236,22 +238,25 @@ describe('tools index', () => {
 
     expect(screen.getByTestId('tool-knowledge')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId('tool-condition-source-value'), {
-      target: { value: 'phone' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('tool-condition-source-value'),
+      String('phone'),
+    );
     const changedConfig = onChangeConfig.mock.calls[0][0];
     const condition = changedConfig.parameters.find(
       (m: Metadata) => m.getKey() === 'tool.condition',
     );
     expect(condition.getValue()).toContain('"phone"');
 
-    fireEvent.change(screen.getByTestId('tool-action-select'), {
-      target: { value: 'api_request' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('tool-action-select'),
+      String('api_request'),
+    );
     expect(onChangeBuildinTool).toHaveBeenCalledWith('api_request');
   });
 
-  it('supports adding another rule and setting conversation mode', () => {
+  it('supports adding another rule and setting conversation mode', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeConfig = jest.fn();
     const Harness = () => {
       const [config, setConfig] = React.useState({
@@ -278,7 +283,7 @@ describe('tools index', () => {
 
     render(<Harness />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
+    await user.click(screen.getByRole('button', { name: 'Add rule' }));
     const addedRuleConfig = onChangeConfig.mock.calls.at(-1)?.[0];
     const addedCondition = addedRuleConfig.parameters.find(
       (m: Metadata) => m.getKey() === 'tool.condition',
@@ -286,12 +291,14 @@ describe('tools index', () => {
     const addedEntries = JSON.parse(addedCondition.getValue());
     expect(addedEntries).toHaveLength(2);
 
-    fireEvent.change(screen.getByTestId('tool-condition-key'), {
-      target: { value: 'conversation_mode' },
-    });
-    fireEvent.change(screen.getByTestId('tool-condition-source-value'), {
-      target: { value: 'text' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('tool-condition-key'),
+      String('conversation_mode'),
+    );
+    await user.selectOptions(
+      screen.getByTestId('tool-condition-source-value'),
+      String('text'),
+    );
 
     const lastConfig = onChangeConfig.mock.calls.at(-1)?.[0];
     const condition = lastConfig.parameters.find(

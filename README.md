@@ -64,7 +64,7 @@ Rapida is written in **Go**, using the highly optimized [gRPC](https://github.co
 
 - **Docker** & **Docker Compose** ([Install](https://www.docker.com/))
 - **Just** command runner ([Install](https://github.com/casey/just#installation))
-- **Go 1.25.13**, **Node.js 22**, and **Yarn 1.22.22** for `just ci`
+- **Go 1.26.9**, **Node.js 22**, and **Yarn 1.22.22** for `just ci`
 - **16GB+ RAM** (for all services)
 
 ---

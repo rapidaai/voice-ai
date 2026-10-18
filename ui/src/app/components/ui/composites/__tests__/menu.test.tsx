@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { CardOptionMenu, OptionMenu, OptionMenuItem } from '../menu';
@@ -45,7 +46,8 @@ jest.mock('@carbon/icons-react', () => ({
 }));
 
 describe('Menu', () => {
-  it('renders OptionMenu actions with the Carbon overflow menu', () => {
+  it('renders OptionMenu actions with the Carbon overflow menu', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onActionClick = jest.fn();
 
     render(
@@ -63,7 +65,7 @@ describe('Menu', () => {
     const action = screen.getByRole('button', { name: 'Open' });
     expect(action).toHaveAttribute('data-design-system-overflow-menu-item');
 
-    fireEvent.click(action);
+    await user.click(action);
 
     expect(onActionClick).toHaveBeenCalledTimes(1);
   });

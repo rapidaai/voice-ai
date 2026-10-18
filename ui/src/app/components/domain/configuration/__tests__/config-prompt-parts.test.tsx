@@ -1,5 +1,6 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { PromptRole } from '@/models/prompt';
 import { InputVarType } from '@/models/common';
@@ -157,7 +158,8 @@ describe('configuration prompt subcomponents', () => {
     jest.useRealTimers();
   });
 
-  it('selects prompt message roles with Carbon dropdown behavior', () => {
+  it('selects prompt message roles with Carbon dropdown behavior', async () => {
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     const onChange = jest.fn();
 
     render(<MessageTypeSelector value={PromptRole.user} onChange={onChange} />);
@@ -167,15 +169,17 @@ describe('configuration prompt subcomponents', () => {
     });
     expect(selector).toHaveValue(PromptRole.user);
     expect(selector).toHaveClass('w-full');
+    expect(selector).not.toHaveClass('[&_.cds--list-box]:!border-none');
 
-    fireEvent.change(selector, { target: { value: PromptRole.assistant } });
-    fireEvent.change(selector, { target: { value: '' } });
+    await user.selectOptions(selector, String(PromptRole.assistant));
+    await user.selectOptions(selector, String(''));
 
     expect(onChange).toHaveBeenCalledWith(PromptRole.assistant);
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 
-  it('changes variable type from the configured option list', () => {
+  it('changes variable type from the configured option list', async () => {
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     const onChange = jest.fn();
 
     render(
@@ -193,14 +197,16 @@ describe('configuration prompt subcomponents', () => {
     const selector = screen.getByLabelText('Type for topic');
 
     expect(selector).toHaveAttribute('id', 'argument-type-topic');
-    fireEvent.change(selector, {
-      target: { value: InputVarType.number },
-    });
+    await user.selectOptions(selector, String(InputVarType.number));
 
     expect(onChange).toHaveBeenCalledWith(InputVarType.number);
   });
 
-  it('edits, adds, removes, and reorders config select options', () => {
+  it('edits, adds, removes, and reorders config select options', async () => {
+    const user = userEvent.setup({
+      advanceTimers: jest.advanceTimersByTime,
+      writeToClipboard: false,
+    });
     const onChange = jest.fn();
 
     render(
@@ -215,23 +221,28 @@ describe('configuration prompt subcomponents', () => {
 
     expect(screen.getByRole('table')).toHaveClass('border-border-subtle');
 
-    fireEvent.change(screen.getByLabelText('suggestion-0'), {
-      target: { value: 'First' },
-    });
+    await user.click(screen.getByLabelText('suggestion-0'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('First'));
     expect(onChange).toHaveBeenCalledWith(['First', 'Two']);
 
-    fireEvent.click(screen.getAllByLabelText('Remove')[0]);
+    await user.click(screen.getAllByLabelText('Remove')[0]);
     expect(onChange).toHaveBeenCalledWith(['Two']);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add choice' }));
+    await user.click(screen.getByRole('button', { name: 'Add choice' }));
     expect(onChange).toHaveBeenCalledWith(['One', 'Two', '']);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reverse options' }));
+    await user.click(screen.getByRole('button', { name: 'Reverse options' }));
     expect(onChange).toHaveBeenCalledWith(['Two', 'One']);
     expect(screen.getByText('Configure choices')).toBeInTheDocument();
   });
 
-  it('handles prompt editing, role changes, copy feedback, delete, and expand', () => {
+  it('handles prompt editing, role changes, copy feedback, delete, and expand', async () => {
+    const user = userEvent.setup({
+      advanceTimers: jest.advanceTimersByTime,
+      writeToClipboard: false,
+    });
+    const writeText = jest.spyOn(navigator.clipboard, 'writeText');
     const onChange = jest.fn();
     const onTypeChange = jest.fn();
     const onDelete = jest.fn();
@@ -250,38 +261,41 @@ describe('configuration prompt subcomponents', () => {
 
     const roleSelector = screen.getByLabelText('Select a role');
     expect(roleSelector.parentElement).toHaveClass('flex-1', 'min-w-0');
+    expect(roleSelector.parentElement?.parentElement).toHaveClass(
+      'h-10',
+      'bg-[var(--cds-field)]',
+    );
     expect(roleSelector.parentElement?.nextElementSibling).toHaveClass(
       'flex',
       'shrink-0',
       'items-stretch',
     );
 
-    fireEvent.change(screen.getByLabelText('Select a role'), {
-      target: { value: PromptRole.user },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Select a role'),
+      String(PromptRole.user),
+    );
     expect(onTypeChange).toHaveBeenCalledWith(PromptRole.user);
 
-    fireEvent.change(screen.getByLabelText('Prompt editor'), {
-      target: { value: 'Updated prompt' },
-    });
+    await user.click(screen.getByLabelText('Prompt editor'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Updated prompt'));
     expect(onChange).toHaveBeenCalledWith('Updated prompt');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      'Initial prompt',
-    );
+    await user.click(screen.getByRole('button', { name: 'Copy prompt' }));
+    expect(writeText).toHaveBeenCalledWith('Initial prompt');
     expect(screen.getByTestId('checkmark-icon')).toBeInTheDocument();
     act(() => {
       jest.advanceTimersByTime(4000);
     });
     expect(screen.getByTestId('copy-icon')).toBeInTheDocument();
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Delete prompt message' }),
     );
     expect(onDelete).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Expand prompt' }));
+    await user.click(screen.getByRole('button', { name: 'Expand prompt' }));
     expect(screen.getByTestId('minimize-icon')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Collapse prompt' }),

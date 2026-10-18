@@ -45,7 +45,9 @@ export interface CarbonModalProps {
 export interface CarbonModalHeaderProps {
   className?: string;
   title?: string;
+  titleClassName?: string;
   label?: string;
+  labelClassName?: string;
   children?: ReactNode;
   onClose?: () => void;
 }
@@ -144,7 +146,9 @@ export function Modal({
 export function ModalHeader({
   className,
   title,
+  titleClassName,
   label,
+  labelClassName,
   children,
   onClose,
 }: CarbonModalHeaderProps) {
@@ -152,7 +156,9 @@ export function ModalHeader({
     <CarbonModalHeader
       className={cn(className)}
       title={title}
+      titleClassName={cn(titleClassName)}
       label={label}
+      labelClassName={cn(labelClassName)}
       buttonOnClick={onClose}
     >
       {children}

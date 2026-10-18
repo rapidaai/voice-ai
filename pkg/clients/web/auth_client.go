@@ -97,7 +97,7 @@ func (client *authServiceClient) Authorize(c context.Context, authToken string, 
 		// Handle error response from vault service
 		if res.GetError() != nil {
 			errMsg := fmt.Sprintf("Failed to get credentials from vault service: %s", res.GetError().HumanMessage)
-			client.logger.Errorf(errMsg)
+			client.logger.Errorf("%s", errMsg)
 			return nil, errors.New(errMsg)
 		}
 	}
@@ -148,7 +148,7 @@ func (client *authServiceClient) ScopeAuthorize(c context.Context, scopeToken st
 		// Handle error response from vault service
 		if res.GetError() != nil {
 			errMsg := fmt.Sprintf("Failed to get credentials from vault service: %s", res.GetError().HumanMessage)
-			client.logger.Errorf(errMsg)
+			client.logger.Errorf("%s", errMsg)
 			return nil, errors.New(errMsg)
 		}
 	}

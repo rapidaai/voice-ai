@@ -7,7 +7,7 @@ const prettierOptions = JSON.parse(
 
 module.exports = {
   extends: ['react-app', 'prettier', 'prettier/react'],
-  plugins: ['prettier'],
+  plugins: ['prettier', 'testing-library'],
   rules: {
     'react-hooks/exhaustive-deps': 'off',
     'prettier/prettier': ['error', prettierOptions],
@@ -16,6 +16,10 @@ module.exports = {
     {
       files: ['**/*.ts?(x)'],
       rules: { 'prettier/prettier': ['warn', prettierOptions] },
+    },
+    {
+      files: ['**/*.{test,spec}.{js,jsx,ts,tsx}'],
+      rules: { 'testing-library/prefer-user-event': 'error' },
     },
   ],
 };

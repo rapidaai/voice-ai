@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { AssistantPage } from '@/app/pages/assistant/listing';
@@ -260,7 +261,8 @@ describe('listing page create CTAs', () => {
     ).toHaveLength(2);
   });
 
-  it('keeps the endpoint create action visible while the listing reloads', () => {
+  it('keeps the endpoint create action visible while the listing reloads', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockLoading = true;
 
     render(<EndpointPage />);
@@ -271,7 +273,7 @@ describe('listing page create CTAs', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText('Button loading')).not.toBeInTheDocument();
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Create new endpoint' }),
     );
     expect(mockNavigate).toHaveBeenCalledWith(

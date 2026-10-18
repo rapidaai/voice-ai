@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import ReactGA from 'react-ga4';
 import { GA, getAnalyticsPagePath, isGoogleAnalyticsEnabled } from '../ga';
@@ -32,6 +33,7 @@ describe('GA', () => {
   });
 
   it('sends page views in production and keeps initialization one-time', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     renderTracker('G-APP-SHELL-1');
 
     await waitFor(() =>
@@ -43,7 +45,7 @@ describe('GA', () => {
       page: '/dashboard?tab=overview',
     });
 
-    fireEvent.click(screen.getByRole('link', { name: 'Go to settings' }));
+    await user.click(screen.getByRole('link', { name: 'Go to settings' }));
 
     await waitFor(() =>
       expect(ReactGA.send).toHaveBeenLastCalledWith({

@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { UpdateAssistantAnalysis } from '@/app/pages/assistant/actions/configure-assistant-analysis/update-assistant-analysis';
@@ -373,17 +374,19 @@ describe('UpdateAssistantAnalysis', () => {
   });
 
   it('loads analysis on mount and pre-fills fields', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<UpdateAssistantAnalysis assistantId="assistant-1" />);
 
     await waitFor(() => {
       expect(GetAssistantConfiguration).toHaveBeenCalled();
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Pick endpoint' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Pick endpoint' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(screen.getByDisplayValue('loaded-analysis')).toBeInTheDocument();
   });
 
   it('shows validation error when configure tab has no parameters', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<UpdateAssistantAnalysis assistantId="assistant-1" />);
 
     await waitFor(() => {
@@ -391,8 +394,8 @@ describe('UpdateAssistantAnalysis', () => {
     });
 
     const removeButtons = screen.getAllByRole('button', { name: 'Remove' });
-    fireEvent.click(removeButtons[removeButtons.length - 1]);
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(removeButtons[removeButtons.length - 1]);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(
       screen.getByText('Please provide one or more parameters.'),
@@ -400,6 +403,7 @@ describe('UpdateAssistantAnalysis', () => {
   });
 
   it('updates analysis successfully and navigates back to analysis listing', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (UpdateAssistantConfiguration as jest.Mock).mockResolvedValue({
       getSuccess: () => true,
     });
@@ -410,9 +414,9 @@ describe('UpdateAssistantAnalysis', () => {
       expect(GetAssistantConfiguration).toHaveBeenCalled();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pick endpoint' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Update analysis' }));
+    await user.click(screen.getByRole('button', { name: 'Pick endpoint' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Update analysis' }));
 
     await waitFor(() => {
       expect(UpdateAssistantConfiguration).toHaveBeenCalled();
@@ -428,6 +432,7 @@ describe('UpdateAssistantAnalysis', () => {
   });
 
   it('shows human error message when update response is unsuccessful', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (UpdateAssistantConfiguration as jest.Mock).mockResolvedValue({
       getSuccess: () => false,
       getError: () => ({ getHumanmessage: () => 'Invalid analysis name' }),
@@ -439,9 +444,9 @@ describe('UpdateAssistantAnalysis', () => {
       expect(GetAssistantConfiguration).toHaveBeenCalled();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pick endpoint' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Update analysis' }));
+    await user.click(screen.getByRole('button', { name: 'Pick endpoint' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Update analysis' }));
 
     expect(
       await screen.findByText('Invalid analysis name'),
@@ -449,6 +454,7 @@ describe('UpdateAssistantAnalysis', () => {
   });
 
   it('supports add and edit for parameter mapping before update', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (UpdateAssistantConfiguration as jest.Mock).mockResolvedValue({
       getSuccess: () => true,
     });
@@ -457,38 +463,37 @@ describe('UpdateAssistantAnalysis', () => {
 
     await waitFor(() => expect(GetAssistantConfiguration).toHaveBeenCalled());
 
-    fireEvent.change(
+    await user.selectOptions(
       document.getElementById('tool-condition-key') as HTMLElement,
-      {
-        target: { value: 'conversation_mode' },
-      },
+      String('conversation_mode'),
     );
-    fireEvent.change(
+    await user.selectOptions(
       document.getElementById('tool-condition-source-value') as HTMLElement,
-      {
-        target: { value: 'text' },
-      },
+      String('text'),
     );
-    fireEvent.change(document.getElementById('param-key-0') as HTMLElement, {
-      target: { value: 'id' },
-    });
-    fireEvent.change(document.getElementById('param-val-0') as HTMLElement, {
-      target: { value: 'conversationId' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add parameter' }));
-    fireEvent.change(document.getElementById('param-type-1') as HTMLElement, {
-      target: { value: 'assistant' },
-    });
-    fireEvent.change(document.getElementById('param-key-1') as HTMLElement, {
-      target: { value: 'name' },
-    });
-    fireEvent.change(document.getElementById('param-val-1') as HTMLElement, {
-      target: { value: 'assistantName' },
-    });
+    await user.selectOptions(
+      document.getElementById('param-key-0') as HTMLElement,
+      String('id'),
+    );
+    await user.click(document.getElementById('param-val-0') as HTMLElement);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('conversationId'));
+    await user.click(screen.getByRole('button', { name: 'Add parameter' }));
+    await user.selectOptions(
+      document.getElementById('param-type-1') as HTMLElement,
+      String('assistant'),
+    );
+    await user.selectOptions(
+      document.getElementById('param-key-1') as HTMLElement,
+      String('name'),
+    );
+    await user.click(document.getElementById('param-val-1') as HTMLElement);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('assistantName'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pick endpoint' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Update analysis' }));
+    await user.click(screen.getByRole('button', { name: 'Pick endpoint' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Update analysis' }));
 
     await waitFor(() =>
       expect(UpdateAssistantConfiguration).toHaveBeenCalled(),
@@ -533,20 +538,22 @@ describe('UpdateAssistantAnalysis', () => {
   });
 
   it('blocks reserved analysis option mapping key', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<UpdateAssistantAnalysis assistantId="assistant-1" />);
 
     await waitFor(() => expect(GetAssistantConfiguration).toHaveBeenCalled());
 
-    fireEvent.change(document.getElementById('param-type-0') as HTMLElement, {
-      target: { value: 'option' },
-    });
-    fireEvent.change(document.getElementById('param-key-0') as HTMLElement, {
-      target: { value: 'endpoint_parameters' },
-    });
-    fireEvent.change(document.getElementById('param-val-0') as HTMLElement, {
-      target: { value: 'shouldFail' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.selectOptions(
+      document.getElementById('param-type-0') as HTMLElement,
+      String('option'),
+    );
+    await user.click(document.getElementById('param-key-0') as HTMLElement);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('endpoint_parameters'));
+    await user.click(document.getElementById('param-val-0') as HTMLElement);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('shouldFail'));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(
       screen.getByText(

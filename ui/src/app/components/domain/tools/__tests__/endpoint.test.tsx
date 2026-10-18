@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import { ConfigureEndpoint } from '../endpoint';
@@ -89,7 +90,8 @@ jest.mock('@/app/components/ui/editor/code-editor', () => ({
 }));
 
 describe('ConfigureEndpoint', () => {
-  it('supports add and edit mapping parameters', () => {
+  it('supports add and edit mapping parameters', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onParameterChange = jest.fn();
 
     render(
@@ -102,17 +104,19 @@ describe('ConfigureEndpoint', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pick endpoint' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add parameter' }));
-    fireEvent.change(screen.getByTestId('param-type-0'), {
-      target: { value: 'tool' },
-    });
-    fireEvent.change(screen.getByTestId('param-key-0'), {
-      target: { value: 'argument' },
-    });
-    fireEvent.change(screen.getByTestId('param-val-0'), {
-      target: { value: 'customer_id' },
-    });
+    await user.click(screen.getByRole('button', { name: 'Pick endpoint' }));
+    await user.click(screen.getByRole('button', { name: 'Add parameter' }));
+    await user.selectOptions(
+      screen.getByTestId('param-type-0'),
+      String('tool'),
+    );
+    await user.selectOptions(
+      screen.getByTestId('param-key-0'),
+      String('argument'),
+    );
+    await user.click(screen.getByTestId('param-val-0'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('customer_id'));
 
     const endpointIdCalls = onParameterChange.mock.calls.map(
       call => toMap(call[0] as Metadata[])['tool.endpoint_id'],

@@ -1,8 +1,9 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
-import { Tab } from '../tabs';
+import { Tab, Tabs } from '../tabs';
 
 jest.mock('@carbon/react', () => {
   const React = require('react');
@@ -63,6 +64,12 @@ jest.mock('@carbon/react', () => {
 });
 
 describe('Tab', () => {
+  it('keeps an associated panel for every tab when content renders elsewhere', () => {
+    render(<Tabs tabs={['Messages', 'Details']} />);
+
+    expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(2);
+  });
+
   it('selects the tab matching the active label', () => {
     render(
       <Tab
@@ -83,7 +90,8 @@ describe('Tab', () => {
     ).not.toHaveAttribute('hidden');
   });
 
-  it('changes selected panels through Carbon tabs', () => {
+  it('changes selected panels through Carbon tabs', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <Tab
         active="Output"
@@ -94,7 +102,7 @@ describe('Tab', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Metrics' }));
+    await user.click(screen.getByRole('tab', { name: 'Metrics' }));
 
     expect(screen.getByRole('tab', { name: 'Metrics' })).toHaveAttribute(
       'aria-selected',

@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	assistantApi "github.com/rapidaai/api/assistant-api/api/assistant"
 	assistantDeploymentApi "github.com/rapidaai/api/assistant-api/api/assistant-deployment"
+	dashboardApi "github.com/rapidaai/api/assistant-api/api/dashboard"
 	observabilityApi "github.com/rapidaai/api/assistant-api/api/observability"
 	assistantTalkApi "github.com/rapidaai/api/assistant-api/api/talk"
 	"github.com/rapidaai/api/assistant-api/config"
@@ -38,6 +39,7 @@ func AssistantApiRoute(
 		Opensearch,
 	)
 	workflow_api.RegisterAssistantServiceServer(S, assistantServiceServer)
+	workflow_api.RegisterProjectDashboardAnalyticsServiceServer(S, dashboardApi.NewProjectDashboardAnalyticsGRPC(Logger, Postgres))
 	workflow_api.RegisterObservabilityServiceServer(S,
 		observabilityApi.NewObservabilityGRPCApi(Cfg,
 			Logger,

@@ -1,5 +1,5 @@
 import { useCallback, useContext, useMemo, useState } from 'react';
-import { Dropdown } from '@carbon/react';
+import { DefinitionTooltip, Dropdown } from '@carbon/react';
 import toast from 'react-hot-toast/headless';
 import {
   Modal,
@@ -11,6 +11,7 @@ import {
   SecondaryButton,
   Stack,
   TextInput,
+  typographyClassNames,
 } from '@/app/components/ui/primitives';
 import { ErrorMessage } from '@/app/components/ui/feedback';
 import { AuthContext } from '@/context/auth-context';
@@ -146,8 +147,10 @@ export function InviteOrganizationUserDialog({
       preventCloseOnClickOutside
     >
       <ModalHeader
-        label="User Management"
+        label="User management"
+        labelClassName={typographyClassNames.helper}
         title="Invite user to organization"
+        titleClassName={typographyClassNames.sectionTitle}
         onClose={closeDialog}
       />
       <ModalBody hasForm hasScrollingContent>
@@ -180,18 +183,30 @@ export function InviteOrganizationUserDialog({
               setOrganizationRole(selectedItem?.value || '');
             }}
           />
-          <ProjectRoleTable
-            rows={projectRoleRows}
-            onChange={next => {
-              setError('');
-              setProjectRoleRows(next);
-            }}
-            projectOptions={projectOptions}
-            roleOptions={projectRoles}
-            defaultProjectId={projectOptions[0]?.value || ''}
-            title="Project roles"
-            addButtonLabel="Add project role"
-          />
+          <div>
+            <div className="mb-3">
+              <h3 className={typographyClassNames.componentTitle}>
+                <DefinitionTooltip
+                  align="right"
+                  definition="Optional. Assign project roles now, or invite the user with organization access only."
+                  openOnHover
+                >
+                  Project access
+                </DefinitionTooltip>
+              </h3>
+            </div>
+            <ProjectRoleTable
+              rows={projectRoleRows}
+              onChange={next => {
+                setError('');
+                setProjectRoleRows(next);
+              }}
+              projectOptions={projectOptions}
+              roleOptions={projectRoles}
+              defaultProjectId={projectOptions[0]?.value || ''}
+              addButtonLabel="Add project access"
+            />
+          </div>
           <ErrorMessage message={error} />
         </Stack>
       </ModalBody>

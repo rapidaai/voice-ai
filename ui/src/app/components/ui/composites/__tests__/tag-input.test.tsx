@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { TagInput } from '../tag-input';
@@ -64,7 +65,8 @@ jest.mock('@carbon/react', () => {
 });
 
 describe('TagInput', () => {
-  it('adds a typed tag on Enter and clears the field', () => {
+  it('adds a typed tag on Enter and clears the field', async () => {
+    const user = userEvent.setup();
     const addTag = jest.fn();
 
     render(
@@ -72,14 +74,17 @@ describe('TagInput', () => {
     );
 
     const input = screen.getByRole('textbox', { name: 'Tags (Optional)' });
-    fireEvent.change(input, { target: { value: 'priority' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
+    await user.click(input);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('priority'));
+    await user.type(input, '{Enter}');
 
     expect(addTag).toHaveBeenCalledWith('priority');
     expect(input).toHaveValue('');
   });
 
-  it('does not add empty values and removes existing tags', () => {
+  it('does not add empty values and removes existing tags', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const addTag = jest.fn();
     const removeTag = jest.fn();
 
@@ -92,14 +97,15 @@ describe('TagInput', () => {
       />,
     );
 
-    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
-    fireEvent.click(screen.getByRole('button', { name: 'production' }));
+    await user.type(screen.getByRole('textbox'), '{Enter}');
+    await user.click(screen.getByRole('button', { name: 'production' }));
 
     expect(addTag).not.toHaveBeenCalled();
     expect(removeTag).toHaveBeenCalledWith('production');
   });
 
-  it('offers only tags that are not already selected', () => {
+  it('offers only tags that are not already selected', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const addTag = jest.fn();
 
     render(
@@ -113,7 +119,7 @@ describe('TagInput', () => {
 
     expect(screen.getAllByRole('button', { name: 'billing' })).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'support' }));
+    await user.click(screen.getByRole('button', { name: 'support' }));
 
     expect(addTag).toHaveBeenCalledWith('support');
   });

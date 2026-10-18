@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { ViewEndpointPage } from '@/app/pages/endpoint/view';
@@ -266,7 +267,8 @@ describe('Endpoint detail layout', () => {
     );
   });
 
-  it('uses the same collapsible Carbon side navigation as assistant details', () => {
+  it('uses the same collapsible Carbon side navigation as assistant details', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const overviewRender = renderEndpointDetailRoute(
       '/deployment/endpoint/endpoint-1/overview',
     );
@@ -305,7 +307,7 @@ describe('Endpoint detail layout', () => {
       within(endpointNav).getByRole('link', { name: 'Open playground' }),
     ).toHaveAttribute('href', '/deployment/endpoint/endpoint-1/playground');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse nav' }));
+    await user.click(screen.getByRole('button', { name: 'Collapse nav' }));
     expect(endpointNav).toHaveAttribute('data-expanded', 'false');
     expect(
       screen.getByRole('button', { name: 'Expand nav' }),

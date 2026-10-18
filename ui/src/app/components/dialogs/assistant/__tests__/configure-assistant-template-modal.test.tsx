@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ConfigureAssistantTemplateDialog } from '../configure-assistant-template-modal';
 
@@ -59,16 +60,18 @@ jest.mock('@/app/components/ui/primitives', () => ({
 }));
 
 describe('ConfigureAssistantTemplateDialog', () => {
-  const selectCustomerSupportTemplate = () => {
+  const selectCustomerSupportTemplate = async () => {
+    const user = userEvent.setup();
     const heading = screen.getByRole('heading', {
       name: 'Customer Support Agent',
     });
     const tile = heading.closest('button');
     if (!tile) throw new Error('Customer Support Agent tile was not found');
-    fireEvent.click(tile);
+    await user.click(tile);
   };
 
-  it('selects an assistant template and returns it', () => {
+  it('selects an assistant template and returns it', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onSelectTemplate = jest.fn();
     const setModalOpen = jest.fn();
 
@@ -82,8 +85,8 @@ describe('ConfigureAssistantTemplateDialog', () => {
 
     expect(screen.getByRole('button', { name: 'Use template' })).toBeDisabled();
 
-    selectCustomerSupportTemplate();
-    fireEvent.click(screen.getByRole('button', { name: 'Use template' }));
+    await selectCustomerSupportTemplate();
+    await user.click(screen.getByRole('button', { name: 'Use template' }));
 
     expect(onSelectTemplate).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Customer Support Agent' }),
@@ -91,7 +94,8 @@ describe('ConfigureAssistantTemplateDialog', () => {
     expect(setModalOpen).toHaveBeenCalledWith(false);
   });
 
-  it('closes after selecting a template when no selection callback is provided', () => {
+  it('closes after selecting a template when no selection callback is provided', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
 
     render(
@@ -101,13 +105,14 @@ describe('ConfigureAssistantTemplateDialog', () => {
       />,
     );
 
-    selectCustomerSupportTemplate();
-    fireEvent.click(screen.getByRole('button', { name: 'Use template' }));
+    await selectCustomerSupportTemplate();
+    await user.click(screen.getByRole('button', { name: 'Use template' }));
 
     expect(setModalOpen).toHaveBeenCalledWith(false);
   });
 
-  it('filters templates by category and clears the active selection', () => {
+  it('filters templates by category and clears the active selection', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onSelectTemplate = jest.fn();
 
     render(
@@ -118,10 +123,10 @@ describe('ConfigureAssistantTemplateDialog', () => {
       />,
     );
 
-    selectCustomerSupportTemplate();
+    await selectCustomerSupportTemplate();
     expect(screen.getByText('Selected:')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sales' }));
+    await user.click(screen.getByRole('button', { name: 'Sales' }));
 
     expect(
       screen.queryByText('Customer Support Agent'),
@@ -132,7 +137,8 @@ describe('ConfigureAssistantTemplateDialog', () => {
     expect(screen.getByRole('button', { name: 'Use template' })).toBeDisabled();
   });
 
-  it('closes without selecting a template', () => {
+  it('closes without selecting a template', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onSelectTemplate = jest.fn();
     const setModalOpen = jest.fn();
 
@@ -144,7 +150,7 @@ describe('ConfigureAssistantTemplateDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(onSelectTemplate).not.toHaveBeenCalled();
     expect(setModalOpen).toHaveBeenCalledWith(false);

@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { SourceConditionRule } from '../source-condition-rule';
 
@@ -35,11 +36,11 @@ jest.mock('@carbon/icons-react', () => ({
 jest.mock('@carbon/react', () => ({
   Button: ({
     children,
-    className: _className,
+    className,
     disabled,
     hasIconOnly: _hasIconOnly,
     iconDescription,
-    kind: _kind,
+    kind,
     onClick,
     renderIcon: Icon,
     size: _size,
@@ -49,6 +50,8 @@ jest.mock('@carbon/react', () => ({
       aria-label={
         iconDescription || (typeof children === 'string' ? children : undefined)
       }
+      className={className}
+      data-kind={kind}
       disabled={disabled}
       onClick={onClick}
       {...props}
@@ -97,7 +100,8 @@ jest.mock('@carbon/react', () => ({
 }));
 
 describe('SourceConditionRule', () => {
-  it('renders a default row and adds a new default condition', () => {
+  it('renders a default row and adds a new default condition', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeConditions = jest.fn();
 
     render(
@@ -116,8 +120,15 @@ describe('SourceConditionRule', () => {
       'phone',
     );
     expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remove' })).toHaveAttribute(
+      'data-kind',
+      'ghost',
+    );
+    expect(screen.getByRole('button', { name: 'Remove' })).toHaveClass(
+      '!text-[var(--cds-support-error)]',
+    );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
+    await user.click(screen.getByRole('button', { name: 'Add rule' }));
 
     expect(onChangeConditions).toHaveBeenCalledWith([
       { key: 'source', condition: '=', value: 'phone' },
@@ -125,7 +136,8 @@ describe('SourceConditionRule', () => {
     ]);
   });
 
-  it('updates key, condition, and value while resetting values by key', () => {
+  it('updates key, condition, and value while resetting values by key', async () => {
+    const user = userEvent.setup();
     const onChangeConditions = jest.fn();
 
     render(
@@ -139,23 +151,26 @@ describe('SourceConditionRule', () => {
       />,
     );
 
-    fireEvent.change(screen.getByTestId('tool-condition-key'), {
-      target: { value: 'conversation_mode' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('tool-condition-key'),
+      String('conversation_mode'),
+    );
     expect(onChangeConditions).toHaveBeenLastCalledWith([
       { key: 'conversation_mode', condition: '=', value: 'voice' },
     ]);
 
-    fireEvent.change(screen.getByTestId('tool-condition-op'), {
-      target: { value: '!=' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('tool-condition-op'),
+      String('!='),
+    );
     expect(onChangeConditions).toHaveBeenLastCalledWith([
       { key: 'source', condition: '!=', value: 'phone' },
     ]);
 
-    fireEvent.change(screen.getByTestId('tool-condition-source-value'), {
-      target: { value: 'web' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('tool-condition-source-value'),
+      String('web'),
+    );
     expect(onChangeConditions).toHaveBeenLastCalledWith([
       { key: 'source', condition: '=', value: 'web' },
     ]);
@@ -194,7 +209,8 @@ describe('SourceConditionRule', () => {
     ).toHaveClass('!w-10', '!p-0', '!text-center');
   });
 
-  it('removes rows only when more than one row is present', () => {
+  it('removes rows only when more than one row is present', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeConditions = jest.fn();
 
     const { rerender } = render(
@@ -206,7 +222,7 @@ describe('SourceConditionRule', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
     expect(onChangeConditions).not.toHaveBeenCalled();
 
     rerender(
@@ -221,14 +237,15 @@ describe('SourceConditionRule', () => {
       />,
     );
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
 
     expect(onChangeConditions).toHaveBeenCalledWith([
       { key: 'source', condition: '!=', value: 'web' },
     ]);
   });
 
-  it('falls back when option lists are empty', () => {
+  it('falls back when option lists are empty', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeConditions = jest.fn();
 
     render(
@@ -241,7 +258,7 @@ describe('SourceConditionRule', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
+    await user.click(screen.getByRole('button', { name: 'Add rule' }));
 
     expect(onChangeConditions).toHaveBeenCalledWith([
       { key: 'source', condition: '=', value: '' },
@@ -249,7 +266,8 @@ describe('SourceConditionRule', () => {
     ]);
   });
 
-  it('uses an empty value when the selected key has no value options', () => {
+  it('uses an empty value when the selected key has no value options', async () => {
+    const user = userEvent.setup();
     const onChangeConditions = jest.fn();
 
     render(
@@ -268,9 +286,10 @@ describe('SourceConditionRule', () => {
       />,
     );
 
-    fireEvent.change(screen.getByTestId('tool-condition-key'), {
-      target: { value: 'empty' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('tool-condition-key'),
+      String('empty'),
+    );
 
     expect(onChangeConditions).toHaveBeenCalledWith([
       { key: 'empty', condition: '=', value: '' },

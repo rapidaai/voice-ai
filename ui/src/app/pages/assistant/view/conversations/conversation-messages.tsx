@@ -105,7 +105,7 @@ export const ConversationMessages: FC<{
       {conversation.getRecordingsList().map((x, idx) => (
         <div key={idx}>
           <div className="flex items-center h-8 px-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 shrink-0">
-            <p className="text-xs font-medium uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+            <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--cds-text-secondary)]">
               Recording {idx + 1}
             </p>
           </div>
@@ -114,7 +114,7 @@ export const ConversationMessages: FC<{
       ))}
 
       <div className="flex items-center justify-between h-10 px-4 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-[2] shrink-0 bg-white dark:bg-gray-900">
-        <span className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        <span className="text-xs font-medium uppercase tracking-wider text-[var(--cds-text-secondary)]">
           {conversations.length}{' '}
           {conversations.length === 1 ? 'message' : 'messages'}
         </span>
@@ -164,7 +164,7 @@ export const ConversationMessages: FC<{
                     <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-gray-300">
                       {visual.label}
                     </p>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400 ml-auto">
+                    <p className="text-[10px] ml-auto text-[var(--cds-text-secondary)]">
                       {toHumanReadableDateTime(x.getCreateddate()!)}
                     </p>
                   </div>

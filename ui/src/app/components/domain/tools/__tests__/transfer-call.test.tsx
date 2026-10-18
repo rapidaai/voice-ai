@@ -1,8 +1,10 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import { ConfigureTransferCall } from '../transfer-call';
+import userEvent from '@testing-library/user-event';
+import { setRangeValue } from '@/test-utils/set-range-value';
 
 jest.mock('@/app/components/ui/primitives/form', () => {
   const React = require('react');
@@ -115,7 +117,8 @@ const createMetadata = (key: string, value: string): Metadata => {
 };
 
 describe('ConfigureTransferCall', () => {
-  it('loads and updates transfer message and transfer delay for save payload', () => {
+  it('loads and updates transfer message and transfer delay for save payload', async () => {
+    const user = userEvent.setup();
     const onParameterChange = jest.fn();
     const params = [
       createMetadata('tool.transfer_to', '+14155551234'),
@@ -145,9 +148,9 @@ describe('ConfigureTransferCall', () => {
     expect(postTransferAction).toHaveValue('end_call');
     expect(ringtone).toHaveValue('ring-ring');
 
-    fireEvent.change(message, {
-      target: { value: 'Connecting you now to our support specialist.' },
-    });
+    await user.click(message);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Connecting you now to our support specialist.'));
 
     const afterMessageUpdate = onParameterChange.mock.calls.at(
       -1,
@@ -163,7 +166,8 @@ describe('ConfigureTransferCall', () => {
         ?.getValue(),
     ).toBe('700');
 
-    fireEvent.change(delay, { target: { value: '650' } });
+    await user.click(delay);
+    setRangeValue(delay as HTMLInputElement, 650);
 
     const afterDelayUpdate = onParameterChange.mock.calls.at(
       -1,
@@ -179,7 +183,7 @@ describe('ConfigureTransferCall', () => {
         ?.getValue(),
     ).toBe('Please hold while I transfer your call.');
 
-    fireEvent.change(postTransferAction, { target: { value: 'resume_ai' } });
+    await user.selectOptions(postTransferAction, String('resume_ai'));
 
     const afterActionUpdate = onParameterChange.mock.calls.at(
       -1,
@@ -190,7 +194,7 @@ describe('ConfigureTransferCall', () => {
         ?.getValue(),
     ).toBe('resume_ai');
 
-    fireEvent.change(ringtone, { target: { value: 'transfer-music' } });
+    await user.selectOptions(ringtone, String('transfer-music'));
 
     const afterRingtoneUpdate = onParameterChange.mock.calls.at(
       -1,

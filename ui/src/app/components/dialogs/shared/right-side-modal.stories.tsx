@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from '@carbon/react';
 import { useState } from 'react';
 import { RightSideModal } from './right-side-modal';

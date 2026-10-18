@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { UpdateKnowledgeDocumentSegment } from '@rapidaai/react';
@@ -110,7 +111,8 @@ describe('EditKnowledgeDocumentSegmentDialog', () => {
     expect(screen.getByTestId('update-icon')).toBeInTheDocument();
   });
 
-  it('submits trimmed entity values and closes after a successful update', () => {
+  it('submits trimmed entity values and closes after a successful update', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onClose = jest.fn();
     const onUpdate = jest.fn();
     mockUpdateKnowledgeDocumentSegment.mockImplementation(
@@ -128,11 +130,12 @@ describe('EditKnowledgeDocumentSegmentDialog', () => {
       />,
     );
 
-    fireEvent.change(
+    await user.click(
       screen.getByPlaceholderText('Enter organizations separated by commas'),
-      { target: { value: 'Org A, Org B, ' } },
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Update document' }));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Org A, Org B, '));
+    await user.click(screen.getByRole('button', { name: 'Update document' }));
 
     expect(mockUpdateKnowledgeDocumentSegment).toHaveBeenCalledWith(
       { endpoint: 'test-endpoint' },
@@ -159,7 +162,8 @@ describe('EditKnowledgeDocumentSegmentDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('shows an error when update fails', () => {
+  it('shows an error when update fails', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockUpdateKnowledgeDocumentSegment.mockImplementation(
       (...args: unknown[]) => {
         const callback = args[13] as Function;
@@ -175,7 +179,7 @@ describe('EditKnowledgeDocumentSegmentDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Update document' }));
+    await user.click(screen.getByRole('button', { name: 'Update document' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Error: Failed to update the segment. Please try again.',

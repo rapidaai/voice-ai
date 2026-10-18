@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import {
@@ -150,7 +151,8 @@ describe('Actionable header project switcher', () => {
     mockRapidaLoadingType = undefined;
   });
 
-  it('renders project dropdown in header and switches project on selection', () => {
+  it('renders project dropdown in header and switches project on selection', async () => {
+    const user = userEvent.setup();
     const setCurrentProjectRole = jest.fn();
 
     render(
@@ -188,7 +190,7 @@ describe('Actionable header project switcher', () => {
     expect(screen.getByRole('option', { name: 'Alpha' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Beta' })).toBeInTheDocument();
 
-    fireEvent.change(projectSelector, { target: { value: '1' } });
+    await user.selectOptions(projectSelector, String('1'));
     expect(setCurrentProjectRole).toHaveBeenCalledWith(projectRoles[1]);
   });
 
@@ -246,7 +248,8 @@ describe('Actionable header project switcher', () => {
     expect(screen.queryByLabelText('Select project')).not.toBeInTheDocument();
   });
 
-  it('ignores an empty project selection from the dropdown', () => {
+  it('ignores an empty project selection from the dropdown', async () => {
+    const user = userEvent.setup();
     const setCurrentProjectRole = jest.fn();
 
     render(
@@ -261,21 +264,23 @@ describe('Actionable header project switcher', () => {
       </AuthContext.Provider>,
     );
 
-    fireEvent.change(screen.getByLabelText('Select project'), {
-      target: { value: '-1' },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Select project'),
+      String('-1'),
+    );
 
     expect(setCurrentProjectRole).not.toHaveBeenCalled();
   });
 
-  it('renders configured account links without documentation or source', () => {
+  it('renders configured account links without documentation or source', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <AuthContext.Provider value={{}}>
         <CustomerOptions />
       </AuthContext.Provider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+    await user.click(screen.getByRole('button', { name: 'Account' }));
 
     expect(
       screen.queryByRole('img', { name: 'Acme Voice' }),
@@ -311,14 +316,15 @@ describe('Actionable header project switcher', () => {
     expect(screen.getByRole('button', { name: 'Account' })).toBeInTheDocument();
   });
 
-  it('toggles theme mode from the global action', () => {
+  it('toggles theme mode from the global action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <AuthContext.Provider value={{}}>
         <CustomerOptions />
       </AuthContext.Provider>,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Switch to dark mode' }),
     );
 

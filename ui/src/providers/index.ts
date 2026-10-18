@@ -1,5 +1,7 @@
 import productionProvider from './provider.production.json';
 import developmentProvider from './provider.development.json';
+import { getRuntimeEnv } from '@/configs/runtime-env';
+import { getProviderAsset } from '@/providers/provider-assets';
 
 export interface IntegrationProvider extends RapidaProvider { }
 interface EndOfSpeechProvider extends RapidaProvider { }
@@ -72,7 +74,7 @@ export const CONJUNCTION_BOUNDARIES = [
 ];
 
 export const allProvider = (): RapidaProvider[] => {
-  const env = process.env.NODE_ENV || 'development';
+  const env = getRuntimeEnv().mode;
   return env === 'production' ? productionProvider : developmentProvider;
 };
 
@@ -134,15 +136,15 @@ export const TELEMETRY_PROVIDER = allProvider().filter(x =>
  */
 
 export const AZURE_TEXT_TO_SPEECH_VOICE = () => {
-  return require('./azure-speech-service/voices.json');
+  return getProviderAsset('azure-speech-service', 'voices.json');
 };
 
 export const AZURE_TEXT_TO_SPEECH_LANGUAGE = () => {
-  return require('./azure-speech-service/text-to-speech-language.json');
+  return getProviderAsset('azure-speech-service', 'text-to-speech-language.json');
 };
 
 export const AZURE_SPEECH_TO_TEXT_LANGUAGE = () => {
-  return require('./azure-speech-service/speech-to-text-language.json');
+  return getProviderAsset('azure-speech-service', 'speech-to-text-language.json');
 };
 
 /**
@@ -150,13 +152,13 @@ export const AZURE_SPEECH_TO_TEXT_LANGUAGE = () => {
  * @returns
  */
 export const GOOGLE_CLOUD_VOICE = () => {
-  return require('./google/interim.voice.json');
+  return getProviderAsset('google', 'interim.voice.json');
 };
 export const GOOGLE_SPEECH_TO_TEXT_MODEL = () => {
-  return require('./google/speech-to-text-model.json');
+  return getProviderAsset('google', 'speech-to-text-model.json');
 };
 export const GOOGLE_SPEECH_TO_TEXT_LANGUGAE = () => {
-  return require('./google/speech-to-text-language.json');
+  return getProviderAsset('google', 'speech-to-text-language.json');
 };
 
 /**
@@ -164,15 +166,15 @@ export const GOOGLE_SPEECH_TO_TEXT_LANGUGAE = () => {
  * @returns
  */
 export const DEEPGRAM_VOICE = () => {
-  return require('./deepgram/voices.json');
+  return getProviderAsset('deepgram', 'voices.json');
 };
 
 export const DEEPGRAM_SPEECH_TO_TEXT_MODEL = () => {
-  return require('./deepgram/speech-to-text-models.json');
+  return getProviderAsset('deepgram', 'speech-to-text-models.json');
 };
 
 export const DEEPGRAM_SPEECH_TO_TEXT_LANGUAGE = () => {
-  return require('./deepgram/speech-to-text-languages.json');
+  return getProviderAsset('deepgram', 'speech-to-text-languages.json');
 };
 
 /**
@@ -180,26 +182,26 @@ export const DEEPGRAM_SPEECH_TO_TEXT_LANGUAGE = () => {
  * @returns
  */
 export const ELEVENLABS_MODEL = () => {
-  return require('./elevenlabs/models.json');
+  return getProviderAsset('elevenlabs', 'models.json');
 };
 
 export const ELEVENLABS_VOICE = () => {
-  return require('./elevenlabs/voices.json');
+  return getProviderAsset('elevenlabs', 'voices.json');
 };
 
 export const ELEVENLABS_LANGUAGE = () => {
-  return require('./elevenlabs/languages.json');
+  return getProviderAsset('elevenlabs', 'languages.json');
 };
 
 /**
  * Rime
  */
 export const RIME_MODEL = () => {
-  return require('./rime/models.json');
+  return getProviderAsset('rime', 'models.json');
 };
 
 export const RIME_VOICE = (model?: string, language?: string) => {
-  const voices = require('./rime/voices.json');
+  const voices = getProviderAsset('rime', 'voices.json');
   if (model && language && voices[model]?.[language]) {
     return voices[model][language];
   }
@@ -210,9 +212,9 @@ export const RIME_VOICE = (model?: string, language?: string) => {
 };
 
 export const RIME_LANGUAGE = (model?: string) => {
-  const allLanguages = require('./rime/languages.json');
+  const allLanguages = getProviderAsset('rime', 'languages.json');
   if (model) {
-    const voices = require('./rime/voices.json');
+    const voices = getProviderAsset('rime', 'voices.json');
     const modelVoices = voices[model];
     if (modelVoices) {
       const availableLangIds = Object.keys(modelVoices);
@@ -232,19 +234,19 @@ export const RIME_LANGUAGE = (model?: string) => {
 //
 
 export const CARTESIA_VOICE = () => {
-  return require('./cartesia/voices.json');
+  return getProviderAsset('cartesia', 'voices.json');
 };
 
 export const CARTESIA_TEXT_TO_SPEECH_MODEL = () => {
-  return require('./cartesia/text-to-speech-models.json');
+  return getProviderAsset('cartesia', 'text-to-speech-models.json');
 };
 
 export const CARTESIA_SPEECH_TO_TEXT_MODEL = () => {
-  return require('./cartesia/speech-to-text-models.json');
+  return getProviderAsset('cartesia', 'speech-to-text-models.json');
 };
 
 export const CARTESIA_LANGUAGE = () => {
-  return require('./cartesia/languages.json');
+  return getProviderAsset('cartesia', 'languages.json');
 };
 
 export const CARTESIA_SPEED_OPTION = () => {
@@ -287,7 +289,7 @@ export const CARTESIA_EMOTION_LEVEL_COMBINATION = [
  */
 
 export const GEMINI_EMBEDDING_MODEL = () => {
-  return require('./gemini/text-embedding-models.json');
+  return getProviderAsset('gemini', 'text-embedding-models.json');
 };
 
 /**
@@ -298,19 +300,19 @@ export const GEMINI_EMBEDDING_MODEL = () => {
  */
 
 export const SARVAM_LANGUAGE = () => {
-  return require('./sarvam/languages.json');
+  return getProviderAsset('sarvam', 'languages.json');
 };
 
 export const SARVAM_TEXT_TO_SPEECH_MODEL = () => {
-  return require('./sarvam/text-to-speech-models.json');
+  return getProviderAsset('sarvam', 'text-to-speech-models.json');
 };
 
 export const SARVAM_SPEECH_TO_TEXT_MODEL = () => {
-  return require('./sarvam/speech-to-text-models.json');
+  return getProviderAsset('sarvam', 'speech-to-text-models.json');
 };
 
 export const SARVAM_VOICE = (model?: string) => {
-  const voices = require('./sarvam/voices.json');
+  const voices = getProviderAsset('sarvam', 'voices.json');
   if (model && voices[model]) {
     return voices[model];
   }
@@ -323,97 +325,97 @@ export const SARVAM_VOICE = (model?: string) => {
  */
 
 export const ASSEMBLYAI_SPEECH_TO_TEXT_MODEL = () => {
-  return require('./assemblyai/speech-to-text-models.json');
+  return getProviderAsset('assemblyai', 'speech-to-text-models.json');
 };
 export const ASSEMBLYAI_LANGUAGE = () => {
-  return require('./assemblyai/languages.json');
+  return getProviderAsset('assemblyai', 'languages.json');
 };
 
 /**
  * Resemble AI
  */
 export const RESEMBLEAI_VOICE = () => {
-  return require('./resembleai/voices.json');
+  return getProviderAsset('resembleai', 'voices.json');
 };
 
 /**
  * Neuphonic
  */
 export const NEUPHONIC_VOICE = () => {
-  return require('./neuphonic/voices.json');
+  return getProviderAsset('neuphonic', 'voices.json');
 };
 
 export const NEUPHONIC_LANGUAGE = () => {
-  return require('./neuphonic/languages.json');
+  return getProviderAsset('neuphonic', 'languages.json');
 };
 
 /**
  * MiniMax
  */
 export const MINIMAX_MODEL = () => {
-  return require('./minimax/models.json');
+  return getProviderAsset('minimax', 'models.json');
 };
 
 export const MINIMAX_VOICE = () => {
-  return require('./minimax/voices.json');
+  return getProviderAsset('minimax', 'voices.json');
 };
 
 /**
  * Groq
  */
 export const GROQ_SPEECH_TO_TEXT_MODEL = () => {
-  return require('./groq/speech-to-text-models.json');
+  return getProviderAsset('groq', 'speech-to-text-models.json');
 };
 
 export const GROQ_SPEECH_TO_TEXT_LANGUAGE = () => {
-  return require('./groq/speech-to-text-languages.json');
+  return getProviderAsset('groq', 'speech-to-text-languages.json');
 };
 
 export const GROQ_TEXT_TO_SPEECH_MODEL = () => {
-  return require('./groq/text-to-speech-models.json');
+  return getProviderAsset('groq', 'text-to-speech-models.json');
 };
 
 export const GROQ_VOICE = () => {
-  return require('./groq/voices.json');
+  return getProviderAsset('groq', 'voices.json');
 };
 
 /**
  * Speechmatics
  */
 export const SPEECHMATICS_LANGUAGE = () => {
-  return require('./speechmatics/languages.json');
+  return getProviderAsset('speechmatics', 'languages.json');
 };
 
 export const SPEECHMATICS_VOICE = () => {
-  return require('./speechmatics/voices.json');
+  return getProviderAsset('speechmatics', 'voices.json');
 };
 
 /**
  * NVIDIA
  */
 export const NVIDIA_LANGUAGE = () => {
-  return require('./nvidia/languages.json');
+  return getProviderAsset('nvidia', 'languages.json');
 };
 
 export const NVIDIA_VOICE = () => {
-  return require('./nvidia/voices.json');
+  return getProviderAsset('nvidia', 'voices.json');
 };
 
 /**
  * AWS
  */
 export const AWS_SPEECH_TO_TEXT_LANGUAGE = () => {
-  return require('./aws/speech-to-text-languages.json');
+  return getProviderAsset('aws', 'speech-to-text-languages.json');
 };
 
 export const AWS_TEXT_TO_SPEECH_MODEL = () => {
-  return require('./aws/text-to-speech-models.json');
+  return getProviderAsset('aws', 'text-to-speech-models.json');
 };
 
 export const AWS_VOICE = () => {
-  return require('./aws/voices.json');
+  return getProviderAsset('aws', 'voices.json');
 };
 
 export const AWS_LANGUAGE = () => {
-  return require('./aws/languages.json');
+  return getProviderAsset('aws', 'languages.json');
 };

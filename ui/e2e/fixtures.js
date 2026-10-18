@@ -2,6 +2,7 @@ const { test: base, expect } = require('@playwright/test');
 const { evaluateA11yViolations } = require('./a11y-baseline');
 const { installGrpcWebPreflightMock } = require('./mocks/grpc-web');
 const {
+  ASSISTANT_DETAIL_PATH,
   ASSISTANT_LIST_PATH,
   installAssistantClientMock,
 } = require('./mocks/clients/assistant');
@@ -14,6 +15,10 @@ const {
   ENDPOINT_LIST_PATH,
   installEndpointClientMock,
 } = require('./mocks/clients/endpoint');
+const {
+  DASHBOARD_PATH,
+  installDashboardClientMock,
+} = require('./mocks/clients/dashboard');
 const {
   ACTIVITY_LIST_PATHS,
   installActivityClientMock,
@@ -29,91 +34,12 @@ const {
 } = require('./mocks/clients/workspace');
 
 const COLOR_MODES = ['light', 'dark'];
-
-const dashboardDesign = {
-  welcome: {
-    prefix: 'Welcome back',
-    fallbackName: 'there',
-  },
-  hero: {
-    title: 'Operate your AI assistants',
-    description:
-      'Design, deploy, and observe realtime assistants from one testable workspace.',
-    actions: [
-      {
-        label: 'Create assistant',
-        kind: 'primary',
-        intent: 'createAssistant',
-      },
-      {
-        label: 'View deployments',
-        kind: 'secondary',
-        href: '/deployment/assistant',
-      },
-    ],
-  },
-  sections: [
-    {
-      title: 'Primary workflows',
-      layout: 'feature-grid',
-      cards: [
-        {
-          title: 'Assistant deployments',
-          description: 'Review assistants, versions, and deployment channels.',
-          action: 'Open assistants',
-          href: '/deployment/assistant',
-        },
-        {
-          title: 'Hosted endpoints',
-          description: 'Track endpoint routing and release readiness.',
-          action: 'Open endpoints',
-          href: '/deployment/endpoint',
-        },
-        {
-          title: 'Observability',
-          description: 'Inspect activity logs and traces.',
-          action: 'Open logs',
-          href: '/logs',
-        },
-      ],
-    },
-    {
-      title: 'Resources',
-      layout: 'resource-grid',
-      cards: [
-        {
-          title: 'Providers',
-          description: 'Manage model and voice provider setup.',
-          action: 'Open integrations',
-          href: '/integration/models',
-        },
-        {
-          title: 'Organization',
-          description: 'Manage workspace profile and access.',
-          action: 'Open organization',
-          href: '/organization',
-        },
-        {
-          title: 'Account',
-          description: 'Review account settings.',
-          action: 'Open account',
-          href: '/account',
-        },
-      ],
-    },
-  ],
-  news: {
-    title: 'Product updates',
-    readMoreHref: 'https://doc.rapida.ai',
-    items: [
-      {
-        date: '2026-09-24',
-        title: 'E2E baseline',
-        description: 'Deterministic dashboard content for browser tests.',
-      },
-    ],
-  },
-};
+const SCREENSHOT_VIEWPORTS = [
+  { name: 'sm', width: 640, height: 900 },
+  { name: 'lg', width: 1024, height: 900 },
+  { name: 'xl', width: 1280, height: 900 },
+  { name: '2xl', width: 1536, height: 960 },
+];
 
 const authState = {
   state: {
@@ -148,15 +74,6 @@ const authState = {
 };
 
 async function installBrowserFixtures(page) {
-  await page.route(
-    'https://cdn-01.rapida.ai/web/rapida-dashboard-v1.json',
-    route =>
-      route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify(dashboardDesign),
-      }),
-  );
-
   await page.route('https://www.googletagmanager.com/**', route =>
     route.abort('blockedbyclient'),
   );
@@ -165,35 +82,76 @@ async function installBrowserFixtures(page) {
   await installAssistantClientMock(page);
   await installAuthenticationClientMock(page);
   await installEndpointClientMock(page);
+  await installDashboardClientMock(page);
   await installActivityClientMock(page);
   await installCredentialClientMock(page);
   await installWorkspaceClientMock(page);
   await installGrpcWebPreflightMock(page);
 }
 
+async function authenticatePage(page) {
+  await page.addInitScript(state => {
+    window.localStorage.setItem('rpd::__user', JSON.stringify(state));
+    window.localStorage.setItem('rapida-sidebar-open', 'true');
+  }, authState);
+}
+
 async function gotoJourney(page, journey) {
-  if (journey.auth) {
-    await page.addInitScript(state => {
-      window.localStorage.setItem('rpd::__user', JSON.stringify(state));
-      window.localStorage.setItem('rapida-sidebar-open', 'true');
-    }, authState);
+  if (journey.auth) await authenticatePage(page);
+
+  const viewport = page.viewportSize();
+  if (viewport) {
+    await page.mouse.move(viewport.width - 1, viewport.height - 1);
   }
 
   await page.goto(journey.path);
   await page.waitForLoadState('domcontentloaded');
+
+  if (viewport?.width < 768) {
+    await page.mouse.move(viewport.width - 1, viewport.height - 1);
+    const sidebar = page
+      .locator('aside')
+      .filter({
+        has: page.getByRole('button', { name: 'Expand sidebar' }),
+      })
+      .first();
+    if ((await sidebar.count()) > 0) {
+      await expect(sidebar).toHaveCSS('width', '48px');
+    }
+  }
+
   await expect(page.locator('body')).toContainText(journey.expectText);
   if (journey.readyText) {
     await expect(page.locator('body')).toContainText(journey.readyText);
   }
-  await expect(page.locator('body')).not.toContainText(
-    "Sorry we couldn't find this page.",
-  );
+  if (!journey.allowNotFound) {
+    await expect(page.locator('body')).not.toContainText(
+      "Sorry we couldn't find this page.",
+    );
+  }
 }
 
 async function setColorMode(page, colorMode) {
   await page.addInitScript(mode => {
     window.localStorage.setItem('ui-theme-mode', mode);
   }, colorMode);
+}
+
+async function expandDashboardForScreenshot(page) {
+  await page.locator('[data-dashboard-page]').evaluate(dashboardPage => {
+    dashboardPage.style.overflow = 'visible';
+    dashboardPage.style.height = 'auto';
+    dashboardPage.style.flex = 'none';
+
+    let ancestor = dashboardPage.parentElement;
+    while (ancestor && ancestor !== document.body) {
+      ancestor.style.overflow = 'visible';
+      ancestor.style.height = 'auto';
+      ancestor = ancestor.parentElement;
+    }
+    document.documentElement.style.overflow = 'visible';
+    document.body.style.overflow = 'visible';
+  });
 }
 
 async function checkA11y(page, journey) {
@@ -244,14 +202,19 @@ module.exports = {
   test,
   expect,
   COLOR_MODES,
+  SCREENSHOT_VIEWPORTS,
   ASSISTANT_LIST_PATH,
+  ASSISTANT_DETAIL_PATH,
   ACTIVITY_LIST_PATHS,
   AUTHENTICATION_PATHS,
   CREDENTIAL_LIST_PATH,
+  DASHBOARD_PATH,
   ENDPOINT_LIST_PATH,
   ORGANIZATION_PATH,
   WORKSPACE_LIST_PATHS,
+  authenticatePage,
   checkA11y,
+  expandDashboardForScreenshot,
   gotoJourney,
   mockAuthenticationOperation,
   setColorMode,

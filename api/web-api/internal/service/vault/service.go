@@ -67,7 +67,7 @@ func (vS *vaultService) Delete(ctx context.Context, auth *types.Authentication, 
 		"updated_date":       time.Now(),
 	})
 	if err := tx.Error; err != nil {
-		vS.logger.Debugf("unable to delete vault %v")
+		vS.logger.Debugf("unable to delete vault %v", err)
 		return nil, err
 	}
 	return vlt, nil

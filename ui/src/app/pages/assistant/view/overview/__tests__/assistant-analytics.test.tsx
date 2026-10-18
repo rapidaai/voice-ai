@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 const mockGoToAssistantSessionList = jest.fn();
@@ -155,6 +156,7 @@ describe('AssistantAnalytics sessions toggletip', () => {
   });
 
   it('shows sessions toggletip action and navigates to sessions page', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const assistant = { getId: () => 'assistant-1' } as any;
     render(<AssistantAnalytics assistant={assistant} />);
 
@@ -165,7 +167,7 @@ describe('AssistantAnalytics sessions toggletip', () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Go to sessions' }));
+    await user.click(screen.getByRole('button', { name: 'Go to sessions' }));
 
     expect(mockGoToAssistantSessionList).toHaveBeenCalledWith('assistant-1');
   });

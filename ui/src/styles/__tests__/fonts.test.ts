@@ -18,12 +18,8 @@ describe('application fonts', () => {
       resolve(process.cwd(), 'src/styles/fonts.scss'),
       'utf8',
     );
-    expect(fontStyles).toMatch(
-      /@ibm\/plex-sans\/fonts\/complete\/woff2/,
-    );
-    expect(fontStyles).toMatch(
-      /@ibm\/plex-mono\/fonts\/complete\/woff2/,
-    );
+    expect(fontStyles).toMatch(/@ibm\/plex-sans\/fonts\/complete\/woff2/);
+    expect(fontStyles).toMatch(/@ibm\/plex-mono\/fonts\/complete\/woff2/);
     expect(fontStyles).not.toMatch(/\blocal\(/);
   });
 });

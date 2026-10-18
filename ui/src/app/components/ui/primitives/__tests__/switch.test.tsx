@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { Switch, SwitchWithLabel } from '../switch';
@@ -39,7 +40,8 @@ describe('Switch', () => {
     expect(toggle).toHaveAttribute('name', 'reranking');
   });
 
-  it('keeps the existing boolean setter contract', () => {
+  it('keeps the existing boolean setter contract', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setEnable = jest.fn();
 
     render(
@@ -51,12 +53,13 @@ describe('Switch', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('switch', { name: 'Enable reranking' }));
+    await user.click(screen.getByRole('switch', { name: 'Enable reranking' }));
 
     expect(setEnable).toHaveBeenCalledWith(true);
   });
 
-  it('renders the labeled row with a Carbon toggle action', () => {
+  it('renders the labeled row with a Carbon toggle action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setEnable = jest.fn();
 
     render(
@@ -70,7 +73,7 @@ describe('Switch', () => {
 
     expect(screen.getByText('Enable grounding check')).toBeInTheDocument();
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('switch', { name: 'Enable grounding check' }),
     );
 

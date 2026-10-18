@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { ScrollableResizableTable } from '../data-table';
@@ -32,7 +33,8 @@ describe('ScrollableResizableTable', () => {
     expect(checkbox).toHaveAttribute('data-design-system-checkbox');
   });
 
-  it('keeps the select-all checked callback contract', () => {
+  it('keeps the select-all checked callback contract', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const ontoggle = jest.fn();
 
     render(
@@ -46,7 +48,7 @@ describe('ScrollableResizableTable', () => {
       </ScrollableResizableTable>,
     );
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all rows' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select all rows' }));
 
     expect(ontoggle).toHaveBeenCalledWith(true);
   });

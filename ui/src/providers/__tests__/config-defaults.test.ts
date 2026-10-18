@@ -68,8 +68,7 @@ const ttsConfig: ProviderConfig = {
         valueField: 'voice_id',
         searchable: true,
         strict: false,
-        errorMessage:
-          'Please select a valid voice ID for text to speech.',
+        errorMessage: 'Please select a valid voice ID for text to speech.',
       },
     ],
   },
@@ -159,12 +158,7 @@ const scopedVadConfig: ProviderConfig = {
 
 describe('getDefaultsFromConfig', () => {
   it('generates correct Metadata[] from config with defaults', () => {
-    const result = getDefaultsFromConfig(
-      minimalSttConfig,
-      'stt',
-      [],
-      'groq',
-    );
+    const result = getDefaultsFromConfig(minimalSttConfig, 'stt', [], 'groq');
 
     expect(result.length).toBeGreaterThanOrEqual(2);
     const model = findMeta(result, 'listen.model');
@@ -270,12 +264,7 @@ describe('getDefaultsFromConfig', () => {
   });
 
   it('handles parameters with no default (optional fields)', () => {
-    const result = getDefaultsFromConfig(
-      sliderConfig,
-      'stt',
-      [],
-      'deepgram',
-    );
+    const result = getDefaultsFromConfig(sliderConfig, 'stt', [], 'deepgram');
 
     const threshold = findMeta(result, 'listen.threshold');
     expect(threshold).toBeDefined();
@@ -312,7 +301,9 @@ describe('getDefaultsFromConfig', () => {
     );
 
     expect(findMeta(result, 'model.temperature')?.getValue()).toBe('0.3');
-    expect(findMeta(result, 'model.max_completion_tokens')?.getValue()).toBe('1048');
+    expect(findMeta(result, 'model.max_completion_tokens')?.getValue()).toBe(
+      '1048',
+    );
   });
 
   it('preserves valid existing values and patches invalid values against model constraints', () => {
@@ -329,7 +320,9 @@ describe('getDefaultsFromConfig', () => {
       { includeCredential: false },
     );
 
-    expect(findMeta(withValidExisting, 'model.temperature')?.getValue()).toBe('0.8');
+    expect(findMeta(withValidExisting, 'model.temperature')?.getValue()).toBe(
+      '0.8',
+    );
 
     const withInvalidExisting = getDefaultsFromConfig(
       openaiConfig,
@@ -343,7 +336,9 @@ describe('getDefaultsFromConfig', () => {
       { includeCredential: false },
     );
 
-    expect(findMeta(withInvalidExisting, 'model.temperature')?.getValue()).toBe('0.3');
+    expect(findMeta(withInvalidExisting, 'model.temperature')?.getValue()).toBe(
+      '0.3',
+    );
   });
 
   it('replaces scoped prefix params while keeping non-scoped metadata', () => {
@@ -368,41 +363,28 @@ describe('getDefaultsFromConfig', () => {
 
     expect(findMeta(result, 'listen.model')?.getValue()).toBe('nova-3');
     expect(findMeta(result, 'rapida.credential_id')?.getValue()).toBe('cred-1');
-    expect(findMeta(result, 'microphone.vad.confidence')?.getValue()).toBe('0.8');
+    expect(findMeta(result, 'microphone.vad.confidence')?.getValue()).toBe(
+      '0.8',
+    );
     expect(findMeta(result, 'microphone.vad.stop_secs')).toBeUndefined();
   });
 });
 
 describe('validateFromConfig', () => {
   it('returns error when rapida.credential_id is missing', () => {
-    const result = validateFromConfig(
-      minimalSttConfig,
-      'stt',
-      'groq',
-      [],
-    );
+    const result = validateFromConfig(minimalSttConfig, 'stt', 'groq', []);
     expect(result).toBe('Please provide a valid groq credential.');
   });
 
   it('returns error when rapida.credential_id is empty', () => {
     const cred = createMetadata('rapida.credential_id', '');
-    const result = validateFromConfig(
-      minimalSttConfig,
-      'stt',
-      'groq',
-      [cred],
-    );
+    const result = validateFromConfig(minimalSttConfig, 'stt', 'groq', [cred]);
     expect(result).toBe('Please provide a valid groq credential.');
   });
 
   it('returns error when required field is empty', () => {
     const cred = createMetadata('rapida.credential_id', 'valid-cred');
-    const result = validateFromConfig(
-      minimalSttConfig,
-      'stt',
-      'groq',
-      [cred],
-    );
+    const result = validateFromConfig(minimalSttConfig, 'stt', 'groq', [cred]);
     expect(result).toBe(
       'Please provide a valid groq model for speech to text.',
     );
@@ -413,12 +395,11 @@ describe('validateFromConfig', () => {
     const model = createMetadata('listen.model', 'nonexistent-model');
     const lang = createMetadata('listen.language', 'en');
 
-    const result = validateFromConfig(
-      minimalSttConfig,
-      'stt',
-      'groq',
-      [cred, model, lang],
-    );
+    const result = validateFromConfig(minimalSttConfig, 'stt', 'groq', [
+      cred,
+      model,
+      lang,
+    ]);
     expect(result).toBe(
       'Please provide a valid groq model for speech to text.',
     );
@@ -429,23 +410,17 @@ describe('validateFromConfig', () => {
     const model = createMetadata('listen.model', 'whisper-large-v3-turbo');
     const lang = createMetadata('listen.language', 'en');
 
-    const result = validateFromConfig(
-      minimalSttConfig,
-      'stt',
-      'groq',
-      [cred, model, lang],
-    );
+    const result = validateFromConfig(minimalSttConfig, 'stt', 'groq', [
+      cred,
+      model,
+      lang,
+    ]);
     expect(result).toBeUndefined();
   });
 
   it('uses custom errorMessage from config when provided', () => {
     const cred = createMetadata('rapida.credential_id', 'valid-cred');
-    const result = validateFromConfig(
-      minimalSttConfig,
-      'stt',
-      'groq',
-      [cred],
-    );
+    const result = validateFromConfig(minimalSttConfig, 'stt', 'groq', [cred]);
     // The first required param without value should return its custom errorMessage
     expect(result).toBe(
       'Please provide a valid groq model for speech to text.',
@@ -455,12 +430,7 @@ describe('validateFromConfig', () => {
   it('skips validation for optional (required: false) empty fields', () => {
     const cred = createMetadata('rapida.credential_id', 'valid-cred');
     // sliderConfig has required:false on threshold
-    const result = validateFromConfig(
-      sliderConfig,
-      'stt',
-      'deepgram',
-      [cred],
-    );
+    const result = validateFromConfig(sliderConfig, 'stt', 'deepgram', [cred]);
     expect(result).toBeUndefined();
   });
 
@@ -483,14 +453,14 @@ describe('validateFromConfig', () => {
 
     const cred = createMetadata('rapida.credential_id', 'valid-cred');
     const tooLow = createMetadata('listen.threshold', '0.05');
-    expect(
-      validateFromConfig(config, 'stt', 'test', [cred, tooLow]),
-    ).toBe('Threshold must be between 0.1 and 0.9.');
+    expect(validateFromConfig(config, 'stt', 'test', [cred, tooLow])).toBe(
+      'Threshold must be between 0.1 and 0.9.',
+    );
 
     const tooHigh = createMetadata('listen.threshold', '1.5');
-    expect(
-      validateFromConfig(config, 'stt', 'test', [cred, tooHigh]),
-    ).toBe('Threshold must be between 0.1 and 0.9.');
+    expect(validateFromConfig(config, 'stt', 'test', [cred, tooHigh])).toBe(
+      'Threshold must be between 0.1 and 0.9.',
+    );
 
     const valid = createMetadata('listen.threshold', '0.5');
     expect(
@@ -556,21 +526,12 @@ describe('validateFromConfig', () => {
     const cred = createMetadata('rapida.credential_id', 'valid-cred');
     const validChoice = createMetadata('model.reasoning_effort', 'medium');
     expect(
-      validateFromConfig(selectConfig, 'text', 'openai', [
-        cred,
-        validChoice,
-      ]),
+      validateFromConfig(selectConfig, 'text', 'openai', [cred, validChoice]),
     ).toBeUndefined();
 
-    const invalidChoice = createMetadata(
-      'model.reasoning_effort',
-      'ultra',
-    );
+    const invalidChoice = createMetadata('model.reasoning_effort', 'ultra');
     expect(
-      validateFromConfig(selectConfig, 'text', 'openai', [
-        cred,
-        invalidChoice,
-      ]),
+      validateFromConfig(selectConfig, 'text', 'openai', [cred, invalidChoice]),
     ).toBeDefined();
   });
 
@@ -579,12 +540,11 @@ describe('validateFromConfig', () => {
     const model = createMetadata('speak.model', 'playai-tts');
     const voice = createMetadata('speak.voice.id', 'any-custom-voice');
 
-    const result = validateFromConfig(
-      ttsConfig,
-      'tts',
-      'groq',
-      [cred, model, voice],
-    );
+    const result = validateFromConfig(ttsConfig, 'tts', 'groq', [
+      cred,
+      model,
+      voice,
+    ]);
     expect(result).toBeUndefined();
   });
 
@@ -599,21 +559,16 @@ describe('validateFromConfig', () => {
     const maxTokens = createMetadata('model.max_completion_tokens', '2048');
     const temperature = createMetadata('model.temperature', '2');
 
-    const result = validateFromConfig(
-      openaiConfig,
-      'text',
-      'openai',
-      [
-        cred,
-        model,
-        modelName,
-        frequencyPenalty,
-        topP,
-        presencePenalty,
-        maxTokens,
-        temperature,
-      ],
-    );
+    const result = validateFromConfig(openaiConfig, 'text', 'openai', [
+      cred,
+      model,
+      modelName,
+      frequencyPenalty,
+      topP,
+      presencePenalty,
+      maxTokens,
+      temperature,
+    ]);
 
     expect(result).toBe(
       'Please check and provide a correct value for temperature any decimal value between 0 to 1',
@@ -621,12 +576,7 @@ describe('validateFromConfig', () => {
   });
 
   it('returns undefined when category not in config', () => {
-    const result = validateFromConfig(
-      minimalSttConfig,
-      'tts',
-      'groq',
-      [],
-    );
+    const result = validateFromConfig(minimalSttConfig, 'tts', 'groq', []);
     expect(result).toBeUndefined();
   });
 
@@ -646,8 +596,8 @@ describe('validateFromConfig', () => {
     };
     const cred = createMetadata('rapida.credential_id', 'valid-cred');
     const nan = createMetadata('listen.threshold', 'not-a-number');
-    expect(
-      validateFromConfig(config, 'stt', 'test', [cred, nan]),
-    ).toBe('Invalid threshold.');
+    expect(validateFromConfig(config, 'stt', 'test', [cred, nan])).toBe(
+      'Invalid threshold.',
+    );
   });
 });

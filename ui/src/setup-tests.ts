@@ -2,9 +2,7 @@
 // allows you to do things like:
 // expect(element).toHaveTextContent(/react/i)
 // learn more: https://github.com/testing-library/jest-dom
-import '@testing-library/jest-dom/extend-expect';
-import 'react-app-polyfill/ie11';
-import 'react-app-polyfill/stable';
+import '@testing-library/jest-dom';
 import 'jest-styled-components';
 
 class ResizeObserverMock {
@@ -13,11 +11,24 @@ class ResizeObserverMock {
   disconnect() {}
 }
 
-const resizeObserver =
-  (globalThis as any).ResizeObserver || ResizeObserverMock;
+const resizeObserver = (globalThis as any).ResizeObserver || ResizeObserverMock;
 
 // Carbon components may resolve ResizeObserver from either global or window.
 (globalThis as any).ResizeObserver = resizeObserver;
 if (typeof window !== 'undefined') {
   (window as any).ResizeObserver = resizeObserver;
 }
+
+const clipboardDescriptor = Object.getOwnPropertyDescriptor(
+  navigator,
+  'clipboard',
+);
+
+afterEach(() => {
+  if (clipboardDescriptor) {
+    Object.defineProperty(navigator, 'clipboard', clipboardDescriptor);
+    return;
+  }
+
+  Reflect.deleteProperty(navigator, 'clipboard');
+});

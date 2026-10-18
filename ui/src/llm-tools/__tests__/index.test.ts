@@ -34,6 +34,8 @@ describe('llm tools catalog', () => {
     expect(() =>
       JSON.parse(EndOfConverstaionToolDefintion.parameters),
     ).not.toThrow();
-    expect(() => JSON.parse(TransferCallToolDefintion.parameters)).not.toThrow();
+    expect(() =>
+      JSON.parse(TransferCallToolDefintion.parameters),
+    ).not.toThrow();
   });
 });

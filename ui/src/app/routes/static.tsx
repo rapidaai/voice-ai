@@ -19,11 +19,6 @@ export function StaticRoute() {
         path="terms-conditions"
         element={<StaticTermsPage />}
       />
-      <Route
-        key="/static/privacy-policy"
-        path="privacy-policy"
-        element={<StaticPrivacyPage />}
-      />
       <Route path="*" element={<StaticPageNotFoundPage />} />
     </Routes>
   );

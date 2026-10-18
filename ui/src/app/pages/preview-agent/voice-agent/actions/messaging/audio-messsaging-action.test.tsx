@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { AudioMessagingAction } from './audio-messsaging-action';
@@ -108,27 +109,29 @@ describe('AudioMessagingAction', () => {
   });
 
   it('shows the active microphone with a Carbon checkmark and switches devices', async () => {
+    const user = userEvent.setup({ skipHover: true, writeToClipboard: false });
     render(<AudioMessagingAction voiceAgent={{} as any} />);
 
-    fireEvent.mouseEnter(screen.getByText('Built-in Microphone'));
+    await user.hover(screen.getByText('Built-in Microphone'));
 
     const activeIcons = await screen.findAllByTestId('checkmark-icon');
     expect(activeIcons).toHaveLength(1);
     expect(activeIcons[0]).not.toHaveAttribute('data-stroke-width');
 
-    fireEvent.click(screen.getByRole('button', { name: 'USB Microphone' }));
+    await user.click(screen.getByRole('button', { name: 'USB Microphone' }));
 
     await waitFor(() =>
       expect(mockSetActiveMediaDevice).toHaveBeenCalledWith('mic-2'),
     );
   });
 
-  it('uses the connected action handlers', () => {
+  it('uses the connected action handlers', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<AudioMessagingAction voiceAgent={{} as any} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /mute/i }));
-    fireEvent.click(screen.getByRole('button', { name: /text/i }));
-    fireEvent.click(screen.getByRole('button', { name: /stop/i }));
+    await user.click(screen.getByRole('button', { name: /mute/i }));
+    await user.click(screen.getByRole('button', { name: /text/i }));
+    await user.click(screen.getByRole('button', { name: /stop/i }));
 
     expect(mockHandleToggleMute).toHaveBeenCalledTimes(1);
     expect(mockHandleTextToggle).toHaveBeenCalledTimes(1);

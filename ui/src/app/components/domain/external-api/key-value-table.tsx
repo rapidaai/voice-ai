@@ -101,8 +101,9 @@ export function KeyValueTable({
                     hasIconOnly
                     renderIcon={TrashCan}
                     iconDescription="Remove"
-                    kind="danger--ghost"
+                    kind="ghost"
                     size="sm"
+                    className="!text-[var(--cds-support-error)]"
                     onClick={() => onChange(rows.filter((_, i) => i !== index))}
                   />
                 </TableCell>

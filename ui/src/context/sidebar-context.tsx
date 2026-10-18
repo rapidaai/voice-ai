@@ -11,6 +11,14 @@ type SidebarContextType = {
 };
 
 const SidebarContext = React.createContext<SidebarContextType | null>(null);
+
+function isMobileViewport() {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(max-width: 767px)').matches
+  );
+}
+
 function useSidebar() {
   const context = React.useContext(SidebarContext);
   if (!context) {
@@ -40,12 +48,29 @@ const SidebarProvider = React.forwardRef<
     },
     ref,
   ) => {
-    const [_open, _setOpen] = React.useState(defaultOpen);
+    const [_open, _setOpen] = React.useState(
+      () => defaultOpen && !isMobileViewport(),
+    );
     const open = openProp ?? _open;
 
     const [locked, setLockedState] = React.useState(() => {
-      return localStorage.getItem(SIDEBAR_COOKIE_NAME) !== 'false';
+      return (
+        !isMobileViewport() &&
+        localStorage.getItem(SIDEBAR_COOKIE_NAME) !== 'false'
+      );
     });
+
+    React.useEffect(() => {
+      const media = window.matchMedia?.('(max-width: 767px)');
+      if (!media) return undefined;
+      const collapseOnMobile = (event: MediaQueryListEvent) => {
+        if (!event.matches) return;
+        setLockedState(false);
+        _setOpen(false);
+      };
+      media.addEventListener('change', collapseOnMobile);
+      return () => media.removeEventListener('change', collapseOnMobile);
+    }, []);
 
     const setLocked = React.useCallback((value: boolean) => {
       setLockedState(value);

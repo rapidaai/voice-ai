@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   ErrorWrapper,
   InfoWrapper,
@@ -41,7 +42,8 @@ describe('layout wrappers', () => {
     );
   });
 
-  it('forwards custom attributes from alert wrappers', () => {
+  it('forwards custom attributes from alert wrappers', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onClick = jest.fn();
 
     render(
@@ -55,7 +57,7 @@ describe('layout wrappers', () => {
       </InfoWrapper>,
     );
 
-    fireEvent.click(screen.getByLabelText('Information'));
+    await user.click(screen.getByLabelText('Information'));
 
     expect(onClick).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('info')).toHaveClass('custom-info');
@@ -81,7 +83,8 @@ describe('layout wrappers', () => {
     );
   });
 
-  it('renders the single row wrapper and forwards interaction props', () => {
+  it('renders the single row wrapper and forwards interaction props', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onClick = jest.fn();
 
     render(
@@ -95,7 +98,7 @@ describe('layout wrappers', () => {
       </SingleRowWrapper>,
     );
 
-    fireEvent.click(screen.getByLabelText('Manual file row'));
+    await user.click(screen.getByLabelText('Manual file row'));
 
     expect(onClick).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('row')).toHaveClass(

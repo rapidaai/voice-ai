@@ -5,7 +5,9 @@
  * category JSON parameter types and calls onParameterChange appropriately.
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { setRangeValue } from '@/test-utils/set-range-value';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import { ConfigRenderer } from '../config-renderer';
@@ -547,7 +549,8 @@ describe('ConfigRenderer', () => {
       expect(slider.value).toBe('0.5');
     });
 
-    it('calls onParameterChange when slider value changes', () => {
+    it('calls onParameterChange when slider value changes', async () => {
+      const user = userEvent.setup();
       const params = [createMetadata('listen.threshold', '0.5')];
       render(
         <ConfigRenderer
@@ -560,7 +563,8 @@ describe('ConfigRenderer', () => {
       );
 
       const slider = screen.getByRole('slider');
-      fireEvent.change(slider, { target: { value: '0.7' } });
+      await user.click(slider);
+      setRangeValue(slider as HTMLInputElement, 0.7);
       expect(mockOnChange).toHaveBeenCalledTimes(1);
 
       const updatedParams = mockOnChange.mock.calls[0][0] as Metadata[];
@@ -660,7 +664,8 @@ describe('ConfigRenderer', () => {
       ).toBeInTheDocument();
     });
 
-    it('calls onParameterChange when input changes', () => {
+    it('calls onParameterChange when input changes', async () => {
+      const user = userEvent.setup();
       render(
         <ConfigRenderer
           provider="test"
@@ -672,7 +677,9 @@ describe('ConfigRenderer', () => {
       );
 
       const input = screen.getByPlaceholderText('Enter endpoint URL');
-      fireEvent.change(input, { target: { value: 'https://api.example.com' } });
+      await user.click(input);
+      await user.keyboard('{Control>}a{/Control}');
+      await user.paste(String('https://api.example.com'));
       expect(mockOnChange).toHaveBeenCalledTimes(1);
 
       const updatedParams = mockOnChange.mock.calls[0][0] as Metadata[];
@@ -749,7 +756,8 @@ describe('ConfigRenderer', () => {
       expect(screen.getByText('Reasoning Effort')).toBeInTheDocument();
     });
 
-    it('calls onParameterChange on select change', () => {
+    it('calls onParameterChange on select change', async () => {
+      const user = userEvent.setup();
       render(
         <ConfigRenderer
           provider="test"
@@ -761,7 +769,7 @@ describe('ConfigRenderer', () => {
       );
 
       const select = screen.getByRole('combobox');
-      fireEvent.change(select, { target: { value: 'high' } });
+      await user.selectOptions(select, String('high'));
       expect(mockOnChange).toHaveBeenCalledTimes(1);
 
       const updatedParams = mockOnChange.mock.calls[0][0] as Metadata[];
@@ -827,7 +835,8 @@ describe('ConfigRenderer', () => {
       ).toBeInTheDocument();
     });
 
-    it('updates json field as raw string without parsing', () => {
+    it('updates json field as raw string without parsing', async () => {
+      const user = userEvent.setup();
       render(
         <ConfigRenderer
           provider="test"
@@ -839,7 +848,9 @@ describe('ConfigRenderer', () => {
       );
 
       const input = screen.getByPlaceholderText('Enter as JSON');
-      fireEvent.change(input, { target: { value: '{' } });
+      await user.click(input);
+      await user.keyboard('{Control>}a{/Control}');
+      await user.paste(String('{'));
 
       expect(mockOnChange).toHaveBeenCalled();
       const updated = mockOnChange.mock.calls[
@@ -851,7 +862,8 @@ describe('ConfigRenderer', () => {
       expect(responseFormat?.getValue()).toBe('{');
     });
 
-    it('updates target json key without mutating sibling json parameter', () => {
+    it('updates target json key without mutating sibling json parameter', async () => {
+      const user = userEvent.setup();
       const thinkingConfig: CategoryConfig = {
         parameters: [
           {
@@ -882,9 +894,9 @@ describe('ConfigRenderer', () => {
       );
 
       const jsonTextareas = screen.getAllByPlaceholderText('Enter as JSON');
-      fireEvent.change(jsonTextareas[1], {
-        target: { value: '{"budget_tokens":250}' },
-      });
+      await user.click(jsonTextareas[1]);
+      await user.keyboard('{Control>}a{/Control}');
+      await user.paste(String('{"budget_tokens":250}'));
 
       expect(mockOnChange).toHaveBeenCalled();
       const updated = mockOnChange.mock.calls[
@@ -1071,7 +1083,8 @@ describe('ConfigRenderer', () => {
       expect(screen.queryByText('Model')).not.toBeInTheDocument();
     });
 
-    it('renders a single advanced json field full width', () => {
+    it('renders a single advanced json field full width', async () => {
+      const user = userEvent.setup({ writeToClipboard: false });
       const singleAdvancedJsonConfig: CategoryConfig = {
         parameters: [
           {
@@ -1102,7 +1115,7 @@ describe('ConfigRenderer', () => {
         />,
       );
 
-      fireEvent.click(screen.getByRole('button'));
+      await user.click(screen.getByRole('button'));
 
       const label = screen.getByText('Model Parameters');
       const wrapper = label.closest('div');
@@ -1161,7 +1174,8 @@ describe('ConfigRenderer', () => {
       expect(screen.queryByText('Seed')).not.toBeInTheDocument();
     });
 
-    it('hydrates model-specific defaults when model dropdown changes', () => {
+    it('hydrates model-specific defaults when model dropdown changes', async () => {
+      const user = userEvent.setup();
       render(
         <ConfigRenderer
           provider="test"
@@ -1176,7 +1190,7 @@ describe('ConfigRenderer', () => {
       );
 
       const dropdown = screen.getAllByRole('combobox')[0];
-      fireEvent.change(dropdown, { target: { value: 'model-b' } });
+      await user.selectOptions(dropdown, String('model-b'));
 
       expect(mockOnChange).toHaveBeenCalled();
       const lastCall = mockOnChange.mock.calls[
@@ -1190,7 +1204,8 @@ describe('ConfigRenderer', () => {
       expect(temperature?.getValue()).toBe('0.9');
     });
 
-    it('drops stale model-specific keys when switched model exposes a different schema', () => {
+    it('drops stale model-specific keys when switched model exposes a different schema', async () => {
+      const user = userEvent.setup();
       render(
         <ConfigRenderer
           provider="test"
@@ -1206,7 +1221,7 @@ describe('ConfigRenderer', () => {
       );
 
       const dropdown = screen.getAllByRole('combobox')[0];
-      fireEvent.change(dropdown, { target: { value: 'model-c' } });
+      await user.selectOptions(dropdown, String('model-c'));
 
       expect(mockOnChange).toHaveBeenCalled();
       const lastCall = mockOnChange.mock.calls[
@@ -1224,7 +1239,8 @@ describe('ConfigRenderer', () => {
       ).toBeUndefined();
     });
 
-    it('supports model switch followed by parameter edit', () => {
+    it('supports model switch followed by parameter edit', async () => {
+      const user = userEvent.setup();
       const { rerender } = render(
         <ConfigRenderer
           provider="test"
@@ -1239,7 +1255,7 @@ describe('ConfigRenderer', () => {
       );
 
       const dropdown = screen.getAllByRole('combobox')[0];
-      fireEvent.change(dropdown, { target: { value: 'model-b' } });
+      await user.selectOptions(dropdown, String('model-b'));
 
       const switchedParams = mockOnChange.mock.calls[
         mockOnChange.mock.calls.length - 1
@@ -1255,7 +1271,9 @@ describe('ConfigRenderer', () => {
       );
 
       const numberInput = screen.getByRole('spinbutton') as HTMLInputElement;
-      fireEvent.change(numberInput, { target: { value: '1.1' } });
+      await user.click(numberInput);
+      await user.keyboard('{Control>}a{/Control}');
+      await user.paste(String('1.1'));
 
       const updated = mockOnChange.mock.calls[
         mockOnChange.mock.calls.length - 1
@@ -1286,7 +1304,8 @@ describe('ConfigRenderer', () => {
       expect(slider.value).toBe('0.33');
     });
 
-    it('accepts custom model value in combobox and preserves it on rerender', () => {
+    it('accepts custom model value in combobox and preserves it on rerender', async () => {
+      const user = userEvent.setup();
       const customModelConfig: CategoryConfig = {
         parameters: [
           {
@@ -1313,8 +1332,10 @@ describe('ConfigRenderer', () => {
 
       const modelInput = screen.getByPlaceholderText('Select model');
       expect(modelInput).toHaveAttribute('data-title-text', '');
-      fireEvent.change(modelInput, { target: { value: 'custom-model-x' } });
-      fireEvent.blur(modelInput);
+      await user.click(modelInput);
+      await user.keyboard('{Control>}a{/Control}');
+      await user.paste(String('custom-model-x'));
+      await user.tab();
 
       expect(mockOnChange).toHaveBeenCalled();
       const committedParams = mockOnChange.mock.calls

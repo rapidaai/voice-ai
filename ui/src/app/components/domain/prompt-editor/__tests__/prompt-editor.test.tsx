@@ -1,7 +1,8 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import PromptEditor from '../prompt-editor';
+import userEvent from '@testing-library/user-event';
 
 let mockResolvedMode = 'light';
 let mockEditorProps: any;
@@ -113,7 +114,8 @@ beforeEach(() => {
 });
 
 describe('PromptEditor', () => {
-  it('renders Monaco with prompt editor defaults and forwards changes', () => {
+  it('renders Monaco with prompt editor defaults and forwards changes', async () => {
+    const user = userEvent.setup();
     const onChange = jest.fn();
 
     render(
@@ -132,10 +134,18 @@ describe('PromptEditor', () => {
     expect(editor).toHaveAttribute('data-height', '320px');
     expect(editor).toHaveAttribute('data-theme', 'vs');
     expect(editor).toHaveAttribute('data-readonly', 'true');
+    expect(editor).toHaveClass('prompt-editor');
     expect(editor).toHaveClass('prompt-shell');
+    expect(mockEditorProps.options.fontFamily).toBe(
+      "'IBM Plex Sans', sans-serif",
+    );
+    expect(mockEditorProps.options.lineDecorationsWidth).toBe(8);
+    expect(mockEditorProps.options.padding).toEqual({ top: 8, bottom: 8 });
     expect(mockEditor.setValue).toHaveBeenCalledWith('Hello');
 
-    fireEvent.change(editor, { target: { value: 'Updated' } });
+    await user.click(editor);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Updated'));
 
     expect(onChange).toHaveBeenCalledWith('Updated');
   });
@@ -231,7 +241,7 @@ describe('PromptEditor', () => {
 
     const domNode = widget.getDomNode();
     expect(domNode.innerText).toBe('Write a prompt');
-    expect(domNode).toHaveStyle({ color: 'var(--cds-text-secondary)' });
+    expect(domNode).toHaveClass('prompt-editor-placeholder');
     expect(widget.getDomNode()).toBe(domNode);
 
     domNode.click();

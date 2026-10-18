@@ -38,7 +38,7 @@ import {
 } from '@carbon/react';
 import { Pagination } from '@/app/components/ui/primitives';
 import { IconOnlyButton } from '@/app/components/ui/primitives';
-import { EmptyState } from '@/app/components/ui/feedback';
+import { EmptyState, ErrorContainer } from '@/app/components/ui/feedback';
 import {
   Renew,
   Download,
@@ -66,12 +66,14 @@ export function Conversations({ currentAssistant }: ConversationProps) {
 
   const [querySearchValue, setQuerySearchValue] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     assistantConversationListAction.clear();
   }, []);
 
   const get = () => {
+    setLoadError(false);
     rapidaContext.showLoader();
     assistantConversationListAction.getAssistantConversations(
       currentAssistant.getId(),
@@ -80,6 +82,7 @@ export function Conversations({ currentAssistant }: ConversationProps) {
       userId,
       (err: string) => {
         rapidaContext.hideLoader();
+        setLoadError(true);
         toast.error(err);
       },
       (data: AssistantConversation[]) => {
@@ -196,6 +199,15 @@ export function Conversations({ currentAssistant }: ConversationProps) {
         <div className="flex items-center justify-center py-16">
           <Loading withOverlay={false} small />
         </div>
+      ) : loadError ? (
+        <ErrorContainer
+          className="flex-1"
+          code="503"
+          title="Conversations unavailable"
+          description="We couldn't load conversations for this assistant. Please try again."
+          actionLabel="Try again"
+          onAction={get}
+        />
       ) : assistantConversationListAction.assistantConversations.length > 0 ? (
         <div className="overflow-auto flex-1">
           <Table>
@@ -366,22 +378,23 @@ export function Conversations({ currentAssistant }: ConversationProps) {
         />
       )}
 
-      {assistantConversationListAction.assistantConversations.length > 0 && (
-        <Pagination
-          className="shrink-0"
-          totalItems={assistantConversationListAction.totalCount}
-          page={assistantConversationListAction.page}
-          pageSize={assistantConversationListAction.pageSize}
-          pageSizes={[10, 20, 25, 50, 100]}
-          onChange={({ page: p, pageSize: ps }) => {
-            if (ps !== assistantConversationListAction.pageSize) {
-              assistantConversationListAction.setPageSize(ps);
-            } else {
-              assistantConversationListAction.setPage(p);
-            }
-          }}
-        />
-      )}
+      {!loadError &&
+        assistantConversationListAction.assistantConversations.length > 0 && (
+          <Pagination
+            className="shrink-0"
+            totalItems={assistantConversationListAction.totalCount}
+            page={assistantConversationListAction.page}
+            pageSize={assistantConversationListAction.pageSize}
+            pageSizes={[10, 20, 25, 50, 100]}
+            onChange={({ page: p, pageSize: ps }) => {
+              if (ps !== assistantConversationListAction.pageSize) {
+                assistantConversationListAction.setPageSize(ps);
+              } else {
+                assistantConversationListAction.setPage(p);
+              }
+            }}
+          />
+        )}
     </div>
   );
 }

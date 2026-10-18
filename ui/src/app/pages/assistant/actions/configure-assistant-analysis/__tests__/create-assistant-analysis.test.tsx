@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { CreateAssistantAnalysis } from '@/app/pages/assistant/actions/configure-assistant-analysis/create-assistant-analysis';
@@ -235,10 +236,11 @@ describe('CreateAssistantAnalysis', () => {
     mockEndpointIdToPick = 'endpoint-1';
   });
 
-  it('shows endpoint validation error when continuing without endpoint', () => {
+  it('shows endpoint validation error when continuing without endpoint', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateAssistantAnalysis assistantId="assistant-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(
       screen.getByText(
@@ -249,15 +251,18 @@ describe('CreateAssistantAnalysis', () => {
   });
 
   it('creates analysis successfully and navigates back to analysis listing', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (CreateAssistantConfiguration as jest.Mock).mockResolvedValue({
       getSuccess: () => true,
     });
 
     render(<CreateAssistantAnalysis assistantId="assistant-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pick endpoint' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Configure analysis' }));
+    await user.click(screen.getByRole('button', { name: 'Pick endpoint' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Configure analysis' }),
+    );
 
     await waitFor(() => {
       expect(CreateAssistantConfiguration).toHaveBeenCalled();
@@ -273,6 +278,7 @@ describe('CreateAssistantAnalysis', () => {
   });
 
   it('shows human error message when create API returns unsuccessful response', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (CreateAssistantConfiguration as jest.Mock).mockResolvedValue({
       getSuccess: () => false,
       getError: () => ({ getHumanmessage: () => 'Name already used' }),
@@ -280,46 +286,49 @@ describe('CreateAssistantAnalysis', () => {
 
     render(<CreateAssistantAnalysis assistantId="assistant-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pick endpoint' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Configure analysis' }));
+    await user.click(screen.getByRole('button', { name: 'Pick endpoint' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Configure analysis' }),
+    );
 
     expect(await screen.findByText('Name already used')).toBeInTheDocument();
   });
 
   it('supports add and edit for parameter mapping before create', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (CreateAssistantConfiguration as jest.Mock).mockResolvedValue({
       getSuccess: () => true,
     });
 
     render(<CreateAssistantAnalysis assistantId="assistant-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pick endpoint' }));
-    fireEvent.change(
+    await user.click(screen.getByRole('button', { name: 'Pick endpoint' }));
+    await user.selectOptions(
       document.getElementById('tool-condition-key') as HTMLElement,
-      {
-        target: { value: 'conversation_mode' },
-      },
+      String('conversation_mode'),
     );
-    fireEvent.change(
+    await user.selectOptions(
       document.getElementById('tool-condition-source-value') as HTMLElement,
-      {
-        target: { value: 'voice' },
-      },
+      String('voice'),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Add parameter' }));
-    fireEvent.change(document.getElementById('param-type-1') as HTMLElement, {
-      target: { value: 'assistant' },
-    });
-    fireEvent.change(document.getElementById('param-key-1') as HTMLElement, {
-      target: { value: 'name' },
-    });
-    fireEvent.change(document.getElementById('param-val-1') as HTMLElement, {
-      target: { value: 'assistantName' },
-    });
+    await user.click(screen.getByRole('button', { name: 'Add parameter' }));
+    await user.selectOptions(
+      document.getElementById('param-type-1') as HTMLElement,
+      String('assistant'),
+    );
+    await user.selectOptions(
+      document.getElementById('param-key-1') as HTMLElement,
+      String('name'),
+    );
+    await user.click(document.getElementById('param-val-1') as HTMLElement);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('assistantName'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Configure analysis' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Configure analysis' }),
+    );
 
     await waitFor(() =>
       expect(CreateAssistantConfiguration).toHaveBeenCalled(),
@@ -362,20 +371,22 @@ describe('CreateAssistantAnalysis', () => {
     );
   });
 
-  it('blocks reserved analysis option mapping key', () => {
+  it('blocks reserved analysis option mapping key', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateAssistantAnalysis assistantId="assistant-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pick endpoint' }));
-    fireEvent.change(document.getElementById('param-type-0') as HTMLElement, {
-      target: { value: 'option' },
-    });
-    fireEvent.change(document.getElementById('param-key-0') as HTMLElement, {
-      target: { value: 'endpoint_parameters' },
-    });
-    fireEvent.change(document.getElementById('param-val-0') as HTMLElement, {
-      target: { value: 'shouldFail' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Pick endpoint' }));
+    await user.selectOptions(
+      document.getElementById('param-type-0') as HTMLElement,
+      String('option'),
+    );
+    await user.click(document.getElementById('param-key-0') as HTMLElement);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('endpoint_parameters'));
+    await user.click(document.getElementById('param-val-0') as HTMLElement);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('shouldFail'));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(
       screen.getByText(

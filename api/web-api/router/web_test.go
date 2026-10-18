@@ -16,4 +16,7 @@ func TestWebAPIRouteRegistersProductUsageService(t *testing.T) {
 	if _, ok := server.GetServiceInfo()["billing_api.ProductUsageService"]; !ok {
 		t.Fatal("ProductUsageService is not registered")
 	}
+	if _, ok := server.GetServiceInfo()["dashboard_api.DashboardService"]; !ok {
+		t.Fatal("DashboardService is not registered")
+	}
 }

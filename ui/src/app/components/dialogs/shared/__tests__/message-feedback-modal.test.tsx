@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { MessageFeedbackDialog } from '../message-feedback-modal';
@@ -42,7 +43,8 @@ describe('MessageFeedbackDialog', () => {
     ).toBeDisabled();
   });
 
-  it('submits feedback with the standard action icon', () => {
+  it('submits feedback with the standard action icon', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
     const onSubmitFeedback = jest.fn();
 
@@ -54,9 +56,9 @@ describe('MessageFeedbackDialog', () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Your feedback...'), {
-      target: { value: 'Needs better source detail' },
-    });
+    await user.click(screen.getByPlaceholderText('Your feedback...'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Needs better source detail'));
 
     const submitButton = screen.getByRole('button', {
       name: 'Submit feedback',
@@ -64,7 +66,7 @@ describe('MessageFeedbackDialog', () => {
     expect(submitButton).toBeEnabled();
     expect(screen.getByTestId('submit-icon')).toBeInTheDocument();
 
-    fireEvent.click(submitButton);
+    await user.click(submitButton);
 
     expect(setModalOpen).toHaveBeenCalledWith(false);
     expect(onSubmitFeedback).toHaveBeenCalledWith('Needs better source detail');

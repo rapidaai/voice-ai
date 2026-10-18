@@ -1,0 +1,354 @@
+const covered = (id, parentJourney, evidence) => ({
+  id,
+  parentJourney,
+  status: 'covered',
+  evidence,
+});
+
+const deferred = (id, parentJourney, reason) => ({
+  id,
+  parentJourney,
+  status: 'deferred',
+  reason,
+});
+
+const disabled = (id, reason) => ({ id, status: 'disabled', reason });
+
+const journeySubjourneys = [
+  covered(
+    'auth.signin.submit',
+    'auth.signin',
+    'journeys/auth/authentication.spec.js',
+  ),
+  covered(
+    'auth.signin.serviceError',
+    'auth.signin',
+    'journeys/auth/authentication.spec.js',
+  ),
+  covered(
+    'auth.signup.submit',
+    'auth.signup',
+    'journeys/auth/authentication.spec.js',
+  ),
+  covered(
+    'auth.forgotPassword.submit',
+    'auth.forgotPassword',
+    'journeys/auth/authentication.spec.js',
+  ),
+  covered(
+    'auth.changePassword.submit',
+    'auth.changePassword',
+    'journeys/auth/authentication.spec.js',
+  ),
+  covered(
+    'dashboard.loading',
+    'dashboard.home',
+    'journeys/dashboard/state-screenshots.spec.js',
+  ),
+  covered(
+    'dashboard.success',
+    'dashboard.home',
+    'journeys/dashboard/state-screenshots.spec.js',
+  ),
+  covered(
+    'dashboard.error',
+    'dashboard.home',
+    'journeys/dashboard/state-screenshots.spec.js',
+  ),
+  covered(
+    'dashboard.responsiveLayout',
+    'dashboard.home',
+    'journeys/dashboard/responsive.spec.js',
+  ),
+  covered(
+    'deployment.assistant.empty',
+    'deployment.assistant',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.initialError',
+    'deployment.assistant',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.loading',
+    'deployment.assistant',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.populated',
+    'deployment.assistant',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.createChooser',
+    'deployment.createAssistant',
+    'journey-viewport-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.endpoint.overview',
+    'deployment.endpointOverview',
+    'journeys/deployment/endpoint-detail.spec.js',
+  ),
+  covered(
+    'deployment.endpoint.emptyActivity',
+    'deployment.endpointOverview',
+    'journeys/deployment/endpoint-detail.spec.js',
+  ),
+  covered(
+    'deployment.endpoint.playground',
+    'deployment.endpointPlayground',
+    'journeys/deployment/endpoint-detail.spec.js',
+  ),
+  covered(
+    'deployment.endpoint.logs',
+    'deployment.endpointLogs',
+    'journey-viewport-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.endpoint.versions',
+    'deployment.endpointVersions',
+    'journey-viewport-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.endpoint.createVersion',
+    'deployment.createEndpointVersion',
+    'journey-viewport-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.endpoint.settings',
+    'deployment.endpointSettings',
+    'journeys/deployment/endpoint-detail.spec.js',
+  ),
+  covered(
+    'integration.provider.catalog',
+    'integration.models',
+    'journeys/integration/provider-catalog.spec.js',
+  ),
+  covered(
+    'integration.provider.search',
+    'integration.models',
+    'journeys/integration/provider-catalog.spec.js',
+  ),
+  covered(
+    'organization.users.empty',
+    'organization.users',
+    'journeys/organization/listings.spec.js',
+  ),
+  covered(
+    'organization.projects.empty',
+    'organization.projects',
+    'journeys/organization/listings.spec.js',
+  ),
+
+  covered(
+    'deployment.assistant.overview',
+    'deployment.assistantOverview',
+    'journeys/deployment/assistant-detail.spec.js',
+  ),
+  covered(
+    'deployment.assistant.overviewLoading',
+    'deployment.assistantOverview',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.overviewError',
+    'deployment.assistantOverview',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.sessions',
+    'deployment.assistantSessions',
+    'journeys/deployment/assistant-detail.spec.js',
+  ),
+  covered(
+    'deployment.assistant.sessionsLoading',
+    'deployment.assistantSessions',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.sessionsEmpty',
+    'deployment.assistantSessions',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.sessionsError',
+    'deployment.assistantSessions',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.sessionDetail',
+    'deployment.assistantSessionDetail',
+    'journeys/deployment/assistant-detail.spec.js',
+  ),
+  covered(
+    'deployment.assistant.versionHistory',
+    'deployment.assistantVersions',
+    'journeys/deployment/assistant-detail.spec.js',
+  ),
+  covered(
+    'deployment.assistant.createPromptVersion',
+    'deployment.assistantCreateVersion',
+    'journey-viewport-screenshots.spec.js',
+  ),
+  deferred(
+    'deployment.assistant.createWebsocketVersion',
+    'deployment.assistant',
+    'WebSocket assistant fixtures are required.',
+  ),
+  covered(
+    'deployment.assistant.createAgentkitVersion',
+    'deployment.assistantCreateAgentkitVersion',
+    'journey-viewport-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.createAgentflowVersion',
+    'deployment.assistantCreateAgentflowVersion',
+    'journey-viewport-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.generalSettings',
+    'deployment.assistantSettings',
+    'journeys/deployment/assistant-detail.spec.js',
+  ),
+  deferred(
+    'deployment.assistant.agentflowEditor',
+    'deployment.assistant',
+    'Agentflow graph fixtures are required.',
+  ),
+  ...[
+    'analysis',
+    'tools',
+    'webhooks',
+    'authentication',
+    'telemetry',
+    'storage',
+  ].map(name =>
+    covered(
+      `deployment.assistant.${name}.list`,
+      `deployment.assistant${name.charAt(0).toUpperCase() + name.slice(1)}`,
+      'journey-viewport-screenshots.spec.js',
+    ),
+  ),
+  ...[
+    'analysis.create',
+    'analysis.edit',
+    'tools.create',
+    'tools.edit',
+    'webhooks.create',
+    'webhooks.edit',
+    'authentication.create',
+    'authentication.edit',
+    'telemetry.create',
+    'telemetry.edit',
+    'storage.create',
+    'storage.edit',
+  ].map(name =>
+    deferred(
+      `deployment.assistant.${name}`,
+      'deployment.assistant',
+      'Assistant configuration entity fixtures are required.',
+    ),
+  ),
+  covered(
+    'deployment.assistant.deployments.list',
+    'deployment.assistantDeployments',
+    'journey-viewport-screenshots.spec.js',
+  ),
+  ...[
+    'deployments.web.create',
+    'deployments.web.edit',
+    'deployments.call.create',
+    'deployments.call.edit',
+    'deployments.api.create',
+    'deployments.api.edit',
+    'deployments.debugger.create',
+    'deployments.debugger.edit',
+  ].map(name =>
+    deferred(
+      `deployment.assistant.${name}`,
+      'deployment.assistant',
+      'Assistant deployment fixtures are required.',
+    ),
+  ),
+  deferred(
+    'deployment.endpoint.configureExisting',
+    'deployment.endpoint',
+    'The routed ConfigureEndpointPage currently renders no UI.',
+  ),
+  deferred(
+    'deployment.endpoint.notFound',
+    'deployment.endpointOverview',
+    'The endpoint layout has no persistent not-found state after load failure.',
+  ),
+  covered(
+    'deployment.assistant.notFound',
+    'deployment.assistantOverview',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  ...['atlassian', 'github', 'hubspot', 'gmail', 'slack'].map(provider =>
+    deferred(
+      `connections.${provider}.callback`,
+      'integration.models',
+      'OAuth callback fixtures and redirect assertions are required.',
+    ),
+  ),
+  ...['chat', 'phone', 'public'].map(channel =>
+    deferred(
+      `preview.assistant.${channel}`,
+      'deployment.assistant',
+      'Assistant-specific realtime media fixtures are required.',
+    ),
+  ),
+  deferred(
+    'integration.provider.unsupportedDetail',
+    'integration.models',
+    'The catalog links providers that do not have a detail route implementation.',
+  ),
+  covered(
+    'organization.users.inviteOrganization',
+    'organization.users',
+    'journeys/organization/listings.spec.js',
+  ),
+  deferred(
+    'organization.users.inviteProject',
+    'organization.users',
+    'The dialog needs deterministic project membership fixtures.',
+  ),
+  covered(
+    'organization.projects.create',
+    'organization.projects',
+    'journeys/organization/listings.spec.js',
+  ),
+  deferred(
+    'integration.credentials.create',
+    'integration.projectCredential',
+    'The dialog needs deterministic credential mutation fixtures.',
+  ),
+  covered(
+    'account.notifications',
+    'account.settings',
+    'journeys/account/settings.spec.js',
+  ),
+  ...[
+    'list',
+    'create',
+    'detail',
+    'document.add',
+    'structure.add',
+    'logs',
+    'googleDrive.callback',
+    'oneDrive.callback',
+    'confluence.callback',
+    'sharePoint.callback',
+    'github.callback',
+    'notion.callback',
+  ].map(name =>
+    disabled(
+      `knowledge.${name}`,
+      'Knowledge is disabled by workspace.features.knowledge in the development configuration.',
+    ),
+  ),
+];
+
+module.exports = { journeySubjourneys };

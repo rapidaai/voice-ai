@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import SingleAssistant from '@/app/pages/assistant/listing/single-assistant';
@@ -142,7 +143,8 @@ describe('assistant listing table UX', () => {
     expect(screen.getAllByRole('cell')).toHaveLength(9);
   });
 
-  it('keeps assistants without deployments actionable from the table row', () => {
+  it('keeps assistants without deployments actionable from the table row', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     renderAssistantRow(
       makeAssistant({
         getApideployment: () => null,
@@ -162,20 +164,25 @@ describe('assistant listing table UX', () => {
     expect(screen.getByText('prompt')).toBeInTheDocument();
     expect(screen.getAllByText('-')).toHaveLength(3);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Set up deployment' }));
+    await user.click(screen.getByRole('button', { name: 'Set up deployment' }));
     expect(mockGoToManageAssistant).toHaveBeenCalledWith('assistant-1');
   });
 
-  it('uses flat icon actions for common assistant workflows', () => {
+  it('uses flat icon actions for common assistant workflows', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     renderAssistantRow();
 
-    fireEvent.click(screen.getByRole('button', { name: 'View detail' }));
+    await user.click(screen.getByRole('button', { name: 'View detail' }));
     expect(mockGoToAssistant).toHaveBeenCalledWith('assistant-1');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Manage deployments' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Manage deployments' }),
+    );
     expect(mockGoToManageAssistant).toHaveBeenCalledWith('assistant-1');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create new version' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Create new version' }),
+    );
     expect(mockGoToCreateAssistantVersion).toHaveBeenCalledWith('assistant-1');
   });
 });

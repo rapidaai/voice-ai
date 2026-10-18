@@ -22,7 +22,7 @@ Development governance helpers:
 
 - artifacts-generate.sh Generating artifacts from protos and OpenAPI specs
 - git-commit-hook-setup.sh Configures versioned pre-commit, commit-msg, and pre-push hooks.
-- check-go-version-consistency Verifies Go, CI, and Docker base-image versions remain aligned.
+- check-go-version-consistency Verifies the project and CI Go version plus the separate Docker bootstrap version.
 - pre-commit-go Go formatting, tidy, lint, vet, test, and build checks used by pre-commit.
 - pre-commit-hygiene Lightweight repository hygiene checks used by pre-commit.
 - go-fmt.sh Legacy formatting check.

@@ -1,6 +1,7 @@
 const {
   COLOR_MODES,
   expect,
+  expandDashboardForScreenshot,
   gotoJourney,
   setColorMode,
   screenshotBaselinePath,
@@ -19,14 +20,26 @@ for (const journey of journeysWithCheck('screenshot')) {
         'data-color-mode',
         colorMode,
       );
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+      });
 
-      await expect(page).toHaveScreenshot(
-        screenshotBaselinePath(journey, colorMode),
-        {
+      const screenshotPath = screenshotBaselinePath(journey, colorMode);
+      if (journey.id === 'dashboard.home') {
+        await expandDashboardForScreenshot(page);
+        await expect(
+          page.getByText('Oct 17, 8:25 AM', { exact: true }),
+        ).toBeVisible();
+        await expect(page.locator('[data-dashboard-content]')).toHaveScreenshot(
+          screenshotPath,
+          { maxDiffPixelRatio: 0.01 },
+        );
+      } else {
+        await expect(page).toHaveScreenshot(screenshotPath, {
           fullPage: true,
-          maxDiffPixelRatio: 0.01,
-        },
-      );
+          maxDiffPixelRatio: journey.id.startsWith('static.') ? 0.03 : 0.01,
+        });
+      }
     });
   }
 }

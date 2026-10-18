@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { KnowledgePage } from './index';
@@ -156,6 +157,7 @@ describe('KnowledgePage', () => {
   });
 
   it('renders knowledge actions with Carbon icons', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<KnowledgePage />);
 
     expect(screen.getByText('Product knowledge')).toBeInTheDocument();
@@ -166,18 +168,21 @@ describe('KnowledgePage', () => {
       'data-stroke-width',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /add new knowledge/i }));
+    await user.click(
+      screen.getByRole('button', { name: /add new knowledge/i }),
+    );
 
     expect(mockGoToCreateKnowledge).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(mockShowLoader).toHaveBeenCalledTimes(1));
   });
 
   it('refreshes knowledge bases from the labeled icon action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<KnowledgePage />);
 
     await waitFor(() => expect(mockGetAllKnowledge).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Refresh knowledge bases' }),
     );
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Dashboard } from '../dashboard';
 import { Deployment } from '../deployment';
@@ -121,7 +122,8 @@ describe('sidebar navigation items', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('expands credential links from the active vault route and can collapse them', () => {
+  it('expands credential links from the active vault route and can collapse them', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     renderAtPath('/integration/personal-credential', <Vault />);
 
     expect(
@@ -134,7 +136,7 @@ describe('sidebar navigation items', () => {
       screen.getByRole('link', { name: /Personal Token/i }),
     ).toHaveAttribute('href', '/integration/personal-credential');
 
-    fireEvent.click(screen.getByText('Credentials'));
+    await user.click(screen.getByText('Credentials'));
 
     expect(
       screen.queryByRole('link', { name: /Project Credential/i }),

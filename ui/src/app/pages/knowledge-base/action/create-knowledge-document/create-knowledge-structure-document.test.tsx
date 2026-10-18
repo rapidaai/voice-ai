@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { CreateKnowledgeStructureDocumentPage } from './create-knowledge-structure-document';
@@ -140,22 +141,26 @@ describe('CreateKnowledgeStructureDocumentPage', () => {
     jest.clearAllMocks();
   });
 
-  it('renders the back action with a Carbon icon and navigates back', () => {
+  it('renders the back action with a Carbon icon and navigates back', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateKnowledgeStructureDocumentPage />);
 
     expect(screen.getByTestId('arrow-left-icon')).not.toHaveAttribute(
       'data-stroke-width',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /back to knowledge/i }));
+    await user.click(
+      screen.getByRole('button', { name: /back to knowledge/i }),
+    );
 
     expect(mockGoBack).toHaveBeenCalledTimes(1);
   });
 
-  it('blocks upload until a structured document type is selected', () => {
+  it('blocks upload until a structured document type is selected', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateKnowledgeStructureDocumentPage />);
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: /upload new document/i }),
     );
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { CreateAssistantWebhook } from '@/app/pages/assistant/actions/configure-assistant-webhook/create-assistant-webhook';
 import { UpdateAssistantWebhook } from '@/app/pages/assistant/actions/configure-assistant-webhook/update-assistant-webhook';
@@ -468,23 +469,26 @@ describe('Assistant webhook flows', () => {
     });
   });
 
-  const selectFirstEventAndContinue = () => {
+  const selectFirstEventAndContinue = async () => {
+    const user = userEvent.setup();
     const eventCheckbox = document.getElementById(
       'webhook-event-call.received',
     ) as HTMLInputElement;
-    fireEvent.click(eventCheckbox);
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(eventCheckbox);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
   };
 
-  const selectWebRTCEventAndContinue = () => {
+  const selectWebRTCEventAndContinue = async () => {
+    const user = userEvent.setup();
     const eventCheckbox = document.getElementById(
       'webhook-event-webrtc.connected',
     ) as HTMLInputElement;
-    fireEvent.click(eventCheckbox);
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(eventCheckbox);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
   };
 
   const continueWithLoadedEvent = async () => {
+    const user = userEvent.setup();
     await waitFor(() => {
       expect(
         document.getElementById(
@@ -492,10 +496,11 @@ describe('Assistant webhook flows', () => {
         ) as HTMLInputElement,
       ).toBeChecked();
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
   };
 
   const continueWithLoadedAndWebRTCEvent = async () => {
+    const user = userEvent.setup();
     await waitFor(() => {
       expect(
         document.getElementById(
@@ -506,45 +511,47 @@ describe('Assistant webhook flows', () => {
     const eventCheckbox = document.getElementById(
       'webhook-event-webrtc.reconnecting',
     ) as HTMLInputElement;
-    fireEvent.click(eventCheckbox);
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(eventCheckbox);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
   };
 
-  it('create webhook supports header add-delete and continues without payload mapping', () => {
+  it('create webhook supports header add-delete and continues without payload mapping', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateAssistantWebhook assistantId="assistant-1" />);
 
-    selectFirstEventAndContinue();
+    await selectFirstEventAndContinue();
 
-    fireEvent.change(screen.getByTestId('webhook-endpoint'), {
-      target: { value: 'https://api.example.com/webhook' },
-    });
+    await user.click(screen.getByTestId('webhook-endpoint'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('https://api.example.com/webhook'));
 
     expect(screen.getByText('Headers (0)')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Add header' }));
+    await user.click(screen.getByRole('button', { name: 'Add header' }));
     expect(screen.getByText('Headers (1)')).toBeInTheDocument();
     const headerKeyInput = screen.getByTestId('api-header-key-0');
     const headerRow = headerKeyInput.closest('tr');
     const headerRemoveButton = headerRow?.querySelector('button');
     expect(headerRemoveButton).toBeTruthy();
-    fireEvent.click(headerRemoveButton!);
+    await user.click(headerRemoveButton!);
     expect(screen.getByText('Headers (0)')).toBeInTheDocument();
     expect(screen.getByText('Destination')).toBeInTheDocument();
   });
 
-  it('create webhook validates headers when key is present without value', () => {
+  it('create webhook validates headers when key is present without value', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateAssistantWebhook assistantId="assistant-1" />);
 
-    selectFirstEventAndContinue();
+    await selectFirstEventAndContinue();
 
-    fireEvent.change(screen.getByTestId('webhook-endpoint'), {
-      target: { value: 'https://api.example.com/webhook' },
-    });
+    await user.click(screen.getByTestId('webhook-endpoint'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('https://api.example.com/webhook'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add header' }));
-    fireEvent.change(screen.getByTestId('api-header-key-0'), {
-      target: { value: 'Authorization' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Configure webhook' }));
+    await user.click(screen.getByRole('button', { name: 'Add header' }));
+    await user.click(screen.getByTestId('api-header-key-0'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Authorization'));
+    await user.click(screen.getByRole('button', { name: 'Configure webhook' }));
 
     expect(
       screen.getByText('Headers with a key must also include a value.'),
@@ -552,23 +559,22 @@ describe('Assistant webhook flows', () => {
   });
 
   it('create webhook submits with selected event and configuration', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateAssistantWebhook assistantId="assistant-1" />);
 
-    selectWebRTCEventAndContinue();
+    await selectWebRTCEventAndContinue();
 
-    fireEvent.change(screen.getByTestId('webhook-endpoint'), {
-      target: { value: 'https://api.example.com/webhook' },
-    });
-    fireEvent.change(screen.getByTestId('webhook-max-retries'), {
-      target: { value: '2' },
-    });
-    fireEvent.change(screen.getByTestId('webhook-timeout'), {
-      target: { value: '220' },
-    });
-    fireEvent.change(screen.getByTestId('webhook-priority'), {
-      target: { value: '4' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Configure webhook' }));
+    await user.click(screen.getByTestId('webhook-endpoint'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('https://api.example.com/webhook'));
+    await user.selectOptions(screen.getByTestId('webhook-max-retries'), '2');
+    await user.click(screen.getByTestId('webhook-timeout'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('220'));
+    await user.click(screen.getByTestId('webhook-priority'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('4'));
+    await user.click(screen.getByRole('button', { name: 'Configure webhook' }));
 
     await waitFor(() =>
       expect(CreateAssistantConfiguration).toHaveBeenCalledTimes(1),
@@ -596,6 +602,7 @@ describe('Assistant webhook flows', () => {
   });
 
   it('update webhook validates invalid destination url', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<UpdateAssistantWebhook assistantId="assistant-1" />);
 
     await continueWithLoadedEvent();
@@ -606,10 +613,10 @@ describe('Assistant webhook flows', () => {
       );
     });
 
-    fireEvent.change(screen.getByTestId('webhook-endpoint'), {
-      target: { value: 'bad-url' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Update webhook' }));
+    await user.click(screen.getByTestId('webhook-endpoint'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('bad-url'));
+    await user.click(screen.getByRole('button', { name: 'Update webhook' }));
 
     expect(
       screen.getByText('Please provide a valid server URL for the webhook.'),
@@ -617,6 +624,7 @@ describe('Assistant webhook flows', () => {
   });
 
   it('update webhook validates headers when key is present without value', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<UpdateAssistantWebhook assistantId="assistant-1" />);
 
     await continueWithLoadedEvent();
@@ -627,10 +635,8 @@ describe('Assistant webhook flows', () => {
       );
     });
 
-    fireEvent.change(screen.getByTestId('api-header-val-0'), {
-      target: { value: '' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Update webhook' }));
+    await user.clear(screen.getByTestId('api-header-val-0'));
+    await user.click(screen.getByRole('button', { name: 'Update webhook' }));
 
     expect(
       screen.getByText('Headers with a key must also include a value.'),
@@ -638,6 +644,7 @@ describe('Assistant webhook flows', () => {
   });
 
   it('update webhook submits with loaded values', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<UpdateAssistantWebhook assistantId="assistant-1" />);
 
     await continueWithLoadedAndWebRTCEvent();
@@ -648,7 +655,7 @@ describe('Assistant webhook flows', () => {
       );
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Update webhook' }));
+    await user.click(screen.getByRole('button', { name: 'Update webhook' }));
 
     await waitFor(() =>
       expect(UpdateAssistantConfiguration).toHaveBeenCalledTimes(1),

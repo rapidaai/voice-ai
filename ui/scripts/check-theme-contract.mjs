@@ -41,7 +41,7 @@ export const FORBIDDEN_THEME_SYMBOLS = Object.freeze([
 
 const THEME_CONTEXT_PATH = 'ui/src/context/dark-mode-context.tsx';
 const LEGACY_THEME_MANIFEST_PATH = 'ui/public/theme.json';
-const PUBLIC_INDEX_PATH = 'ui/public/index.html';
+const APP_INDEX_PATH = 'ui/index.html';
 export const THEME_CONFIG_PATHS = Object.freeze([
   'ui/src/configs/config.development.json',
   'ui/src/configs/config.production.json',
@@ -359,22 +359,22 @@ export function validateSingleSourceTheme(repoRoot = DEFAULT_REPO_ROOT) {
   }
 
   try {
-    const source = readFileSync(resolve(repoRoot, PUBLIC_INDEX_PATH), 'utf8');
+    const source = readFileSync(resolve(repoRoot, APP_INDEX_PATH), 'utf8');
     const scriptTags = source.match(/<script\b[^>]*>/gi) ?? [];
     if (scriptTags.some(scriptTag => !/\ssrc\s*=/i.test(scriptTag))) {
       pushDiagnostic(
         diagnostics,
-        PUBLIC_INDEX_PATH,
+        APP_INDEX_PATH,
         'inline bootstrap scripts are not allowed; use CONFIG.theme',
       );
     }
   } catch (error) {
     pushDiagnostic(
       diagnostics,
-      PUBLIC_INDEX_PATH,
+      APP_INDEX_PATH,
       error?.code === 'ENOENT'
-        ? 'public index is missing'
-        : `could not read public index: ${error.message}`,
+        ? 'application index is missing'
+        : `could not read application index: ${error.message}`,
     );
   }
 

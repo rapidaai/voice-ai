@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { AccountSettingPage } from './index';
@@ -55,10 +56,11 @@ describe('AccountSettingPage', () => {
     expect(screen.getByTestId('dashboard-back-icon')).toBeInTheDocument();
   });
 
-  it('navigates to the dashboard from the back action', () => {
+  it('navigates to the dashboard from the back action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<AccountSettingPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Dashboard' }));
+    await user.click(screen.getByRole('button', { name: 'Dashboard' }));
 
     expect(mockGoToDashboard).toHaveBeenCalledTimes(1);
   });

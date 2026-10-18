@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { CreateProjectPage } from '@/app/pages/user-onboarding/user-project';
@@ -84,6 +85,7 @@ describe('CreateProjectPage', () => {
   });
 
   it('submits and navigates to dashboard on success', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const authorize = jest.fn(success => success());
     (CreateProject as jest.Mock).mockImplementation(
       (_cfg, _name, _description, _headers, callback) => {
@@ -93,19 +95,19 @@ describe('CreateProjectPage', () => {
 
     renderWithAuth(authorize);
 
-    fireEvent.change(
+    await user.click(
       screen.getByPlaceholderText('eg: Acme Support Operations'),
-      {
-        target: { value: 'Support Bot' },
-      },
     );
-    fireEvent.change(
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support Bot'));
+    await user.click(
       screen.getByPlaceholderText(
         'eg: White-label inbound voice agents for healthcare support across US and UK',
       ),
-      { target: { value: 'Project description' } },
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Go to dashboard' }));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Project description'));
+    await user.click(screen.getByRole('button', { name: 'Go to dashboard' }));
 
     await waitFor(() => {
       expect(CreateProject).toHaveBeenCalled();
@@ -118,6 +120,7 @@ describe('CreateProjectPage', () => {
   });
 
   it('shows generic error when API returns service error', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (CreateProject as jest.Mock).mockImplementation(
       (_cfg, _name, _description, _headers, callback) => {
         callback(new Error('boom'), null);
@@ -126,13 +129,12 @@ describe('CreateProjectPage', () => {
 
     renderWithAuth();
 
-    fireEvent.change(
+    await user.click(
       screen.getByPlaceholderText('eg: Acme Support Operations'),
-      {
-        target: { value: 'Support Bot' },
-      },
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Go to dashboard' }));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support Bot'));
+    await user.click(screen.getByRole('button', { name: 'Go to dashboard' }));
 
     expect(
       await screen.findByText(
@@ -142,6 +144,7 @@ describe('CreateProjectPage', () => {
   });
 
   it('shows project details error when API returns unsuccessful response', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (CreateProject as jest.Mock).mockImplementation(
       (_cfg, _name, _description, _headers, callback) => {
         callback(null, { getSuccess: () => false });
@@ -150,13 +153,12 @@ describe('CreateProjectPage', () => {
 
     renderWithAuth();
 
-    fireEvent.change(
+    await user.click(
       screen.getByPlaceholderText('eg: Acme Support Operations'),
-      {
-        target: { value: 'Support Bot' },
-      },
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Go to dashboard' }));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support Bot'));
+    await user.click(screen.getByRole('button', { name: 'Go to dashboard' }));
 
     expect(
       await screen.findByText(

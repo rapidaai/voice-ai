@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import {
   ColumnPreferencesDialog,
@@ -166,7 +167,8 @@ describe('shared dialogs', () => {
     mockRapidaStore.loading = false;
   });
 
-  it('renders confirm dialogs and dispatches each action', () => {
+  it('renders confirm dialogs and dispatches each action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onConfirm = jest.fn();
     const onCancel = jest.fn();
     const onClose = jest.fn();
@@ -188,9 +190,9 @@ describe('shared dialogs', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Create this version.')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Modal close' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Modal close' }));
 
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onCancel).toHaveBeenCalledTimes(1);
@@ -218,7 +220,8 @@ describe('shared dialogs', () => {
     expect(screen.getByText('Warning')).toBeInTheDocument();
   });
 
-  it('requires the object name before confirming a delete', () => {
+  it('requires the object name before confirming a delete', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onConfirm = jest.fn();
 
     render(
@@ -236,21 +239,22 @@ describe('shared dialogs', () => {
     const deleteButton = screen.getByRole('button', { name: 'Delete' });
     expect(deleteButton).toBeDisabled();
 
-    fireEvent.change(screen.getByPlaceholderText('support'), {
-      target: { value: 'wrong' },
-    });
+    await user.click(screen.getByPlaceholderText('support'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('wrong'));
     expect(deleteButton).toBeDisabled();
 
-    fireEvent.change(screen.getByPlaceholderText('support'), {
-      target: { value: 'support' },
-    });
+    await user.click(screen.getByPlaceholderText('support'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('support'));
     expect(deleteButton).toBeEnabled();
 
-    fireEvent.click(deleteButton);
+    await user.click(deleteButton);
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it('resets delete confirmation input when cancelled or closed', () => {
+  it('resets delete confirmation input when cancelled or closed', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onCancel = jest.fn();
     const onClose = jest.fn();
 
@@ -267,18 +271,23 @@ describe('shared dialogs', () => {
     );
 
     const input = screen.getByPlaceholderText('support');
-    fireEvent.change(input, { target: { value: 'support' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(input);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('support'));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(input).toHaveValue('');
     expect(onCancel).toHaveBeenCalledTimes(1);
 
-    fireEvent.change(input, { target: { value: 'support' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Modal close' }));
+    await user.click(input);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('support'));
+    await user.click(screen.getByRole('button', { name: 'Modal close' }));
     expect(input).toHaveValue('');
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('saves column preferences and page size selections', () => {
+  it('saves column preferences and page size selections', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeColumns = jest.fn();
     const onChangePageSize = jest.fn();
     const setOpen = jest.fn();
@@ -298,9 +307,9 @@ describe('shared dialogs', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '25 Items' }));
-    fireEvent.click(screen.getByLabelText('Status'));
-    fireEvent.click(screen.getByRole('button', { name: 'Save Preference' }));
+    await user.click(screen.getByRole('button', { name: '25 Items' }));
+    await user.click(screen.getByLabelText('Status'));
+    await user.click(screen.getByRole('button', { name: 'Save Preference' }));
 
     expect(onChangePageSize).toHaveBeenCalledWith(25);
     expect(onChangeColumns).toHaveBeenCalledWith([
@@ -310,7 +319,8 @@ describe('shared dialogs', () => {
     expect(setOpen).toHaveBeenCalledWith(false);
   });
 
-  it('blocks column preferences when every column is hidden', () => {
+  it('blocks column preferences when every column is hidden', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeColumns = jest.fn();
 
     render(
@@ -325,8 +335,8 @@ describe('shared dialogs', () => {
       />,
     );
 
-    fireEvent.click(screen.getByLabelText('Name'));
-    fireEvent.click(screen.getByRole('button', { name: 'Save Preference' }));
+    await user.click(screen.getByLabelText('Name'));
+    await user.click(screen.getByRole('button', { name: 'Save Preference' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Select at least one visible column',
@@ -334,7 +344,8 @@ describe('shared dialogs', () => {
     expect(onChangeColumns).not.toHaveBeenCalled();
   });
 
-  it('creates tags with selected values and closes on success', () => {
+  it('creates tags with selected values and closes on success', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
     const onCreateTag = jest.fn((_tags, _onError, onSuccess) => onSuccess({}));
 
@@ -349,9 +360,9 @@ describe('shared dialogs', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add support' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Remove existing' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save tags' }));
+    await user.click(screen.getByRole('button', { name: 'Add support' }));
+    await user.click(screen.getByRole('button', { name: 'Remove existing' }));
+    await user.click(screen.getByRole('button', { name: 'Save tags' }));
 
     expect(mockRapidaStore.showLoader).toHaveBeenCalledWith('overlay');
     expect(mockRapidaStore.hideLoader).toHaveBeenCalledTimes(1);
@@ -363,7 +374,8 @@ describe('shared dialogs', () => {
     expect(setModalOpen).toHaveBeenCalledWith(false);
   });
 
-  it('shows create tag errors and keeps the dialog open', () => {
+  it('shows create tag errors and keeps the dialog open', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
     const onCreateTag = jest.fn((_tags, onError) => onError('Tag failed'));
 
@@ -378,13 +390,14 @@ describe('shared dialogs', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save tags' }));
+    await user.click(screen.getByRole('button', { name: 'Save tags' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('Error: Tag failed');
     expect(setModalOpen).not.toHaveBeenCalledWith(false);
   });
 
-  it('updates descriptions and closes on success', () => {
+  it('updates descriptions and closes on success', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
     const onUpdateDescription = jest.fn(
       (_name, _description, _onError, onSuccess) => onSuccess(),
@@ -401,13 +414,13 @@ describe('shared dialogs', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Name'), {
-      target: { value: 'Updated endpoint' },
-    });
-    fireEvent.change(screen.getByLabelText('Description'), {
-      target: { value: 'Updated description' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(screen.getByLabelText('Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Updated endpoint'));
+    await user.click(screen.getByLabelText('Description'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Updated description'));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     expect(onUpdateDescription).toHaveBeenCalledWith(
       'Updated endpoint',
@@ -418,7 +431,8 @@ describe('shared dialogs', () => {
     expect(setModalOpen).toHaveBeenCalledWith(false);
   });
 
-  it('shows update description errors', () => {
+  it('shows update description errors', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onUpdateDescription = jest.fn((_name, _description, onError) =>
       onError('Update failed'),
     );
@@ -431,12 +445,13 @@ describe('shared dialogs', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('Error: Update failed');
   });
 
-  it('renders disconnect detail rows and empty state', () => {
+  it('renders disconnect detail rows and empty state', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
     const { rerender } = render(
       <DisconnectDetailsDialog
@@ -449,8 +464,8 @@ describe('shared dialogs', () => {
     expect(screen.getByText('Reason')).toBeInTheDocument();
     expect(screen.getByText('Client disconnected')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Modal close' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Header close' }));
+    await user.click(screen.getByRole('button', { name: 'Modal close' }));
+    await user.click(screen.getByRole('button', { name: 'Header close' }));
     expect(setModalOpen).toHaveBeenCalledWith(false);
     expect(setModalOpen).toHaveBeenCalledTimes(2);
 

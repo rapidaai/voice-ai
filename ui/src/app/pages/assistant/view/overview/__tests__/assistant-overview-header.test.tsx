@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { Overview } from '@/app/pages/assistant/view/overview';
@@ -25,7 +26,7 @@ jest.mock('@/app/components/ui/feedback/loaders/section-loader', () => ({
 }));
 
 jest.mock('@/app/components/ui/feedback/notification', () => ({
-  LinkNotification: ({ title }: any) => <div>{title}</div>,
+  ActionNotification: ({ title }: any) => <div>{title}</div>,
 }));
 
 jest.mock('@/app/pages/assistant/view/overview/assistant-analytics', () => ({
@@ -76,7 +77,8 @@ describe('Assistant overview header', () => {
     mockLoading = false;
   });
 
-  it('shows the Carbon-style overview header with a flush full-height primary create version action', () => {
+  it('shows the Carbon-style overview header with a flush full-height primary create version action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<Overview currentAssistant={makeAssistant()} />);
 
     expect(screen.getByText('Assistants')).toHaveAttribute(
@@ -103,7 +105,7 @@ describe('Assistant overview header', () => {
     expect(createVersionButton).toHaveClass('items-center');
     expect(createVersionButton).toHaveClass('justify-center');
 
-    fireEvent.click(createVersionButton);
+    await user.click(createVersionButton);
 
     expect(mockGoToCreateAssistantVersion).toHaveBeenCalledWith('assistant-1');
   });

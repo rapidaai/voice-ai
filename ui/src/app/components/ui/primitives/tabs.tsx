@@ -57,7 +57,7 @@ export function Tabs({
     ? children
     : children
       ? [children]
-      : [];
+      : tabs.map(() => null);
 
   return (
     <div className={cn(fill && 'flex flex-1 min-h-0 flex-col', className)}>

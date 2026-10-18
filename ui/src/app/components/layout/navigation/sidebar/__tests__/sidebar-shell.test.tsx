@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { SidebarNavigation } from '@/app/components/layout/navigation/sidebar';
 import developmentConfig from '@/configs/config.development.json';
 import { ThemeManifest } from '@/theme/types';
@@ -124,13 +125,14 @@ describe('sidebar shell', () => {
     );
   });
 
-  it('uses the design-system ghost button to lock and unlock the sidebar', () => {
+  it('uses the design-system ghost button to lock and unlock the sidebar', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<SidebarNavigation />);
 
     const toggle = screen.getByRole('button', { name: 'Expand sidebar' });
     expect(toggle).toHaveAttribute('data-design-system-button-kind', 'ghost');
 
-    fireEvent.click(toggle);
+    await user.click(toggle);
     expect(mockSetLocked).toHaveBeenCalledWith(true);
   });
 
@@ -148,7 +150,8 @@ describe('sidebar shell', () => {
     );
   });
 
-  it('uses the locked state for the collapse action', () => {
+  it('uses the locked state for the collapse action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockLocked = true;
 
     render(<SidebarNavigation />);
@@ -156,7 +159,7 @@ describe('sidebar shell', () => {
     const toggle = screen.getByRole('button', { name: 'Collapse sidebar' });
     expect(toggle).toHaveTextContent('Collapse');
 
-    fireEvent.click(toggle);
+    await user.click(toggle);
     expect(mockSetLocked).toHaveBeenCalledWith(false);
   });
 });

@@ -86,3 +86,19 @@ func TestVaultServiceUsesNormalizedIdentityContext(t *testing.T) {
 		t.Fatal("Get() error = nil for mismatched project context")
 	}
 }
+
+func TestVaultServiceDeleteReturnsDatabaseError(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	logger, err := commons.NewApplicationLogger(commons.EnableConsole(true), commons.EnableFile(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewVaultService(logger, &vaultTestPostgres{db: db})
+
+	if _, err := service.Delete(context.Background(), &types.Authentication{}, types.ProjectContext{OrganizationID: 81, ProjectID: 92}, 1); err == nil {
+		t.Fatal("Delete() error = nil for missing vault table")
+	}
+}

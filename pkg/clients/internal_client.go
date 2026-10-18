@@ -174,7 +174,7 @@ func (ic *internalClient) createServiceScopeToken(auth *types.Authentication) (s
 func (client *internalClient) Cache(c context.Context, key string, value interface{}) *connectors.RedisResponse {
 	data, err := json.Marshal(value)
 	if err != nil {
-		client.logger.Errorf("Unable to cache the record as value is not marshalable %s", err, key)
+		client.logger.Errorf("Unable to cache the record as value is not marshalable %v for key %s", err, key)
 		return nil
 	}
 	put := client.redis.Cmd(c, "SET", []string{key, string(data)})
@@ -190,7 +190,7 @@ func (client *internalClient) CacheWithTTL(c context.Context, key string, value 
 	}
 	data, err := json.Marshal(value)
 	if err != nil {
-		client.logger.Errorf("Unable to cache the record as value is not marshalable %s", err, key)
+		client.logger.Errorf("Unable to cache the record as value is not marshalable %v for key %s", err, key)
 		return &connectors.RedisResponse{Err: err}
 	}
 	put := client.redis.Cmd(c, "SET", []string{key, string(data), "EX", strconv.FormatInt(int64(ttl/time.Second), 10)})

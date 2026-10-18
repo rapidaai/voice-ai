@@ -124,7 +124,7 @@ func NewKnowledgeRetrievalToolCaller(
 		)
 
 	if err != nil {
-		logger.Errorf("error while getting provider model credentials %v for embedding provide model id %d", err, knowledge.EmbeddingModelProviderName)
+		logger.Errorf("error while getting provider model credentials %v for embedding provide model id %s", err, knowledge.EmbeddingModelProviderName)
 		return nil, err
 	}
 	return &knowledgeRetrievalToolCaller{

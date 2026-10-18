@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import toast from 'react-hot-toast/headless';
 import { DeleteProviderKey } from '@rapidaai/react';
@@ -27,7 +28,6 @@ const makeCredential = (
 });
 
 let mockProviderCredentials: MockCredential[] = [];
-const mockWriteText = jest.fn();
 const mockHideLoader = jest.fn();
 const mockReloadProviderCredentials = jest.fn();
 const mockShowLoader = jest.fn();
@@ -131,14 +131,11 @@ describe('ViewProviderCredentialDialog', () => {
   beforeEach(() => {
     mockProviderCredentials = [];
     jest.clearAllMocks();
-    mockWriteText.mockReset();
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText: mockWriteText },
-    });
   });
 
   it('renders the credential ID and copies it from the accessible action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    const writeText = jest.spyOn(navigator.clipboard, 'writeText');
     mockProviderCredentials = [
       makeCredential('credential-openai-123', 'Production key', 'openai'),
     ];
@@ -161,9 +158,11 @@ describe('ViewProviderCredentialDialog', () => {
       await screen.findByText('credential-openai-123'),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy credential ID' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Copy credential ID' }),
+    );
 
-    expect(mockWriteText).toHaveBeenCalledWith('credential-openai-123');
+    expect(writeText).toHaveBeenCalledWith('credential-openai-123');
   });
 
   it('filters credentials that belong to a different provider', async () => {
@@ -199,7 +198,8 @@ describe('ViewProviderCredentialDialog', () => {
     expect(screen.queryByText('ElevenLabs key')).not.toBeInTheDocument();
   });
 
-  it('opens the setup flow from the empty state', () => {
+  it('opens the setup flow from the empty state', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onSetupCredential = jest.fn();
 
     render(
@@ -219,12 +219,13 @@ describe('ViewProviderCredentialDialog', () => {
     expect(
       screen.getByText('No provider credential to display'),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Setup Credential' }));
+    await user.click(screen.getByRole('button', { name: 'Setup Credential' }));
 
     expect(onSetupCredential).toHaveBeenCalledTimes(1);
   });
 
   it('deletes credentials and reloads on success', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockProviderCredentials = [
       makeCredential('credential-openai-123', 'Production key', 'openai'),
     ];
@@ -248,20 +249,25 @@ describe('ViewProviderCredentialDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(mockShowLoader).toHaveBeenCalledTimes(1);
     expect(DeleteProviderKey).toHaveBeenCalledWith(
       {},
       'credential-openai-123',
       expect.any(Function),
-      undefined,
+      {
+        authorization: 'token-1',
+        projectId: 'project-1',
+        userId: 'user-1',
+      },
     );
     expect(mockHideLoader).toHaveBeenCalledTimes(1);
     expect(mockReloadProviderCredentials).toHaveBeenCalledTimes(1);
   });
 
-  it('reports delete errors from the API callback', () => {
+  it('reports delete errors from the API callback', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockProviderCredentials = [
       makeCredential('credential-openai-123', 'Production key', 'openai'),
     ];
@@ -288,12 +294,13 @@ describe('ViewProviderCredentialDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(toast.error).toHaveBeenCalledWith('Delete failed');
   });
 
-  it('reports the fallback delete error when no API message exists', () => {
+  it('reports the fallback delete error when no API message exists', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockProviderCredentials = [
       makeCredential('credential-openai-123', 'Production key', 'openai'),
     ];
@@ -320,14 +327,15 @@ describe('ViewProviderCredentialDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(toast.error).toHaveBeenCalledWith(
       'Unable to process your request. please try again later.',
     );
   });
 
-  it('closes from the header and footer actions', () => {
+  it('closes from the header and footer actions', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
 
     render(
@@ -344,8 +352,8 @@ describe('ViewProviderCredentialDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Header close' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
+    await user.click(screen.getByRole('button', { name: 'Header close' }));
+    await user.click(screen.getByRole('button', { name: 'Got it' }));
 
     expect(setModalOpen).toHaveBeenCalledWith(false);
     expect(setModalOpen).toHaveBeenCalledTimes(2);

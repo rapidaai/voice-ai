@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ProjectRoleTable } from '../project-role-table';
 
@@ -15,7 +16,9 @@ jest.mock('@carbon/react', () => ({
     </button>
   ),
   Dropdown: ({
+    autoAlign,
     className,
+    direction,
     id,
     items,
     itemToString,
@@ -27,6 +30,8 @@ jest.mock('@carbon/react', () => ({
       {label}
       <select
         className={className}
+        data-auto-align={autoAlign || undefined}
+        data-direction={direction}
         id={id}
         value={selectedItem?.value || ''}
         onChange={event =>
@@ -69,8 +74,8 @@ jest.mock('@carbon/react', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives', () => ({
-  TertiaryButton: ({ children, onClick }: any) => (
-    <button type="button" onClick={onClick}>
+  TertiaryButton: ({ children, className, onClick }: any) => (
+    <button type="button" className={className} onClick={onClick}>
       {children}
     </button>
   ),
@@ -87,7 +92,8 @@ const roleOptions = [
 ];
 
 describe('ProjectRoleTable', () => {
-  it('renders an empty state and adds a default project row', () => {
+  it('renders an empty state and adds a default project row', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -107,14 +113,15 @@ describe('ProjectRoleTable', () => {
       'No project roles yet. Click Add role below.',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add role' }));
+    await user.click(screen.getByRole('button', { name: 'Add role' }));
 
     expect(onChange).toHaveBeenCalledWith([
       { projectId: 'project-2', projectRole: '' },
     ]);
   });
 
-  it('updates project and role selections for an existing row', () => {
+  it('updates project and role selections for an existing row', async () => {
+    const user = userEvent.setup();
     const onChange = jest.fn();
 
     render(
@@ -126,16 +133,18 @@ describe('ProjectRoleTable', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Select project'), {
-      target: { value: 'project-2' },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Select project'),
+      String('project-2'),
+    );
     expect(onChange).toHaveBeenLastCalledWith([
       { projectId: 'project-2', projectRole: 'admin' },
     ]);
 
-    fireEvent.change(screen.getByLabelText('Select role'), {
-      target: { value: 'reader' },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Select role'),
+      String('reader'),
+    );
     expect(onChange).toHaveBeenLastCalledWith([
       { projectId: 'project-1', projectRole: 'reader' },
     ]);
@@ -156,6 +165,17 @@ describe('ProjectRoleTable', () => {
       'border-border-subtle',
     );
     expect(screen.getByLabelText('Select project')).toHaveClass('w-full');
+    expect(screen.getByLabelText('Select project')).toHaveAttribute(
+      'data-auto-align',
+      'true',
+    );
+    expect(screen.getByLabelText('Select project')).not.toHaveAttribute(
+      'data-direction',
+    );
+    expect(screen.getByLabelText('Select role')).toHaveAttribute(
+      'data-auto-align',
+      'true',
+    );
     expect(screen.getByLabelText('Select project').closest('td')).toHaveClass(
       '!p-0',
     );
@@ -169,9 +189,16 @@ describe('ProjectRoleTable', () => {
     expect(
       screen.getByRole('button', { name: 'Remove project role' }).closest('td'),
     ).toHaveClass('!w-10', '!p-0', '!text-center');
+    expect(
+      screen.getByRole('button', { name: 'Add project role' }),
+    ).toHaveClass('!w-full', '!max-w-none');
+    expect(
+      screen.getByRole('button', { name: 'Add project role' }).parentElement,
+    ).toHaveClass('mt-4');
   });
 
-  it('removes rows when the remove column is visible', () => {
+  it('removes rows when the remove column is visible', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -186,7 +213,7 @@ describe('ProjectRoleTable', () => {
       />,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getAllByRole('button', {
         name: 'Remove project role',
       })[0],
@@ -218,7 +245,8 @@ describe('ProjectRoleTable', () => {
     expect(screen.queryByText('Actions')).toBeNull();
   });
 
-  it('adds an empty row when no default project or options are available', () => {
+  it('adds an empty row when no default project or options are available', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -230,7 +258,7 @@ describe('ProjectRoleTable', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add project role' }));
+    await user.click(screen.getByRole('button', { name: 'Add project role' }));
 
     expect(onChange).toHaveBeenCalledWith([{ projectId: '', projectRole: '' }]);
   });

@@ -1,12 +1,6 @@
 import React from 'react';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import {
   ConfigureAssistantAuthenticationPage,
@@ -398,14 +392,16 @@ describe('CreateAssistantAuthenticationPage', () => {
   };
 
   const clickSaveAuthentication = async () => {
+    const user = userEvent.setup();
     const saveButton = screen.getByRole('button', {
       name: 'Save authentication',
     });
-    fireEvent.click(saveButton);
+    await user.click(saveButton);
     await waitFor(() => expect(saveButton).not.toBeDisabled());
   };
 
   it('keeps save enabled and validates on click', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateAssistantAuthenticationPage />);
     await waitUntilReady();
     expect(GetAllAssistantConfiguration).not.toHaveBeenCalled();
@@ -415,7 +411,7 @@ describe('CreateAssistantAuthenticationPage', () => {
     });
     expect(saveButton).not.toBeDisabled();
 
-    fireEvent.click(saveButton);
+    await user.click(saveButton);
 
     expect(
       screen.getByText('Please provide a server URL for authentication.'),
@@ -424,58 +420,64 @@ describe('CreateAssistantAuthenticationPage', () => {
   });
 
   it('supports add and edit for authentication parameter mapping', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateAssistantAuthenticationPage />);
     await waitUntilReady();
     expect(GetAllAssistantConfiguration).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByTestId('assistant-auth-endpoint'), {
-      target: { value: 'https://auth.example.com/resolve' },
-    });
+    await user.click(screen.getByTestId('assistant-auth-endpoint'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('https://auth.example.com/resolve'));
 
     const beforeCount = screen.getAllByTestId(/param-val-/).length;
-    fireEvent.click(screen.getByRole('button', { name: 'Add parameter' }));
+    await user.click(screen.getByRole('button', { name: 'Add parameter' }));
     await waitFor(() =>
       expect(screen.getAllByTestId(/param-val-/).length).toBe(beforeCount + 1),
     );
     const fields = screen.getAllByTestId(/param-val-/);
     const lastField = fields[fields.length - 1];
-    fireEvent.change(lastField, {
-      target: { value: 'assistantPrompt' },
-    });
+    await user.click(lastField);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('assistantPrompt'));
 
     expect(screen.getByText(/Mapping \(\d+\)/)).toBeInTheDocument();
     expect(lastField).toHaveValue('assistantPrompt');
   });
 
   it('submits canonical assistant and provider call identifiers', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateAssistantAuthenticationPage />);
     await waitUntilReady();
 
-    fireEvent.change(screen.getByTestId('assistant-auth-endpoint'), {
-      target: { value: 'https://auth.example.com/resolve' },
-    });
+    await user.click(screen.getByTestId('assistant-auth-endpoint'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('https://auth.example.com/resolve'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add parameter' }));
-    fireEvent.change(screen.getByTestId('param-type-2'), {
-      target: { value: 'client' },
-    });
-    fireEvent.change(screen.getByTestId('param-key-2'), {
-      target: { value: 'assistant_phone' },
-    });
-    fireEvent.change(screen.getByTestId('param-val-2'), {
-      target: { value: 'assistantPhoneValue' },
-    });
+    await user.click(screen.getByRole('button', { name: 'Add parameter' }));
+    await user.selectOptions(
+      screen.getByTestId('param-type-2'),
+      String('client'),
+    );
+    await user.selectOptions(
+      screen.getByTestId('param-key-2'),
+      String('assistant_phone'),
+    );
+    await user.click(screen.getByTestId('param-val-2'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('assistantPhoneValue'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add parameter' }));
-    fireEvent.change(screen.getByTestId('param-type-3'), {
-      target: { value: 'client' },
-    });
-    fireEvent.change(screen.getByTestId('param-key-3'), {
-      target: { value: 'provider_call_id' },
-    });
-    fireEvent.change(screen.getByTestId('param-val-3'), {
-      target: { value: 'providerCallIdValue' },
-    });
+    await user.click(screen.getByRole('button', { name: 'Add parameter' }));
+    await user.selectOptions(
+      screen.getByTestId('param-type-3'),
+      String('client'),
+    );
+    await user.selectOptions(
+      screen.getByTestId('param-key-3'),
+      String('provider_call_id'),
+    );
+    await user.click(screen.getByTestId('param-val-3'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('providerCallIdValue'));
 
     await clickSaveAuthentication();
 
@@ -529,13 +531,14 @@ describe('CreateAssistantAuthenticationPage', () => {
   });
 
   it('creates authentication when valid', async () => {
+    const user = userEvent.setup();
     render(<CreateAssistantAuthenticationPage />);
     await waitUntilReady();
     expect(GetAllAssistantConfiguration).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByTestId('assistant-auth-endpoint'), {
-      target: { value: 'https://auth.example.com/resolve' },
-    });
+    await user.click(screen.getByTestId('assistant-auth-endpoint'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('https://auth.example.com/resolve'));
     await clickSaveAuthentication();
 
     await waitFor(() =>
@@ -585,16 +588,18 @@ describe('CreateAssistantAuthenticationPage', () => {
   });
 
   it('sends DO_NOTHING when on error is set to do nothing', async () => {
+    const user = userEvent.setup();
     render(<CreateAssistantAuthenticationPage />);
     await waitUntilReady();
     expect(GetAllAssistantConfiguration).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByTestId('assistant-auth-endpoint'), {
-      target: { value: 'https://auth.example.com/resolve' },
-    });
-    fireEvent.change(screen.getByTestId('assistant-auth-fail-behavior'), {
-      target: { value: 'do_nothing' },
-    });
+    await user.click(screen.getByTestId('assistant-auth-endpoint'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('https://auth.example.com/resolve'));
+    await user.selectOptions(
+      screen.getByTestId('assistant-auth-fail-behavior'),
+      String('do_nothing'),
+    );
     await clickSaveAuthentication();
 
     await waitFor(() =>
@@ -650,6 +655,7 @@ describe('CreateAssistantAuthenticationPage', () => {
   });
 
   it('saves DO_NOTHING when loaded legacy none without changing selection', async () => {
+    const user = userEvent.setup();
     (GetAllAssistantConfiguration as jest.Mock).mockResolvedValueOnce(
       getSuccessLoadResponse('none'),
     );
@@ -660,9 +666,9 @@ describe('CreateAssistantAuthenticationPage', () => {
     );
     await waitUntilReady();
 
-    fireEvent.change(screen.getByTestId('assistant-auth-endpoint'), {
-      target: { value: 'https://auth.example.com/resolve' },
-    });
+    await user.click(screen.getByTestId('assistant-auth-endpoint'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('https://auth.example.com/resolve'));
     await clickSaveAuthentication();
 
     await waitFor(() =>
@@ -690,6 +696,7 @@ describe('CreateAssistantAuthenticationPage', () => {
   });
 
   it('falls back to add flow when initial load does not return authentication data', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAllAssistantConfiguration as jest.Mock).mockResolvedValueOnce({
       getSuccess: () => false,
       getError: () => ({
@@ -709,7 +716,7 @@ describe('CreateAssistantAuthenticationPage', () => {
       ).not.toBeDisabled(),
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Save authentication' }),
     );
     expect(
@@ -719,6 +726,7 @@ describe('CreateAssistantAuthenticationPage', () => {
   });
 
   it('disables authentication from the list after confirmation', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAllAssistantConfiguration as jest.Mock)
       .mockResolvedValueOnce(getSuccessLoadResponse('BLOCK', true))
       .mockResolvedValueOnce(getSuccessLoadResponse('BLOCK', false));
@@ -731,13 +739,13 @@ describe('CreateAssistantAuthenticationPage', () => {
       ).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Disable' }));
+    await user.click(screen.getByRole('button', { name: 'Disable' }));
     expect(screen.getByRole('dialog')).toHaveTextContent(
       'Disable authentication?',
     );
 
     await act(async () => {
-      fireEvent.click(
+      await user.click(
         within(screen.getByRole('dialog')).getByRole('button', {
           name: 'Disable',
         }),
@@ -774,6 +782,7 @@ describe('CreateAssistantAuthenticationPage', () => {
   });
 
   it('enables authentication from the list after confirmation', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAllAssistantConfiguration as jest.Mock)
       .mockResolvedValueOnce(getSuccessLoadResponse('BLOCK', false))
       .mockResolvedValueOnce(getSuccessLoadResponse('BLOCK', true));
@@ -784,13 +793,13 @@ describe('CreateAssistantAuthenticationPage', () => {
       expect(screen.getByText('Inactive')).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Enable' }));
+    await user.click(screen.getByRole('button', { name: 'Enable' }));
     expect(screen.getByRole('dialog')).toHaveTextContent(
       'Enable authentication?',
     );
 
     await act(async () => {
-      fireEvent.click(
+      await user.click(
         within(screen.getByRole('dialog')).getByRole('button', {
           name: 'Enable',
         }),

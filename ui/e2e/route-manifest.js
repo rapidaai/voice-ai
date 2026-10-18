@@ -42,6 +42,22 @@ const routeRoots = [
 
 const routeJourneys = [
   {
+    id: 'navigation.root',
+    path: '/',
+    auth: false,
+    expectText: 'Sign in',
+    readyText: 'Sign in with GitHub',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'auth.root',
+    path: '/auth',
+    auth: false,
+    expectText: 'Sign in',
+    readyText: 'Sign in with GitHub',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
     id: 'auth.signin',
     path: '/auth/signin',
     auth: false,
@@ -88,12 +104,20 @@ const routeJourneys = [
     id: 'dashboard.home',
     path: '/dashboard',
     auth: true,
-    expectText: 'Welcome back, E2E!',
+    expectText: 'Project overview',
+    readyText: 'Top assistants',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
     id: 'deployment.assistant',
     path: '/deployment/assistant',
+    auth: true,
+    expectText: 'Assistants',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.root',
+    path: '/deployment',
     auth: true,
     expectText: 'Assistants',
     checks: ['smoke', 'a11y', 'screenshot'],
@@ -136,6 +160,123 @@ const routeJourneys = [
   {
     id: 'deployment.createAgentflow',
     path: '/deployment/assistant/create-agentflow',
+    auth: true,
+    expectText: 'Quick start',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantOverview',
+    path: '/deployment/assistant/2301664620831571968/overview',
+    auth: true,
+    expectText: 'Assistant activity',
+    readyText: '1,284',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantSessions',
+    path: '/deployment/assistant/2301664620831571968/sessions',
+    auth: true,
+    expectText: 'customer@example.test',
+    readyText: '2301664620831572101',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantSessionDetail',
+    path: '/deployment/assistant/2301664620831571968/sessions/2301664620831572101',
+    auth: true,
+    expectText: 'I need help resetting my password.',
+    readyText: '2 messages',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantVersions',
+    path: '/deployment/assistant/2301664620831571968/version-history',
+    auth: true,
+    expectText: 'Add new version',
+    readyText: 'vrsn_2301664620831571999',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantSettings',
+    path: '/deployment/assistant/2301664620831571968/edit-assistant',
+    auth: true,
+    expectText: 'General Settings',
+    readyText: 'Support bot',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantDeployments',
+    path: '/deployment/assistant/2301664620831571968/deployment',
+    auth: true,
+    expectText: 'Deployments',
+    readyText: 'No deployments found',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantTools',
+    path: '/deployment/assistant/2301664620831571968/configure-tool',
+    auth: true,
+    expectText: 'Tools & MCP',
+    readyText: 'No tools found',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantWebhooks',
+    path: '/deployment/assistant/2301664620831571968/configure-webhook',
+    auth: true,
+    expectText: 'Webhooks',
+    readyText: 'No Webhook',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantAuthentication',
+    path: '/deployment/assistant/2301664620831571968/configure-authentication',
+    auth: true,
+    expectText: 'Authentication',
+    readyText: 'No authentication configured',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantTelemetry',
+    path: '/deployment/assistant/2301664620831571968/configure-telemetry',
+    auth: true,
+    expectText: 'Telemetry',
+    readyText: 'No telemetry providers',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantStorage',
+    path: '/deployment/assistant/2301664620831571968/configure-storage',
+    auth: true,
+    expectText: 'Storage',
+    readyText: 'No Storage',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantAnalysis',
+    path: '/deployment/assistant/2301664620831571968/configure-analysis',
+    auth: true,
+    expectText: 'Analysis',
+    readyText: 'No analysis',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantCreateVersion',
+    path: '/deployment/assistant/2301664620831571968/create-new-version',
+    auth: true,
+    expectText: 'Create a new version of this assistant.',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantCreateAgentkitVersion',
+    path: '/deployment/assistant/2301664620831571968/create-agentkit-version',
+    auth: true,
+    expectText: 'Create a new version of this AgentKit connection.',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantCreateAgentflowVersion',
+    path: '/deployment/assistant/2301664620831571968/create-agentflow-version',
     auth: true,
     expectText: 'Quick start',
     checks: ['smoke', 'a11y', 'screenshot'],
@@ -201,6 +342,29 @@ const routeJourneys = [
     path: '/deployment/endpoint/2301664620831571968/settings',
     auth: true,
     expectText: 'General Settings',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.endpointLogs',
+    path: '/deployment/endpoint/2301664620831571968/logs',
+    auth: true,
+    expectText: 'Filter table',
+    readyText: 'vrsn_2301664620831571999',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.endpointVersions',
+    path: '/deployment/endpoint/2301664620831571968/versions',
+    auth: true,
+    expectText: 'No versions found',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.createEndpointVersion',
+    path: '/deployment/endpoint/2301664620831571968/create-endpoint-version',
+    auth: true,
+    expectText: 'Create a new version of this endpoint.',
+    readyText: 'Configure instruction',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
@@ -297,10 +461,41 @@ const routeJourneys = [
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
+    id: 'onboarding.root',
+    path: '/onboarding',
+    auth: true,
+    expectText: 'Set up your organization',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
     id: 'onboarding.project',
     path: '/onboarding/project',
     auth: true,
     expectText: 'Create your first project',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'navigation.globalNotFound',
+    path: '/missing-journey',
+    auth: false,
+    expectText: "Sorry we couldn't find this page.",
+    allowNotFound: true,
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'navigation.deploymentNotFound',
+    path: '/deployment/missing-journey',
+    auth: true,
+    expectText: "Sorry we couldn't find this page.",
+    allowNotFound: true,
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'navigation.staticNotFound',
+    path: '/static/missing-journey',
+    auth: false,
+    expectText: "Sorry we couldn't find this page.",
+    allowNotFound: true,
     checks: ['smoke', 'a11y', 'screenshot'],
   },
 ];
@@ -359,11 +554,7 @@ const sourceRouteInventory = {
   'deployment.tsx': [
     {
       path: '/',
-      journey: 'deployment.endpoint',
-    },
-    {
-      path: '',
-      journey: 'deployment.endpoint',
+      journey: 'deployment.assistant',
     },
     { path: 'endpoint', journey: 'deployment.endpoint' },
     {
@@ -384,26 +575,25 @@ const sourceRouteInventory = {
     },
     {
       path: 'create-endpoint-version',
-      deferredReason: 'Endpoint version fixtures are not available yet.',
+      journey: 'deployment.createEndpointVersion',
     },
     {
       path: ':tab',
       count: 2,
-      deferredReason:
-        'Assistant detail tabs still need entity fixtures; endpoint tabs use the endpoint detail journeys.',
+      journey: 'deployment.assistantOverview',
     },
     { path: 'assistant', journey: 'deployment.assistant' },
     {
       path: 'assistant/:assistantId',
-      deferredReason: 'Assistant detail fixtures are not available yet.',
+      journey: 'deployment.assistantOverview',
     },
     {
       path: 'sessions/:sessionId',
-      deferredReason: 'Conversation detail fixtures are not available yet.',
+      journey: 'deployment.assistantSessionDetail',
     },
     {
       path: 'create-new-version',
-      deferredReason: 'Assistant version fixtures are not available yet.',
+      journey: 'deployment.assistantCreateVersion',
     },
     {
       path: 'create-websocket-version',
@@ -411,15 +601,15 @@ const sourceRouteInventory = {
     },
     {
       path: 'create-agentkit-version',
-      deferredReason: 'Assistant version fixtures are not available yet.',
+      journey: 'deployment.assistantCreateAgentkitVersion',
     },
     {
       path: 'create-agentflow-version',
-      deferredReason: 'Assistant version fixtures are not available yet.',
+      journey: 'deployment.assistantCreateAgentflowVersion',
     },
     {
       path: 'edit-assistant/',
-      deferredReason: 'Assistant detail fixtures are not available yet.',
+      journey: 'deployment.assistantSettings',
     },
     {
       path: 'edit-agentflow/',
@@ -427,7 +617,7 @@ const sourceRouteInventory = {
     },
     {
       path: 'configure-analysis/',
-      deferredReason: 'Assistant analysis fixtures are not available yet.',
+      journey: 'deployment.assistantAnalysis',
     },
     {
       path: 'configure-analysis/create',
@@ -439,7 +629,7 @@ const sourceRouteInventory = {
     },
     {
       path: 'configure-tool',
-      deferredReason: 'Assistant tool fixtures are not available yet.',
+      journey: 'deployment.assistantTools',
     },
     {
       path: 'configure-tool/create',
@@ -451,7 +641,7 @@ const sourceRouteInventory = {
     },
     {
       path: 'configure-webhook/',
-      deferredReason: 'Assistant webhook fixtures are not available yet.',
+      journey: 'deployment.assistantWebhooks',
     },
     {
       path: 'configure-webhook/create',
@@ -463,8 +653,7 @@ const sourceRouteInventory = {
     },
     {
       path: 'configure-authentication/',
-      deferredReason:
-        'Assistant authentication fixtures are not available yet.',
+      journey: 'deployment.assistantAuthentication',
     },
     {
       path: 'configure-authentication/create',
@@ -478,7 +667,7 @@ const sourceRouteInventory = {
     },
     {
       path: 'configure-telemetry/',
-      deferredReason: 'Assistant telemetry fixtures are not available yet.',
+      journey: 'deployment.assistantTelemetry',
     },
     {
       path: 'configure-telemetry/create',
@@ -490,7 +679,7 @@ const sourceRouteInventory = {
     },
     {
       path: 'configure-storage/',
-      deferredReason: 'Assistant storage fixtures are not available yet.',
+      journey: 'deployment.assistantStorage',
     },
     {
       path: 'configure-storage/create',
@@ -502,7 +691,7 @@ const sourceRouteInventory = {
     },
     {
       path: 'deployment/',
-      deferredReason: 'Assistant deployment fixtures are not available yet.',
+      journey: 'deployment.assistantDeployments',
     },
     {
       path: 'deployment/web/',
@@ -630,7 +819,7 @@ const sourceRouteInventory = {
     },
   ],
   'static.tsx': [
-    { path: 'privacy-policy', count: 2, journey: 'static.privacy' },
+    { path: 'privacy-policy', journey: 'static.privacy' },
     { path: 'terms-conditions', journey: 'static.terms' },
   ],
 };

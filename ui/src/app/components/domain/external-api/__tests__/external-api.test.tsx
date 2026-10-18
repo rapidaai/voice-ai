@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ApiHeader, ApiStringHeader, APiStringHeader } from '../api-header';
 import { ApiParameter, APiParameter } from '../api-parameter';
@@ -67,7 +68,8 @@ jest.mock('@/app/components/ui/primitives/form', () => ({
 }));
 
 describe('external API key value editors', () => {
-  it('edits, adds, and removes header rows', () => {
+  it('edits, adds, and removes header rows', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setHeaders = jest.fn();
 
     render(
@@ -80,30 +82,30 @@ describe('external API key value editors', () => {
       />,
     );
 
-    fireEvent.change(screen.getByTestId('api-header-key-0'), {
-      target: { value: 'X-Trace' },
-    });
+    await user.click(screen.getByTestId('api-header-key-0'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('X-Trace'));
     expect(setHeaders).toHaveBeenCalledWith([
       { key: 'X-Trace', value: 'Bearer token' },
       { key: 'X-Trace', value: 'trace-id' },
     ]);
 
-    fireEvent.change(screen.getByTestId('api-header-val-1'), {
-      target: { value: 'trace-id-2' },
-    });
+    await user.click(screen.getByTestId('api-header-val-1'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('trace-id-2'));
     expect(setHeaders).toHaveBeenCalledWith([
       { key: 'Authorization', value: 'Bearer token' },
       { key: 'X-Trace', value: 'trace-id-2' },
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add header' }));
+    await user.click(screen.getByRole('button', { name: 'Add header' }));
     expect(setHeaders).toHaveBeenCalledWith([
       { key: 'Authorization', value: 'Bearer token' },
       { key: 'X-Trace', value: 'trace-id' },
       { key: '', value: '' },
     ]);
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
     expect(setHeaders).toHaveBeenCalledWith([
       { key: 'X-Trace', value: 'trace-id' },
     ]);
@@ -137,6 +139,7 @@ describe('external API key value editors', () => {
   });
 
   it('serializes valid header JSON and ignores blank keys', async () => {
+    const user = userEvent.setup();
     const setHeaderValue = jest.fn();
 
     render(
@@ -150,16 +153,14 @@ describe('external API key value editors', () => {
       expect(screen.getByDisplayValue('Authorization')).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByTestId('api-header-key-0'), {
-      target: { value: '  X-Trace  ' },
-    });
+    await user.click(screen.getByTestId('api-header-key-0'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('  X-Trace  '));
     expect(JSON.parse(setHeaderValue.mock.calls.at(-1)?.[0])).toEqual({
       'X-Trace': 'Bearer token',
     });
 
-    fireEvent.change(screen.getByTestId('api-header-key-0'), {
-      target: { value: '' },
-    });
+    await user.clear(screen.getByTestId('api-header-key-0'));
     expect(JSON.parse(setHeaderValue.mock.calls.at(-1)?.[0])).toEqual({});
   });
 
@@ -193,7 +194,8 @@ describe('external API key value editors', () => {
     });
   });
 
-  it('edits, adds, and removes parameter rows with the configured label', () => {
+  it('edits, adds, and removes parameter rows with the configured label', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setParameterValue = jest.fn();
 
     render(
@@ -208,7 +210,7 @@ describe('external API key value editors', () => {
       'No parameter yet. Click Add parameter below.',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add parameter' }));
+    await user.click(screen.getByRole('button', { name: 'Add parameter' }));
     expect(setParameterValue).toHaveBeenCalledWith([{ key: '', value: '' }]);
 
     render(
@@ -218,9 +220,9 @@ describe('external API key value editors', () => {
       />,
     );
 
-    fireEvent.change(screen.getByTestId('api-param-val-0'), {
-      target: { value: 'customer.name' },
-    });
+    await user.click(screen.getByTestId('api-param-val-0'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('customer.name'));
     expect(setParameterValue).toHaveBeenCalledWith([
       { key: 'body.name', value: 'customer.name' },
     ]);

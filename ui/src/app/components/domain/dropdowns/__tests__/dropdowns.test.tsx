@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import toast from 'react-hot-toast/headless';
 import {
@@ -221,7 +222,8 @@ describe('domain dropdowns', () => {
     mockKnowledgeCriteria = [];
   });
 
-  it('filters credentials by provider and delegates selection changes', () => {
+  it('filters credentials by provider and delegates selection changes', async () => {
+    const user = userEvent.setup();
     const onChangeCredential = jest.fn();
     const openAiCred = makeCredential('c1', 'Primary', 'openai');
     const azureCred = makeCredential('c2', 'Secondary', 'azure');
@@ -243,9 +245,10 @@ describe('domain dropdowns', () => {
       screen.queryByRole('option', { name: 'Azure / Secondary' }),
     ).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId('credential-dropdown'), {
-      target: { value: '0' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('credential-dropdown'),
+      String('0'),
+    );
 
     expect(onChangeCredential).toHaveBeenCalledWith(openAiCred);
   });
@@ -322,7 +325,8 @@ describe('domain dropdowns', () => {
     ).toHaveClass('domain-connected-dropdown-action');
   });
 
-  it('supports credential fallback labels, empty changes, refresh, and create', () => {
+  it('supports credential fallback labels, empty changes, refresh, and create', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeCredential = jest.fn();
     const onReloadCredentials = jest.fn();
     const onCreateCredential = jest.fn();
@@ -341,21 +345,23 @@ describe('domain dropdowns', () => {
 
     expect(screen.getByRole('option', { name: 'Lonely' })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId('credential-dropdown'), {
-      target: { value: '' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('credential-dropdown'),
+      String(''),
+    );
     expect(onChangeCredential).not.toHaveBeenCalled();
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Refresh credentials' }),
     );
     expect(onReloadCredentials).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create credential' }));
+    await user.click(screen.getByRole('button', { name: 'Create credential' }));
     expect(onCreateCredential).toHaveBeenCalledTimes(1);
   });
 
-  it('opens the credential creation modal from the data wrapper', () => {
+  it('opens the credential creation modal from the data wrapper', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockProviderCredentials = [makeCredential('c1', 'Primary', 'openai')];
 
     render(
@@ -365,7 +371,7 @@ describe('domain dropdowns', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create credential' }));
+    await user.click(screen.getByRole('button', { name: 'Create credential' }));
 
     expect(
       screen.getByTestId('create-provider-credential-modal'),
@@ -378,7 +384,8 @@ describe('domain dropdowns', () => {
     );
   });
 
-  it('loads endpoints and delegates endpoint view actions', () => {
+  it('loads endpoints and delegates endpoint view actions', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeEndpoint = jest.fn();
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
 
@@ -392,15 +399,16 @@ describe('domain dropdowns', () => {
     expect(mockAddEndpointCriteria).toHaveBeenCalledWith('id', 'e1', 'or');
     expect(mockGetAllEndpoint).toHaveBeenCalled();
 
-    fireEvent.change(screen.getByTestId('endpoint-dropdown'), {
-      target: { value: '1' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('endpoint-dropdown'),
+      String('1'),
+    );
     expect(onChangeEndpoint).toHaveBeenCalledWith(mockEndpoints[1]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh endpoints' }));
+    await user.click(screen.getByRole('button', { name: 'Refresh endpoints' }));
     expect(mockGetAllEndpoint).toHaveBeenCalledTimes(2);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create endpoint' }));
+    await user.click(screen.getByRole('button', { name: 'Create endpoint' }));
     expect(openSpy).toHaveBeenCalledWith(
       '/deployment/endpoint/create-endpoint',
       '_blank',
@@ -409,7 +417,8 @@ describe('domain dropdowns', () => {
     openSpy.mockRestore();
   });
 
-  it('handles endpoint loading, empty selection, and fetch errors', () => {
+  it('handles endpoint loading, empty selection, and fetch errors', async () => {
+    const user = userEvent.setup();
     const onChangeEndpoint = jest.fn();
     const onRefresh = jest.fn();
 
@@ -437,9 +446,10 @@ describe('domain dropdowns', () => {
       />,
     );
 
-    fireEvent.change(screen.getByTestId('endpoint-dropdown'), {
-      target: { value: '' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('endpoint-dropdown'),
+      String(''),
+    );
     expect(onChangeEndpoint).not.toHaveBeenCalled();
 
     mockGetAllEndpoint.mockImplementation(
@@ -451,7 +461,8 @@ describe('domain dropdowns', () => {
     expect(toast.error).toHaveBeenCalledWith('endpoint failed');
   });
 
-  it('loads knowledge bases and delegates knowledge view actions', () => {
+  it('loads knowledge bases and delegates knowledge view actions', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeKnowledge = jest.fn();
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
 
@@ -465,15 +476,16 @@ describe('domain dropdowns', () => {
     expect(mockAddKnowledgeCriteria).toHaveBeenCalledWith('id', 'k1', 'or');
     expect(mockGetAllKnowledge).toHaveBeenCalled();
 
-    fireEvent.change(screen.getByTestId('knowledge-dropdown'), {
-      target: { value: '1' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('knowledge-dropdown'),
+      String('1'),
+    );
     expect(onChangeKnowledge).toHaveBeenCalledWith(mockKnowledgeBases[1]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh knowledge' }));
+    await user.click(screen.getByRole('button', { name: 'Refresh knowledge' }));
     expect(mockGetAllKnowledge).toHaveBeenCalledTimes(2);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create knowledge' }));
+    await user.click(screen.getByRole('button', { name: 'Create knowledge' }));
     expect(openSpy).toHaveBeenCalledWith(
       '/knowledge/create-knowledge',
       '_blank',
@@ -482,7 +494,8 @@ describe('domain dropdowns', () => {
     openSpy.mockRestore();
   });
 
-  it('handles knowledge loading, optional selection callback, and fetch errors', () => {
+  it('handles knowledge loading, optional selection callback, and fetch errors', async () => {
+    const user = userEvent.setup();
     const { rerender } = render(
       <KnowledgeDropdownView
         knowledgeBases={mockKnowledgeBases as any}
@@ -505,12 +518,14 @@ describe('domain dropdowns', () => {
       />,
     );
 
-    fireEvent.change(screen.getByTestId('knowledge-dropdown'), {
-      target: { value: '1' },
-    });
-    fireEvent.change(screen.getByTestId('knowledge-dropdown'), {
-      target: { value: '' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('knowledge-dropdown'),
+      String('1'),
+    );
+    await user.selectOptions(
+      screen.getByTestId('knowledge-dropdown'),
+      String(''),
+    );
 
     mockGetAllKnowledge.mockImplementation(
       (_projectId, _token, _userId, onError) => onError('knowledge failed'),

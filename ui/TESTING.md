@@ -13,7 +13,7 @@ yarn install --frozen-lockfile
 yarn build:css
 ```
 
-Start the application or Storybook:
+Start the Vite application or Storybook:
 
 ```bash
 yarn start:dev
@@ -107,7 +107,10 @@ yarn e2e
 `yarn test:e2e` runs the same canonical suite and is used by CI and `just ui-browser-test`.
 
 The route inventory lives in `e2e/route-manifest.js`. Every enabled route must have an explicit
-smoke, accessibility, and screenshot decision. A route can defer a check only with a concrete reason.
+smoke, accessibility, and screenshot decision. Logical child flows, including tabs, dialogs,
+callbacks, realtime previews, and feature-gated paths, live in `e2e/journey-catalog.js`. Every
+subjourney is marked covered, deferred with a concrete fixture or product limitation, or disabled by
+configuration. `yarn check:e2e-routes` validates both catalogs.
 
 Keep route-wide contract specs at the `e2e/` root. Put page interaction journeys in
 `e2e/journeys/<route-area>/` and reusable client doubles in `e2e/mocks/clients/`, with one module per
@@ -120,8 +123,19 @@ explicitly deferred. Existing debt is recorded in `e2e/a11y-baseline.js` with a 
 for each journey, rule, and selector. A new finding or an increase above that limit fails the suite.
 
 Playwright writes failure screenshots, diffs, traces, and videos to `test-results/e2e/`. Its HTML
-report is generated under `e2e/reports/` in the `playwright` subdirectory. Reviewed visual baselines use the
-`e2e/screenshots/<route-area>/<journey>-<theme>.png` structure.
+report is generated under `e2e/reports/` in the `playwright` subdirectory. Reviewed route baselines use
+the `e2e/screenshots/<route-area>/<journey>-<theme>.png` structure.
+
+Feature UX baselines cover loading, success, and error states in light and dark mode at the Tailwind
+`sm`, `lg`, `xl`, and `2xl` viewport widths. Store them as
+`e2e/screenshots/<feature>/<state>/<viewport>-<theme>.png`. A feature journey must use deterministic
+client doubles and assert that the intended state is visible before taking each screenshot.
+
+Settled route journeys use
+`e2e/screenshots/<route-area>/<journey>/<success|empty|error>/<viewport>-<theme>.png`. Interaction
+subjourneys add another descriptive path segment, such as
+`e2e/screenshots/organization/invite-user/success/lg-dark.png`. The compact legacy route baselines
+remain in place while the responsive matrix is the primary UX review evidence.
 
 Update visual baselines only after reviewing the rendered change:
 

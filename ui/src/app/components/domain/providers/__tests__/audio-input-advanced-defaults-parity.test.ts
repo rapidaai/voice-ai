@@ -354,9 +354,9 @@ describe('Audio input advanced defaults parity', () => {
       expect(seed.map(metadata => metadata.toObject())).toEqual(original);
       expect(defaults).toEqual(expect.arrayContaining(seed.slice(0, 3)));
       expect(getMetadataValue(defaults, 'microphone.eos.obsolete')).toBe('');
-      expect(
-        sortMetadata(GetDefaultEOSConfig(provider, defaults)),
-      ).toEqual(sortMetadata(defaults));
+      expect(sortMetadata(GetDefaultEOSConfig(provider, defaults))).toEqual(
+        sortMetadata(defaults),
+      );
     },
   );
 
@@ -544,14 +544,10 @@ describe('Audio input advanced defaults parity', () => {
     ];
 
     expect(
-      sortMetadata(
-        GetDefaultVADConfig('unknown_vad', cloneMetadata(seed)),
-      ),
+      sortMetadata(GetDefaultVADConfig('unknown_vad', cloneMetadata(seed))),
     ).toEqual(sortMetadata(seed));
     expect(
-      sortMetadata(
-        GetDefaultEOSConfig('unknown_eos', cloneMetadata(seed)),
-      ),
+      sortMetadata(GetDefaultEOSConfig('unknown_eos', cloneMetadata(seed))),
     ).toEqual(sortMetadata(seed));
     expect(
       sortMetadata(

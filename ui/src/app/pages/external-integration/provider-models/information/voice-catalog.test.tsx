@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -37,7 +38,6 @@ const voices: VoiceCatalogItem[] = Array.from({ length: 15 }, (_, index) => ({
 }));
 
 describe('VoiceCatalog', () => {
-  const writeText = jest.fn();
   const audioInstances: Array<{
     pause: jest.Mock;
     play: jest.Mock;
@@ -48,10 +48,6 @@ describe('VoiceCatalog', () => {
 
   beforeEach(() => {
     audioInstances.length = 0;
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText },
-    });
     window.Audio = jest.fn().mockImplementation(() => {
       const audio = {
         pause: jest.fn(),
@@ -69,7 +65,8 @@ describe('VoiceCatalog', () => {
     jest.clearAllMocks();
   });
 
-  it('uses the platform page size and lets users reach remaining voices', () => {
+  it('uses the platform page size and lets users reach remaining voices', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <MemoryRouter>
         <VoiceCatalog voices={voices} />
@@ -84,13 +81,14 @@ describe('VoiceCatalog', () => {
     expect(pagination).toHaveAttribute('data-page-size', '10');
     expect(pagination).toHaveAttribute('data-page-sizes', '10,20,50,100');
 
-    fireEvent.click(pagination);
+    await user.click(pagination);
 
     expect(screen.getAllByRole('row')).toHaveLength(6);
     expect(screen.getByText('Voice 15')).toBeInTheDocument();
   });
 
-  it('keeps every voice field visible and expands the description', () => {
+  it('keeps every voice field visible and expands the description', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <MemoryRouter>
         <VoiceCatalog
@@ -134,7 +132,7 @@ describe('VoiceCatalog', () => {
       screen.getByRole('button', { name: 'Copy Voice 1 voice ID' }),
     ).toBeInTheDocument();
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Expand Voice 1 details' }),
     );
 
@@ -161,7 +159,8 @@ describe('VoiceCatalog', () => {
     expect(screen.getAllByLabelText('Preview unavailable')).toHaveLength(2);
   });
 
-  it('uses one Carbon toolbar for expandable search and page actions', () => {
+  it('uses one Carbon toolbar for expandable search and page actions', async () => {
+    const user = userEvent.setup();
     render(
       <MemoryRouter>
         <VoiceCatalog
@@ -190,16 +189,17 @@ describe('VoiceCatalog', () => {
       'cds--toolbar-search-container-active',
     );
 
-    fireEvent.focus(search);
+    await user.click(search);
     expect(searchContainer).toHaveClass('cds--toolbar-search-container-active');
 
-    fireEvent.blur(search);
+    await user.tab();
     expect(searchContainer).not.toHaveClass(
       'cds--toolbar-search-container-active',
     );
   });
 
-  it('filters voice metadata from the URL and reports an empty result', () => {
+  it('filters voice metadata from the URL and reports an empty result', async () => {
+    const user = userEvent.setup();
     render(
       <MemoryRouter initialEntries={['/integration/models/test?query=spanish']}>
         <VoiceCatalog voices={voices} />
@@ -209,14 +209,15 @@ describe('VoiceCatalog', () => {
     expect(screen.getByText('Voice 15')).toBeInTheDocument();
     expect(screen.queryByText('Voice 1')).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search voices' }), {
-      target: { value: 'not-found' },
-    });
+    await user.click(screen.getByRole('searchbox', { name: 'Search voices' }));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('not-found'));
 
     expect(screen.getByText('No voices found')).toBeInTheDocument();
   });
 
-  it('creates audio only on demand and stops the previous preview', () => {
+  it('creates audio only on demand and stops the previous preview', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <MemoryRouter>
         <VoiceCatalog voices={voices.slice(0, 2)} />
@@ -225,24 +226,26 @@ describe('VoiceCatalog', () => {
 
     expect(window.Audio).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Preview Voice 1' }));
+    await user.click(screen.getByRole('button', { name: 'Preview Voice 1' }));
     expect(window.Audio).toHaveBeenCalledTimes(1);
     expect(audioInstances[0].play).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Preview Voice 2' }));
+    await user.click(screen.getByRole('button', { name: 'Preview Voice 2' }));
     expect(audioInstances[0].pause).toHaveBeenCalledTimes(1);
     expect(window.Audio).toHaveBeenCalledTimes(2);
     expect(audioInstances[1].play).toHaveBeenCalledTimes(1);
   });
 
-  it('copies a voice ID from the Carbon table action', () => {
+  it('copies a voice ID from the Carbon table action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    const writeText = jest.spyOn(navigator.clipboard, 'writeText');
     render(
       <MemoryRouter>
         <VoiceCatalog voices={voices.slice(0, 1)} />
       </MemoryRouter>,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Copy Voice 1 voice ID' }),
     );
 
@@ -250,6 +253,7 @@ describe('VoiceCatalog', () => {
   });
 
   it('ignores a stale failure after a newer preview starts', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     let rejectFirstPreview: (() => void) | undefined;
     (window.Audio as unknown as jest.Mock)
       .mockImplementationOnce(() => {
@@ -284,8 +288,8 @@ describe('VoiceCatalog', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Preview Voice 1' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Preview Voice 2' }));
+    await user.click(screen.getByRole('button', { name: 'Preview Voice 1' }));
+    await user.click(screen.getByRole('button', { name: 'Preview Voice 2' }));
     rejectFirstPreview?.();
     await Promise.resolve();
 

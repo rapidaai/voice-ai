@@ -1,5 +1,6 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { CodeEditor } from '../code-editor';
 import { CodeHighlighting } from '../code-highlighting';
@@ -124,6 +125,10 @@ jest.mock('@monaco-editor/react', () => {
       <textarea
         aria-label={`${language}-editor`}
         className={className}
+        data-font-family={options?.fontFamily}
+        data-line-padding={options?.lineDecorationsWidth}
+        data-padding-bottom={options?.padding?.bottom}
+        data-padding-top={options?.padding?.top}
         data-readonly={String(options?.readOnly ?? false)}
         data-theme={theme}
         value={value}
@@ -154,12 +159,14 @@ describe('editor components', () => {
     jest.useRealTimers();
   });
 
-  it('renders JsonEditor with theme and forwards changes', () => {
+  it('renders JsonEditor with theme and forwards changes', async () => {
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     const onChange = jest.fn();
     const dispose = jest.fn();
 
     const { unmount } = render(
       <JsonEditor
+        className="consumer-class"
         value=""
         placeholder="Enter JSON"
         onChange={onChange}
@@ -169,19 +176,32 @@ describe('editor components', () => {
 
     const editor = screen.getByLabelText('json-editor');
     expect(editor).toHaveAttribute('data-theme', 'vs-dark');
+    expect(editor).toHaveAttribute('data-font-family', 'IBM Plex Mono');
+    expect(editor).toHaveAttribute('data-line-padding', '8');
+    expect(editor).toHaveAttribute('data-padding-bottom', '8');
+    expect(editor).toHaveAttribute('data-padding-top', '8');
+    expect(editor).toHaveClass('json-editor', 'consumer-class');
+    expect(editor.closest('.json-editor-surface')).toBeInTheDocument();
     const placeholderWidget = mockAddContentWidget.mock.calls[0][0];
-    expect(placeholderWidget.getDomNode()).toHaveStyle({
-      color: 'var(--cds-text-secondary)',
-    });
+    expect(placeholderWidget.getDomNode()).toHaveClass(
+      'json-editor-placeholder',
+    );
 
-    fireEvent.change(editor, { target: { value: '{"a":2}' } });
+    await user.click(editor);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('{"a":2}'));
     expect(onChange).toHaveBeenCalledWith('{"a":2}');
 
     unmount();
     expect(dispose).toHaveBeenCalledTimes(1);
   });
 
-  it('renders CodeEditor controls and handles copy, expand, and edits', () => {
+  it('renders CodeEditor controls and handles copy, expand, and edits', async () => {
+    const user = userEvent.setup({
+      advanceTimers: jest.advanceTimersByTime,
+      writeToClipboard: false,
+    });
+    const writeText = jest.spyOn(navigator.clipboard, 'writeText');
     const onChange = jest.fn();
 
     render(
@@ -197,15 +217,13 @@ describe('editor components', () => {
     expect(screen.getByText('Parameters')).toBeInTheDocument();
     expect(screen.getByText('JSON body')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('json-editor'), {
-      target: { value: '{"enabled":false}' },
-    });
+    await user.click(screen.getByLabelText('json-editor'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('{"enabled":false}'));
     expect(onChange).toHaveBeenCalledWith('{"enabled":false}');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      '{"enabled":true}',
-    );
+    await user.click(screen.getByRole('button', { name: 'Copy' }));
+    expect(writeText).toHaveBeenCalledWith('{"enabled":true}');
     expect(screen.getByTestId('checkmark-icon')).toBeInTheDocument();
 
     act(() => {
@@ -213,7 +231,7 @@ describe('editor components', () => {
     });
     expect(screen.getByTestId('copy-icon')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Maximize' }));
+    await user.click(screen.getByRole('button', { name: 'Maximize' }));
     expect(
       screen.getByRole('button', { name: 'Minimize' }),
     ).toBeInTheDocument();
@@ -228,6 +246,25 @@ describe('editor components', () => {
     expect(screen.getByLabelText('html-editor')).toHaveAttribute(
       'data-readonly',
       'true',
+    );
+    expect(screen.getByLabelText('html-editor')).toHaveAttribute(
+      'data-font-family',
+      'IBM Plex Mono',
+    );
+    expect(screen.getByLabelText('html-editor')).toHaveAttribute(
+      'data-line-padding',
+      '8',
+    );
+    expect(screen.getByLabelText('html-editor')).toHaveAttribute(
+      'data-padding-bottom',
+      '8',
+    );
+    expect(screen.getByLabelText('html-editor')).toHaveAttribute(
+      'data-padding-top',
+      '8',
+    );
+    expect(screen.getByLabelText('html-editor')).toHaveClass(
+      'code-highlighting-editor',
     );
     expect(screen.getByRole('button', { name: 'Copy code' })).toHaveTextContent(
       '<main>Hello</main>',

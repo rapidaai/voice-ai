@@ -89,7 +89,7 @@ func (core *Core) Errorf(format string, args ...any) error {
 func (core *Core) BuildConnectionURL(baseURL string, queryParams map[string]any, resolve VariableResolver) (string, error) {
 	parsed, err := url.Parse(baseURL)
 	if err != nil {
-		return "", core.Errorf("invalid base url: %w", err)
+		return "", core.Errorf("invalid base url: %v", err)
 	}
 	if len(queryParams) == 0 {
 		return parsed.String(), nil
@@ -107,7 +107,7 @@ func (core *Core) BuildConnectionURL(baseURL string, queryParams map[string]any,
 		}
 		primitive, err := core.ToPrimitiveString(value)
 		if err != nil {
-			return "", core.Errorf("query param %q must resolve to primitive: %w", key, err)
+			return "", core.Errorf("query param %q must resolve to primitive: %v", key, err)
 		}
 		query.Set(key, primitive)
 	}
@@ -498,7 +498,11 @@ func (core *Core) ToNumber(value any) (any, error) {
 	case int, int8, int16, int32, int64:
 		return reflect.ValueOf(typed).Int(), nil
 	case uint, uint8, uint16, uint32, uint64:
-		return int64(reflect.ValueOf(typed).Uint()), nil
+		unsignedValue := reflect.ValueOf(typed).Uint()
+		if unsignedValue > math.MaxInt64 {
+			return nil, core.Errorf("cannot cast %d to number: exceeds maximum signed integer", unsignedValue)
+		}
+		return int64(unsignedValue), nil
 	case float32:
 		return float64(typed), nil
 	case float64:
@@ -603,7 +607,11 @@ func (core *Core) normalize(value any) any {
 	case int32:
 		return int64(typed)
 	case uint:
-		return int64(typed)
+		unsignedValue := uint64(typed)
+		if unsignedValue > math.MaxInt64 {
+			return unsignedValue
+		}
+		return int64(unsignedValue)
 	case uint8:
 		return int64(typed)
 	case uint16:
@@ -611,6 +619,9 @@ func (core *Core) normalize(value any) any {
 	case uint32:
 		return int64(typed)
 	case uint64:
+		if typed > math.MaxInt64 {
+			return typed
+		}
 		return int64(typed)
 	case float32:
 		floatValue := float64(typed)
@@ -815,7 +826,7 @@ func (core *Core) validateRenderedRequestBody(rendered any, frame string, field 
 		}
 	case FrameText:
 		if _, err := core.ToString(rendered); err != nil {
-			return core.Errorf("%s must resolve to string for %q frames: %w", field, FrameText, err)
+			return core.Errorf("%s must resolve to string for %q frames: %v", field, FrameText, err)
 		}
 		return nil
 	case FrameJSON:
@@ -1035,7 +1046,7 @@ func (core *Core) evalResponseNode(node any, frame Frame, contract Contract, all
 			}
 			decoded, err := base64.StdEncoding.DecodeString(encoded)
 			if err != nil {
-				return nil, core.Errorf("base64 decode failed: %w", err)
+				return nil, core.Errorf("base64 decode failed: %v", err)
 			}
 			return decoded, nil
 		}

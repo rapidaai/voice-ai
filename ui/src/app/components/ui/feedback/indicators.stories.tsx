@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Stack } from '@carbon/react';
 import { CarbonIconIndicator } from './icon-indicator';
 import { RecordStatusIndicator } from './record-status-indicator';

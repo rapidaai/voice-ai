@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import {
@@ -12,6 +12,7 @@ import {
   ValidateCohereRerankerDefaultOptions,
 } from '../reranker/cohere/constants';
 import { ConfigureCohereRerankerModel } from '../reranker/cohere';
+import userEvent from '@testing-library/user-event';
 
 jest.mock('@/providers', () => ({
   RERANKER_PROVIDER: [
@@ -78,7 +79,8 @@ const getMetadataValue = (parameters: Metadata[], key: string) =>
   parameters.find(parameter => parameter.getKey() === key)?.getValue();
 
 describe('RerankerProvider', () => {
-  it('renders the provider selector and ignores empty selections', () => {
+  it('renders the provider selector and ignores empty selections', async () => {
+    const user = userEvent.setup();
     const onChangeProvider = jest.fn();
 
     render(
@@ -104,14 +106,15 @@ describe('RerankerProvider', () => {
     const select = screen.getByRole('combobox', {
       name: 'Select reranker provider',
     });
-    fireEvent.change(select, { target: { value: 'cohere' } });
-    fireEvent.change(select, { target: { value: '' } });
+    await user.selectOptions(select, String('cohere'));
+    await user.selectOptions(select, String(''));
 
     expect(onChangeProvider).toHaveBeenCalledWith('cohere');
     expect(onChangeProvider).toHaveBeenCalledTimes(1);
   });
 
-  it('updates Cohere model metadata while preserving custom parameters', () => {
+  it('updates Cohere model metadata while preserving custom parameters', async () => {
+    const user = userEvent.setup();
     const onChangeParameter = jest.fn();
 
     render(
@@ -134,10 +137,8 @@ describe('RerankerProvider', () => {
     const select = screen.getByRole('combobox', {
       name: 'Select reranker model',
     });
-    fireEvent.change(select, {
-      target: { value: COHERE_RERANKER_MODEL[1].id },
-    });
-    fireEvent.change(select, { target: { value: '' } });
+    await user.selectOptions(select, String(COHERE_RERANKER_MODEL[1].id));
+    await user.selectOptions(select, String(''));
 
     const nextParameters = onChangeParameter.mock.calls[0][0] as Metadata[];
     expect(getMetadataValue(nextParameters, 'model.id')).toBe(

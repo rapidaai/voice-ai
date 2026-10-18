@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ListingPage } from '@/app/pages/activities/webhook-activities';
 import { RetryHTTPLog } from '@rapidaai/react';
@@ -247,13 +248,14 @@ describe('Request logs listing', () => {
   });
 
   it('retries request only after confirm dialog acceptance', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ListingPage />);
 
     await waitFor(() => expect(mockGetActivities).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('button', { name: 'Retry request' }));
+    await user.click(screen.getByRole('button', { name: 'Retry request' }));
 
     expect(RetryHTTPLog).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry request?' }));
+    await user.click(screen.getByRole('button', { name: 'Retry request?' }));
 
     await waitFor(() => expect(RetryHTTPLog).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(mockGetActivities).toHaveBeenCalledTimes(2));

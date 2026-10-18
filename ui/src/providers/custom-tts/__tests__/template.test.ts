@@ -102,9 +102,7 @@ describe('custom-tts websocket DSL helpers', () => {
       '{"text":{"$var":"text"}}',
       'Query Parameters',
     );
-    expect(queryTextResult).toContain(
-      'Unsupported custom tts variable "text"',
-    );
+    expect(queryTextResult).toContain('Unsupported custom tts variable "text"');
 
     const variableResult = validateCustomTtsQueryParams(
       '{"message_id":{"$var":"request_id"}}',

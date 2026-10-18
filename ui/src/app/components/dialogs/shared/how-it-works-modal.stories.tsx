@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { CloudUpload, Settings, TaskComplete } from '@carbon/icons-react';
 import { HowItWorks, HowItWorksDialog } from './how-it-works-modal';
 

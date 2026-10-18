@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { ChangePasswordPage } from '@/app/pages/authentication/change-password';
@@ -62,19 +63,20 @@ describe('ChangePasswordPage', () => {
   });
 
   it('shows token expiry error when token is missing', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ChangePasswordPage />);
 
     expect(
       screen.getByRole('heading', { level: 1, name: 'Set a new password' }),
     ).toBeInTheDocument();
 
-    fireEvent.change(screen.getAllByPlaceholderText('********')[0], {
-      target: { value: 'secret' },
-    });
-    fireEvent.change(screen.getAllByPlaceholderText('********')[1], {
-      target: { value: 'secret' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save new password' }));
+    await user.click(screen.getAllByPlaceholderText('********')[0]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
+    await user.click(screen.getAllByPlaceholderText('********')[1]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
+    await user.click(screen.getByRole('button', { name: 'Save new password' }));
 
     expect(
       await screen.findByText(
@@ -86,16 +88,17 @@ describe('ChangePasswordPage', () => {
   });
 
   it('shows mismatch error when passwords do not match', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockParams = { token: 'token-1' };
     render(<ChangePasswordPage />);
 
-    fireEvent.change(screen.getAllByPlaceholderText('********')[0], {
-      target: { value: 'secret-1' },
-    });
-    fireEvent.change(screen.getAllByPlaceholderText('********')[1], {
-      target: { value: 'secret-2' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save new password' }));
+    await user.click(screen.getAllByPlaceholderText('********')[0]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret-1'));
+    await user.click(screen.getAllByPlaceholderText('********')[1]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret-2'));
+    await user.click(screen.getByRole('button', { name: 'Save new password' }));
 
     expect(
       await screen.findByText(
@@ -106,6 +109,7 @@ describe('ChangePasswordPage', () => {
   });
 
   it('submits and navigates to sign in on success', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockParams = { token: 'token-1' };
     (CreatePassword as jest.Mock).mockImplementation(
       (_cfg, _token, _password, callback) => {
@@ -115,13 +119,13 @@ describe('ChangePasswordPage', () => {
 
     render(<ChangePasswordPage />);
 
-    fireEvent.change(screen.getAllByPlaceholderText('********')[0], {
-      target: { value: 'secret' },
-    });
-    fireEvent.change(screen.getAllByPlaceholderText('********')[1], {
-      target: { value: 'secret' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save new password' }));
+    await user.click(screen.getAllByPlaceholderText('********')[0]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
+    await user.click(screen.getAllByPlaceholderText('********')[1]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
+    await user.click(screen.getByRole('button', { name: 'Save new password' }));
 
     await waitFor(() => {
       expect(CreatePassword).toHaveBeenCalled();
@@ -132,6 +136,7 @@ describe('ChangePasswordPage', () => {
   });
 
   it('shows fallback error when API callback returns service error', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockParams = { token: 'token-1' };
     (CreatePassword as jest.Mock).mockImplementation(
       (_cfg, _token, _password, callback) => {
@@ -141,13 +146,13 @@ describe('ChangePasswordPage', () => {
 
     render(<ChangePasswordPage />);
 
-    fireEvent.change(screen.getAllByPlaceholderText('********')[0], {
-      target: { value: 'secret' },
-    });
-    fireEvent.change(screen.getAllByPlaceholderText('********')[1], {
-      target: { value: 'secret' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save new password' }));
+    await user.click(screen.getAllByPlaceholderText('********')[0]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
+    await user.click(screen.getAllByPlaceholderText('********')[1]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
+    await user.click(screen.getByRole('button', { name: 'Save new password' }));
 
     expect(
       await screen.findByText(
@@ -158,6 +163,7 @@ describe('ChangePasswordPage', () => {
   });
 
   it('shows human message when API returns unsuccessful response with error', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockParams = { token: 'token-1' };
     (CreatePassword as jest.Mock).mockImplementation(
       (_cfg, _token, _password, callback) => {
@@ -170,18 +176,19 @@ describe('ChangePasswordPage', () => {
 
     render(<ChangePasswordPage />);
 
-    fireEvent.change(screen.getAllByPlaceholderText('********')[0], {
-      target: { value: 'secret' },
-    });
-    fireEvent.change(screen.getAllByPlaceholderText('********')[1], {
-      target: { value: 'secret' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save new password' }));
+    await user.click(screen.getAllByPlaceholderText('********')[0]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
+    await user.click(screen.getAllByPlaceholderText('********')[1]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
+    await user.click(screen.getByRole('button', { name: 'Save new password' }));
 
     expect(await screen.findByText('Token invalid')).toBeInTheDocument();
   });
 
   it('shows fallback error when API returns unsuccessful response without error details', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockParams = { token: 'token-1' };
     (CreatePassword as jest.Mock).mockImplementation(
       (_cfg, _token, _password, callback) => {
@@ -194,13 +201,13 @@ describe('ChangePasswordPage', () => {
 
     render(<ChangePasswordPage />);
 
-    fireEvent.change(screen.getAllByPlaceholderText('********')[0], {
-      target: { value: 'secret' },
-    });
-    fireEvent.change(screen.getAllByPlaceholderText('********')[1], {
-      target: { value: 'secret' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save new password' }));
+    await user.click(screen.getAllByPlaceholderText('********')[0]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
+    await user.click(screen.getAllByPlaceholderText('********')[1]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
+    await user.click(screen.getByRole('button', { name: 'Save new password' }));
 
     expect(
       await screen.findByText(

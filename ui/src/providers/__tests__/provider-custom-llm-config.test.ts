@@ -15,7 +15,8 @@ describe('Custom LLM provider config', () => {
     const developmentProviders = require('../provider.development.json');
     const productionProviders = require('../provider.production.json');
 
-    const developmentCustomLLM = getCustomLLMProviderConfig(developmentProviders);
+    const developmentCustomLLM =
+      getCustomLLMProviderConfig(developmentProviders);
     const productionCustomLLM = getCustomLLMProviderConfig(productionProviders);
 
     const getCompatibilityValues = (provider: any) => {
@@ -42,7 +43,8 @@ describe('Custom LLM provider config', () => {
     const getConfigurationKeys = (provider: any) =>
       provider.configurations.map((config: any) => config.name);
 
-    const developmentCustomLLM = getCustomLLMProviderConfig(developmentProviders);
+    const developmentCustomLLM =
+      getCustomLLMProviderConfig(developmentProviders);
     const productionCustomLLM = getCustomLLMProviderConfig(productionProviders);
 
     expect(getConfigurationKeys(developmentCustomLLM)).toEqual(

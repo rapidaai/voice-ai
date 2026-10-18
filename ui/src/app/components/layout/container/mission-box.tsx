@@ -22,7 +22,7 @@ export function MissionBox({
           className={cn('relative flex h-[100dvh] w-[100dvw]', className)}
         >
           <SidebarNavigation />
-          <main className="relative flex w-full flex-1 overflow-hidden bg-surface font-sans text-sm text-foreground antialiased">
+          <main className="relative flex min-w-0 flex-1 overflow-hidden bg-surface font-sans text-sm text-foreground antialiased">
             <div className="flex h-full w-full flex-col">
               <ActionableHeader />
               <div className="relative flex flex-1 flex-col overflow-hidden bg-surface">

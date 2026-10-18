@@ -1,5 +1,6 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ConversationDirectionIndicator } from '../conversation-direction';
 import { HttpStatusSpanIndicator } from '../http-status';
@@ -180,14 +181,17 @@ describe('domain indicators', () => {
     expect(screen.getByText('102')).toHaveAttribute('data-kind', 'undefined');
   });
 
-  it('copies version ids and shows copied state temporarily', () => {
+  it('copies version ids and shows copied state temporarily', async () => {
+    const user = userEvent.setup({
+      advanceTimers: jest.advanceTimersByTime,
+      writeToClipboard: false,
+    });
+    const writeText = jest.spyOn(navigator.clipboard, 'writeText');
     render(<VersionIndicator id="version-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy version' }));
+    await user.click(screen.getByRole('button', { name: 'Copy version' }));
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      'vrsn_version-1',
-    );
+    expect(writeText).toHaveBeenCalledWith('vrsn_version-1');
     expect(screen.getByRole('button', { name: 'Copied' })).toBeInTheDocument();
 
     act(() => {

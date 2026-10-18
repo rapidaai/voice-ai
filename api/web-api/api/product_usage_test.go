@@ -23,6 +23,10 @@ import (
 
 type failingProductUsageService struct{}
 
+func (failingProductUsageService) GetDashboardUsage(context.Context, *types.Authentication, time.Time, time.Time) (*protos.DashboardUsageSection, error) {
+	return nil, errors.New("dashboard usage failed")
+}
+
 func (failingProductUsageService) CreateProductUsage(context.Context, *types.Authentication, *protos.CreateProductUsageRequest) (*internal_entity.ProductUsage, error) {
 	return nil, errors.New("database unavailable")
 }
@@ -74,7 +78,7 @@ func newProductUsageAPITest(t *testing.T) (*webProductUsageGRPCApi, *gorm.DB) {
 	postgres := &productUsageAPITestPostgres{db: database}
 	return &webProductUsageGRPCApi{
 		logger:              applicationLogger,
-		productUsageService: internal_productusage_service.NewProductUsageService(postgres),
+		productUsageService: internal_productusage_service.NewProductUsageService(postgres, applicationLogger),
 	}, database
 }
 

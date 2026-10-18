@@ -220,8 +220,9 @@ export function SourceConditionRule<TCondition extends SourceCondition>({
                     hasIconOnly
                     renderIcon={TrashCan}
                     iconDescription="Remove"
-                    kind="danger--ghost"
+                    kind="ghost"
                     size="sm"
+                    className="!text-[var(--cds-support-error)]"
                     disabled={rows.length <= 1}
                     onClick={() => removeRow(index)}
                   />
