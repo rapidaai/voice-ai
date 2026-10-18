@@ -16,7 +16,9 @@ jest.mock('@carbon/react', () => ({
     </button>
   ),
   Dropdown: ({
+    autoAlign,
     className,
+    direction,
     id,
     items,
     itemToString,
@@ -28,6 +30,8 @@ jest.mock('@carbon/react', () => ({
       {label}
       <select
         className={className}
+        data-auto-align={autoAlign || undefined}
+        data-direction={direction}
         id={id}
         value={selectedItem?.value || ''}
         onChange={event =>
@@ -70,8 +74,8 @@ jest.mock('@carbon/react', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives', () => ({
-  TertiaryButton: ({ children, onClick }: any) => (
-    <button type="button" onClick={onClick}>
+  TertiaryButton: ({ children, className, onClick }: any) => (
+    <button type="button" className={className} onClick={onClick}>
       {children}
     </button>
   ),
@@ -161,6 +165,17 @@ describe('ProjectRoleTable', () => {
       'border-border-subtle',
     );
     expect(screen.getByLabelText('Select project')).toHaveClass('w-full');
+    expect(screen.getByLabelText('Select project')).toHaveAttribute(
+      'data-auto-align',
+      'true',
+    );
+    expect(screen.getByLabelText('Select project')).not.toHaveAttribute(
+      'data-direction',
+    );
+    expect(screen.getByLabelText('Select role')).toHaveAttribute(
+      'data-auto-align',
+      'true',
+    );
     expect(screen.getByLabelText('Select project').closest('td')).toHaveClass(
       '!p-0',
     );
@@ -174,6 +189,12 @@ describe('ProjectRoleTable', () => {
     expect(
       screen.getByRole('button', { name: 'Remove project role' }).closest('td'),
     ).toHaveClass('!w-10', '!p-0', '!text-center');
+    expect(
+      screen.getByRole('button', { name: 'Add project role' }),
+    ).toHaveClass('!w-full', '!max-w-none');
+    expect(
+      screen.getByRole('button', { name: 'Add project role' }).parentElement,
+    ).toHaveClass('mt-4');
   });
 
   it('removes rows when the remove column is visible', async () => {

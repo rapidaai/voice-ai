@@ -86,6 +86,26 @@ test('organization user listing opens the invite subjourney and validates input'
     page.getByRole('heading', { name: 'Invite user to organization' }),
   ).toBeVisible();
 
+  await page.getByRole('button', { name: 'Add project access' }).click();
+  await page.getByRole('combobox', { name: 'Select role' }).click();
+
+  const firstProjectRole = page.getByRole('option', {
+    name: 'Super Admin',
+    exact: true,
+  });
+  await expect(firstProjectRole).toBeVisible();
+  expect(
+    await firstProjectRole.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      const hitTarget = document.elementFromPoint(
+        bounds.left + bounds.width / 2,
+        bounds.top + bounds.height / 2,
+      );
+
+      return hitTarget === element || element.contains(hitTarget);
+    }),
+  ).toBe(true);
+
   await page
     .getByRole('button', { name: 'Invite user', exact: true })
     .last()

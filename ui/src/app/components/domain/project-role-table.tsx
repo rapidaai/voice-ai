@@ -77,6 +77,7 @@ export function ProjectRoleTable(props: ProjectRoleTableProps) {
               <TableRow key={index}>
                 <TableCell className="!p-0">
                   <Dropdown
+                    autoAlign
                     id={`project-role-project-${index}`}
                     titleText=""
                     label="Select project"
@@ -98,12 +99,12 @@ export function ProjectRoleTable(props: ProjectRoleTableProps) {
                       props.onChange(next);
                     }}
                     size="md"
-                    direction="top"
                     className="w-full"
                   />
                 </TableCell>
                 <TableCell className="!p-0">
                   <Dropdown
+                    autoAlign
                     id={`project-role-role-${index}`}
                     titleText=""
                     label="Select role"
@@ -123,7 +124,6 @@ export function ProjectRoleTable(props: ProjectRoleTableProps) {
                       props.onChange(next);
                     }}
                     size="md"
-                    direction="top"
                     className="w-full"
                   />
                 </TableCell>
@@ -147,10 +147,11 @@ export function ProjectRoleTable(props: ProjectRoleTableProps) {
         </Table>
       </TableContainer>
       {showAddButton && (
-        <div>
+        <div className="mt-4">
           <TertiaryButton
             size="md"
             renderIcon={Add}
+            className="!w-full !max-w-none"
             onClick={() =>
               props.onChange([
                 ...props.rows,

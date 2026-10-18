@@ -129,6 +129,9 @@ jest.mock('@/app/components/ui/feedback', () => ({
 
 jest.mock('@/app/components/ui/primitives', () => {
   const React = jest.requireActual('react');
+  const { typographyClassNames } = jest.requireActual(
+    '@/app/components/ui/primitives/text',
+  );
 
   return {
     Form: ({ children, onSubmit }: any) => (
@@ -145,10 +148,16 @@ jest.mock('@/app/components/ui/primitives', () => {
       ) : null,
     ModalBody: ({ children }: any) => <main>{children}</main>,
     ModalFooter: ({ children }: any) => <footer>{children}</footer>,
-    ModalHeader: ({ label, title, onClose }: any) => (
+    ModalHeader: ({
+      label,
+      labelClassName,
+      title,
+      titleClassName,
+      onClose,
+    }: any) => (
       <header>
-        {label ? <p>{label}</p> : null}
-        <h2>{title}</h2>
+        {label ? <p className={labelClassName}>{label}</p> : null}
+        <h2 className={titleClassName}>{title}</h2>
         <button type="button" onClick={onClose}>
           Header close
         </button>
@@ -163,6 +172,7 @@ jest.mock('@/app/components/ui/primitives', () => {
       <button {...props}>{children}</button>
     ),
     Stack: ({ children }: any) => <div>{children}</div>,
+    typographyClassNames,
     TextArea: React.forwardRef(
       (
         { id, labelText, ...props }: any,
@@ -220,6 +230,9 @@ jest.mock('@carbon/react', () => ({
       </button>
     );
   },
+  DefinitionTooltip: ({ children, definition }: any) => (
+    <span data-definition={definition}>{children}</span>
+  ),
 }));
 
 jest.mock('@/app/components/domain/project-role-table', () => ({
@@ -703,6 +716,17 @@ describe('workspace dialogs', () => {
         setModalOpen={jest.fn()}
         onSuccess={jest.fn()}
       />,
+    );
+
+    expect(
+      screen.queryByText(
+        'Send an invitation and choose the access this user should receive.',
+      ),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Project access' }),
+    ).toContainHTML(
+      'data-definition="Optional. Assign project roles now, or invite the user with organization access only."',
     );
 
     await user.click(screen.getByRole('button', { name: 'Invite user' }));
