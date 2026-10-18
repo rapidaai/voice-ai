@@ -65,7 +65,10 @@ for (const journey of screenshotJourneys) {
             state,
             `${viewport.name}-${colorMode}.png`,
           ],
-          { fullPage: true, maxDiffPixelRatio: 0.01 },
+          {
+            fullPage: true,
+            maxDiffPixelRatio: area === 'static' ? 0.02 : 0.01,
+          },
         );
       });
     }

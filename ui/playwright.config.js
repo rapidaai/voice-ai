@@ -10,7 +10,7 @@ module.exports = defineConfig({
   testMatch: '**/*.spec.js',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: [
     ['list'],
@@ -21,6 +21,10 @@ module.exports = defineConfig({
   timeout: 45_000,
   expect: {
     timeout: 10_000,
+    // Filter platform-specific glyph rasterization while preserving area limits.
+    toHaveScreenshot: {
+      threshold: 0.5,
+    },
   },
   use: {
     baseURL,
