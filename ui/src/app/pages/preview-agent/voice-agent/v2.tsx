@@ -33,6 +33,15 @@ import {
   WriteableElementName,
 } from '@carbon/ai-chat';
 import {
+  AgentConfig,
+  type Assistant,
+  Channel,
+  InputOptions,
+  StringToAny,
+  VoiceAgent,
+  useSelectInputDeviceAgent,
+} from '@rapidaai/react';
+import {
   Accordion,
   AccordionItem,
   Dropdown,
@@ -40,6 +49,7 @@ import {
   FluidTextInput,
   IconButton as CarbonIconButton,
   InlineLoading,
+  InlineNotification,
   Layer,
   StructuredListBody,
   StructuredListCell,
@@ -48,169 +58,251 @@ import {
 } from '@carbon/react';
 import { IconOnlyButton } from '@/app/components/ui/primitives';
 import { ConfirmDialog } from '@/app/components/dialogs/shared';
+import { createVoiceAgentDebuggerConnection } from '@/clients/runtime.client';
+import { useCurrentCredential } from '@/hooks/use-credential';
 import { useTheme } from '@/theme/theme-provider';
 import { cn } from '@/utils';
 import { PreviewAgentHeader } from './preview-agent-header';
 
-const conversationHistory: HistoryItem[] = [
-  {
-    time: '2026-10-18T10:42:08.000Z',
-    message: {
-      id: 'delivery-request-1',
-      input: {
-        message_type: MessageInputType.TEXT,
-        text: 'I need to move my delivery to Friday afternoon. Can you help?',
-      },
-    },
-  },
-  {
-    time: '2026-10-18T10:42:10.000Z',
-    message: {
-      id: 'delivery-response-1',
-      request_id: 'delivery-request-1',
-      output: {
-        generic: [
-          {
-            response_type: MessageResponseTypes.TEXT,
-            text: 'I found your next delivery scheduled for Wednesday. I can move it to Friday between 1:00 PM and 5:00 PM. Would you like me to confirm that change?',
-          },
-        ],
-      },
-    },
-  },
-  {
-    time: '2026-10-18T10:42:16.000Z',
-    message: {
-      id: 'delivery-request-2',
-      input: {
-        message_type: MessageInputType.TEXT,
-        text: 'Yes, please confirm it.',
-      },
-    },
-  },
-  {
-    time: '2026-10-18T10:42:17.000Z',
-    message: {
-      id: 'delivery-response-2',
-      request_id: 'delivery-request-2',
-      output: {
-        generic: [
-          {
-            response_type: MessageResponseTypes.TEXT,
-            text: 'Done. Your delivery is now scheduled for Friday between 1:00 PM and 5:00 PM.',
-          },
-        ],
-      },
-    },
-  },
-];
-
-const voiceStack = [
-  {
-    id: 'language-model',
-    icon: Model,
-    label: 'Language model',
-    configuration: [
-      { id: 'provider', label: 'Provider', key: 'provider', value: 'OpenAI' },
-      {
-        id: 'model',
-        label: 'Model',
-        key: 'model.name',
-        value: 'gpt-4.1-mini',
-      },
-      {
-        id: 'temperature',
-        label: 'Temperature',
-        key: 'model.temperature',
-        value: '0.7',
-      },
-      { id: 'top-p', label: 'Top P', key: 'model.top_p', value: '1' },
-      {
-        id: 'max-completion-tokens',
-        label: 'Max completion tokens',
-        key: 'model.max_completion_tokens',
-        value: '1048',
-      },
-    ],
-  },
-  {
-    id: 'speech-to-text',
-    icon: VoiceActivate,
-    label: 'Speech to text',
-    configuration: [
-      {
-        id: 'provider',
-        label: 'Provider',
-        key: 'provider',
-        value: 'Deepgram',
-      },
-      { id: 'model', label: 'Model', key: 'listen.model', value: 'nova-3' },
-    ],
-  },
-  {
-    id: 'text-to-speech',
-    icon: VolumeUp,
-    label: 'Text to speech',
-    configuration: [
-      {
-        id: 'provider',
-        label: 'Provider',
-        key: 'provider',
-        value: 'Cartesia',
-      },
-      { id: 'model', label: 'Model', key: 'speak.model', value: 'sonic-2' },
-      {
-        id: 'voice',
-        label: 'Voice',
-        key: 'speak.voice.id',
-        value: '6ccbfb76-1fc6-48f7-b71d-91ac6298247b',
-        displayValue: 'Tessa - Kind Companion',
-      },
-      {
-        id: 'language',
-        label: 'Language',
-        key: 'speak.language',
-        value: 'en',
-      },
-    ],
-  },
-];
-
 type VoicePhase = 'idle' | 'connecting' | 'listening';
 
-const microphoneOptions = [
-  { id: 'built-in', label: 'Built-in Microphone' },
-  { id: 'usb', label: 'USB Microphone' },
-];
+type PromptVariable = {
+  name: string;
+  value: string;
+};
+
+type ConfigurationOption = {
+  id: string;
+  label: string;
+  key: string;
+  value: string;
+};
+
+function formatConfigurationLabel(key: string) {
+  if (key.includes('voice')) return 'Voice';
+  if (key.endsWith('model') || key === 'model.name') return 'Model';
+  if (key.endsWith('top_p')) return 'Top P';
+
+  const name = key.split('.').at(-1)?.replaceAll('_', ' ') || key;
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+function VoiceMicrophoneSelector({
+  voiceAgent,
+  onError,
+}: {
+  voiceAgent: VoiceAgent;
+  onError: (error: Error) => void;
+}) {
+  const { devices, activeDeviceId, setActiveMediaDevice } =
+    useSelectInputDeviceAgent({
+      voiceAgent,
+      requestPermissions: true,
+      onError,
+    });
+  const microphoneOptions = useMemo(
+    () =>
+      devices.map((device, index) => ({
+        id: device.deviceId,
+        label: device.label || `Microphone ${index + 1}`,
+      })),
+    [devices],
+  );
+  const selectedMicrophone =
+    microphoneOptions.find(option => option.id === activeDeviceId) ??
+    microphoneOptions[0] ??
+    null;
+
+  return (
+    <Dropdown
+      id="voice-microphone"
+      aria-label="Microphone"
+      titleText="Microphone"
+      hideLabel
+      label="Select microphone"
+      size="sm"
+      direction="top"
+      autoAlign
+      items={microphoneOptions}
+      itemToString={item => item?.label ?? ''}
+      selectedItem={selectedMicrophone}
+      onChange={({ selectedItem }) => {
+        if (!selectedItem) return;
+        void setActiveMediaDevice(selectedItem.id).catch(onError);
+      }}
+      className="w-full sm:w-48"
+    />
+  );
+}
 
 export function PreviewVoiceAgentV2() {
   const { assistantId } = useParams();
+  const { user, authId, token, projectId } = useCurrentCredential();
+
+  if (!assistantId || !user?.name) {
+    return <Navigate to="/404" replace />;
+  }
+
+  return (
+    <PreviewVoiceAgentV2Workspace
+      assistantId={assistantId}
+      userName={user.name}
+      authId={authId}
+      token={token}
+      projectId={projectId}
+    />
+  );
+}
+
+function PreviewVoiceAgentV2Workspace({
+  assistantId,
+  userName,
+  authId,
+  token,
+  projectId,
+}: {
+  assistantId: string;
+  userName: string;
+  authId: string;
+  token: string;
+  projectId: string;
+}) {
   const navigate = useNavigate();
   const { resolvedMode } = useTheme();
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const conversationRef = useRef<HTMLElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const panelTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const chatInstanceRef = useRef<ChatInstance | null>(null);
+  const pendingRequestIdsRef = useRef<string[]>([]);
+  const voiceTranscriptIdRef = useRef<string>();
   const responseSequence = useRef(0);
+  const voiceAgent = useMemo(
+    () =>
+      new VoiceAgent(
+        createVoiceAgentDebuggerConnection({
+          token,
+          userId: authId,
+          projectId,
+        }),
+        new AgentConfig(
+          assistantId,
+          new InputOptions([Channel.Audio, Channel.Text], Channel.Text),
+        )
+          .setUserIdentifier(authId, userName)
+          .addKeywords([userName])
+          .addMetadata('authId', StringToAny(authId))
+          .addMetadata('projectId', StringToAny(projectId)),
+      ),
+    [assistantId, authId, projectId, token, userName],
+  );
+  const [assistant, setAssistant] = useState<Assistant | null>(null);
   const [isConfigurationOpen, setIsConfigurationOpen] = useState(false);
   const [voicePhase, setVoicePhase] = useState<VoicePhase>('idle');
   const [isVoiceMuted, setIsVoiceMuted] = useState(false);
   const [isEndConfirmationOpen, setIsEndConfirmationOpen] = useState(false);
-  const [selectedMicrophone, setSelectedMicrophone] = useState(
-    microphoneOptions[0],
-  );
+  const [runtimeError, setRuntimeError] = useState('');
   const [isOverlayPanel, setIsOverlayPanel] = useState(
     () =>
       typeof window !== 'undefined' &&
       window.matchMedia('(max-width: 1055px)').matches,
   );
-  const [promptVariables, setPromptVariables] = useState([
-    { name: 'customer_name', value: 'Prashant' },
-    { name: 'account_tier', value: 'Enterprise' },
-  ]);
+  const [promptVariables, setPromptVariables] = useState<PromptVariable[]>([]);
+
+  const voiceStack = useMemo(() => {
+    const model = assistant?.getAssistantprovidermodel();
+    const deployment = assistant?.getDebuggerdeployment();
+    const speechToText = deployment?.getInputaudio();
+    const textToSpeech = deployment?.getOutputaudio();
+    const unavailableConfiguration: ConfigurationOption[] = [
+      {
+        id: 'status',
+        label: 'Status',
+        key: 'status',
+        value: assistant ? 'Not configured' : 'Loading',
+      },
+    ];
+
+    return [
+      {
+        id: 'language-model',
+        icon: Model,
+        label: 'Language model',
+        configuration: model
+          ? [
+              {
+                id: 'model-provider',
+                label: 'Provider',
+                key: 'provider',
+                value: model.getModelprovidername(),
+              },
+              ...model.getAssistantmodeloptionsList().map(option => ({
+                id: `model-${option.getKey()}`,
+                label: formatConfigurationLabel(option.getKey()),
+                key: option.getKey(),
+                value: option.getValue(),
+              })),
+            ]
+          : unavailableConfiguration,
+      },
+      {
+        id: 'speech-to-text',
+        icon: VoiceActivate,
+        label: 'Speech to text',
+        configuration: speechToText
+          ? [
+              {
+                id: 'stt-provider',
+                label: 'Provider',
+                key: 'provider',
+                value: speechToText.getAudioprovider(),
+              },
+              ...speechToText.getAudiooptionsList().map(option => ({
+                id: `stt-${option.getKey()}`,
+                label: formatConfigurationLabel(option.getKey()),
+                key: option.getKey(),
+                value: option.getValue(),
+              })),
+            ]
+          : unavailableConfiguration,
+      },
+      {
+        id: 'text-to-speech',
+        icon: VolumeUp,
+        label: 'Text to speech',
+        configuration: textToSpeech
+          ? [
+              {
+                id: 'tts-provider',
+                label: 'Provider',
+                key: 'provider',
+                value: textToSpeech.getAudioprovider(),
+              },
+              ...textToSpeech.getAudiooptionsList().map(option => ({
+                id: `tts-${option.getKey()}`,
+                label: formatConfigurationLabel(option.getKey()),
+                key: option.getKey(),
+                value: option.getValue(),
+              })),
+            ]
+          : unavailableConfiguration,
+      },
+    ];
+  }, [assistant]);
+
+  const handleRuntimeError = useCallback((error: unknown) => {
+    setRuntimeError(
+      error instanceof Error && error.message
+        ? error.message
+        : 'The voice session could not complete this action.',
+    );
+  }, []);
 
   const loadConversationHistory = useCallback(
-    async () => conversationHistory,
+    async (instance: ChatInstance): Promise<HistoryItem[]> => {
+      chatInstanceRef.current = instance;
+      return [];
+    },
     [],
   );
 
@@ -233,14 +325,169 @@ export function PreviewVoiceAgentV2() {
   }, []);
 
   useEffect(() => {
-    if (voicePhase !== 'connecting') return;
+    let isActive = true;
+    setAssistant(null);
+    setPromptVariables([]);
+    setRuntimeError('');
 
-    const connectionTimer = window.setTimeout(
-      () => setVoicePhase('listening'),
-      600,
-    );
-    return () => window.clearTimeout(connectionTimer);
-  }, [voicePhase]);
+    voiceAgent
+      .getAssistant()
+      .then(response => {
+        if (!isActive) return;
+        const loadedAssistant = response.getSuccess()
+          ? response.getData()
+          : null;
+        if (!loadedAssistant) {
+          setRuntimeError('Unable to load assistant configuration.');
+          return;
+        }
+
+        setAssistant(loadedAssistant);
+        const variables =
+          loadedAssistant
+            .getAssistantprovidermodel()
+            ?.getTemplate()
+            ?.getPromptvariablesList() ?? [];
+        setPromptVariables(
+          variables.map(variable => ({
+            name: variable.getName(),
+            value: variable.getDefaultvalue(),
+          })),
+        );
+        variables.forEach(variable => {
+          if (variable.getDefaultvalue()) {
+            voiceAgent.agentConfiguration.addArgument(
+              variable.getName(),
+              variable.getDefaultvalue(),
+            );
+          }
+        });
+      })
+      .catch(() => {
+        if (isActive) {
+          setRuntimeError('Unable to load assistant configuration.');
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [voiceAgent]);
+
+  useEffect(() => {
+    let isActive = true;
+    const handleConnectionState = (state: string) => {
+      if (!isActive) return;
+      if (state === 'connecting') {
+        setVoicePhase('connecting');
+      } else if (
+        state === 'connected' &&
+        voiceAgent.agentConfiguration.inputOptions.channel === Channel.Audio
+      ) {
+        setVoicePhase('listening');
+      } else if (state === 'disconnected') {
+        pendingRequestIdsRef.current = [];
+        setVoicePhase('idle');
+        setIsVoiceMuted(false);
+      }
+    };
+    const handleAgentError = (_type: string, error: string) => {
+      if (!isActive) return;
+      pendingRequestIdsRef.current = [];
+      voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
+      voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
+      setVoicePhase('idle');
+      setIsVoiceMuted(false);
+      setRuntimeError(error || 'Voice session failed.');
+    };
+
+    voiceAgent.on('onConnectionStateEvent', handleConnectionState);
+    voiceAgent.on('onErrorEvent', handleAgentError);
+    voiceAgent.registerCallback({
+      onAssistantMessage: message => {
+        if (!isActive || !message || message.completed === false) return;
+        const instance = chatInstanceRef.current;
+        if (!instance) return;
+
+        const storedMessage = voiceAgent.messages.find(
+          current => current.id === message.id,
+        );
+        const text =
+          storedMessage?.messages.join('') || message.messageText?.trim();
+        if (!text) return;
+
+        responseSequence.current += 1;
+        const requestId = pendingRequestIdsRef.current.shift();
+        void instance.messaging
+          .addMessage({
+            id: message.id || `assistant-response-${responseSequence.current}`,
+            request_id: requestId,
+            output: {
+              generic: [
+                {
+                  response_type: MessageResponseTypes.TEXT,
+                  text,
+                },
+              ],
+            },
+          })
+          .catch(handleRuntimeError);
+      },
+      onUserMessage: message => {
+        if (
+          !isActive ||
+          !message ||
+          message.completed === false ||
+          !message.messageText?.trim() ||
+          voiceAgent.agentConfiguration.inputOptions.channel !== Channel.Audio
+        ) {
+          return;
+        }
+        const instance = chatInstanceRef.current;
+        if (!instance) return;
+
+        voiceTranscriptIdRef.current = message.id;
+        if (message.id) pendingRequestIdsRef.current.push(message.id);
+        void instance
+          .send({
+            id: message.id,
+            input: {
+              message_type: MessageInputType.TEXT,
+              text: message.messageText,
+            },
+          })
+          .catch(error => {
+            pendingRequestIdsRef.current = pendingRequestIdsRef.current.filter(
+              requestId => requestId !== message.id,
+            );
+            if (voiceTranscriptIdRef.current === message.id) {
+              voiceTranscriptIdRef.current = undefined;
+            }
+            handleRuntimeError(error);
+          });
+      },
+      onConversationError: error => {
+        if (isActive) {
+          pendingRequestIdsRef.current = [];
+          setRuntimeError(error.message || 'Voice session failed.');
+        }
+      },
+    });
+
+    return () => {
+      isActive = false;
+      voiceAgent.off('onConnectionStateEvent', handleConnectionState);
+      voiceAgent.off('onErrorEvent', handleAgentError);
+    };
+  }, [handleRuntimeError, voiceAgent]);
+
+  useEffect(
+    () => () => {
+      chatInstanceRef.current = null;
+      void voiceAgent.disconnect();
+    },
+    [voiceAgent],
+  );
 
   useEffect(() => {
     const conversation = conversationRef.current;
@@ -257,7 +504,7 @@ export function PreviewVoiceAgentV2() {
     conversation.removeAttribute('inert');
   }, [isConfigurationOpen, isOverlayPanel]);
 
-  const sendEvaluationMessage = useCallback(
+  const sendRuntimeMessage = useCallback(
     async (
       request: MessageRequest,
       options: CustomSendMessageOptions,
@@ -268,25 +515,24 @@ export function PreviewVoiceAgentV2() {
       const message = request.input.text?.trim();
       if (!message) return;
 
-      const customerName =
-        promptVariables.find(variable => variable.name === 'customer_name')
-          ?.value || 'there';
-      responseSequence.current += 1;
+      chatInstanceRef.current = instance;
+      if (voiceTranscriptIdRef.current === request.id) {
+        voiceTranscriptIdRef.current = undefined;
+        return;
+      }
 
-      await instance.messaging.addMessage({
-        id: `evaluation-response-${responseSequence.current}`,
-        request_id: request.id,
-        output: {
-          generic: [
-            {
-              response_type: MessageResponseTypes.TEXT,
-              text: `Thanks, ${customerName}. This evaluation received your message: “${message}”`,
-            },
-          ],
-        },
-      });
+      if (request.id) pendingRequestIdsRef.current.push(request.id);
+      setRuntimeError('');
+      try {
+        await voiceAgent.onSendText(message);
+      } catch (error) {
+        pendingRequestIdsRef.current = pendingRequestIdsRef.current.filter(
+          requestId => requestId !== request.id,
+        );
+        throw error;
+      }
     },
-    [promptVariables],
+    [voiceAgent],
   );
 
   const closePanel = useCallback(() => {
@@ -318,12 +564,7 @@ export function PreviewVoiceAgentV2() {
     return () => document.removeEventListener('keydown', closeOnEscape, true);
   }, [closePanel, isConfigurationOpen, isOverlayPanel]);
 
-  const resetVoiceSession = useCallback((shouldFocusText = false) => {
-    setVoicePhase('idle');
-    setIsVoiceMuted(false);
-    setIsEndConfirmationOpen(false);
-    if (!shouldFocusText) return;
-
+  const focusTextComposer = useCallback(() => {
     window.requestAnimationFrame(() => {
       const chatElement =
         chatContainerRef.current?.querySelector<HTMLElement>(
@@ -334,6 +575,51 @@ export function PreviewVoiceAgentV2() {
         ?.focus();
     });
   }, []);
+
+  const startVoiceSession = useCallback(async () => {
+    setRuntimeError('');
+    setVoicePhase('connecting');
+    try {
+      await voiceAgent.setInputChannel(Channel.Audio);
+    } catch (error) {
+      setVoicePhase('idle');
+      handleRuntimeError(error);
+    }
+  }, [handleRuntimeError, voiceAgent]);
+
+  const switchToText = useCallback(async () => {
+    try {
+      await voiceAgent.setInputChannel(Channel.Text);
+      setVoicePhase('idle');
+      setIsVoiceMuted(false);
+      focusTextComposer();
+    } catch (error) {
+      handleRuntimeError(error);
+    }
+  }, [focusTextComposer, handleRuntimeError, voiceAgent]);
+
+  const endVoiceSession = useCallback(
+    async (shouldFocusText = false) => {
+      try {
+        await voiceAgent.disconnect();
+      } catch (error) {
+        handleRuntimeError(error);
+      }
+      voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
+      voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
+      setVoicePhase('idle');
+      setIsVoiceMuted(false);
+      setIsEndConfirmationOpen(false);
+      if (shouldFocusText) focusTextComposer();
+    },
+    [focusTextComposer, handleRuntimeError, voiceAgent],
+  );
+
+  const toggleMute = useCallback(() => {
+    setIsVoiceMuted(voiceAgent.toggleMute());
+  }, [voiceAgent]);
+
+  const assistantName = assistant?.getName() || 'Voice assistant';
 
   const chatSlots = useMemo(
     () => ({
@@ -354,7 +640,7 @@ export function PreviewVoiceAgentV2() {
             }
           />
           <h1 className="min-w-0 flex-1 truncate px-1 text-sm font-semibold text-[var(--cds-text-primary)]">
-            Delivery concierge
+            {assistantName}
           </h1>
           <CarbonIconButton
             label="Configuration"
@@ -398,7 +684,7 @@ export function PreviewVoiceAgentV2() {
                   renderIcon={Close}
                   iconDescription="Cancel voice connection"
                   tooltipPosition="left"
-                  onClick={() => resetVoiceSession()}
+                  onClick={() => void endVoiceSession()}
                 />
               </div>
             ) : (
@@ -416,22 +702,9 @@ export function PreviewVoiceAgentV2() {
                   <span>{isVoiceMuted ? 'Microphone muted' : 'Listening'}</span>
                 </div>
                 <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-end">
-                  <Dropdown
-                    id="voice-microphone"
-                    aria-label="Microphone"
-                    titleText="Microphone"
-                    hideLabel
-                    label="Select microphone"
-                    size="sm"
-                    direction="top"
-                    autoAlign
-                    items={microphoneOptions}
-                    itemToString={item => item?.label ?? ''}
-                    selectedItem={selectedMicrophone}
-                    onChange={({ selectedItem }) => {
-                      if (selectedItem) setSelectedMicrophone(selectedItem);
-                    }}
-                    className="w-full sm:w-48"
+                  <VoiceMicrophoneSelector
+                    voiceAgent={voiceAgent}
+                    onError={handleRuntimeError}
                   />
                   <div
                     role="toolbar"
@@ -446,7 +719,7 @@ export function PreviewVoiceAgentV2() {
                         isVoiceMuted ? 'Unmute microphone' : 'Mute microphone'
                       }
                       tooltipPosition="top"
-                      onClick={() => setIsVoiceMuted(current => !current)}
+                      onClick={toggleMute}
                     />
                     <IconOnlyButton
                       kind="ghost"
@@ -454,7 +727,7 @@ export function PreviewVoiceAgentV2() {
                       renderIcon={Chat}
                       iconDescription="Switch to text"
                       tooltipPosition="top"
-                      onClick={() => resetVoiceSession(true)}
+                      onClick={() => void switchToText()}
                     />
                     <IconOnlyButton
                       kind="ghost"
@@ -479,18 +752,23 @@ export function PreviewVoiceAgentV2() {
             renderIcon={VoiceMode}
             iconDescription="Start voice conversation"
             tooltipPosition="top"
-            onClick={() => setVoicePhase('connecting')}
+            onClick={() => void startVoiceSession()}
           />
         ) : null,
     }),
     [
       assistantId,
+      assistantName,
+      endVoiceSession,
+      handleRuntimeError,
       isConfigurationOpen,
       isVoiceMuted,
       navigate,
-      resetVoiceSession,
-      selectedMicrophone,
+      startVoiceSession,
+      switchToText,
       toggleConfiguration,
+      toggleMute,
+      voiceAgent,
       voicePhase,
     ],
   );
@@ -531,10 +809,6 @@ export function PreviewVoiceAgentV2() {
     }
   };
 
-  if (!assistantId) {
-    return <Navigate to="/404" replace />;
-  }
-
   return (
     <div className="flex h-dvh min-h-0 flex-col bg-white text-sm dark:bg-gray-950">
       <PreviewAgentHeader />
@@ -546,6 +820,16 @@ export function PreviewVoiceAgentV2() {
             aria-label="Conversation"
             className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-gray-950"
           >
+            {runtimeError ? (
+              <InlineNotification
+                kind="error"
+                title="Debugger error"
+                subtitle={runtimeError}
+                lowContrast
+                onClose={() => setRuntimeError('')}
+                className="!m-0 !max-w-none shrink-0"
+              />
+            ) : null}
             <div ref={chatContainerRef} className="min-h-0 flex-1">
               <ChatCustomElement
                 className="block h-full min-h-0 w-full"
@@ -556,7 +840,7 @@ export function PreviewVoiceAgentV2() {
                 injectCarbonTheme={
                   resolvedMode === 'dark' ? CarbonTheme.G100 : CarbonTheme.WHITE
                 }
-                assistantName="Delivery concierge"
+                assistantName={assistantName}
                 aiEnabled
                 header={{ isOn: true }}
                 history={{ isOn: false }}
@@ -576,10 +860,10 @@ export function PreviewVoiceAgentV2() {
                 messaging={{
                   skipWelcome: true,
                   customLoadHistory: loadConversationHistory,
-                  customSendMessage: sendEvaluationMessage,
+                  customSendMessage: sendRuntimeMessage,
                 }}
                 strings={{
-                  input_placeholder: 'Message Delivery concierge',
+                  input_placeholder: `Message ${assistantName}`,
                 }}
               />
             </div>
@@ -678,15 +962,8 @@ export function PreviewVoiceAgentV2() {
                                     </StructuredListCell>
                                     <StructuredListCell className="min-w-0 !py-2 !pl-2 !pr-4 text-right align-top">
                                       <span className="block break-all text-sm text-[var(--cds-text-primary)]">
-                                        {'displayValue' in option
-                                          ? option.displayValue
-                                          : option.value}
+                                        {option.value}
                                       </span>
-                                      {'displayValue' in option && (
-                                        <span className="block break-all font-mono text-[0.6875rem] leading-4 text-[var(--cds-text-helper)]">
-                                          {option.value}
-                                        </span>
-                                      )}
                                     </StructuredListCell>
                                   </StructuredListRow>
                                 ))}
@@ -727,12 +1004,17 @@ export function PreviewVoiceAgentV2() {
                                 labelText={`{{${variable.name}}}`}
                                 value={variable.value}
                                 onChange={event => {
+                                  const value = event.target.value;
                                   setPromptVariables(current =>
                                     current.map((item, itemIndex) =>
                                       itemIndex === index
-                                        ? { ...item, value: event.target.value }
+                                        ? { ...item, value }
                                         : item,
                                     ),
+                                  );
+                                  voiceAgent.agentConfiguration.addArgument(
+                                    variable.name,
+                                    value,
                                   );
                                 }}
                               />
@@ -755,7 +1037,7 @@ export function PreviewVoiceAgentV2() {
         title="End voice conversation?"
         content="This will stop the current voice session and return to the text composer."
         confirmText="End conversation"
-        onConfirm={() => resetVoiceSession(true)}
+        onConfirm={() => void endVoiceSession(true)}
         onCancel={() => setIsEndConfirmationOpen(false)}
         onClose={() => setIsEndConfirmationOpen(false)}
       />

@@ -8,9 +8,152 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { PreviewVoiceAgentV2 } from '../v2';
 
 const mockAddMessage = jest.fn();
+const mockSend = jest.fn();
+const mockOnSendText = jest.fn();
+const mockSetInputChannel = jest.fn();
+const mockDisconnect = jest.fn();
+const mockToggleMute = jest.fn();
+const mockSetActiveMediaDevice = jest.fn();
+const mockAddArgument = jest.fn();
+const mockGetAssistant = jest.fn();
+const mockRegisterCallback = jest.fn();
+const mockOnAgentEvent = jest.fn();
+const mockOffAgentEvent = jest.fn();
 let mockCarbonChatProps: Record<string, any>;
 let mockResolvedMode = 'light';
 let mockIsOverlayPanel = false;
+let mockAgentCallback: Record<string, (...args: any[]) => void>;
+let mockConnectionStateHandler: ((state: string) => void) | undefined;
+let mockAgentErrorHandler: ((type: string, error: string) => void) | undefined;
+let resolveVoiceConnection: (() => void) | undefined;
+
+const mockModelOptions = [
+  ['model.name', 'gpt-4.1-mini'],
+  ['model.temperature', '0.7'],
+  ['model.top_p', '1'],
+  ['model.max_completion_tokens', '1048'],
+].map(([key, value]) => ({
+  getKey: () => key,
+  getValue: () => value,
+}));
+const mockSpeechToTextOptions = [['listen.model', 'nova-3']].map(
+  ([key, value]) => ({
+    getKey: () => key,
+    getValue: () => value,
+  }),
+);
+const mockTextToSpeechOptions = [
+  ['speak.model', 'sonic-2'],
+  ['speak.voice.id', '6ccbfb76-1fc6-48f7-b71d-91ac6298247b'],
+  ['speak.language', 'en'],
+].map(([key, value]) => ({
+  getKey: () => key,
+  getValue: () => value,
+}));
+const mockVariables = [
+  { name: 'customer_name', value: 'Prashant' },
+  { name: 'account_tier', value: 'Enterprise' },
+].map(variable => ({
+  getName: () => variable.name,
+  getDefaultvalue: () => variable.value,
+}));
+const mockAssistant = {
+  getName: () => 'Delivery concierge',
+  getAssistantprovidermodel: () => ({
+    getModelprovidername: () => 'OpenAI',
+    getAssistantmodeloptionsList: () => mockModelOptions,
+    getTemplate: () => ({
+      getPromptvariablesList: () => mockVariables,
+    }),
+  }),
+  getDebuggerdeployment: () => ({
+    getInputaudio: () => ({
+      getAudioprovider: () => 'Deepgram',
+      getAudiooptionsList: () => mockSpeechToTextOptions,
+    }),
+    getOutputaudio: () => ({
+      getAudioprovider: () => 'Cartesia',
+      getAudiooptionsList: () => mockTextToSpeechOptions,
+    }),
+  }),
+};
+const mockAgentConfiguration = {
+  inputOptions: { channel: 'text' },
+  outputOptions: { channel: 'text' },
+  addArgument: mockAddArgument,
+};
+const mockVoiceAgent = {
+  agentConfiguration: mockAgentConfiguration,
+  messages: [] as Array<{ id: string; messages: string[] }>,
+  getAssistant: mockGetAssistant,
+  registerCallback: mockRegisterCallback,
+  on: mockOnAgentEvent,
+  off: mockOffAgentEvent,
+  onSendText: mockOnSendText,
+  setInputChannel: mockSetInputChannel,
+  disconnect: mockDisconnect,
+  toggleMute: mockToggleMute,
+};
+
+jest.mock('@/hooks/use-credential', () => ({
+  useCurrentCredential: () => ({
+    user: { name: 'Prashant' },
+    authId: 'user-123',
+    token: 'token-123',
+    projectId: 'project-123',
+  }),
+}));
+
+jest.mock('@/clients/runtime.client', () => ({
+  createVoiceAgentDebuggerConnection: jest.fn(() => ({
+    kind: 'debugger-connection',
+  })),
+}));
+
+jest.mock('@rapidaai/react', () => {
+  class InputOptions {
+    channels: string[];
+    channel: string;
+
+    constructor(channels: string[], channel: string) {
+      this.channels = channels;
+      this.channel = channel;
+    }
+  }
+
+  class AgentConfig {
+    inputOptions: InputOptions;
+    outputOptions: { channel: string };
+    addArgument = mockAddArgument;
+    addKeywords = jest.fn(() => this);
+    addMetadata = jest.fn(() => this);
+    setUserIdentifier = jest.fn(() => this);
+
+    constructor(_id: string, inputOptions: InputOptions) {
+      this.inputOptions = inputOptions;
+      this.outputOptions = { channel: inputOptions.channel };
+    }
+  }
+
+  return {
+    AgentConfig,
+    Channel: { Audio: 'audio', Text: 'text' },
+    InputOptions,
+    StringToAny: (value: string) => value,
+    VoiceAgent: jest.fn((_connection, agentConfiguration) => {
+      mockVoiceAgent.agentConfiguration = agentConfiguration;
+      return mockVoiceAgent;
+    }),
+    useSelectInputDeviceAgent: () => ({
+      devices: [
+        { deviceId: 'built-in', label: 'Built-in Microphone' },
+        { deviceId: 'usb', label: 'USB Microphone' },
+      ],
+      activeDeviceId: 'built-in',
+      setActiveMediaDevice: mockSetActiveMediaDevice,
+    }),
+  };
+});
 
 jest.mock(
   '@carbon/ai-chat',
@@ -55,7 +198,57 @@ jest.mock('../preview-agent-header', () => ({
 
 describe('PreviewVoiceAgentV2', () => {
   beforeEach(() => {
-    mockAddMessage.mockReset();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: jest.fn(),
+    });
+    mockAddMessage.mockReset().mockResolvedValue(undefined);
+    mockSend.mockReset().mockResolvedValue(undefined);
+    mockOnSendText.mockReset().mockResolvedValue(undefined);
+    mockDisconnect.mockReset().mockResolvedValue(undefined);
+    mockToggleMute.mockReset().mockReturnValue(true);
+    mockSetActiveMediaDevice.mockReset().mockResolvedValue(undefined);
+    mockAddArgument
+      .mockReset()
+      .mockImplementation(() => mockAgentConfiguration);
+    mockGetAssistant.mockReset().mockResolvedValue({
+      getSuccess: () => true,
+      getData: () => mockAssistant,
+    });
+    mockRegisterCallback.mockReset().mockImplementation(callback => {
+      mockAgentCallback = callback;
+    });
+    mockOnAgentEvent.mockReset().mockImplementation((event, handler) => {
+      if (event === 'onConnectionStateEvent') {
+        mockConnectionStateHandler = handler;
+      } else if (event === 'onErrorEvent') {
+        mockAgentErrorHandler = handler;
+      }
+    });
+    mockOffAgentEvent.mockReset();
+    mockSetInputChannel.mockReset().mockImplementation(channel => {
+      if (channel === 'audio') {
+        return new Promise<void>(resolve => {
+          resolveVoiceConnection = () => {
+            mockVoiceAgent.agentConfiguration.inputOptions.channel = channel;
+            mockVoiceAgent.agentConfiguration.outputOptions.channel = channel;
+            mockConnectionStateHandler?.('connected');
+            resolve();
+          };
+        });
+      }
+      mockVoiceAgent.agentConfiguration.inputOptions.channel = channel;
+      mockVoiceAgent.agentConfiguration.outputOptions.channel = channel;
+      return Promise.resolve();
+    });
+    mockVoiceAgent.messages = [];
+    mockVoiceAgent.agentConfiguration = mockAgentConfiguration;
+    mockAgentConfiguration.inputOptions.channel = 'text';
+    mockAgentConfiguration.outputOptions.channel = 'text';
+    mockAgentCallback = {};
+    mockConnectionStateHandler = undefined;
+    mockAgentErrorHandler = undefined;
+    resolveVoiceConnection = undefined;
     mockCarbonChatProps = {};
     mockResolvedMode = 'light';
     mockIsOverlayPanel = false;
@@ -90,7 +283,7 @@ describe('PreviewVoiceAgentV2', () => {
     );
 
     expect(
-      screen.getByRole('heading', { name: 'Delivery concierge' }),
+      await screen.findByRole('heading', { name: 'Delivery concierge' }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Carbon AI chat')).toBeInTheDocument();
     expect(mockCarbonChatProps.openChatByDefault).toBe(true);
@@ -154,12 +347,14 @@ describe('PreviewVoiceAgentV2', () => {
       screen.queryByRole('button', { name: 'Start voice input' }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText('Connected')).not.toBeInTheDocument();
-    const history = await mockCarbonChatProps.messaging.customLoadHistory();
-    expect(history).toHaveLength(4);
-    expect(history[0].message.input.text).toContain('move my delivery');
-    expect(history[1].message.output.generic[0].text).toContain(
-      'Friday between 1:00 PM and 5:00 PM',
-    );
+    await waitFor(() => expect(mockGetAssistant).toHaveBeenCalledTimes(1));
+    const history = await mockCarbonChatProps.messaging.customLoadHistory({
+      messaging: {
+        addMessage: mockAddMessage,
+      },
+      send: mockSend,
+    });
+    expect(history).toEqual([]);
     await user.click(configurationButton);
 
     expect(configurationButton).toHaveAttribute('aria-expanded', 'true');
@@ -249,11 +444,7 @@ describe('PreviewVoiceAgentV2', () => {
         rows: [
           ['Provider', 'provider', 'Cartesia'],
           ['Model', 'speak.model', 'sonic-2'],
-          [
-            'Voice',
-            'speak.voice.id',
-            'Tessa - Kind Companion6ccbfb76-1fc6-48f7-b71d-91ac6298247b',
-          ],
+          ['Voice', 'speak.voice.id', '6ccbfb76-1fc6-48f7-b71d-91ac6298247b'],
           ['Language', 'speak.language', 'en'],
         ],
       },
@@ -311,6 +502,7 @@ describe('PreviewVoiceAgentV2', () => {
     await user.type(customerName, 'Avery');
 
     expect(customerName).toHaveValue('Avery');
+    expect(mockAddArgument).toHaveBeenCalledWith('customer_name', 'Avery');
 
     await act(async () => {
       await mockCarbonChatProps.messaging.customSendMessage(
@@ -319,17 +511,33 @@ describe('PreviewVoiceAgentV2', () => {
           input: { message_type: 'text', text: 'Where is my delivery?' },
         },
         { signal: new AbortController().signal, silent: false },
-        { messaging: { addMessage: mockAddMessage } },
+        {
+          messaging: {
+            addMessage: mockAddMessage,
+          },
+          send: mockSend,
+        },
       );
     });
 
+    expect(mockOnSendText).toHaveBeenCalledWith('Where is my delivery?');
+    mockVoiceAgent.messages = [
+      { id: 'assistant-response-1', messages: ['Your delivery is Friday.'] },
+    ];
+    await act(async () => {
+      mockAgentCallback.onAssistantMessage?.({
+        id: 'assistant-response-1',
+        messageText: '',
+        completed: true,
+      });
+    });
     expect(mockAddMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         request_id: 'request-1',
         output: {
           generic: [
             expect.objectContaining({
-              text: expect.stringContaining('Avery'),
+              text: 'Your delivery is Friday.',
             }),
           ],
         },
@@ -361,6 +569,7 @@ describe('PreviewVoiceAgentV2', () => {
       </MemoryRouter>,
     );
 
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
     await user.click(
       screen.getByRole('button', { name: 'Start voice conversation' }),
     );
@@ -390,7 +599,54 @@ describe('PreviewVoiceAgentV2', () => {
     });
     expect(cancelConnection).not.toHaveTextContent('Cancel');
     expect(mockCarbonChatProps.input.isVisible).toBe(false);
+    await act(async () => resolveVoiceConnection?.());
     expect(await screen.findByText('Listening')).toBeInTheDocument();
+    await mockCarbonChatProps.messaging.customLoadHistory({
+      messaging: {
+        addMessage: mockAddMessage,
+      },
+      send: mockSend,
+    });
+    await act(async () => {
+      mockAgentCallback.onUserMessage?.({
+        id: 'voice-user-1',
+        messageText: 'Where is my delivery?',
+        completed: true,
+      });
+    });
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'voice-user-1',
+        input: expect.objectContaining({ text: 'Where is my delivery?' }),
+      }),
+    );
+    await act(async () => {
+      await mockCarbonChatProps.messaging.customSendMessage(
+        {
+          id: 'voice-user-1',
+          input: { message_type: 'text', text: 'Where is my delivery?' },
+        },
+        { signal: new AbortController().signal, silent: false },
+        {
+          messaging: { addMessage: mockAddMessage },
+          send: mockSend,
+        },
+      );
+    });
+    expect(mockOnSendText).not.toHaveBeenCalled();
+    mockVoiceAgent.messages = [
+      { id: 'voice-response-1', messages: ['Your delivery is Friday.'] },
+    ];
+    await act(async () => {
+      mockAgentCallback.onAssistantMessage?.({
+        id: 'voice-response-1',
+        messageText: '',
+        completed: true,
+      });
+    });
+    expect(mockAddMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ request_id: 'voice-user-1' }),
+    );
     expect(screen.getByText('Built-in Microphone')).toBeInTheDocument();
     const microphoneDropdown = screen.getByRole('combobox', {
       name: 'Microphone',
@@ -414,7 +670,12 @@ describe('PreviewVoiceAgentV2', () => {
     expect(switchToTextButton).not.toHaveTextContent('Switch to text');
     expect(endButton).not.toHaveTextContent('End');
 
+    await user.click(microphoneDropdown);
+    await user.click(screen.getByRole('option', { name: 'USB Microphone' }));
+    expect(mockSetActiveMediaDevice).toHaveBeenCalledWith('usb');
+
     await user.click(muteButton);
+    expect(mockToggleMute).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Microphone muted')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Unmute microphone' }),
@@ -422,11 +683,106 @@ describe('PreviewVoiceAgentV2', () => {
 
     await user.click(switchToTextButton);
 
+    expect(mockSetInputChannel).toHaveBeenCalledWith('text');
     expect(
       screen.getByRole('button', { name: 'Start voice conversation' }),
     ).toBeInTheDocument();
     expect(mockCarbonChatProps.input.isVisible).toBe(true);
     expect(screen.queryByText('Listening')).not.toBeInTheDocument();
+  });
+
+  it('returns to text mode when voice connection setup emits an error', async () => {
+    const user = userEvent.setup({
+      pointerEventsCheck: PointerEventsCheckLevel.Never,
+      skipHover: true,
+    });
+    mockSetInputChannel.mockImplementationOnce(async channel => {
+      mockVoiceAgent.agentConfiguration.inputOptions.channel = channel;
+      mockVoiceAgent.agentConfiguration.outputOptions.channel = channel;
+      mockAgentErrorHandler?.('client', 'Microphone permission denied');
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/preview/v2/chat/assistant-123']}>
+        <Routes>
+          <Route
+            path="/preview/v2/chat/:assistantId"
+            element={<PreviewVoiceAgentV2 />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
+    await user.click(
+      screen.getByRole('button', { name: 'Start voice conversation' }),
+    );
+
+    expect(
+      await screen.findByText('Microphone permission denied'),
+    ).toBeVisible();
+    expect(screen.queryByText('Listening')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Start voice conversation' }),
+    ).toBeInTheDocument();
+    expect(mockVoiceAgent.agentConfiguration.inputOptions.channel).toBe('text');
+    expect(mockVoiceAgent.agentConfiguration.outputOptions.channel).toBe(
+      'text',
+    );
+  });
+
+  it('does not correlate a retry response to a failed text request', async () => {
+    render(
+      <MemoryRouter initialEntries={['/preview/v2/chat/assistant-123']}>
+        <Routes>
+          <Route
+            path="/preview/v2/chat/:assistantId"
+            element={<PreviewVoiceAgentV2 />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
+    const chatInstance = {
+      messaging: { addMessage: mockAddMessage },
+      send: mockSend,
+    };
+    await mockCarbonChatProps.messaging.customLoadHistory(chatInstance);
+    await act(async () => {
+      await mockCarbonChatProps.messaging.customSendMessage(
+        {
+          id: 'failed-request',
+          input: { message_type: 'text', text: 'First attempt' },
+        },
+        { signal: new AbortController().signal, silent: false },
+        chatInstance,
+      );
+      mockAgentErrorHandler?.('client', 'No connection available to send text');
+      await mockCarbonChatProps.messaging.customSendMessage(
+        {
+          id: 'retry-request',
+          input: { message_type: 'text', text: 'Retry' },
+        },
+        { signal: new AbortController().signal, silent: false },
+        chatInstance,
+      );
+    });
+
+    mockVoiceAgent.messages = [
+      { id: 'retry-response', messages: ['Retry succeeded.'] },
+    ];
+    await act(async () => {
+      mockAgentCallback.onAssistantMessage?.({
+        id: 'retry-response',
+        messageText: '',
+        completed: true,
+      });
+    });
+
+    expect(mockAddMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ request_id: 'retry-request' }),
+    );
   });
 
   it('confirms before ending an active voice conversation', async () => {
@@ -446,9 +802,11 @@ describe('PreviewVoiceAgentV2', () => {
       </MemoryRouter>,
     );
 
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
     await user.click(
       screen.getByRole('button', { name: 'Start voice conversation' }),
     );
+    await act(async () => resolveVoiceConnection?.());
     expect(await screen.findByText('Listening')).toBeInTheDocument();
 
     await user.click(
@@ -473,6 +831,7 @@ describe('PreviewVoiceAgentV2', () => {
     );
     await user.click(screen.getByRole('button', { name: /End conversation/ }));
 
+    expect(mockDisconnect).toHaveBeenCalledTimes(1);
     expect(
       screen.getByRole('button', { name: 'Start voice conversation' }),
     ).toBeInTheDocument();
@@ -500,6 +859,7 @@ describe('PreviewVoiceAgentV2', () => {
       </MemoryRouter>,
     );
 
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
     const toolbar = screen.getByRole('toolbar', {
       name: 'Conversation toolbar',
     });
@@ -528,6 +888,7 @@ describe('PreviewVoiceAgentV2', () => {
       </MemoryRouter>,
     );
 
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
     const configurationButton = screen.getByRole('button', {
       name: 'Configuration',
     });
@@ -571,6 +932,7 @@ describe('PreviewVoiceAgentV2', () => {
       </MemoryRouter>,
     );
 
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
     await user.click(screen.getByRole('button', { name: 'Configuration' }));
 
     const dialog = screen.getByRole('dialog', {
@@ -592,7 +954,7 @@ describe('PreviewVoiceAgentV2', () => {
     expect(closeButton).toHaveFocus();
   });
 
-  it('uses the Carbon dark theme when the application is dark', () => {
+  it('uses the Carbon dark theme when the application is dark', async () => {
     mockResolvedMode = 'dark';
 
     render(
@@ -606,7 +968,30 @@ describe('PreviewVoiceAgentV2', () => {
       </MemoryRouter>,
     );
 
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
     expect(mockCarbonChatProps.injectCarbonTheme).toBe('g100');
+  });
+
+  it('surfaces assistant loading failures and disconnects on cleanup', async () => {
+    mockGetAssistant.mockRejectedValueOnce(new Error('Unavailable'));
+
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/preview/v2/chat/assistant-123']}>
+        <Routes>
+          <Route
+            path="/preview/v2/chat/:assistantId"
+            element={<PreviewVoiceAgentV2 />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByText('Unable to load assistant configuration.'),
+    ).toBeInTheDocument();
+
+    unmount();
+    await waitFor(() => expect(mockDisconnect).toHaveBeenCalledTimes(1));
   });
 
   it('redirects to not found when the assistant id is missing', () => {
