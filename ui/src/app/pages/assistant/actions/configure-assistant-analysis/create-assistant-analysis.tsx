@@ -244,7 +244,7 @@ export const CreateAssistantAnalysis: FC<{ assistantId: string }> = ({
                     title="Parameters"
                     addButtonLabel="Add parameter"
                     valuePlaceholder="Variable name"
-                    removeButtonKind="danger--ghost"
+                    isRemoveDestructive
                   />
                 </Stack>
               </div>

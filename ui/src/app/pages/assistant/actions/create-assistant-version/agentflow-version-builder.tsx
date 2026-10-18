@@ -4517,13 +4517,13 @@ export function AgentflowVersionBuilder({
               <div className="mx-1 h-5 border-l border-gray-200 dark:border-gray-800" />
               <Tooltip align="top" description="Cancel">
                 <Button
-                  kind="danger--ghost"
+                  kind="ghost"
                   size="sm"
                   hasIconOnly
                   renderIcon={Close}
                   iconDescription="Cancel"
                   onClick={() => showDialog(goBack)}
-                  className="!h-8 !min-h-8 !w-8 !p-0 hover:!bg-red-600 hover:!text-white"
+                  className="!h-8 !min-h-8 !w-8 !p-0 !text-[var(--cds-support-error)] hover:!bg-red-600 hover:!text-white"
                 />
               </Tooltip>
               <Tooltip

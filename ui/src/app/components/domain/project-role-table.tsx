@@ -133,8 +133,9 @@ export function ProjectRoleTable(props: ProjectRoleTableProps) {
                       hasIconOnly
                       renderIcon={TrashCan}
                       iconDescription="Remove project role"
-                      kind="danger--ghost"
+                      kind="ghost"
                       size="sm"
+                      className="!text-[var(--cds-support-error)]"
                       onClick={() =>
                         props.onChange(props.rows.filter((_, i) => i !== index))
                       }

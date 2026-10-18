@@ -221,7 +221,7 @@ interface AssistantMappingTableProps<
   title?: string;
   addButtonLabel?: string;
   valuePlaceholder?: string;
-  removeButtonKind?: 'ghost' | 'danger--ghost';
+  isRemoveDestructive?: boolean;
   inputClass?: string;
 }
 
@@ -241,7 +241,7 @@ export const AssistantMappingTable = <
   title = 'Mapping',
   addButtonLabel = 'Add parameter',
   valuePlaceholder = 'Value',
-  removeButtonKind = 'ghost',
+  isRemoveDestructive = false,
 }: AssistantMappingTableProps<TType, TItem>) => {
   const getDefaultKey = useCallback(
     (type: TType) => {
@@ -377,8 +377,13 @@ export const AssistantMappingTable = <
                     hasIconOnly
                     renderIcon={TrashCan}
                     iconDescription="Remove"
-                    kind={removeButtonKind}
+                    kind="ghost"
                     size="sm"
+                    className={
+                      isRemoveDestructive
+                        ? '!text-[var(--cds-support-error)]'
+                        : undefined
+                    }
                     onClick={() => handleRemove(index)}
                   />
                 </TableFormCell>
@@ -417,7 +422,7 @@ interface ParameterEditorProps {
   title?: string;
   addButtonLabel?: string;
   valuePlaceholder?: string;
-  removeButtonKind?: 'ghost' | 'danger--ghost';
+  isRemoveDestructive?: boolean;
   inputClass?: string;
 }
 
@@ -433,7 +438,7 @@ export function ParameterEditor({
   title = 'Mapping',
   addButtonLabel = 'Add parameter',
   valuePlaceholder = 'Value',
-  removeButtonKind = 'ghost',
+  isRemoveDestructive = false,
 }: ParameterEditorProps) {
   const [params, setParams] = useState<AssistantMappingItem[]>(() =>
     parseJsonParameters(value).map(({ key, value: parameterValue }) => {
@@ -476,7 +481,7 @@ export function ParameterEditor({
       title={title}
       addButtonLabel={addButtonLabel}
       valuePlaceholder={valuePlaceholder}
-      removeButtonKind={removeButtonKind}
+      isRemoveDestructive={isRemoveDestructive}
     />
   );
 }

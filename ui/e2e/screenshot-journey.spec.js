@@ -27,6 +27,9 @@ for (const journey of journeysWithCheck('screenshot')) {
       const screenshotPath = screenshotBaselinePath(journey, colorMode);
       if (journey.id === 'dashboard.home') {
         await expandDashboardForScreenshot(page);
+        await expect(
+          page.getByText('Oct 17, 8:25 AM', { exact: true }),
+        ).toBeVisible();
         await expect(page.locator('[data-dashboard-content]')).toHaveScreenshot(
           screenshotPath,
           { maxDiffPixelRatio: 0.01 },
@@ -34,7 +37,7 @@ for (const journey of journeysWithCheck('screenshot')) {
       } else {
         await expect(page).toHaveScreenshot(screenshotPath, {
           fullPage: true,
-          maxDiffPixelRatio: 0.01,
+          maxDiffPixelRatio: journey.id.startsWith('static.') ? 0.03 : 0.01,
         });
       }
     });

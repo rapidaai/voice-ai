@@ -99,6 +99,11 @@ async function authenticatePage(page) {
 async function gotoJourney(page, journey) {
   if (journey.auth) await authenticatePage(page);
 
+  const viewport = page.viewportSize();
+  if (viewport) {
+    await page.mouse.move(viewport.width - 1, viewport.height - 1);
+  }
+
   await page.goto(journey.path);
   await page.waitForLoadState('domcontentloaded');
   await expect(page.locator('body')).toContainText(journey.expectText);

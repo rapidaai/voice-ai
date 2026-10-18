@@ -36,11 +36,11 @@ jest.mock('@carbon/icons-react', () => ({
 jest.mock('@carbon/react', () => ({
   Button: ({
     children,
-    className: _className,
+    className,
     disabled,
     hasIconOnly: _hasIconOnly,
     iconDescription,
-    kind: _kind,
+    kind,
     onClick,
     renderIcon: Icon,
     size: _size,
@@ -50,6 +50,8 @@ jest.mock('@carbon/react', () => ({
       aria-label={
         iconDescription || (typeof children === 'string' ? children : undefined)
       }
+      className={className}
+      data-kind={kind}
       disabled={disabled}
       onClick={onClick}
       {...props}
@@ -118,6 +120,13 @@ describe('SourceConditionRule', () => {
       'phone',
     );
     expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remove' })).toHaveAttribute(
+      'data-kind',
+      'ghost',
+    );
+    expect(screen.getByRole('button', { name: 'Remove' })).toHaveClass(
+      '!text-[var(--cds-support-error)]',
+    );
 
     await user.click(screen.getByRole('button', { name: 'Add rule' }));
 

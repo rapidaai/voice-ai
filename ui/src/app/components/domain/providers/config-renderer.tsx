@@ -723,8 +723,9 @@ function KeyValueField({
                   hasIconOnly
                   renderIcon={TrashCan}
                   iconDescription="Remove"
-                  kind="danger--ghost"
+                  kind="ghost"
                   size="sm"
+                  className="!text-[var(--cds-support-error)]"
                   onClick={() => removeEntry(index)}
                 />
               </TableFormCell>

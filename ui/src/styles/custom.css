@@ -276,7 +276,7 @@ li::marker {
 }
 
 .prompt-editor-placeholder {
-  color: var(--cds-text-placeholder);
+  color: var(--cds-text-secondary);
 }
 
 .json-editor-surface::after {
