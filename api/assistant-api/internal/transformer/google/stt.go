@@ -540,7 +540,7 @@ func (g *googleSpeechToText) Close(ctx context.Context) error {
 	if g.stream != nil {
 		if err := g.stream.CloseSend(); err != nil {
 			combinedErr = fmt.Errorf("error closing StreamClient: %v", err)
-			g.logger.Errorf(combinedErr.Error())
+			g.logger.Errorf("%v", combinedErr)
 		}
 	}
 
@@ -548,7 +548,7 @@ func (g *googleSpeechToText) Close(ctx context.Context) error {
 		if err := g.client.Close(); err != nil {
 			// Log the error if closure fails.
 			combinedErr = fmt.Errorf("error closing Client: %v", err)
-			g.logger.Errorf(combinedErr.Error())
+			g.logger.Errorf("%v", combinedErr)
 		}
 	}
 	g.mu.Unlock()

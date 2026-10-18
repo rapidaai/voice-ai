@@ -2,6 +2,8 @@ package internal_transformer_google
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -9,6 +11,7 @@ import (
 
 	"cloud.google.com/go/speech/apiv2/speechpb"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,8 +25,9 @@ import (
 
 type mockStream struct {
 	grpc.ClientStream
-	recvFunc func() (*speechpb.StreamingRecognizeResponse, error)
-	sendFunc func(*speechpb.StreamingRecognizeRequest) error
+	recvFunc      func() (*speechpb.StreamingRecognizeResponse, error)
+	sendFunc      func(*speechpb.StreamingRecognizeRequest) error
+	closeSendFunc func() error
 }
 
 func (m *mockStream) Recv() (*speechpb.StreamingRecognizeResponse, error) { return m.recvFunc() }
@@ -35,10 +39,15 @@ func (m *mockStream) Send(req *speechpb.StreamingRecognizeRequest) error {
 }
 func (m *mockStream) Header() (metadata.MD, error) { return nil, nil }
 func (m *mockStream) Trailer() metadata.MD         { return nil }
-func (m *mockStream) CloseSend() error             { return nil }
-func (m *mockStream) Context() context.Context     { return context.Background() }
-func (m *mockStream) SendMsg(interface{}) error    { return nil }
-func (m *mockStream) RecvMsg(interface{}) error    { return nil }
+func (m *mockStream) CloseSend() error {
+	if m.closeSendFunc != nil {
+		return m.closeSendFunc()
+	}
+	return nil
+}
+func (m *mockStream) Context() context.Context  { return context.Background() }
+func (m *mockStream) SendMsg(interface{}) error { return nil }
+func (m *mockStream) RecvMsg(interface{}) error { return nil }
 
 // --- helpers ---
 
@@ -56,6 +65,35 @@ func newTestSTT(ctx context.Context, factory func(context.Context) (speechpb.Spe
 		onPacket:      onPacket,
 		streamFactory: factory,
 	}
+}
+
+type googleSTTRecordingLogger struct {
+	commons.Logger
+	errorMessage string
+}
+
+func (logger *googleSTTRecordingLogger) Errorf(format string, args ...interface{}) {
+	logger.errorMessage = fmt.Sprintf(format, args...)
+}
+
+func TestClose_LogsStreamErrorsContainingFormatDirectives(t *testing.T) {
+	logger := &googleSTTRecordingLogger{}
+	_, cancel := context.WithCancel(context.Background())
+	transformer := &googleSpeechToText{
+		ctxCancel: cancel,
+		logger:    logger,
+		stream: &mockStream{
+			closeSendFunc: func() error {
+				return errors.New("stream is 100% unavailable")
+			},
+		},
+		onPacket: func(...internal_type.Packet) error { return nil },
+	}
+
+	err := transformer.Close(context.Background())
+
+	require.EqualError(t, err, "error closing StreamClient: stream is 100% unavailable")
+	assert.Equal(t, "error closing StreamClient: stream is 100% unavailable", logger.errorMessage)
 }
 
 // TestRecvLoop_ReinitOnTimeout proves that when the Google stream returns

@@ -7,6 +7,7 @@
 package internal_transformer_custom_dsl
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -205,4 +206,30 @@ func TestCoreValidateQueryParams_RejectsNestedValues(t *testing.T) {
 	}, contract, "ws.query_params")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "must resolve to primitive value")
+}
+
+func TestCoreBuildConnectionURL_FormatsPrefixedParseErrors(t *testing.T) {
+	core := NewCore("custom-stt websocket_v1")
+
+	_, err := core.BuildConnectionURL("://invalid", nil, nil)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "custom-stt websocket_v1: invalid base url")
+	assert.NotContains(t, err.Error(), "%!w")
+}
+
+func TestCoreToNumber_RejectsUnsignedOverflow(t *testing.T) {
+	core := NewCore("custom-stt websocket_v1")
+
+	_, err := core.ToNumber(uint64(math.MaxUint64))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds maximum signed integer")
+}
+
+func TestCoreValuesEqual_PreservesLargeUnsignedValues(t *testing.T) {
+	core := NewCore("custom-stt websocket_v1")
+
+	assert.True(t, core.ValuesEqual(uint64(math.MaxUint64), uint64(math.MaxUint64)))
+	assert.False(t, core.ValuesEqual(uint64(math.MaxUint64), int64(-1)))
 }
