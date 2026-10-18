@@ -1,5 +1,6 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { ForgotPasswordPage } from '@/app/pages/authentication/forgot-password';
@@ -389,6 +390,7 @@ describe('Requested create/update flow pages', () => {
   });
 
   it('forgot password shows success message on success callback', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (ForgotPassword as jest.Mock).mockImplementation((_cfg, _email, cb) => {
       cb(null, { getSuccess: () => true });
     });
@@ -403,19 +405,20 @@ describe('Requested create/update flow pages', () => {
     expect(
       screen.getByRole('link', { name: 'Back to sign in' }),
     ).toHaveAttribute('href', '/auth/signin');
-    fireEvent.change(screen.getByPlaceholderText('eg: john@example.com'), {
-      target: { value: 'user@x.com' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Send reset link' }));
+    await user.click(screen.getByPlaceholderText('eg: john@example.com'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('user@x.com'));
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
 
     expect(
       await screen.findByText(/Thanks! An email was sent/i),
     ).toBeInTheDocument();
   });
 
-  it('create endpoint blocks continue when prompt template variables are missing', () => {
+  it('create endpoint blocks continue when prompt template variables are missing', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateEndpointPage />);
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Configure instruction' }),
     );
     expect(
@@ -438,7 +441,8 @@ describe('Requested create/update flow pages', () => {
     );
   });
 
-  it('create endpoint moves to define step after prompt variable edit', () => {
+  it('create endpoint moves to define step after prompt variable edit', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateEndpointPage />);
 
     const endpointPromptProps = getLatestConfigPromptProps();
@@ -449,7 +453,7 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Configure instruction' }),
     );
 
@@ -469,7 +473,8 @@ describe('Requested create/update flow pages', () => {
     ).toBeInTheDocument();
   });
 
-  it('create endpoint validates using changed provider', () => {
+  it('create endpoint validates using changed provider', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateEndpointPage />);
 
     const endpointTextProviderProps = getLatestTextProviderProps();
@@ -485,7 +490,7 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Configure instruction' }),
     );
 
@@ -495,9 +500,10 @@ describe('Requested create/update flow pages', () => {
     );
   });
 
-  it('create endpoint version blocks continue when variables are missing', () => {
+  it('create endpoint version blocks continue when variables are missing', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateNewVersionEndpointPage />);
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Configure instruction' }),
     );
     expect(
@@ -505,7 +511,8 @@ describe('Requested create/update flow pages', () => {
     ).toBeInTheDocument();
   });
 
-  it('create endpoint version moves to commit step after prompt variable edit', () => {
+  it('create endpoint version moves to commit step after prompt variable edit', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateNewVersionEndpointPage />);
 
     const endpointVersionPromptProps = getLatestConfigPromptProps();
@@ -516,14 +523,15 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Configure instruction' }),
     );
 
     expect(screen.getByText('Version note')).toBeInTheDocument();
   });
 
-  it('create endpoint version validates using changed provider', () => {
+  it('create endpoint version validates using changed provider', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateNewVersionEndpointPage />);
 
     const endpointVersionTextProviderProps = getLatestTextProviderProps();
@@ -539,7 +547,7 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Configure instruction' }),
     );
 
@@ -549,7 +557,8 @@ describe('Requested create/update flow pages', () => {
     );
   });
 
-  it('redirects to endpoint versions after creating a new endpoint version', () => {
+  it('redirects to endpoint versions after creating a new endpoint version', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockParams = { endpointId: 'endpoint-1' };
     (CreateEndpointProviderModel as jest.Mock).mockImplementation(
       (_cfg, _endpointId, _attr, _auth, cb) => {
@@ -572,10 +581,12 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Configure instruction' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Create new version' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Create new version' }),
+    );
 
     expect(CreateEndpointProviderModel).toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith(
@@ -583,11 +594,12 @@ describe('Requested create/update flow pages', () => {
     );
   });
 
-  it('create assistant blocks continue when prompt content is empty', () => {
+  it('create assistant blocks continue when prompt content is empty', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     renderWithTheme(<CreateAssistantPage />);
     const assistantConfigPrompt = getLatestConfigPromptProps();
     expect(assistantConfigPrompt.showRuntimeReplacementHint).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(
       screen.getByText(
         'Each prompt message must have a valid role and non-empty content.',
@@ -608,7 +620,8 @@ describe('Requested create/update flow pages', () => {
     );
   });
 
-  it('create assistant moves forward after prompt content edit', () => {
+  it('create assistant moves forward after prompt content edit', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     renderWithTheme(<CreateAssistantPage />);
 
     const assistantConfigPrompt = getLatestConfigPromptProps();
@@ -619,14 +632,15 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(
       screen.getByRole('button', { name: 'Skip for now' }),
     ).toBeInTheDocument();
   });
 
-  it('create assistant validates using changed provider', () => {
+  it('create assistant validates using changed provider', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     renderWithTheme(<CreateAssistantPage />);
 
     const assistantTextProviderProps = getLatestTextProviderProps();
@@ -642,7 +656,7 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(mockValidateTextProviderDefaultOptions).toHaveBeenCalled();
     expect(mockValidateTextProviderDefaultOptions.mock.calls.at(-1)?.[0]).toBe(
@@ -665,8 +679,12 @@ describe('Requested create/update flow pages', () => {
   });
 
   it('create assistant version moves to commit step after prompt edit', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockParams = { assistantId: 'a-1' };
     render(<CreateVersionAssistantPage />);
+    await waitFor(() =>
+      expect(mockConfigPrompt.mock.calls.length).toBeGreaterThan(1),
+    );
 
     const assistantVersionConfigPrompt = getLatestConfigPromptProps();
     act(() => {
@@ -676,7 +694,7 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(screen.getByText('Version note')).toBeInTheDocument();
     await act(async () => {});
@@ -701,8 +719,12 @@ describe('Requested create/update flow pages', () => {
   });
 
   it('create assistant version validates using changed provider', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockParams = { assistantId: 'a-1' };
     render(<CreateVersionAssistantPage />);
+    await waitFor(() =>
+      expect(mockConfigPrompt.mock.calls.length).toBeGreaterThan(1),
+    );
 
     const assistantVersionTextProviderProps = getLatestTextProviderProps();
     act(() => {
@@ -717,7 +739,7 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(mockValidateTextProviderDefaultOptions).toHaveBeenCalled();
     expect(mockValidateTextProviderDefaultOptions.mock.calls.at(-1)?.[0]).toBe(

@@ -1,11 +1,6 @@
 import React from 'react';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { EndpointOverviewPage } from '../overview-page';
@@ -165,6 +160,7 @@ describe('EndpointOverviewPage', () => {
   });
 
   it('keeps the failure visible and retries the log request', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockListEndpointLogs
       .mockImplementationOnce(({ callback }) =>
         callback(new Error('Log service unavailable'), null),
@@ -183,7 +179,7 @@ describe('EndpointOverviewPage', () => {
     expect(
       await screen.findByText('Endpoint activity is unavailable'),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     await waitFor(() => expect(mockListEndpointLogs).toHaveBeenCalledTimes(2));
     expect(await screen.findAllByText('128')).toHaveLength(2);
@@ -219,7 +215,8 @@ describe('EndpointOverviewPage', () => {
     expect(within(usageTile!).getByText('0')).toBeInTheDocument();
   });
 
-  it('opens the create version flow from the overview header', () => {
+  it('opens the create version flow from the overview header', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <EndpointOverviewPage
         currentEndpoint={currentEndpoint}
@@ -227,7 +224,9 @@ describe('EndpointOverviewPage', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create new version' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Create new version' }),
+    );
     expect(mockNavigate).toHaveBeenCalledWith(
       '/deployment/endpoint/endpoint-1/create-endpoint-version',
     );

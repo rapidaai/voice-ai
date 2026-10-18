@@ -3,7 +3,7 @@ import { SectionLoader } from '@/app/components/ui/feedback';
 import { AssistantAnalytics } from '@/app/pages/assistant/view/overview/assistant-analytics';
 import { useRapidaStore } from '@/stores/app';
 import { FC } from 'react';
-import { LinkNotification } from '@/app/components/ui/feedback';
+import { ActionNotification } from '@/app/components/ui/feedback';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import {
   Breadcrumb,
@@ -66,15 +66,17 @@ export const Overview: FC<{ currentAssistant: Assistant }> = ({
         !currentAssistant.getDebuggerdeployment() &&
         !currentAssistant.getWebplugindeployment() &&
         !currentAssistant.getPhonedeployment() && (
-          <LinkNotification
-            kind="warning"
-            title="Your assistant is ready, but not live yet."
-            subtitle="It looks like your assistant isn't deployed to any channel."
-            linkText="Enable deployment"
-            onLinkClick={() =>
-              navigation.goToDeploymentAssistant(currentAssistant.getId())
-            }
-          />
+          <div className="max-md:bg-[var(--cds-notification-background-warning)]">
+            <ActionNotification
+              kind="warning"
+              title="Your assistant is ready, but not live yet."
+              subtitle="It looks like your assistant isn't deployed to any channel."
+              actionButtonLabel="Enable deployment"
+              onActionButtonClick={() =>
+                navigation.goToDeploymentAssistant(currentAssistant.getId())
+              }
+            />
+          </div>
         )}
 
       {/* ── Dashboard content ── */}

@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { EndpointDetailTabContent } from '@/app/pages/endpoint/view/pages';
@@ -90,7 +91,8 @@ describe('EndpointDetailTabContent', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders logs and versions pages from their route keys', () => {
+  it('renders logs and versions pages from their route keys', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onReload = jest.fn();
     const { rerender } = render(
       <EndpointDetailTabContent
@@ -114,7 +116,7 @@ describe('EndpointDetailTabContent', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reload versions' }));
+    await user.click(screen.getByRole('button', { name: 'Reload versions' }));
     expect(
       screen.getByText(/Versions page Production endpoint/),
     ).toBeInTheDocument();

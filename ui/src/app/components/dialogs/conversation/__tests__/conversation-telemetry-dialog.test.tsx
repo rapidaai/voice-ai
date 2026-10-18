@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ConversationTelemetryDialog } from '../conversation-telemetry-modal';
 
@@ -194,6 +195,7 @@ describe('ConversationTelemetryDialog', () => {
   });
 
   it('fetches telemetry when opened and closes through modal actions', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
 
     render(
@@ -213,14 +215,15 @@ describe('ConversationTelemetryDialog', () => {
       expect(screen.getByText('No events found')).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Modal close' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Header close' }));
+    await user.click(screen.getByRole('button', { name: 'Modal close' }));
+    await user.click(screen.getByRole('button', { name: 'Header close' }));
 
     expect(setModalOpen).toHaveBeenCalledWith(false);
     expect(setModalOpen).toHaveBeenCalledTimes(2);
   });
 
   it('renders fetched event and metric rows across tabs', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockListTelemetry.mockResolvedValue(
       createTelemetryResponse([
         {
@@ -245,15 +248,15 @@ describe('ConversationTelemetryDialog', () => {
     expect(await screen.findByText('sip.call.lifecycle')).toBeInTheDocument();
     expect(screen.getByText(/initialized/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText('sip.call.lifecycle').closest('tr')!);
+    await user.click(screen.getByText('sip.call.lifecycle').closest('tr')!);
     expect(screen.getByText(/"traceId": "trace-1"/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Metrics' }));
+    await user.click(screen.getByRole('button', { name: 'Metrics' }));
     expect(mockListTelemetry).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('metric·message')).toBeInTheDocument();
     expect(screen.getByText(/stt.latency_ms/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Latency' }));
+    await user.click(screen.getByRole('button', { name: 'Latency' }));
     await waitFor(() => expect(mockListTelemetry).toHaveBeenCalledTimes(2));
     await waitFor(() =>
       expect(screen.getByTestId('latency-chart')).toHaveAttribute(
@@ -264,6 +267,7 @@ describe('ConversationTelemetryDialog', () => {
   });
 
   it('renders initial criteria chips and removes them', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <ConversationTelemetryDialog
         modalOpen
@@ -285,9 +289,9 @@ describe('ConversationTelemetryDialog', () => {
     expect(screen.getByText('messageId/contextId: ctx-1')).toBeInTheDocument();
     expect(screen.getByText('scope: telephony')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText('assistantConversationId: 123'));
-    fireEvent.click(screen.getByText('messageId/contextId: ctx-1'));
-    fireEvent.click(screen.getByText('scope: telephony'));
+    await user.click(screen.getByText('assistantConversationId: 123'));
+    await user.click(screen.getByText('messageId/contextId: ctx-1'));
+    await user.click(screen.getByText('scope: telephony'));
 
     await waitFor(() =>
       expect(screen.queryByText('scope: telephony')).not.toBeInTheDocument(),
@@ -298,6 +302,7 @@ describe('ConversationTelemetryDialog', () => {
   });
 
   it('applies and resets event and metric filters', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <ConversationTelemetryDialog
         modalOpen
@@ -308,33 +313,33 @@ describe('ConversationTelemetryDialog', () => {
 
     await screen.findByText('No events found');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Select event name' }));
-    fireEvent.change(screen.getByLabelText('MessageID / ContextID'), {
-      target: { value: 'ctx-1' },
-    });
-    fireEvent.change(screen.getByLabelText('Type'), {
-      target: { value: 'initialized' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
+    await user.click(screen.getByRole('button', { name: 'Select event name' }));
+    await user.click(screen.getByLabelText('MessageID / ContextID'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('ctx-1'));
+    await user.click(screen.getByLabelText('Type'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('initialized'));
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
 
     expect(await screen.findByText('name: session')).toBeInTheDocument();
     expect(screen.getByText('messageId/contextId: ctx-1')).toBeInTheDocument();
     expect(screen.getByText('data.type: initialized')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText('name: session'));
-    fireEvent.click(screen.getByText('messageId/contextId: ctx-1'));
-    fireEvent.click(screen.getByText('data.type: initialized'));
-    fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+    await user.click(screen.getByText('name: session'));
+    await user.click(screen.getByText('messageId/contextId: ctx-1'));
+    await user.click(screen.getByText('data.type: initialized'));
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Metrics' }));
-    fireEvent.click(
+    await user.click(screen.getByRole('button', { name: 'Metrics' }));
+    await user.click(
       screen.getByRole('button', { name: 'Select metric scope' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
 
     expect(await screen.findByText('scope: message')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('scope: message'));
-    fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+    await user.click(screen.getByText('scope: message'));
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
     await waitFor(() =>
       expect(screen.queryByRole('status')).not.toBeInTheDocument(),
     );

@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ClickableKnowledgeCard, SelectKnowledgeCard } from '../knowledge-card';
 import { ProviderCard } from '../provider-card';
@@ -248,7 +249,8 @@ describe('domain cards', () => {
     Object.assign(navigator, { clipboard: originalClipboard });
   });
 
-  it('renders selectable and clickable knowledge cards', () => {
+  it('renders selectable and clickable knowledge cards', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onActionClick = jest.fn();
 
     render(
@@ -276,11 +278,12 @@ describe('domain cards', () => {
       '/knowledge/knowledge-1',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    await user.click(screen.getByRole('button', { name: 'Archive' }));
     expect(onActionClick).toHaveBeenCalled();
   });
 
-  it('renders provider connection state and actions', () => {
+  it('renders provider connection state and actions', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockProviderCredentials = [makeCredential()];
 
     render(<ProviderCard provider={makeProvider()} />);
@@ -291,29 +294,31 @@ describe('domain cards', () => {
       screen.queryByRole('button', { name: 'Setup Credential' }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open provider' }));
+    await user.click(screen.getByRole('button', { name: 'Open provider' }));
     expect(mockGoTo).toHaveBeenCalledWith('/providers/openai');
   });
 
-  it('opens provider credential dialogs from card actions', () => {
+  it('opens provider credential dialogs from card actions', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ProviderCard provider={makeProvider()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
-    fireEvent.click(
+    await user.click(screen.getByRole('button', { name: 'Actions' }));
+    await user.click(
       screen.getByRole('button', { name: 'Create a credential' }),
     );
     expect(screen.getByText('Create credential dialog')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'View credential' }));
+    await user.click(screen.getByRole('button', { name: 'View credential' }));
     expect(screen.getByText('View credential dialog')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('View credential dialog'));
+    await user.click(screen.getByText('View credential dialog'));
     expect(screen.getByText('Create credential dialog')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Setup Credential' }));
+    await user.click(screen.getByRole('button', { name: 'Setup Credential' }));
     expect(screen.getByText('Create credential dialog')).toBeInTheDocument();
   });
 
-  it('renders tool metadata and dispatches edit/delete actions', () => {
+  it('renders tool metadata and dispatches edit/delete actions', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onEdit = jest.fn();
     const onDelete = jest.fn();
 
@@ -325,8 +330,8 @@ describe('domain cards', () => {
     expect(screen.getAllByText('MCP')).toHaveLength(2);
     expect(screen.getByText('Source: API')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Edit/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Delete/ }));
+    await user.click(screen.getByRole('button', { name: /Edit/ }));
+    await user.click(screen.getByRole('button', { name: /Delete/ }));
 
     expect(onEdit).toHaveBeenCalled();
     expect(onDelete).toHaveBeenCalled();
@@ -359,6 +364,8 @@ describe('domain cards', () => {
   });
 
   it('renders SDK credentials and reloads the list', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    const writeText = jest.spyOn(navigator.clipboard, 'writeText');
     render(<RapidaCredentialCard />);
 
     await waitFor(() => {
@@ -367,14 +374,15 @@ describe('domain cards', () => {
     expect(mockShowLoader).toHaveBeenCalled();
     expect(mockHideLoader).toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    await user.click(screen.getByRole('button', { name: 'Reload' }));
     expect(mockGetAllProjectCredential).toHaveBeenCalledTimes(2);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('pk_test_123');
+    await user.click(screen.getByRole('button', { name: 'Copy' }));
+    expect(writeText).toHaveBeenCalledWith('pk_test_123');
   });
 
   it('creates a credential from the empty credential state', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockGetAllProjectCredential.mockImplementation(
       (_config, _projectId, cb) => {
         cb(null, {
@@ -395,7 +403,7 @@ describe('domain cards', () => {
       expect(screen.getByText('No credentials')).toBeInTheDocument();
     });
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Create new credential' }),
     );
 
@@ -403,6 +411,7 @@ describe('domain cards', () => {
   });
 
   it('shows SDK credential errors from create and list requests', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockGetAllProjectCredential.mockImplementationOnce(
       (_config, _projectId, cb) => {
         cb(null, {
@@ -441,7 +450,7 @@ describe('domain cards', () => {
     await waitFor(() => {
       expect(screen.getByText('No credentials')).toBeInTheDocument();
     });
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Create new credential' }),
     );
 
@@ -449,6 +458,7 @@ describe('domain cards', () => {
   });
 
   it('uses fallback SDK credential errors when responses omit details', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockGetAllProjectCredential.mockImplementationOnce(
       (_config, _projectId, cb) => {
         cb(null, {
@@ -490,7 +500,7 @@ describe('domain cards', () => {
     await waitFor(() => {
       expect(screen.getByText('No credentials')).toBeInTheDocument();
     });
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Create new credential' }),
     );
 

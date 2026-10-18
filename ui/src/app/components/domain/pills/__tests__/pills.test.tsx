@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { DocumentSourcePill } from '../document-source-pill';
 import { ProviderPill } from '../provider-model-pill';
@@ -103,7 +104,8 @@ describe('domain pills', () => {
     ).toHaveAttribute('data-type', 'blue');
   });
 
-  it('renders document sources and delegates tool sources', () => {
+  it('renders document sources and delegates tool sources', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onClick = jest.fn();
 
     render(
@@ -131,7 +133,7 @@ describe('domain pills', () => {
       'gray',
     );
 
-    fireEvent.click(screen.getByText('manual'));
+    await user.click(screen.getByText('manual'));
     expect(onClick).toHaveBeenCalled();
   });
 });

@@ -1,8 +1,9 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import { Select } from '../select';
+import userEvent from '@testing-library/user-event';
 
 jest.mock('@carbon/react', () => {
   const React = require('react');
@@ -60,7 +61,8 @@ describe('Select', () => {
     expect(screen.getByRole('option', { name: 'Allow' })).toHaveValue('allow');
   });
 
-  it('keeps the existing change handler contract', () => {
+  it('keeps the existing change handler contract', async () => {
+    const user = userEvent.setup();
     const selectedValues: string[] = [];
 
     render(
@@ -74,9 +76,10 @@ describe('Select', () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole('combobox', { name: 'Action' }), {
-      target: { value: 'allow' },
-    });
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Action' }),
+      String('allow'),
+    );
 
     expect(selectedValues).toEqual(['allow']);
   });

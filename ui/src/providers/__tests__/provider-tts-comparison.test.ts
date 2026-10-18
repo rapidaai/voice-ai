@@ -99,7 +99,9 @@ describe('Speechmatics TTS — config vs original', () => {
       createMetadata('speak.voice.id', 'some-voice'),
       createMetadata('speak.language', 'en'),
     ];
-    expect(validateFromConfig(config, 'tts', 'speechmatics', opts)).toBeUndefined();
+    expect(
+      validateFromConfig(config, 'tts', 'speechmatics', opts),
+    ).toBeUndefined();
   });
 
   it('validates: voice.id accepts any value (strict:false)', () => {
@@ -108,7 +110,9 @@ describe('Speechmatics TTS — config vs original', () => {
       createMetadata('speak.voice.id', 'custom-voice-xyz'),
       createMetadata('speak.language', 'en'),
     ];
-    expect(validateFromConfig(config, 'tts', 'speechmatics', opts)).toBeUndefined();
+    expect(
+      validateFromConfig(config, 'tts', 'speechmatics', opts),
+    ).toBeUndefined();
   });
 
   it('validates: invalid language returns error', () => {
@@ -359,11 +363,16 @@ describe('Smallest TTS — config resolution', () => {
       config.tts!,
       [createMetadata('speak.model', 'lightning_v3.1')],
     );
-    const proParams = resolveCategoryParameters('smallest', 'tts', config.tts!, [
-      createMetadata('speak.model', 'lightning_v3.1_pro'),
-    ]);
+    const proParams = resolveCategoryParameters(
+      'smallest',
+      'tts',
+      config.tts!,
+      [createMetadata('speak.model', 'lightning_v3.1_pro')],
+    );
 
-    const standardVoiceParam = standardParams.find(p => p.key === 'speak.voice.id');
+    const standardVoiceParam = standardParams.find(
+      p => p.key === 'speak.voice.id',
+    );
     const proVoiceParam = proParams.find(p => p.key === 'speak.voice.id');
     expect(standardVoiceParam?.data).toBe(
       'text-to-speech-voices-lightning-v3-1.json',

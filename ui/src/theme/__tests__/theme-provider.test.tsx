@@ -1,5 +1,6 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ThemeProvider, useTheme } from '@/theme/theme-provider';
 import { THEME_STORAGE_KEY } from '@/theme/theme-config';
 import { ThemeManifest } from '@/theme/types';
@@ -44,7 +45,8 @@ describe('ThemeProvider', () => {
       .forEach(icon => icon.remove());
   });
 
-  it('applies brand tokens and toggles the resolved color mode', () => {
+  it('applies brand tokens and toggles the resolved color mode', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <ThemeProvider theme={configuredTheme}>
         <ThemeConsumer />
@@ -72,7 +74,7 @@ describe('ThemeProvider', () => {
       configuredTheme.colors.light.primary,
     );
 
-    fireEvent.click(screen.getByRole('button'));
+    await user.click(screen.getByRole('button'));
 
     expect(screen.getByRole('button')).toHaveTextContent('Rapida AI:dark');
     expect(document.documentElement).toHaveAttribute('data-color-mode', 'dark');
@@ -82,7 +84,8 @@ describe('ThemeProvider', () => {
     ).toBe(configuredTheme.colors.dark.primary);
   });
 
-  it('does not change a locked whitelabel theme', () => {
+  it('does not change a locked whitelabel theme', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     localStorage.setItem(THEME_STORAGE_KEY, 'light');
     const lockedTheme: ThemeManifest = {
       ...configuredTheme,
@@ -96,7 +99,7 @@ describe('ThemeProvider', () => {
       </ThemeProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button'));
+    await user.click(screen.getByRole('button'));
 
     expect(screen.getByRole('button')).toHaveTextContent('Rapida AI:dark');
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
@@ -112,13 +115,16 @@ describe('ThemeProvider', () => {
     const storageEvent = new Event('storage');
     Object.defineProperty(storageEvent, 'key', { value: THEME_STORAGE_KEY });
     Object.defineProperty(storageEvent, 'newValue', { value: 'dark' });
-    fireEvent(window, storageEvent);
+    act(() => {
+      window.dispatchEvent(storageEvent);
+    });
 
     expect(screen.getByRole('button')).toHaveTextContent('Rapida AI:dark');
     expect(document.documentElement).toHaveAttribute('data-color-mode', 'dark');
   });
 
-  it('renders and changes mode when browser storage is unavailable', () => {
+  it('renders and changes mode when browser storage is unavailable', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new DOMException('Denied', 'SecurityError');
     });
@@ -132,19 +138,20 @@ describe('ThemeProvider', () => {
       </ThemeProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button'));
+    await user.click(screen.getByRole('button'));
 
     expect(screen.getByRole('button')).toHaveTextContent('Rapida AI:dark');
   });
 
-  it('keeps a selected mode when a selectable theme object refreshes', () => {
+  it('keeps a selected mode when a selectable theme object refreshes', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const { rerender } = render(
       <ThemeProvider theme={configuredTheme}>
         <ThemeConsumer />
       </ThemeProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button'));
+    await user.click(screen.getByRole('button'));
     rerender(
       <ThemeProvider theme={{ ...configuredTheme, id: 'refreshed' }}>
         <ThemeConsumer />

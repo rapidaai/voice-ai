@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { Dropdown } from '../listbox-dropdown';
@@ -67,7 +68,8 @@ describe('Dropdown', () => {
     ).toHaveAttribute('data-design-system-dropdown');
   });
 
-  it('calls setValue from dropdown changes and marks the selected option', () => {
+  it('calls setValue from dropdown changes and marks the selected option', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setValue = jest.fn();
 
     render(
@@ -90,7 +92,7 @@ describe('Dropdown', () => {
       screen.getByRole('button', { name: 'one selected' }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'two' }));
+    await user.click(screen.getByRole('button', { name: 'two' }));
 
     expect(setValue).toHaveBeenCalledWith('two');
   });

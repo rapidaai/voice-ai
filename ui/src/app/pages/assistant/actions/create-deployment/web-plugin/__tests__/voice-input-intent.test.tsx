@@ -1,11 +1,6 @@
 import React from 'react';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ConfigureAssistantWebDeploymentPage } from '@/app/pages/assistant/actions/create-deployment/web-plugin';
 import {
@@ -331,17 +326,18 @@ describe('Web plugin deployment voice input intent actions', () => {
   });
 
   it('Continue keeps existing voice input enabled', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureAssistantWebDeploymentPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() =>
       expect(
         screen.getByText(/receive user input via audio and text/i),
       ).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy Web Widget' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Deploy Web Widget' }));
 
     await waitFor(() =>
       expect(CreateAssistantWebpluginDeployment).toHaveBeenCalledTimes(1),
@@ -355,22 +351,23 @@ describe('Web plugin deployment voice input intent actions', () => {
   });
 
   it('unchecking voice input removes input audio on save', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureAssistantWebDeploymentPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() =>
       expect(
         screen.getByText(/receive user input via audio and text/i),
       ).toBeInTheDocument(),
     );
-    fireEvent.click(
+    await user.click(
       screen.getByLabelText(/Enable Voice Input \(Speech-to-Text\)/i),
     );
     expect(
       screen.getByText(/receive user input via text only/i),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy Web Widget' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Deploy Web Widget' }));
 
     await waitFor(() =>
       expect(CreateAssistantWebpluginDeployment).toHaveBeenCalledTimes(1),
@@ -384,19 +381,20 @@ describe('Web plugin deployment voice input intent actions', () => {
   });
 
   it('unchecking voice output removes output audio on save', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureAssistantWebDeploymentPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() =>
       expect(
         screen.getByText(/delivered via audio and text/i),
       ).toBeInTheDocument(),
     );
-    fireEvent.click(
+    await user.click(
       screen.getByLabelText(/Enable Voice Output \(Text-to-Speech\)/i),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy Web Widget' }));
+    await user.click(screen.getByRole('button', { name: 'Deploy Web Widget' }));
 
     await waitFor(() =>
       expect(CreateAssistantWebpluginDeployment).toHaveBeenCalledTimes(1),
@@ -410,15 +408,16 @@ describe('Web plugin deployment voice input intent actions', () => {
   });
 
   it('create mode deploys without existing deployment data', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAssistantWebpluginDeployment as jest.Mock).mockResolvedValue({
       getData: () => null,
     });
 
     render(<ConfigureAssistantWebDeploymentPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy Web Widget' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Deploy Web Widget' }));
 
     await waitFor(() =>
       expect(CreateAssistantWebpluginDeployment).toHaveBeenCalledTimes(1),

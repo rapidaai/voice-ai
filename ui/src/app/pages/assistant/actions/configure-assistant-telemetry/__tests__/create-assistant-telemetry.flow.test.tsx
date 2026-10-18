@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { CreateAssistantTelemetry } from '@/app/pages/assistant/actions/configure-assistant-telemetry/create-assistant-telemetry';
 import { CreateAssistantConfiguration, Metadata } from '@rapidaai/react';
@@ -162,13 +163,14 @@ describe('Create assistant telemetry flow', () => {
     });
   });
 
-  it('shows validation error when telemetry config is invalid', () => {
+  it('shows validation error when telemetry config is invalid', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (ValidateTelemetry as jest.Mock).mockReturnValue(
       'Please provide a valid telemetry endpoint.',
     );
     render(<CreateAssistantTelemetry assistantId="assistant-1" />);
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Configure telemetry' }),
     );
 
@@ -178,7 +180,8 @@ describe('Create assistant telemetry flow', () => {
     expect(CreateAssistantConfiguration).not.toHaveBeenCalled();
   });
 
-  it('switching provider rehydrates defaults from credential-only parameters', () => {
+  it('switching provider rehydrates defaults from credential-only parameters', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetDefaultTelemetryIfInvalid as jest.Mock)
       .mockReturnValueOnce([
         meta('rapida.credential_id', 'cred-1'),
@@ -187,7 +190,7 @@ describe('Create assistant telemetry flow', () => {
       .mockImplementation((_provider: string, params: Metadata[]) => params);
 
     render(<CreateAssistantTelemetry assistantId="assistant-1" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Switch provider' }));
+    await user.click(screen.getByRole('button', { name: 'Switch provider' }));
 
     expect(GetDefaultTelemetryIfInvalid).toHaveBeenNthCalledWith(
       2,
@@ -202,9 +205,10 @@ describe('Create assistant telemetry flow', () => {
   });
 
   it('creates telemetry provider successfully and navigates back to telemetry listing', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateAssistantTelemetry assistantId="assistant-1" />);
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Configure telemetry' }),
     );
 

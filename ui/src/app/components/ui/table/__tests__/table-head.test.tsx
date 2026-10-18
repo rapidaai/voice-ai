@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { TableHead, TableHederWithCheckbox } from '../table-head';
@@ -38,7 +39,8 @@ describe('TableHead', () => {
     expect(screen.getByText('Menu')).toBeInTheDocument();
   });
 
-  it('uses the design-system checkbox for selectable headers', () => {
+  it('uses the design-system checkbox for selectable headers', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const ontoggle = jest.fn();
 
     render(
@@ -53,7 +55,7 @@ describe('TableHead', () => {
     const checkbox = screen.getByRole('checkbox', { name: 'Select all rows' });
     expect(checkbox).toHaveAttribute('data-design-system-checkbox');
 
-    fireEvent.click(checkbox);
+    await user.click(checkbox);
 
     expect(ontoggle).toHaveBeenCalledWith(true);
   });

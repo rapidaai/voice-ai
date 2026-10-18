@@ -4319,7 +4319,7 @@ export function AgentflowVersionBuilder({
                   ? 'Collapse components'
                   : 'Expand components'
               }
-              className="flex h-10 w-full cursor-pointer items-center px-4 text-gray-400 transition-colors duration-100 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-400"
+              className="flex h-10 w-full cursor-pointer items-center px-4 text-[var(--cds-text-secondary)] transition-colors duration-100 hover:bg-gray-100 hover:text-[var(--cds-text-primary)] dark:hover:bg-gray-800"
             >
               <span className="shrink-0">
                 {componentListLocked ? (
@@ -4396,6 +4396,7 @@ export function AgentflowVersionBuilder({
             zoomOnPinch
             nodesDraggable={!canvasLocked}
             nodesConnectable
+            nodesFocusable={false}
             edgesUpdatable
             edgeUpdaterRadius={16}
             elementsSelectable

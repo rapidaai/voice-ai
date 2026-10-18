@@ -1,5 +1,7 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { setRangeValue } from '@/test-utils/set-range-value';
 import { Metadata } from '@rapidaai/react';
 import { ConfigureAudioOutputProvider } from '../configure-audio-output';
 
@@ -129,7 +131,8 @@ describe('ConfigureAudioOutputProvider design integration', () => {
     jest.clearAllMocks();
   });
 
-  it('keeps only shared speaker advanced keys when switching TTS provider', () => {
+  it('keeps only shared speaker advanced keys when switching TTS provider', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const inputParameters = [
       createMetadata('rapida.credential_id', 'cred-1'),
       createMetadata('speaker.model', 'sonic-2'),
@@ -160,7 +163,7 @@ describe('ConfigureAudioOutputProvider design integration', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'change tts' }));
+    await user.click(screen.getByRole('button', { name: 'change tts' }));
 
     const keptParams = mockGetDefaultSpeakerConfig.mock
       .calls[0][0] as Metadata[];
@@ -183,7 +186,8 @@ describe('ConfigureAudioOutputProvider design integration', () => {
     });
   });
 
-  it('updates pronunciation, conjunction boundaries and pause from advanced settings', () => {
+  it('updates pronunciation, conjunction boundaries and pause from advanced settings', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setAudioOutputConfig = jest.fn();
     render(
       <ConfigureAudioOutputProvider
@@ -195,25 +199,26 @@ describe('ConfigureAudioOutputProvider design integration', () => {
       />,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: /show advanced settings/i }),
     );
 
-    fireEvent.change(screen.getByTestId('pronunciation-dictionaries'), {
-      target: { value: 'medical<|||>retail' },
-    });
-    fireEvent.change(screen.getByTestId('ambient-sound'), {
-      target: { value: 'cafe' },
-    });
-    fireEvent.change(screen.getByTestId('ambient-volume'), {
-      target: { value: '34' },
-    });
-    fireEvent.change(screen.getByTestId('conjunction-boundaries'), {
-      target: { value: 'and<|||>or' },
-    });
-    fireEvent.change(screen.getByTestId('conjunction-break'), {
-      target: { value: '280' },
-    });
+    await user.click(screen.getByTestId('pronunciation-dictionaries'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('medical<|||>retail'));
+    await user.selectOptions(
+      screen.getByTestId('ambient-sound'),
+      String('cafe'),
+    );
+    const ambientVolume = screen.getByTestId('ambient-volume');
+    await user.click(ambientVolume);
+    setRangeValue(ambientVolume as HTMLInputElement, 34);
+    await user.click(screen.getByTestId('conjunction-boundaries'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('and<|||>or'));
+    const conjunctionBreak = screen.getByTestId('conjunction-break');
+    await user.click(conjunctionBreak);
+    setRangeValue(conjunctionBreak as HTMLInputElement, 280);
 
     const allMaps = setAudioOutputConfig.mock.calls.map(call =>
       Object.fromEntries(

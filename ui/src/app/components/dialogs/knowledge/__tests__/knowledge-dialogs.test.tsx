@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { DeleteKnowledgeDocumentSegment } from '@rapidaai/react';
 import { CreateKnowledgeDocumentDialog } from '../create-knowledge-document-modal';
@@ -142,7 +143,8 @@ describe('knowledge dialogs', () => {
     mockRapidaStore.loading = false;
   });
 
-  it('creates a knowledge document and reloads after success', () => {
+  it('creates a knowledge document and reloads after success', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
     const onReload = jest.fn();
     mockCreateStore.onCreateKnowledgeDocument.mockImplementation(
@@ -163,7 +165,7 @@ describe('knowledge dialogs', () => {
     expect(mockCreateStore.clear).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('manual-file')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create Document' }));
+    await user.click(screen.getByRole('button', { name: 'Create Document' }));
 
     expect(mockRapidaStore.showLoader).toHaveBeenCalledWith('overlay');
     expect(mockCreateStore.onCreateKnowledgeDocument).toHaveBeenCalledWith(
@@ -179,7 +181,8 @@ describe('knowledge dialogs', () => {
     expect(onReload).toHaveBeenCalledTimes(1);
   });
 
-  it('shows create document errors without closing', () => {
+  it('shows create document errors without closing', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
     mockCreateStore.onCreateKnowledgeDocument.mockImplementation(
       (_knowledgeId, _projectId, _token, _userId, _onSuccess, onError) => {
@@ -196,13 +199,14 @@ describe('knowledge dialogs', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create Document' }));
+    await user.click(screen.getByRole('button', { name: 'Create Document' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('Error: Upload failed');
     expect(setModalOpen).not.toHaveBeenCalledWith(false);
   });
 
-  it('requires a delete reason before deleting a segment', () => {
+  it('requires a delete reason before deleting a segment', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <DeleteKnowledgeDocumentSegmentDialog
         segment={makeSegment() as any}
@@ -211,7 +215,7 @@ describe('knowledge dialogs', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Segment' }));
+    await user.click(screen.getByRole('button', { name: 'Delete Segment' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Error: Please provide a reason for deletion.',
@@ -219,7 +223,8 @@ describe('knowledge dialogs', () => {
     expect(mockDeleteKnowledgeDocumentSegment).not.toHaveBeenCalled();
   });
 
-  it('deletes a segment with credentials and closes after success', () => {
+  it('deletes a segment with credentials and closes after success', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onClose = jest.fn();
     const onDelete = jest.fn();
     mockDeleteKnowledgeDocumentSegment.mockImplementation(
@@ -234,10 +239,10 @@ describe('knowledge dialogs', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Reason'), {
-      target: { value: ' outdated ' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Segment' }));
+    await user.click(screen.getByLabelText('Reason'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String(' outdated '));
+    await user.click(screen.getByRole('button', { name: 'Delete Segment' }));
 
     expect(mockDeleteKnowledgeDocumentSegment).toHaveBeenCalledWith(
       { endpoint: 'test-endpoint' },
@@ -255,7 +260,8 @@ describe('knowledge dialogs', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('shows delete segment API errors', () => {
+  it('shows delete segment API errors', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockDeleteKnowledgeDocumentSegment.mockImplementation(
       (_config, _documentId, _index, _reason, callback) =>
         callback({ message: 'failed' }, null),
@@ -269,10 +275,10 @@ describe('knowledge dialogs', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Reason'), {
-      target: { value: 'outdated' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Segment' }));
+    await user.click(screen.getByLabelText('Reason'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('outdated'));
+    await user.click(screen.getByRole('button', { name: 'Delete Segment' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Error: Failed to delete the segment. Please try again.',

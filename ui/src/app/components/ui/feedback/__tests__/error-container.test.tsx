@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { ErrorContainer } from '../error-container';
@@ -35,7 +36,8 @@ describe('ErrorContainer', () => {
     expect(screen.getByTestId('action-icon')).toBeInTheDocument();
   });
 
-  it('runs the configured action', () => {
+  it('runs the configured action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onAction = jest.fn();
 
     render(
@@ -48,7 +50,7 @@ describe('ErrorContainer', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(onAction).toHaveBeenCalledTimes(1);
   });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Metadata } from '@rapidaai/react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { TextToSpeechProvider } from '../text-to-speech';
 import {
@@ -181,6 +182,7 @@ function findMeta(source: Metadata[], key: string): string | undefined {
 
 describe('custom-tts text-to-speech flow', () => {
   it('lets a user select custom-tts, pick a credential, fill required fields, and pass validation', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     let latestProvider = '';
     let latestParameters: Metadata[] = [];
 
@@ -208,9 +210,10 @@ describe('custom-tts text-to-speech flow', () => {
 
     render(<Harness />);
 
-    fireEvent.change(screen.getByLabelText('Select voice output provider'), {
-      target: { value: 'custom-tts' },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Select voice output provider'),
+      String('custom-tts'),
+    );
 
     expect(screen.queryByText('Model')).not.toBeInTheDocument();
     expect(screen.queryByText('Language')).not.toBeInTheDocument();
@@ -233,31 +236,34 @@ describe('custom-tts text-to-speech flow', () => {
     expect(screen.getByText('Request Rules')).toBeInTheDocument();
     expect(screen.getByText('Response Rules')).toBeInTheDocument();
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Pick custom-tts credential' }),
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Type { for DSL snippets'), {
-      target: {
-        value:
-          '{"language":{"$var":"language"},"message_id":{"$var":"message_id"},"sample_rate":{"$cast":"number","value":{"$var":"sample_rate"}}}',
-      },
-    });
+    await user.click(screen.getByPlaceholderText('Type { for DSL snippets'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(
+      String(
+        '{"language":{"$var":"language"},"message_id":{"$var":"message_id"},"sample_rate":{"$cast":"number","value":{"$var":"sample_rate"}}}',
+      ),
+    );
     const ruleEditors = screen.getAllByPlaceholderText(
       'Type [ for rule snippets',
     );
-    fireEvent.change(ruleEditors[0], {
-      target: {
-        value:
-          '[{"when":{"packet":"text"},"send":{"frame":"json","body":{"text":{"$path":"packet.text"},"voice_id":{"$path":"config.voice.id"},"message_id":{"$path":"packet.message_id"},"model":{"$path":"config.model"},"language":{"$path":"config.language"},"audio":{"encoding":{"$path":"config.audio.encoding"},"sample_rate":{"$cast":"number","value":{"$path":"config.audio.sample_rate"}}}}}}]',
-      },
-    });
-    fireEvent.change(ruleEditors[1], {
-      target: {
-        value:
-          '[{"when":{"frame":"binary"},"emit":{"audio":{"$frame":"binary"}}},{"when":{"frame":"json","path":"type","equals":"done"},"emit":{"message_id":{"$path":"message_id"},"done":true}}]',
-      },
-    });
+    await user.click(ruleEditors[0]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(
+      String(
+        '[{"when":{"packet":"text"},"send":{"frame":"json","body":{"text":{"$path":"packet.text"},"voice_id":{"$path":"config.voice.id"},"message_id":{"$path":"packet.message_id"},"model":{"$path":"config.model"},"language":{"$path":"config.language"},"audio":{"encoding":{"$path":"config.audio.encoding"},"sample_rate":{"$cast":"number","value":{"$path":"config.audio.sample_rate"}}}}}}]',
+      ),
+    );
+    await user.click(ruleEditors[1]);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(
+      String(
+        '[{"when":{"frame":"binary"},"emit":{"audio":{"$frame":"binary"}}},{"when":{"frame":"json","path":"type","equals":"done"},"emit":{"message_id":{"$path":"message_id"},"done":true}}]',
+      ),
+    );
 
     await waitFor(() => {
       expect(latestProvider).toBe('custom-tts');

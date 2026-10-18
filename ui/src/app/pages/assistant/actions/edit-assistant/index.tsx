@@ -246,6 +246,7 @@ export const EditAssistant: FC<{ assistantId: string }> = ({ assistantId }) => {
             <div>
               <PrimaryButton
                 size="md"
+                className="assistant-settings-save"
                 isLoading={loading}
                 onClick={onUpdateAssistantDetail}
               >
@@ -260,17 +261,20 @@ export const EditAssistant: FC<{ assistantId: string }> = ({ assistantId }) => {
 
         {/* ── Danger Zone ── */}
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-red-600 mb-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--cds-support-error)] mb-4">
             Danger Zone
           </h2>
           <div>
             <div className="flex items-start justify-between gap-6">
               <div className="flex flex-col gap-1">
                 <p className="text-sm font-semibold flex items-center gap-2">
-                  <WarningAlt size={16} className="text-red-600" />
+                  <WarningAlt
+                    size={16}
+                    className="text-[var(--cds-support-error)]"
+                  />
                   Delete this assistant
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                <p className="text-xs leading-relaxed text-[var(--cds-text-secondary)]">
                   Once deleted, all active connections will be terminated
                   immediately and data will be permanently removed. This action
                   cannot be undone.

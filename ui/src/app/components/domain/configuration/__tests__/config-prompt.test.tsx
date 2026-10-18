@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { MAX_PROMPT_MESSAGE_LENGTH } from '@/configs';
 import { ConfigPrompt } from '../config-prompt';
@@ -154,7 +155,8 @@ describe('ConfigPrompt', () => {
     variables: [{ name: 'assistant.name', type: 'text', defaultvalue: '' }],
   };
 
-  it('shows runtime argument hint text when hints are provided', () => {
+  it('shows runtime argument hint text when hints are provided', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <ConfigPrompt
         existingPrompt={basePrompt}
@@ -182,7 +184,7 @@ describe('ConfigPrompt', () => {
       ),
     ).toBeInTheDocument();
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: /Reserved Variables/i }),
     );
 
@@ -243,7 +245,8 @@ describe('ConfigPrompt', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps reserved variables in arguments list with runtime hint enabled', () => {
+  it('keeps reserved variables in arguments list with runtime hint enabled', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
     render(
       <ConfigPrompt
@@ -256,7 +259,7 @@ describe('ConfigPrompt', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'trigger-change' }));
+    await user.click(screen.getByRole('button', { name: 'trigger-change' }));
 
     const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0];
     expect(lastCall.variables).toEqual([
@@ -284,7 +287,8 @@ describe('ConfigPrompt', () => {
     expect(screen.getAllByText('Reserved').length).toBe(1);
   });
 
-  it('removes reserved variables from arguments once removed from prompt content', () => {
+  it('removes reserved variables from arguments once removed from prompt content', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
     render(
       <ConfigPrompt
@@ -297,8 +301,8 @@ describe('ConfigPrompt', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'trigger-change' }));
-    fireEvent.click(
+    await user.click(screen.getByRole('button', { name: 'trigger-change' }));
+    await user.click(
       screen.getByRole('button', { name: 'trigger-change-custom-only' }),
     );
 
@@ -308,7 +312,8 @@ describe('ConfigPrompt', () => {
     ]);
   });
 
-  it('keeps all extracted variables when runtime hints are disabled', () => {
+  it('keeps all extracted variables when runtime hints are disabled', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
     render(
       <ConfigPrompt
@@ -320,7 +325,7 @@ describe('ConfigPrompt', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'trigger-change' }));
+    await user.click(screen.getByRole('button', { name: 'trigger-change' }));
 
     const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0];
     expect(lastCall.variables).toEqual([
@@ -330,7 +335,8 @@ describe('ConfigPrompt', () => {
     ]);
   });
 
-  it('preserves existing variable configuration when prompt content still references it', () => {
+  it('preserves existing variable configuration when prompt content still references it', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
     render(
       <ConfigPrompt
@@ -348,7 +354,7 @@ describe('ConfigPrompt', () => {
       />,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'trigger-change-custom-only' }),
     );
 
@@ -362,7 +368,8 @@ describe('ConfigPrompt', () => {
     ]);
   });
 
-  it('updates one prompt message without changing the other messages', () => {
+  it('updates one prompt message without changing the other messages', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
     render(
       <ConfigPrompt
@@ -377,7 +384,7 @@ describe('ConfigPrompt', () => {
       />,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getAllByRole('button', { name: 'trigger-change' })[0],
     );
 
@@ -391,7 +398,8 @@ describe('ConfigPrompt', () => {
     ]);
   });
 
-  it('adds a new message with the next alternating role', () => {
+  it('adds a new message with the next alternating role', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -404,7 +412,7 @@ describe('ConfigPrompt', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add new message' }));
+    await user.click(screen.getByRole('button', { name: 'Add new message' }));
 
     expect(onChange).toHaveBeenCalledWith({
       prompt: [
@@ -415,7 +423,8 @@ describe('ConfigPrompt', () => {
     });
   });
 
-  it('adds a user message after an assistant message', () => {
+  it('adds a user message after an assistant message', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -428,7 +437,7 @@ describe('ConfigPrompt', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add new message' }));
+    await user.click(screen.getByRole('button', { name: 'Add new message' }));
 
     expect(onChange).toHaveBeenCalledWith({
       prompt: [
@@ -461,7 +470,8 @@ describe('ConfigPrompt', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('updates message role and deletes prompt messages', () => {
+  it('updates message role and deletes prompt messages', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -488,7 +498,7 @@ describe('ConfigPrompt', () => {
       'true',
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getAllByRole('button', { name: 'trigger-type-change' })[0],
     );
     expect(onChange).toHaveBeenLastCalledWith({
@@ -499,7 +509,7 @@ describe('ConfigPrompt', () => {
       variables: [],
     });
 
-    fireEvent.click(
+    await user.click(
       screen.getAllByRole('button', { name: 'trigger-delete' })[0],
     );
     expect(onChange).toHaveBeenLastCalledWith({
@@ -508,7 +518,8 @@ describe('ConfigPrompt', () => {
     });
   });
 
-  it('edits argument type and default value inline from its table row action', () => {
+  it('edits argument type and default value inline from its table row action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -538,7 +549,7 @@ describe('ConfigPrompt', () => {
     });
     expect(editButton.closest('td')).toHaveClass('!text-center');
 
-    fireEvent.click(editButton);
+    await user.click(editButton);
 
     const variableInput = screen.getByLabelText('Variable customer_name');
     expect(variableInput).toHaveValue('customer_name');
@@ -549,13 +560,13 @@ describe('ConfigPrompt', () => {
     expect(typeSelect).toHaveAttribute('id', 'argument-type-customer_name');
     expect(typeSelect.closest('td')).toHaveClass('!p-0');
 
-    fireEvent.change(typeSelect, {
-      target: { value: 'number' },
-    });
+    await user.selectOptions(typeSelect, String('number'));
 
     const defaultInput = screen.getByPlaceholderText('Optional default value');
     expect(defaultInput.closest('td')).toHaveClass('!p-0');
-    fireEvent.change(defaultInput, { target: { value: '42' } });
+    await user.click(defaultInput);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('42'));
     expect(onChange).not.toHaveBeenCalled();
 
     const saveButton = screen.getByRole('button', {
@@ -563,7 +574,7 @@ describe('ConfigPrompt', () => {
     });
     expect(saveButton.parentElement).toHaveClass('justify-center');
 
-    fireEvent.click(saveButton);
+    await user.click(saveButton);
 
     expect(onChange).toHaveBeenLastCalledWith({
       prompt: [{ role: 'system', content: 'Hello {{customer_name}}' }],
@@ -574,7 +585,8 @@ describe('ConfigPrompt', () => {
     });
   });
 
-  it('cancels inline argument edits without changing the prompt', () => {
+  it('cancels inline argument edits without changing the prompt', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -589,11 +601,13 @@ describe('ConfigPrompt', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit customer_name' }));
-    fireEvent.change(screen.getByPlaceholderText('Optional default value'), {
-      target: { value: 'Changed' },
-    });
-    fireEvent.click(
+    await user.click(
+      screen.getByRole('button', { name: 'Edit customer_name' }),
+    );
+    await user.click(screen.getByPlaceholderText('Optional default value'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Changed'));
+    await user.click(
       screen.getByRole('button', { name: 'Cancel customer_name' }),
     );
 

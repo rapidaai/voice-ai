@@ -1,6 +1,7 @@
 import React from 'react';
 import { Metadata } from '@rapidaai/react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { SpeechToTextProvider } from '../speech-to-text';
 import {
@@ -169,6 +170,7 @@ function findMeta(source: Metadata[], key: string): string | undefined {
 
 describe('custom-stt speech-to-text flow', () => {
   it('lets a user select custom-stt, pick a credential, fill required fields, and pass validation', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     let latestProvider = '';
     let latestParameters: Metadata[] = [];
 
@@ -196,9 +198,10 @@ describe('custom-stt speech-to-text flow', () => {
 
     render(<Harness />);
 
-    fireEvent.change(screen.getByLabelText('Select voice input provider'), {
-      target: { value: 'custom-stt' },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Select voice input provider'),
+      String('custom-stt'),
+    );
 
     expect(screen.queryByText('Model')).not.toBeInTheDocument();
     expect(screen.queryByText('Language')).not.toBeInTheDocument();
@@ -220,18 +223,18 @@ describe('custom-stt speech-to-text flow', () => {
     expect(screen.getByText('Request Rules')).toBeInTheDocument();
     expect(screen.getByText('Response Rules')).toBeInTheDocument();
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Pick custom-stt credential' }),
     );
 
-    fireEvent.change(
+    await user.click(
       screen.getAllByPlaceholderText('Type [ for rule snippets')[1],
-      {
-        target: {
-          value:
-            '[{"when":{"frame":"json","path":"type","equals":"partial"},"emit":{"script":{"$path":"text"},"interim":true}},{"when":{"frame":"json","path":"type","equals":"final"},"emit":{"script":{"$path":"text"},"confidence":{"$cast":"number","value":{"$path":"confidence"}},"language":{"$path":"language"},"interim":false}}]',
-        },
-      },
+    );
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(
+      String(
+        '[{"when":{"frame":"json","path":"type","equals":"partial"},"emit":{"script":{"$path":"text"},"interim":true}},{"when":{"frame":"json","path":"type","equals":"final"},"emit":{"script":{"$path":"text"},"confidence":{"$cast":"number","value":{"$path":"confidence"}},"language":{"$path":"language"},"interim":false}}]',
+      ),
     );
 
     await waitFor(() => {

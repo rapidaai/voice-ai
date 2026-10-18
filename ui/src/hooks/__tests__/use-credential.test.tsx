@@ -67,7 +67,10 @@ describe('use-credential hooks', () => {
   it('resolves resource role in owner/project/org/anyone order', () => {
     const wrapper = makeWrapper({
       currentUser: { id: 'owner-user' } as any,
-      projectRoles: [{ projectid: 'project-1' }, { projectid: 'project-2' }] as any,
+      projectRoles: [
+        { projectid: 'project-1' },
+        { projectid: 'project-2' },
+      ] as any,
       organizationRole: { organizationid: 'org-1' } as any,
     });
 
@@ -92,17 +95,21 @@ describe('use-credential hooks', () => {
       getOrganizationid: () => 'other-org',
     };
 
-    expect(renderHook(() => useResourceRole(ownerResource), { wrapper }).result.current).toBe(
-      ResourceRole.owner,
-    );
     expect(
-      renderHook(() => useResourceRole(projectResource), { wrapper }).result.current,
+      renderHook(() => useResourceRole(ownerResource), { wrapper }).result
+        .current,
+    ).toBe(ResourceRole.owner);
+    expect(
+      renderHook(() => useResourceRole(projectResource), { wrapper }).result
+        .current,
     ).toBe(ResourceRole.projectMember);
-    expect(renderHook(() => useResourceRole(orgResource), { wrapper }).result.current).toBe(
-      ResourceRole.organizationMember,
-    );
     expect(
-      renderHook(() => useResourceRole(unrelatedResource), { wrapper }).result.current,
+      renderHook(() => useResourceRole(orgResource), { wrapper }).result
+        .current,
+    ).toBe(ResourceRole.organizationMember);
+    expect(
+      renderHook(() => useResourceRole(unrelatedResource), { wrapper }).result
+        .current,
     ).toBe(ResourceRole.anyone);
   });
 

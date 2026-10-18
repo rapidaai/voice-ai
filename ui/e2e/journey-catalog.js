@@ -63,12 +63,22 @@ const journeySubjourneys = [
   covered(
     'deployment.assistant.empty',
     'deployment.assistant',
-    'journeys/deployment/assistant-listing.spec.js',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
   ),
   covered(
     'deployment.assistant.initialError',
     'deployment.assistant',
-    'journeys/deployment/assistant-listing.spec.js',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.loading',
+    'deployment.assistant',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.populated',
+    'deployment.assistant',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
   ),
   covered(
     'deployment.assistant.createChooser',
@@ -131,50 +141,75 @@ const journeySubjourneys = [
     'journeys/organization/listings.spec.js',
   ),
 
-  deferred(
+  covered(
     'deployment.assistant.overview',
-    'deployment.assistant',
-    'Assistant entity, dashboard, and version fixtures are required.',
+    'deployment.assistantOverview',
+    'journeys/deployment/assistant-detail.spec.js',
   ),
-  deferred(
+  covered(
+    'deployment.assistant.overviewLoading',
+    'deployment.assistantOverview',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.overviewError',
+    'deployment.assistantOverview',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
     'deployment.assistant.sessions',
-    'deployment.assistant',
-    'Assistant conversation list fixtures are required.',
+    'deployment.assistantSessions',
+    'journeys/deployment/assistant-detail.spec.js',
   ),
-  deferred(
+  covered(
+    'deployment.assistant.sessionsLoading',
+    'deployment.assistantSessions',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.sessionsEmpty',
+    'deployment.assistantSessions',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.sessionsError',
+    'deployment.assistantSessions',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
     'deployment.assistant.sessionDetail',
-    'deployment.assistant',
-    'Conversation and message fixtures are required.',
+    'deployment.assistantSessionDetail',
+    'journeys/deployment/assistant-detail.spec.js',
   ),
-  deferred(
+  covered(
     'deployment.assistant.versionHistory',
-    'deployment.assistant',
-    'Assistant version fixtures are required.',
+    'deployment.assistantVersions',
+    'journeys/deployment/assistant-detail.spec.js',
   ),
-  deferred(
+  covered(
     'deployment.assistant.createPromptVersion',
-    'deployment.assistant',
-    'Assistant provider and credential fixtures are required.',
+    'deployment.assistantCreateVersion',
+    'journey-viewport-screenshots.spec.js',
   ),
   deferred(
     'deployment.assistant.createWebsocketVersion',
     'deployment.assistant',
     'WebSocket assistant fixtures are required.',
   ),
-  deferred(
+  covered(
     'deployment.assistant.createAgentkitVersion',
-    'deployment.assistant',
-    'AgentKit assistant fixtures are required.',
+    'deployment.assistantCreateAgentkitVersion',
+    'journey-viewport-screenshots.spec.js',
   ),
-  deferred(
+  covered(
     'deployment.assistant.createAgentflowVersion',
-    'deployment.assistant',
-    'Agentflow assistant fixtures are required.',
+    'deployment.assistantCreateAgentflowVersion',
+    'journey-viewport-screenshots.spec.js',
   ),
-  deferred(
+  covered(
     'deployment.assistant.generalSettings',
-    'deployment.assistant',
-    'Assistant entity fixtures are required.',
+    'deployment.assistantSettings',
+    'journeys/deployment/assistant-detail.spec.js',
   ),
   deferred(
     'deployment.assistant.agentflowEditor',
@@ -182,22 +217,30 @@ const journeySubjourneys = [
     'Agentflow graph fixtures are required.',
   ),
   ...[
-    'analysis.list',
+    'analysis',
+    'tools',
+    'webhooks',
+    'authentication',
+    'telemetry',
+    'storage',
+  ].map(name =>
+    covered(
+      `deployment.assistant.${name}.list`,
+      `deployment.assistant${name.charAt(0).toUpperCase() + name.slice(1)}`,
+      'journey-viewport-screenshots.spec.js',
+    ),
+  ),
+  ...[
     'analysis.create',
     'analysis.edit',
-    'tools.list',
     'tools.create',
     'tools.edit',
-    'webhooks.list',
     'webhooks.create',
     'webhooks.edit',
-    'authentication.list',
     'authentication.create',
     'authentication.edit',
-    'telemetry.list',
     'telemetry.create',
     'telemetry.edit',
-    'storage.list',
     'storage.create',
     'storage.edit',
   ].map(name =>
@@ -207,8 +250,12 @@ const journeySubjourneys = [
       'Assistant configuration entity fixtures are required.',
     ),
   ),
+  covered(
+    'deployment.assistant.deployments.list',
+    'deployment.assistantDeployments',
+    'journey-viewport-screenshots.spec.js',
+  ),
   ...[
-    'deployments.list',
     'deployments.web.create',
     'deployments.web.edit',
     'deployments.call.create',
@@ -234,10 +281,10 @@ const journeySubjourneys = [
     'deployment.endpointOverview',
     'The endpoint layout has no persistent not-found state after load failure.',
   ),
-  deferred(
+  covered(
     'deployment.assistant.notFound',
-    'deployment.assistant',
-    'The assistant layout does not set its persistent error state for transport failures.',
+    'deployment.assistantOverview',
+    'journeys/deployment/assistant-state-screenshots.spec.js',
   ),
   ...['atlassian', 'github', 'hubspot', 'gmail', 'slack'].map(provider =>
     deferred(

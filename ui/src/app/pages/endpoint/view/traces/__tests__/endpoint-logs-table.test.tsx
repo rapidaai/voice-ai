@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import toast from 'react-hot-toast/headless';
 
@@ -229,6 +230,7 @@ describe('Endpoint logs table', () => {
   });
 
   it('uses flat row actions to open endpoint log detail', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <EndpointTraces
         currentEndpoint={
@@ -240,7 +242,7 @@ describe('Endpoint logs table', () => {
     );
 
     await waitFor(() => expect(mockGetLogs).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('button', { name: 'View detail' }));
+    await user.click(screen.getByRole('button', { name: 'View detail' }));
 
     expect(mockGetLog).toHaveBeenCalledWith(
       'endpoint-1',
@@ -255,6 +257,7 @@ describe('Endpoint logs table', () => {
   });
 
   it('keeps the detail modal closed when endpoint log detail fails', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockGetLog.mockImplementationOnce(
       (_endpointId, _logId, _projectId, _token, _userId, onError) => {
         onError('Unable to get endpoint log');
@@ -272,7 +275,7 @@ describe('Endpoint logs table', () => {
     );
 
     await waitFor(() => expect(mockGetLogs).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('button', { name: 'View detail' }));
+    await user.click(screen.getByRole('button', { name: 'View detail' }));
 
     expect(toast.error).toHaveBeenCalledWith('Unable to get endpoint log');
     expect(screen.queryByText('endpoint-log-modal')).not.toBeInTheDocument();

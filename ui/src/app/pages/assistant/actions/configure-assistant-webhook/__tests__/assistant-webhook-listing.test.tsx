@@ -1,11 +1,6 @@
 import React from 'react';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ConfigureAssistantWebhookPage } from '@/app/pages/assistant/actions/configure-assistant-webhook';
 import { useAssistantWebhookPageStore } from '@/stores/assistant/actions';
@@ -186,12 +181,13 @@ describe('ConfigureAssistantWebhookPage listing', () => {
   });
 
   it('refetches when page changes from pagination', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureAssistantWebhookPage />);
 
     await waitFor(() =>
       expect(mockGetAssistantWebhook).toHaveBeenCalledTimes(1),
     );
-    fireEvent.click(screen.getByTestId('change-page'));
+    await user.click(screen.getByTestId('change-page'));
 
     await waitFor(() =>
       expect(mockGetAssistantWebhook).toHaveBeenCalledTimes(2),
@@ -200,13 +196,14 @@ describe('ConfigureAssistantWebhookPage listing', () => {
   });
 
   it('resets to first page and refetches when page size changes', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     useAssistantWebhookPageStore.setState({ page: 4 });
     render(<ConfigureAssistantWebhookPage />);
 
     await waitFor(() =>
       expect(mockGetAssistantWebhook).toHaveBeenCalledTimes(1),
     );
-    fireEvent.click(screen.getByTestId('change-page-size'));
+    await user.click(screen.getByTestId('change-page-size'));
 
     await waitFor(() =>
       expect(mockGetAssistantWebhook).toHaveBeenCalledTimes(2),
@@ -216,17 +213,18 @@ describe('ConfigureAssistantWebhookPage listing', () => {
   });
 
   it('opens confirmation before deleting webhook', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureAssistantWebhookPage />);
 
     await waitFor(() =>
       expect(mockGetAssistantWebhook).toHaveBeenCalledTimes(1),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(screen.getByRole('dialog')).toHaveTextContent('Delete webhook?');
     expect(mockDeleteAssistantWebhook).not.toHaveBeenCalled();
 
-    fireEvent.click(
+    await user.click(
       within(screen.getByRole('dialog')).getByRole('button', {
         name: 'Delete',
       }),

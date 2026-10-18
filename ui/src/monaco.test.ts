@@ -18,33 +18,28 @@ jest.mock(
   'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController',
   () => mockLanguageLoads.push('suggest-controller'),
 );
-jest.mock(
-  'monaco-editor/esm/vs/basic-languages/html/html.contribution',
-  () => mockLanguageLoads.push('html'),
+jest.mock('monaco-editor/esm/vs/basic-languages/html/html.contribution', () =>
+  mockLanguageLoads.push('html'),
 );
 jest.mock(
   'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution',
   () => mockLanguageLoads.push('javascript'),
 );
-jest.mock(
-  'monaco-editor/esm/vs/basic-languages/twig/twig.contribution',
-  () => mockLanguageLoads.push('twig'),
+jest.mock('monaco-editor/esm/vs/basic-languages/twig/twig.contribution', () =>
+  mockLanguageLoads.push('twig'),
 );
 jest.mock(
   'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution',
   () => mockLanguageLoads.push('typescript'),
 );
-jest.mock(
-  'monaco-editor/esm/vs/language/html/monaco.contribution',
-  () => mockLanguageLoads.push('html-service'),
+jest.mock('monaco-editor/esm/vs/language/html/monaco.contribution', () =>
+  mockLanguageLoads.push('html-service'),
 );
-jest.mock(
-  'monaco-editor/esm/vs/language/json/monaco.contribution',
-  () => mockLanguageLoads.push('json-service'),
+jest.mock('monaco-editor/esm/vs/language/json/monaco.contribution', () =>
+  mockLanguageLoads.push('json-service'),
 );
-jest.mock(
-  'monaco-editor/esm/vs/language/typescript/monaco.contribution',
-  () => mockLanguageLoads.push('typescript-service'),
+jest.mock('monaco-editor/esm/vs/language/typescript/monaco.contribution', () =>
+  mockLanguageLoads.push('typescript-service'),
 );
 jest.mock('./monaco-workers', () => ({
   CssWorker: mockCssWorkerClass,

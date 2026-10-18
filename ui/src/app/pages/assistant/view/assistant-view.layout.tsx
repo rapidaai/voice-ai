@@ -22,7 +22,9 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
     state => state.onChangeCurrentAssistant,
   );
   const { assistantId } = useParams();
-  const [navExpanded, setNavExpanded] = useState(true);
+  const [navExpanded, setNavExpanded] = useState(
+    () => !window.matchMedia?.('(max-width: 767px)').matches,
+  );
 
   const {
     goToAssistantPreview,
@@ -33,7 +35,20 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
   const [unknownState, setUnknownState] = useState(false);
 
   useEffect(() => {
+    const media = window.matchMedia?.('(max-width: 767px)');
+    if (!media) return undefined;
+
+    const collapseOnMobile = (event: MediaQueryListEvent) => {
+      if (event.matches) setNavExpanded(false);
+    };
+
+    media.addEventListener('change', collapseOnMobile);
+    return () => media.removeEventListener('change', collapseOnMobile);
+  }, []);
+
+  useEffect(() => {
     clearAssistantState();
+    setUnknownState(false);
     if (assistantId) {
       showLoader();
       getAssistantById({
@@ -42,22 +57,20 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
       })
         .then(epmr => {
           hideLoader();
-          if (epmr?.getSuccess()) {
-            let assistant = epmr.getData();
-            if (assistant) setCurrentAssistant(assistant);
-          } else {
-            setUnknownState(true);
-            const error = epmr?.getError();
-            if (error) {
-              toast.error(error.getHumanmessage());
-              return;
-            }
-            toast.error(
-              'Unable to get your assistant. please try again later.',
-            );
+          if (epmr?.getSuccess() && epmr.getData()) {
+            setCurrentAssistant(epmr.getData()!);
+            return;
           }
+
+          setUnknownState(true);
+          const error = epmr?.getError();
+          toast.error(
+            error?.getHumanmessage() ||
+              'Unable to get your assistant. please try again later.',
+          );
         })
         .catch(() => {
+          setUnknownState(true);
           toast.error('Unable to get your assistant. please try again later.');
           hideLoader();
         });
@@ -96,7 +109,7 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
           assistantId={assistantId}
           assistant={currentAssistant}
           expanded={navExpanded}
-          onToggle={() => setNavExpanded(!navExpanded)}
+          onToggle={() => setNavExpanded(expanded => !expanded)}
           actions={{
             preview: () => goToAssistantPreview(assistantId),
             'preview-call': () => goToAssistantPreviewCall(assistantId),

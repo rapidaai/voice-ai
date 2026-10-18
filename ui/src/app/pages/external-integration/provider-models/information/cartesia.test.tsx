@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -157,7 +157,9 @@ describe('CartesiaModelInformationPage', () => {
     renderPage();
 
     const logo = screen.getByRole('img', { name: 'Cartesia logo' });
-    fireEvent.error(logo);
+    act(() => {
+      logo.dispatchEvent(new Event('error'));
+    });
 
     expect(screen.getByTestId('provider-logo-fallback')).toBeInTheDocument();
   });

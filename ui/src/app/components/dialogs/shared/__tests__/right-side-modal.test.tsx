@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { RightSideModal } from '../right-side-modal';
@@ -111,6 +112,7 @@ describe('RightSideModal', () => {
   });
 
   it('closes no-title drawers from the Carbon icon action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
 
     render(
@@ -138,7 +140,7 @@ describe('RightSideModal', () => {
     );
     expect(screen.getByTestId('close-icon')).toBeInTheDocument();
 
-    fireEvent.click(closeButton);
+    await user.click(closeButton);
 
     await waitFor(() => expect(setModalOpen).toHaveBeenCalledWith(false));
   });
@@ -164,16 +166,18 @@ describe('RightSideModal', () => {
     ).toBeInTheDocument();
   });
 
-  it('starts drawer dragging from the resize handle', () => {
+  it('starts drawer dragging from the resize handle', async () => {
+    const user = userEvent.setup();
     render(
       <RightSideModal modalOpen setModalOpen={jest.fn()}>
         Drawer content
       </RightSideModal>,
     );
 
-    fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'Resize drawer' }),
-    );
+    await user.pointer({
+      keys: '[MouseLeft>]',
+      target: screen.getByRole('button', { name: 'Resize drawer' }),
+    });
 
     expect(mockDragStart).toHaveBeenCalledTimes(1);
   });
@@ -188,7 +192,11 @@ describe('RightSideModal', () => {
       </RightSideModal>,
     );
 
-    fireEvent.dragEnd(screen.getByRole('dialog'));
+    act(() => {
+      screen
+        .getByRole('dialog')
+        .dispatchEvent(new Event('dragend', { bubbles: true }));
+    });
 
     await waitFor(() => expect(setModalOpen).toHaveBeenCalledWith(false));
   });
@@ -203,7 +211,11 @@ describe('RightSideModal', () => {
       </RightSideModal>,
     );
 
-    fireEvent.dragEnd(screen.getByRole('dialog'));
+    act(() => {
+      screen
+        .getByRole('dialog')
+        .dispatchEvent(new Event('dragend', { bubbles: true }));
+    });
 
     expect(setModalOpen).not.toHaveBeenCalled();
   });

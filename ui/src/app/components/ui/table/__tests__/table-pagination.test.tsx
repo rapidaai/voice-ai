@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { TablePagination } from '../table-pagination';
@@ -100,7 +101,8 @@ describe('TablePagination', () => {
     ).toHaveAttribute('data-design-system-icon-button-kind', 'ghost');
   });
 
-  it('changes pages, updates page size, and opens column preferences', () => {
+  it('changes pages, updates page size, and opens column preferences', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeCurrentPage = jest.fn();
     const onChangePageSize = jest.fn();
 
@@ -114,16 +116,16 @@ describe('TablePagination', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+    await user.click(screen.getByRole('button', { name: 'Previous' }));
     expect(onChangeCurrentPage).toHaveBeenCalledWith(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(onChangeCurrentPage).toHaveBeenCalledWith(3);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Change page size' }));
+    await user.click(screen.getByRole('button', { name: 'Change page size' }));
     expect(onChangePageSize).toHaveBeenCalledWith(20);
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Configure column preference' }),
     );
     expect(screen.getByTestId('column-preferences-dialog')).toBeInTheDocument();

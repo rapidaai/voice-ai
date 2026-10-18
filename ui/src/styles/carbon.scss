@@ -184,6 +184,15 @@
   color: var(--brand-on-primary);
 }
 
+.assistant-settings-save {
+  background-color: var(--cds-background-inverse);
+  color: var(--cds-text-inverse);
+
+  &:hover {
+    background-color: var(--cds-background-inverse-hover);
+  }
+}
+
 // ─── Scoped inverse theme zone ───────────────────────────────────────────────
 .carbon-theme-g100 {
   @include carbon-theme.theme(themes.$g100);

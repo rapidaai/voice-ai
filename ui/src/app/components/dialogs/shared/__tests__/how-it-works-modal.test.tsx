@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { HowItWorksDialog } from '@/app/components/dialogs/shared/how-it-works-modal';
 
@@ -64,7 +65,8 @@ describe('HowItWorksDialog', () => {
     expect(screen.getByText('Pick the source data.')).toBeInTheDocument();
   });
 
-  it('uses a Carbon primary button for the close action', () => {
+  it('uses a Carbon primary button for the close action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
     render(
       <HowItWorksDialog modalOpen setModalOpen={setModalOpen} steps={steps} />,
@@ -74,7 +76,7 @@ describe('HowItWorksDialog', () => {
     expect(closeButton).toHaveAttribute('data-carbon-button-kind', 'primary');
     expect(screen.getByTestId('checkmark-icon')).toBeInTheDocument();
 
-    fireEvent.click(closeButton);
+    await user.click(closeButton);
     expect(setModalOpen).toHaveBeenCalledWith(false);
   });
 
@@ -97,15 +99,16 @@ describe('HowItWorksDialog', () => {
     );
   });
 
-  it('closes from the modal and header close actions', () => {
+  it('closes from the modal and header close actions', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
 
     render(
       <HowItWorksDialog modalOpen setModalOpen={setModalOpen} steps={steps} />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Modal close' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Header close' }));
+    await user.click(screen.getByRole('button', { name: 'Modal close' }));
+    await user.click(screen.getByRole('button', { name: 'Header close' }));
 
     expect(setModalOpen).toHaveBeenCalledWith(false);
     expect(setModalOpen).toHaveBeenCalledTimes(2);

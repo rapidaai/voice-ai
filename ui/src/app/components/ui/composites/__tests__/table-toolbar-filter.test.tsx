@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { TableToolbarFilter } from '../table-toolbar-filter';
@@ -62,7 +63,8 @@ jest.mock('@carbon/react', () => ({
 }));
 
 describe('TableToolbarFilter', () => {
-  it('renders the Carbon filter trigger and opens a Carbon popover', () => {
+  it('renders the Carbon filter trigger and opens a Carbon popover', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <TableToolbarFilter
         filters={[{ id: 'llm', label: 'LLM' }]}
@@ -80,7 +82,7 @@ describe('TableToolbarFilter', () => {
       screen.queryByRole('checkbox', { name: 'LLM' }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(trigger);
+    await user.click(trigger);
 
     expect(screen.getByRole('checkbox', { name: 'LLM' })).toBeChecked();
     expect(
@@ -90,7 +92,8 @@ describe('TableToolbarFilter', () => {
     ).toBeInTheDocument();
   });
 
-  it('applies local filter changes from the popover', () => {
+  it('applies local filter changes from the popover', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onApplyFilter = jest.fn();
 
     render(
@@ -105,9 +108,9 @@ describe('TableToolbarFilter', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Tool' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    await user.click(screen.getByRole('button', { name: 'Filter' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
 
     expect(onApplyFilter).toHaveBeenCalledWith(new Set(['llm', 'tool']));
     expect(
@@ -115,7 +118,8 @@ describe('TableToolbarFilter', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('resets filters and honors the Carbon popover close request', () => {
+  it('resets filters and honors the Carbon popover close request', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onResetFilter = jest.fn();
     const onReset = jest.fn();
 
@@ -129,14 +133,14 @@ describe('TableToolbarFilter', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    await user.click(screen.getByRole('button', { name: 'Filter' }));
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
 
     expect(onResetFilter).toHaveBeenCalledTimes(1);
     expect(onReset).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Close popover' }));
+    await user.click(screen.getByRole('button', { name: 'Filter' }));
+    await user.click(screen.getByRole('button', { name: 'Close popover' }));
 
     expect(
       screen.queryByRole('checkbox', { name: 'Metric' }),

@@ -6,7 +6,10 @@
  * as the original hand-written constant.ts functions.
  */
 import { Metadata } from '@rapidaai/react';
-import { loadProviderConfig, resolveCategoryParameters } from '../config-loader';
+import {
+  loadProviderConfig,
+  resolveCategoryParameters,
+} from '../config-loader';
 import { getDefaultsFromConfig, validateFromConfig } from '../config-defaults';
 
 function createMetadata(key: string, value: string): Metadata {
@@ -80,7 +83,9 @@ describe('Groq STT — config vs original', () => {
       createMetadata('listen.language', 'en'),
     ];
     const result = validateFromConfig(config, 'stt', 'groq', opts);
-    expect(result).toBe('Please provide a valid groq model for speech to text.');
+    expect(result).toBe(
+      'Please provide a valid groq model for speech to text.',
+    );
   });
 
   it('validates: invalid language returns error', () => {
@@ -90,7 +95,9 @@ describe('Groq STT — config vs original', () => {
       createMetadata('listen.language', 'invalid-lang'),
     ];
     const result = validateFromConfig(config, 'stt', 'groq', opts);
-    expect(result).toBe('Please provide a valid groq language for speech to text.');
+    expect(result).toBe(
+      'Please provide a valid groq language for speech to text.',
+    );
   });
 });
 
@@ -149,12 +156,9 @@ describe('Deepgram STT — config vs original', () => {
   });
 
   it('renders endpointing as a bounded number input', () => {
-    const params = resolveCategoryParameters(
-      'deepgram',
-      'stt',
-      config.stt!,
-      [createMetadata('listen.model', 'nova-3')],
-    );
+    const params = resolveCategoryParameters('deepgram', 'stt', config.stt!, [
+      createMetadata('listen.model', 'nova-3'),
+    ]);
     const endpointing = params.find(p => p.key === 'listen.endpointing');
 
     expect(endpointing).toMatchObject({
@@ -212,7 +216,9 @@ describe('Speechmatics STT — config vs original', () => {
       createMetadata('listen.model', 'speechmatics-universal'),
       createMetadata('listen.language', 'en'),
     ];
-    expect(validateFromConfig(config, 'stt', 'speechmatics', opts)).toBeUndefined();
+    expect(
+      validateFromConfig(config, 'stt', 'speechmatics', opts),
+    ).toBeUndefined();
   });
 
   it('validates: invalid language returns error', () => {
@@ -262,7 +268,9 @@ describe('AssemblyAI STT — config vs original', () => {
       createMetadata('listen.model', 'slam-1'),
       createMetadata('listen.language', 'en'),
     ];
-    expect(validateFromConfig(config, 'stt', 'assemblyai', opts)).toBeUndefined();
+    expect(
+      validateFromConfig(config, 'stt', 'assemblyai', opts),
+    ).toBeUndefined();
   });
 
   it('validates: threshold is not required', () => {
@@ -272,7 +280,9 @@ describe('AssemblyAI STT — config vs original', () => {
       createMetadata('listen.language', 'en'),
       // no threshold
     ];
-    expect(validateFromConfig(config, 'stt', 'assemblyai', opts)).toBeUndefined();
+    expect(
+      validateFromConfig(config, 'stt', 'assemblyai', opts),
+    ).toBeUndefined();
   });
 });
 
@@ -310,7 +320,12 @@ describe('Azure Speech Service STT — config vs original', () => {
   const config = loadProviderConfig('azure-speech-service')!;
 
   it('produces the same default keys and values', () => {
-    const result = getDefaultsFromConfig(config, 'stt', [], 'azure-speech-service');
+    const result = getDefaultsFromConfig(
+      config,
+      'stt',
+      [],
+      'azure-speech-service',
+    );
     expect(findMeta(result, 'listen.model')).toBe('azure-speech');
     expect(findMeta(result, 'listen.language')).toBe('en-US');
   });
@@ -321,7 +336,9 @@ describe('Azure Speech Service STT — config vs original', () => {
       createMetadata('listen.model', 'azure-speech'),
       createMetadata('listen.language', 'en-US'),
     ];
-    expect(validateFromConfig(config, 'stt', 'azure-speech-service', opts)).toBeUndefined();
+    expect(
+      validateFromConfig(config, 'stt', 'azure-speech-service', opts),
+    ).toBeUndefined();
   });
 });
 
@@ -329,7 +346,12 @@ describe('Google Speech Service STT — config vs original', () => {
   const config = loadProviderConfig('google-speech-service')!;
 
   it('produces the same default keys and values', () => {
-    const result = getDefaultsFromConfig(config, 'stt', [], 'google-speech-service');
+    const result = getDefaultsFromConfig(
+      config,
+      'stt',
+      [],
+      'google-speech-service',
+    );
     expect(findMeta(result, 'listen.threshold')).toBe('0.5');
     expect(findMeta(result, 'listen.region')).toBe('global');
     expect(findMeta(result, 'listen.model')).toBe('latest_long');
@@ -343,7 +365,9 @@ describe('Google Speech Service STT — config vs original', () => {
       createMetadata('listen.region', 'global'),
       createMetadata('listen.language', 'en-SG'),
     ];
-    expect(validateFromConfig(config, 'stt', 'google-speech-service', opts)).toBeUndefined();
+    expect(
+      validateFromConfig(config, 'stt', 'google-speech-service', opts),
+    ).toBeUndefined();
   });
 });
 

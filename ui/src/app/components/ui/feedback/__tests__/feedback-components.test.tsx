@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { Renew, Search } from '@carbon/icons-react';
 
@@ -207,7 +208,8 @@ describe('feedback components', () => {
     mockUpdateHeight.mockClear();
   });
 
-  it('renders an accessible empty state with icon and action', () => {
+  it('renders an accessible empty state with icon and action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onAction = jest.fn();
 
     render(
@@ -227,7 +229,9 @@ describe('feedback components', () => {
       screen.getByText('Create a deployment to start testing.'),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /create deployment/i }));
+    await user.click(
+      screen.getByRole('button', { name: /create deployment/i }),
+    );
 
     expect(onAction).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('button-icon')).toBeInTheDocument();
@@ -247,7 +251,8 @@ describe('feedback components', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders page error content and executes its recovery action', () => {
+  it('renders page error content and executes its recovery action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onAction = jest.fn();
 
     render(
@@ -269,7 +274,7 @@ describe('feedback components', () => {
     expect(screen.getByLabelText('Access denied')).toHaveClass('custom-error');
     expect(screen.getByTestId('arrow-left')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    await user.click(screen.getByRole('button', { name: 'Go back' }));
 
     expect(onAction).toHaveBeenCalledTimes(1);
   });
@@ -285,7 +290,8 @@ describe('feedback components', () => {
     expect(screen.getByText('Request failed')).toBeVisible();
   });
 
-  it('passes notification behavior through Carbon wrappers', () => {
+  it('passes notification behavior through Carbon wrappers', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onClose = jest.fn();
     const onAction = jest.fn();
     const onLink = jest.fn();
@@ -321,16 +327,17 @@ describe('feedback components', () => {
       '!max-w-full',
     );
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
-    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Read docs' }));
+    await user.click(screen.getAllByRole('button', { name: 'Close' })[0]);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await user.click(screen.getByRole('button', { name: 'Read docs' }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onAction).toHaveBeenCalledTimes(1);
     expect(onLink).toHaveBeenCalledTimes(1);
   });
 
-  it('passes toast notification options and close callbacks', () => {
+  it('passes toast notification options and close callbacks', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onClose = jest.fn();
     const onCloseButtonClick = jest.fn();
 
@@ -352,8 +359,10 @@ describe('feedback components', () => {
     expect(screen.getByText('Try again')).toBeVisible();
     expect(screen.getByText('Now')).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close toast' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Close toast button' }));
+    await user.click(screen.getByRole('button', { name: 'Close toast' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Close toast button' }),
+    );
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onCloseButtonClick).toHaveBeenCalledTimes(1);
@@ -502,7 +511,8 @@ describe('feedback components', () => {
     );
   });
 
-  it('renders headless toasts and reports measured heights', () => {
+  it('renders headless toasts and reports measured heights', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockToasts = [
       { id: 'success-toast', message: 'Saved', type: 'success' },
       { id: 'error-toast', message: 'Failed', type: 'error', height: 48 },
@@ -522,8 +532,8 @@ describe('feedback components', () => {
 
     const wrapper = screen.getByText('Saved').closest('.absolute');
     expect(wrapper).toBeInTheDocument();
-    fireEvent.mouseEnter(wrapper!);
-    fireEvent.mouseLeave(wrapper!);
+    await user.hover(wrapper!);
+    await user.unhover(wrapper!);
 
     expect(mockStartPause).toHaveBeenCalledTimes(1);
     expect(mockEndPause).toHaveBeenCalledTimes(1);
@@ -540,7 +550,7 @@ describe('feedback components', () => {
       expect.any(Number),
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getAllByRole('button', { name: 'Close toast button' })[0],
     );
 

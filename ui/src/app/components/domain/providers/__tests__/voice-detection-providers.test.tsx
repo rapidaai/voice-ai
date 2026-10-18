@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import { EndOfSpeechProvider } from '../end-of-speech';
@@ -14,6 +14,7 @@ import {
 } from '../noise-removal/provider';
 import { VADProvider } from '../vad';
 import { GetDefaultVADConfig, VADConfigComponent } from '../vad/provider';
+import userEvent from '@testing-library/user-event';
 
 const mockGetDefaultsFromConfig = jest.fn();
 const mockLoadProviderConfig = jest.fn();
@@ -112,7 +113,8 @@ beforeEach(() => {
 });
 
 describe('voice detection provider selectors', () => {
-  it('renders VAD selector and config only after provider selection', () => {
+  it('renders VAD selector and config only after provider selection', async () => {
+    const user = userEvent.setup();
     const onChangeProvider = jest.fn();
     mockLoadProviderConfig.mockReturnValue({ vad: { parameters: [] } });
 
@@ -131,8 +133,8 @@ describe('voice detection provider selectors', () => {
     const select = screen.getByRole('combobox', {
       name: 'Select VAD provider',
     });
-    fireEvent.change(select, { target: { value: 'silero_vad' } });
-    fireEvent.change(select, { target: { value: '' } });
+    await user.selectOptions(select, String('silero_vad'));
+    await user.selectOptions(select, String(''));
 
     expect(onChangeProvider).toHaveBeenCalledWith('silero_vad');
     expect(onChangeProvider).toHaveBeenCalledTimes(1);
@@ -149,7 +151,8 @@ describe('voice detection provider selectors', () => {
     expect(screen.getByTestId('config-vad')).toHaveTextContent('silero_vad');
   });
 
-  it('renders end-of-speech selector and config only after provider selection', () => {
+  it('renders end-of-speech selector and config only after provider selection', async () => {
+    const user = userEvent.setup();
     const onChangeProvider = jest.fn();
     mockLoadProviderConfig.mockReturnValue({ eos: { parameters: [] } });
 
@@ -164,17 +167,13 @@ describe('voice detection provider selectors', () => {
 
     expect(screen.queryByTestId('config-eos')).not.toBeInTheDocument();
 
-    fireEvent.change(
-      screen.getByRole('combobox', {
-        name: 'Select end of speech provider',
-      }),
-      { target: { value: 'livekit_eos' } },
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Select end of speech provider' }),
+      String('livekit_eos'),
     );
-    fireEvent.change(
-      screen.getByRole('combobox', {
-        name: 'Select end of speech provider',
-      }),
-      { target: { value: '' } },
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Select end of speech provider' }),
+      String(''),
     );
 
     expect(onChangeProvider).toHaveBeenCalledWith('livekit_eos');
@@ -192,7 +191,8 @@ describe('voice detection provider selectors', () => {
     expect(screen.getByTestId('config-eos')).toHaveTextContent('livekit_eos');
   });
 
-  it('renders noise cancellation selector and requires parameters for config', () => {
+  it('renders noise cancellation selector and requires parameters for config', async () => {
+    const user = userEvent.setup();
     const onChangeProvider = jest.fn();
     const onChangeParameter = jest.fn();
     mockLoadProviderConfig.mockReturnValue({
@@ -208,17 +208,13 @@ describe('voice detection provider selectors', () => {
 
     expect(screen.queryByTestId('config-noise')).not.toBeInTheDocument();
 
-    fireEvent.change(
-      screen.getByRole('combobox', {
-        name: 'Select noise removal provider',
-      }),
-      { target: { value: 'rn_noise' } },
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Select noise removal provider' }),
+      String('rn_noise'),
     );
-    fireEvent.change(
-      screen.getByRole('combobox', {
-        name: 'Select noise removal provider',
-      }),
-      { target: { value: '' } },
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Select noise removal provider' }),
+      String(''),
     );
 
     expect(onChangeProvider).toHaveBeenCalledWith('rn_noise');

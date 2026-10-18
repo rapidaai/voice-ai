@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { EndpointSettingsPage } from '../settings-page';
@@ -59,7 +60,8 @@ describe('EndpointSettingsPage', () => {
     );
   });
 
-  it('matches the Assistant general settings hierarchy and saves details', () => {
+  it('matches the Assistant general settings hierarchy and saves details', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<EndpointSettingsPage currentEndpoint={currentEndpoint} />);
 
     expect(
@@ -77,16 +79,15 @@ describe('EndpointSettingsPage', () => {
       screen.getByRole('button', { name: 'Description information' }),
     ).toBeInTheDocument();
 
-    fireEvent.change(screen.getByDisplayValue('Customer support analysis'), {
-      target: { value: 'Updated endpoint' },
-    });
-    fireEvent.change(
+    await user.click(screen.getByDisplayValue('Customer support analysis'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Updated endpoint'));
+    await user.click(
       screen.getByDisplayValue('Summarizes support conversations.'),
-      {
-        target: { value: 'Updated description' },
-      },
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Updated description'));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     expect(mockShowLoader).toHaveBeenCalledWith('block');
     expect(mockOnUpdateEndpointDetail).toHaveBeenCalledWith(
@@ -105,18 +106,19 @@ describe('EndpointSettingsPage', () => {
     );
   });
 
-  it('keeps endpoint actions in settings and rejects an empty name', () => {
+  it('keeps endpoint actions in settings and rejects an empty name', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<EndpointSettingsPage currentEndpoint={currentEndpoint} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit tags' }));
-    fireEvent.click(screen.getByRole('button', { name: 'View instructions' }));
+    await user.click(screen.getByRole('button', { name: 'Edit tags' }));
+    await user.click(screen.getByRole('button', { name: 'View instructions' }));
     expect(mockOnShowEditTagVisible).toHaveBeenCalledWith(currentEndpoint);
     expect(mockOnShowInstruction).toHaveBeenCalledTimes(1);
 
-    fireEvent.change(screen.getByDisplayValue('Customer support analysis'), {
-      target: { value: '   ' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(screen.getByDisplayValue('Customer support analysis'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('   '));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     expect(
       screen.getByText('Please provide an endpoint name.'),

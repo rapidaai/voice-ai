@@ -1,8 +1,9 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import { HelpToggletip } from '../help-label';
+import userEvent from '@testing-library/user-event';
 import {
   BargeInTriggerControl,
   LEGACY_MICROPHONE_VAD_BARGE_IN_TRIGGER_KEY,
@@ -59,7 +60,8 @@ describe('provider controls', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('defaults the barge-in trigger to VAD and writes the current metadata key', () => {
+  it('defaults the barge-in trigger to VAD and writes the current metadata key', async () => {
+    const user = userEvent.setup();
     const onChangeParameter = jest.fn();
 
     render(
@@ -72,7 +74,7 @@ describe('provider controls', () => {
     const select = screen.getByRole('combobox');
     expect(select).toHaveValue('vad');
 
-    fireEvent.change(select, { target: { value: 'word' } });
+    await user.selectOptions(select, String('word'));
 
     const nextParameters = onChangeParameter.mock.calls[0][0] as Metadata[];
     expect(getMetadataValue(nextParameters, 'unrelated')).toBe('keep-me');
@@ -95,7 +97,8 @@ describe('provider controls', () => {
     expect(screen.getByRole('combobox')).toHaveValue('vad');
   });
 
-  it('uses legacy barge-in metadata and removes it after changes', () => {
+  it('uses legacy barge-in metadata and removes it after changes', async () => {
+    const user = userEvent.setup();
     const onChangeParameter = jest.fn();
 
     render(
@@ -110,7 +113,7 @@ describe('provider controls', () => {
     const select = screen.getByRole('combobox');
     expect(select).toHaveValue('word');
 
-    fireEvent.change(select, { target: { value: 'vad' } });
+    await user.selectOptions(select, String('vad'));
 
     const nextParameters = onChangeParameter.mock.calls[0][0] as Metadata[];
     expect(

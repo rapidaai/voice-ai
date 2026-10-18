@@ -31,9 +31,9 @@ const getVisibleNavItems = (
 // ─── Skeleton placeholder for a single nav item ─────────────────────────────
 
 const NavItemSkeleton: FC<{ itemKey: string }> = ({ itemKey }) => (
-  <div key={itemKey} className="flex items-center h-8 px-4 py-2">
+  <li key={itemKey} className="flex items-center h-8 px-4 py-2">
     <SkeletonText className="mb-0! flex-1" width="70%" />
-  </div>
+  </li>
 );
 
 // ─── Single nav item (link or menu with children) ───────────────────────────
@@ -114,7 +114,7 @@ const NavSection: FC<{
   if (visibleItems.length === 0) return null;
 
   return (
-    <div>
+    <>
       {section.label && (
         <li
           className={cn(
@@ -140,7 +140,7 @@ const NavSection: FC<{
           isLoading={isLoading}
         />
       ))}
-    </div>
+    </>
   );
 };
 
@@ -207,8 +207,8 @@ export const AssistantSideNav: FC<AssistantSideNavProps> = ({
           onClick={onToggle}
           className={cn(
             'flex items-center h-10 w-full cursor-pointer px-4',
-            'text-gray-400 dark:text-gray-500',
-            'hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400',
+            'text-gray-700 dark:text-gray-300',
+            'hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-100',
             'transition-colors duration-100',
           )}
           aria-label={expanded ? 'Collapse nav' : 'Expand nav'}

@@ -117,7 +117,7 @@ export function ConversationDetailPage() {
                 key={idx}
                 className="px-6 py-4 space-y-3 bg-white dark:bg-gray-900"
               >
-                <p className="text-xs font-medium uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--cds-text-secondary)]">
                   {x.getKey().replace('.', ' › ')}
                 </p>
                 <JsonViewer data={x.getValue()} />
@@ -304,7 +304,7 @@ export function ConversationDetailPage() {
             iconDescription="Back to sessions"
             onClick={() => navigator.goToAssistantSessionList(assistantId!)}
           />
-          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+          <span className="text-sm font-medium text-[var(--cds-text-secondary)]">
             Sessions
           </span>
           <span className="text-gray-300 dark:text-gray-600">/</span>
@@ -358,7 +358,7 @@ const DataField = ({
   mono?: boolean;
 }) => (
   <div>
-    <p className="text-xs font-medium uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400 mb-1">
+    <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--cds-text-secondary)] mb-1">
       {label}
     </p>
     <p
@@ -445,7 +445,7 @@ const JsonViewer = ({ data, preview = false }: JsonViewerProps) => {
           key={index}
           className="border-l-2 border-primary bg-primary/5 pl-4 py-2"
         >
-          <p className="text-xs font-medium uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400 mb-1 capitalize">
+          <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--cds-text-secondary)] mb-1 capitalize">
             {insight.key}
           </p>
           <p className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed">

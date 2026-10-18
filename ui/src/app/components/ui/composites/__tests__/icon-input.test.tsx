@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { SearchIconInput } from '../icon-input';
@@ -32,7 +33,8 @@ jest.mock('@carbon/icons-react', () => ({
 }));
 
 describe('SearchIconInput', () => {
-  it('renders a search input with a Carbon icon submit action', () => {
+  it('renders a search input with a Carbon icon submit action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onSubmit = jest.fn((event: React.FormEvent) => {
       event.preventDefault();
     });
@@ -58,7 +60,7 @@ describe('SearchIconInput', () => {
     expect(submit).toHaveAttribute('data-design-system-icon-button-size', 'sm');
     expect(screen.getByTestId('search-icon')).toHaveClass('opacity-90');
 
-    fireEvent.click(submit);
+    await user.click(submit);
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });

@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { APiStringHeader } from '@/app/components/domain/external-api/api-header';
 import { ParameterEditor } from '@/app/components/domain/tools/common/components';
@@ -119,6 +120,7 @@ jest.mock('@carbon/react', () => {
 
 describe('Tool list editors', () => {
   it('header list supports add/delete and serializes JSON payload', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -133,13 +135,13 @@ describe('Tool list editors', () => {
       expect(screen.getByDisplayValue('Bearer token')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add header' }));
-    fireEvent.change(screen.getByTestId('api-header-key-1'), {
-      target: { value: 'X-Trace' },
-    });
-    fireEvent.change(screen.getByTestId('api-header-val-1'), {
-      target: { value: 'trace-id' },
-    });
+    await user.click(screen.getByRole('button', { name: 'Add header' }));
+    await user.click(screen.getByTestId('api-header-key-1'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('X-Trace'));
+    await user.click(screen.getByTestId('api-header-val-1'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('trace-id'));
 
     const setPayloads = onChange.mock.calls.map(call => JSON.parse(call[0]));
     expect(setPayloads).toContainEqual({
@@ -147,7 +149,7 @@ describe('Tool list editors', () => {
       'X-Trace': 'trace-id',
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
 
     const lastCallArg =
       onChange.mock.calls[onChange.mock.calls.length - 1]?.[0] || '{}';
@@ -170,35 +172,35 @@ describe('Tool list editors', () => {
     spy.mockRestore();
   });
 
-  it('mapping list supports add/edit/delete for tool parameter mapping', () => {
+  it('mapping list supports add/edit/delete for tool parameter mapping', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(<ParameterEditor value="{}" onChange={onChange} />);
 
     expect(screen.getByText('Mapping (0)')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add parameter' }));
+    await user.click(screen.getByRole('button', { name: 'Add parameter' }));
     expect(screen.getByText('Mapping (1)')).toBeInTheDocument();
     expect(screen.getByRole('table')).toHaveClass('border-border-subtle');
 
-    fireEvent.change(screen.getByTestId('param-type-0'), {
-      target: { value: 'tool' },
-    });
+    await user.selectOptions(
+      screen.getByTestId('param-type-0'),
+      String('tool'),
+    );
     expect(screen.getByTestId('param-type-0')).toHaveClass('w-full');
     expect(screen.getByTestId('param-type-0').closest('td')).toHaveClass('p-0');
-    fireEvent.change(screen.getByTestId('param-key-0'), {
-      target: { value: 'name' },
-    });
+    await user.selectOptions(screen.getByTestId('param-key-0'), String('name'));
     expect(screen.getByTestId('param-key-0')).toHaveClass('w-full');
-    fireEvent.change(screen.getByTestId('param-val-0'), {
-      target: { value: 'customer_profile' },
-    });
+    await user.click(screen.getByTestId('param-val-0'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('customer_profile'));
 
     expect(onChange).toHaveBeenLastCalledWith(
       JSON.stringify({ 'tool.name': 'customer_profile' }),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
 
     expect(onChange).toHaveBeenLastCalledWith('{}');
     expect(screen.getByText('Mapping (0)')).toBeInTheDocument();

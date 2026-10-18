@@ -50,7 +50,7 @@ const SingleAssistant: FC<{ assistant: Assistant }> = ({ assistant }) => {
         {assistant.getAssistantproviderid() ? (
           <VersionIndicator id={assistant.getAssistantproviderid()} />
         ) : (
-          <span className="text-sm text-gray-400">-</span>
+          <span className="text-sm text-[var(--cds-text-secondary)]">-</span>
         )}
       </TableCell>
 
@@ -58,7 +58,7 @@ const SingleAssistant: FC<{ assistant: Assistant }> = ({ assistant }) => {
         {status ? (
           <RecordStatusIndicator state={status} />
         ) : (
-          <span className="text-sm text-gray-400">-</span>
+          <span className="text-sm text-[var(--cds-text-secondary)]">-</span>
         )}
       </TableCell>
 
@@ -79,7 +79,9 @@ const SingleAssistant: FC<{ assistant: Assistant }> = ({ assistant }) => {
             )}
           </div>
         ) : (
-          <span className="text-sm text-gray-400">Not configured</span>
+          <span className="text-sm text-[var(--cds-text-secondary)]">
+            Not configured
+          </span>
         )}
       </TableCell>
 
@@ -134,7 +136,7 @@ const SingleAssistant: FC<{ assistant: Assistant }> = ({ assistant }) => {
             )}
           </div>
         ) : (
-          <span className="text-sm text-gray-400">-</span>
+          <span className="text-sm text-[var(--cds-text-secondary)]">-</span>
         )}
       </TableCell>
 

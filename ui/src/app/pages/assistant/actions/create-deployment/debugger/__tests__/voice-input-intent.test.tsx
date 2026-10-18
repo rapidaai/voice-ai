@@ -1,11 +1,6 @@
 import React from 'react';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ConfigureAssistantDebuggerDeploymentPage } from '@/app/pages/assistant/actions/create-deployment/debugger';
 import {
@@ -321,17 +316,18 @@ describe('Debugger deployment voice input intent actions', () => {
   });
 
   it('Continue keeps existing voice input enabled', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureAssistantDebuggerDeploymentPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() =>
       expect(
         screen.getByText(/receive user input via audio and text/i),
       ).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy Debugger' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Deploy Debugger' }));
 
     await waitFor(() =>
       expect(CreateAssistantDebuggerDeployment).toHaveBeenCalledTimes(1),
@@ -345,22 +341,23 @@ describe('Debugger deployment voice input intent actions', () => {
   });
 
   it('unchecking voice input removes input audio on save', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureAssistantDebuggerDeploymentPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() =>
       expect(
         screen.getByText(/receive user input via audio and text/i),
       ).toBeInTheDocument(),
     );
-    fireEvent.click(
+    await user.click(
       screen.getByLabelText(/Enable Voice Input \(Speech-to-Text\)/i),
     );
     expect(
       screen.getByText(/receive user input via text only/i),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy Debugger' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Deploy Debugger' }));
 
     await waitFor(() =>
       expect(CreateAssistantDebuggerDeployment).toHaveBeenCalledTimes(1),
@@ -374,19 +371,20 @@ describe('Debugger deployment voice input intent actions', () => {
   });
 
   it('unchecking voice output removes output audio on save', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureAssistantDebuggerDeploymentPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() =>
       expect(
         screen.getByText(/delivered via audio and text/i),
       ).toBeInTheDocument(),
     );
-    fireEvent.click(
+    await user.click(
       screen.getByLabelText(/Enable Voice Output \(Text-to-Speech\)/i),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy Debugger' }));
+    await user.click(screen.getByRole('button', { name: 'Deploy Debugger' }));
 
     await waitFor(() =>
       expect(CreateAssistantDebuggerDeployment).toHaveBeenCalledTimes(1),
@@ -417,6 +415,7 @@ describe('Debugger deployment voice input intent actions', () => {
   });
 
   it('section mode cancel navigates back to deployment listing', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockSearchParams = new URLSearchParams('editMode=section&section=tts');
     render(<ConfigureAssistantDebuggerDeploymentPage />);
 
@@ -426,12 +425,13 @@ describe('Debugger deployment voice input intent actions', () => {
       ).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Are you sure?' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Are you sure?' }));
     expect(mockGoToDeploymentAssistant).toHaveBeenCalledWith('assistant-1');
   });
 
   it('section mode saves selected section and preserves untouched section values', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockSearchParams = new URLSearchParams('editMode=section&section=stt');
     render(<ConfigureAssistantDebuggerDeploymentPage />);
 
@@ -441,10 +441,10 @@ describe('Debugger deployment voice input intent actions', () => {
       ).toBeInTheDocument(),
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByLabelText(/Enable Voice Input \(Speech-to-Text\)/i),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() =>
       expect(CreateAssistantDebuggerDeployment).toHaveBeenCalledTimes(1),
@@ -460,15 +460,16 @@ describe('Debugger deployment voice input intent actions', () => {
   });
 
   it('create mode deploys without existing deployment data', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAssistantDebuggerDeployment as jest.Mock).mockResolvedValue({
       getData: () => null,
     });
 
     render(<ConfigureAssistantDebuggerDeploymentPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy Debugger' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Deploy Debugger' }));
 
     await waitFor(() =>
       expect(CreateAssistantDebuggerDeployment).toHaveBeenCalledTimes(1),

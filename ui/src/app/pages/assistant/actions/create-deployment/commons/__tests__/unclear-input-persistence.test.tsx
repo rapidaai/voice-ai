@@ -1,11 +1,6 @@
 import React from 'react';
-import {
-  act,
-  fireEvent,
-  render,
-  renderHook,
-  screen,
-} from '@testing-library/react';
+import { act, render, renderHook, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import {
   AssistantApiDeployment,
@@ -256,6 +251,7 @@ describe.each(deployments)('$type unclear speech persistence', config => {
     it.each(['new', 'absent', 'empty', 'explicit', 'cleared'])(
       'roundtrips the displayed values for %s settings',
       async state => {
+        const user = userEvent.setup({ writeToClipboard: false });
         const saved = new config.Deployment();
         saved.setGreeting('Hello');
         if (state === 'explicit' || state === 'cleared') {
@@ -272,26 +268,26 @@ describe.each(deployments)('$type unclear speech persistence', config => {
           render(<Page />);
         });
         if (config.type === 'phone') {
-          fireEvent.click(
+          await user.click(
             screen.getByRole('button', {
               name: mode === 'create' ? 'Next' : 'General Experience',
             }),
           );
         }
         if (config.type === 'web') {
-          fireEvent.click(
+          await user.click(
             screen.getByRole('button', { name: 'Show advanced settings' }),
           );
           if (state === 'new') {
-            fireEvent.change(screen.getByLabelText('Greeting'), {
-              target: { value: 'Hello' },
-            });
+            await user.click(screen.getByLabelText('Greeting'));
+            await user.keyboard('{Control>}a{/Control}');
+            await user.paste(String('Hello'));
           }
         }
         const message = screen.getByLabelText('Unclear Speech Message');
         const timeout = screen.getByLabelText('Unclear Speech Wait (Seconds)');
         if (state === 'cleared') {
-          fireEvent.change(message, { target: { value: '' } });
+          await user.clear(message);
         }
         const expectedMessage =
           state === 'explicit'
@@ -304,11 +300,11 @@ describe.each(deployments)('$type unclear speech persistence', config => {
         expect(message).toHaveValue(expectedMessage);
         expect(timeout).toHaveValue(expectedTimeout);
         if (mode === 'create') {
-          fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-          fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+          await user.click(screen.getByRole('button', { name: 'Next' }));
+          await user.click(screen.getByRole('button', { name: 'Next' }));
         }
         await act(async () => {
-          fireEvent.click(
+          await user.click(
             screen.getByRole('button', {
               name: mode === 'create' ? config.deployLabel : 'Save Changes',
             }),
@@ -330,6 +326,7 @@ describe.each(deployments)('$type unclear speech persistence', config => {
   it.each(['absent', 'empty', 'explicit', 'cleared'])(
     'saves the displayed values in shared experience edit for %s settings',
     async state => {
+      const user = userEvent.setup({ writeToClipboard: false });
       const saved = new config.Deployment();
       if (state === 'explicit' || state === 'cleared') {
         saved.setUnclearinputtimeout(3.5);
@@ -355,14 +352,12 @@ describe.each(deployments)('$type unclear speech persistence', config => {
         />,
       );
       if (config.type === 'web') {
-        fireEvent.click(
+        await user.click(
           screen.getByRole('button', { name: 'Show advanced settings' }),
         );
       }
       if (state === 'cleared') {
-        fireEvent.change(screen.getByLabelText('Unclear Speech Message'), {
-          target: { value: '' },
-        });
+        await user.clear(screen.getByLabelText('Unclear Speech Message'));
         view.rerender(
           <Experience
             experienceConfig={{
@@ -434,6 +429,7 @@ describe.each(deployments)('$type unclear speech persistence', config => {
 it.each(['experience', 'stt', 'tts'])(
   'only applies displayed defaults in debugger section mode when editing experience (%s)',
   async section => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockSearchParams = new URLSearchParams({ editMode: 'section', section });
     (GetAssistantDebuggerDeployment as jest.Mock).mockResolvedValue({
       getData: () => new AssistantDebuggerDeployment(),
@@ -442,7 +438,7 @@ it.each(['experience', 'stt', 'tts'])(
       render(<ConfigureAssistantDebuggerDeploymentPage />);
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await user.click(screen.getByRole('button', { name: 'Save' }));
     });
     const sent = (
       CreateAssistantDebuggerDeployment as jest.Mock
@@ -605,6 +601,7 @@ describe.each([
     { name: 'stored settings', timeout: '37', count: '4', expected: '37' },
     { name: 'unlimited count', timeout: '5', count: '0', expected: '5' },
   ])('loads and saves $name', async ({ timeout, count, expected }) => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const saved = new config.Deployment();
     saved.setIdealtimeout(timeout);
     saved.setIdealtimeoutbackoff(count);
@@ -620,11 +617,11 @@ describe.each([
     expect(experience.experienceConfig.idealTimeout).toBe(expected);
     expect(experience.experienceConfig.idleTimeoutBackoffTimes).toBe(count);
     if (config.mode === 'create') {
-      fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      await user.click(screen.getByRole('button', { name: 'Next' }));
     }
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: config.saveLabel }));
+      await user.click(screen.getByRole('button', { name: config.saveLabel }));
     });
     expect(config.save).toHaveBeenCalledTimes(1);
     const sent = config.save.mock.calls[0][1][config.field]();
@@ -638,6 +635,7 @@ describe.each([
     { name: 'whitespace', timeout: '   ', count: '   ' },
     { name: 'explicit unlimited count', timeout: '', count: '0' },
   ])('saves defaults for $name values', async ({ timeout, count }) => {
+    const user = userEvent.setup({ writeToClipboard: false });
     config.fetch.mockResolvedValue({
       getData: () => new config.Deployment(),
     });
@@ -655,11 +653,11 @@ describe.each([
       });
     });
     if (config.mode === 'create') {
-      fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      await user.click(screen.getByRole('button', { name: 'Next' }));
     }
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: config.saveLabel }));
+      await user.click(screen.getByRole('button', { name: config.saveLabel }));
     });
     expect(config.save).toHaveBeenCalledTimes(1);
     const sent = config.save.mock.calls[0][1][config.field]();
@@ -693,6 +691,7 @@ describe.each([
   ])(
     'rejects $name before requesting a save',
     async ({ timeout, count, range }) => {
+      const user = userEvent.setup({ writeToClipboard: false });
       config.fetch.mockResolvedValue({
         getData: () => new config.Deployment(),
       });
@@ -710,11 +709,13 @@ describe.each([
         });
       });
       if (config.mode === 'create') {
-        fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+        await user.click(screen.getByRole('button', { name: 'Next' }));
+        await user.click(screen.getByRole('button', { name: 'Next' }));
       }
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: config.saveLabel }));
+        await user.click(
+          screen.getByRole('button', { name: config.saveLabel }),
+        );
       });
       expect(config.save).not.toHaveBeenCalled();
       expect(screen.getByRole('alert')).toHaveTextContent(/idle/i);

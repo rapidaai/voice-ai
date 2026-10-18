@@ -325,7 +325,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
     <div className="w-full min-h-full bg-gray-100 p-4 dark:bg-[#161616]">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Dashboard</p>
+          <p className="text-xs text-[var(--cds-text-secondary)]">Dashboard</p>
           <h2 className="text-2xl font-normal text-gray-900 dark:text-gray-100">
             Assistant activity
           </h2>
@@ -617,7 +617,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                       };
                       return (
                         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-lg px-3 py-2 text-sm min-w-[140px]">
-                          <p className="text-gray-400 text-xs mb-1.5">
+                          <p className="text-xs mb-1.5 text-[var(--cds-text-secondary)]">
                             {payload[0]?.payload?.label}
                           </p>
                           {(payload as ChartTooltipPayload[]).map(p => (
@@ -761,7 +761,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
           skeletonVariant="bar-chart"
           bodyClassName="pt-4"
         >
-          <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+          <p className="mb-3 text-xs text-[var(--cds-text-secondary)]">
             Messages over selected range
           </p>
           <div className="h-[206px]">
@@ -794,7 +794,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                       if (!active || !payload?.length) return null;
                       return (
                         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-lg px-3 py-2.5 text-sm min-w-[140px]">
-                          <p className="text-gray-400 text-xs mb-1.5">
+                          <p className="text-xs mb-1.5 text-[var(--cds-text-secondary)]">
                             {payload[0]?.payload?.label}
                           </p>
                           <div className="flex items-center gap-2">
@@ -898,7 +898,7 @@ const KpiTile: FC<{
       ) : (
         <>
           <div>
-            <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+            <p className="truncate text-xs text-[var(--cds-text-secondary)]">
               {label}
             </p>
             <div className="mt-2 flex items-baseline gap-1">
@@ -906,14 +906,14 @@ const KpiTile: FC<{
                 {typeof value === 'number' ? value.toLocaleString() : value}
               </span>
               {unit && (
-                <span className="text-sm text-gray-500 dark:text-gray-400">
+                <span className="text-sm text-[var(--cds-text-secondary)]">
                   {unit}
                 </span>
               )}
             </div>
           </div>
           {caption && (
-            <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+            <p className="truncate text-xs text-[var(--cds-text-secondary)]">
               {caption}
             </p>
           )}
@@ -1032,17 +1032,17 @@ const WidgetHeroMetric: FC<{
   caption?: string;
 }> = ({ label, value, unit, caption }) => (
   <div>
-    <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+    <p className="text-xs text-[var(--cds-text-secondary)]">{label}</p>
     <div className="mt-2 flex items-baseline gap-1">
       <span className="text-4xl font-light leading-none tabular-nums text-gray-900 dark:text-gray-100">
         {typeof value === 'number' ? value.toLocaleString() : value}
       </span>
       {unit && (
-        <span className="text-sm text-gray-500 dark:text-gray-400">{unit}</span>
+        <span className="text-sm text-[var(--cds-text-secondary)]">{unit}</span>
       )}
     </div>
     {caption && (
-      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{caption}</p>
+      <p className="mt-2 text-xs text-[var(--cds-text-secondary)]">{caption}</p>
     )}
   </div>
 );
@@ -1053,13 +1053,13 @@ const InlineMetric: FC<{
   unit?: string;
 }> = ({ label, value, unit }) => (
   <div>
-    <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+    <p className="text-xs text-[var(--cds-text-secondary)]">{label}</p>
     <div className="mt-1 flex items-baseline gap-1">
       <span className="text-2xl font-light leading-none tabular-nums text-gray-900 dark:text-gray-100">
         {typeof value === 'number' ? value.toLocaleString() : value}
       </span>
       {unit && (
-        <span className="text-xs text-gray-500 dark:text-gray-400">{unit}</span>
+        <span className="text-xs text-[var(--cds-text-secondary)]">{unit}</span>
       )}
     </div>
   </div>
@@ -1102,7 +1102,7 @@ const DonutContent: FC<{
 }> = ({ data, dataKey, nameKey, total }) => {
   if (data.length === 0)
     return (
-      <div className="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+      <div className="flex h-full items-center justify-center text-sm text-[var(--cds-text-secondary)]">
         No source data
       </div>
     );
@@ -1154,7 +1154,9 @@ const DonutContent: FC<{
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center">
             <p className="text-lg font-bold tabular-nums">{total}</p>
-            <p className="text-[10px] text-gray-400 uppercase">Total</p>
+            <p className="text-[10px] uppercase text-[var(--cds-text-secondary)]">
+              Total
+            </p>
           </div>
         </div>
       </div>
@@ -1168,13 +1170,15 @@ const DonutContent: FC<{
               className="w-2.5 h-2.5 shrink-0"
               style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
             />
-            <span className="text-gray-600 dark:text-gray-400 truncate flex-1 capitalize">
+            <span className="truncate flex-1 capitalize text-[var(--cds-text-secondary)]">
               {item[nameKey] || 'Unknown'}
             </span>
             <span className="font-semibold tabular-nums">
               {item.percentage}%
             </span>
-            <span className="text-gray-400 tabular-nums">({item.count})</span>
+            <span className="tabular-nums text-[var(--cds-text-secondary)]">
+              ({item.count})
+            </span>
           </div>
         ))}
       </div>
@@ -1187,7 +1191,7 @@ const LanguageContent: FC<{
 }> = ({ data }) => {
   if (data.length === 0)
     return (
-      <div className="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+      <div className="flex h-full items-center justify-center text-sm text-[var(--cds-text-secondary)]">
         No language data
       </div>
     );
@@ -1213,7 +1217,7 @@ const LanguageContent: FC<{
               }}
             />
           </div>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-xs text-[var(--cds-text-secondary)]">
             {item.count.toLocaleString()} messages
           </p>
         </div>

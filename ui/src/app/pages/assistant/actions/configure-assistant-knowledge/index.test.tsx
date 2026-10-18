@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { ConfigureAssistantKnowledgePage } from './index';
@@ -72,22 +73,19 @@ jest.mock('@/app/pages/assistant/actions/hooks/use-confirmation', () => ({
   }),
 }));
 
-jest.mock(
-  '@/stores/assistant/actions',
-  () => ({
-    useAssistantKnowledgePageStore: () => ({
-      deleteAssistantKnowledge: jest.fn(),
-      getAssistantKnowledge: mockGetAssistantKnowledge,
-      knowledges: [],
-      page: 1,
-      pageSize: 10,
-      setColumns: jest.fn(),
-      setPage: jest.fn(),
-      setPageSize: jest.fn(),
-      totalCount: 0,
-    }),
+jest.mock('@/stores/assistant/actions', () => ({
+  useAssistantKnowledgePageStore: () => ({
+    deleteAssistantKnowledge: jest.fn(),
+    getAssistantKnowledge: mockGetAssistantKnowledge,
+    knowledges: [],
+    page: 1,
+    pageSize: 10,
+    setColumns: jest.fn(),
+    setPage: jest.fn(),
+    setPageSize: jest.fn(),
+    totalCount: 0,
   }),
-);
+}));
 
 jest.mock('@/stores/app', () => ({
   useRapidaStore: () => ({
@@ -143,6 +141,7 @@ describe('ConfigureAssistantKnowledgePage', () => {
   });
 
   it('renders knowledge actions with Carbon icons', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureAssistantKnowledgePage />);
 
     expect(screen.getByText('Configure Knowledge')).toBeInTheDocument();
@@ -156,10 +155,12 @@ describe('ConfigureAssistantKnowledgePage', () => {
       'data-stroke-width',
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: /create new knowledge/i }),
     );
-    fireEvent.click(screen.getByRole('button', { name: /connect knowledge/i }));
+    await user.click(
+      screen.getByRole('button', { name: /connect knowledge/i }),
+    );
 
     expect(mockGoToCreateKnowledge).toHaveBeenCalledTimes(1);
     expect(mockGoToCreateAssistantKnowledge).toHaveBeenCalledWith(
@@ -168,10 +169,11 @@ describe('ConfigureAssistantKnowledgePage', () => {
     await waitFor(() => expect(mockGetAssistantKnowledge).toHaveBeenCalled());
   });
 
-  it('routes empty-state action to assistant knowledge creation', () => {
+  it('routes empty-state action to assistant knowledge creation', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureAssistantKnowledgePage />);
 
-    fireEvent.click(screen.getByRole('button', { name: /connect knowlege/i }));
+    await user.click(screen.getByRole('button', { name: /connect knowlege/i }));
 
     expect(mockGoToCreateAssistantKnowledge).toHaveBeenCalledWith(
       'assistant-1',

@@ -2,6 +2,7 @@ const { test: base, expect } = require('@playwright/test');
 const { evaluateA11yViolations } = require('./a11y-baseline');
 const { installGrpcWebPreflightMock } = require('./mocks/grpc-web');
 const {
+  ASSISTANT_DETAIL_PATH,
   ASSISTANT_LIST_PATH,
   installAssistantClientMock,
 } = require('./mocks/clients/assistant');
@@ -88,13 +89,15 @@ async function installBrowserFixtures(page) {
   await installGrpcWebPreflightMock(page);
 }
 
+async function authenticatePage(page) {
+  await page.addInitScript(state => {
+    window.localStorage.setItem('rpd::__user', JSON.stringify(state));
+    window.localStorage.setItem('rapida-sidebar-open', 'true');
+  }, authState);
+}
+
 async function gotoJourney(page, journey) {
-  if (journey.auth) {
-    await page.addInitScript(state => {
-      window.localStorage.setItem('rpd::__user', JSON.stringify(state));
-      window.localStorage.setItem('rapida-sidebar-open', 'true');
-    }, authState);
-  }
+  if (journey.auth) await authenticatePage(page);
 
   await page.goto(journey.path);
   await page.waitForLoadState('domcontentloaded');
@@ -182,6 +185,7 @@ module.exports = {
   COLOR_MODES,
   SCREENSHOT_VIEWPORTS,
   ASSISTANT_LIST_PATH,
+  ASSISTANT_DETAIL_PATH,
   ACTIVITY_LIST_PATHS,
   AUTHENTICATION_PATHS,
   CREDENTIAL_LIST_PATH,
@@ -189,6 +193,7 @@ module.exports = {
   ENDPOINT_LIST_PATH,
   ORGANIZATION_PATH,
   WORKSPACE_LIST_PATHS,
+  authenticatePage,
   checkA11y,
   expandDashboardForScreenshot,
   gotoJourney,

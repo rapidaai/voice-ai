@@ -1,6 +1,7 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import userEvent from '@testing-library/user-event';
 
 import { CreateOrganizationPage } from '@/app/pages/user-onboarding/user-organization';
 import { AuthContext } from '@/context/auth-context';
@@ -89,21 +90,21 @@ describe('CreateOrganizationPage', () => {
     };
   });
 
-  it('shows validation error when required industry is missing', async () => {
+  it('blocks submission when the required industry is missing', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     renderWithAuth();
 
-    fireEvent.change(screen.getByPlaceholderText('eg: Acme Voice Studio'), {
-      target: { value: 'My Org' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    const industry = screen.getByPlaceholderText(
+      'eg: Agency services, healthcare, finance',
+    );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
-    expect(
-      await screen.findByText('Please provide an industry.'),
-    ).toBeInTheDocument();
+    expect(industry).toBeInvalid();
     expect(CreateOrganization).not.toHaveBeenCalled();
   });
 
   it('submits and navigates to onboarding project on success', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const authorize = jest.fn(success => success());
     (CreateOrganization as jest.Mock).mockImplementation(
       (_cfg, _name, _size, _industry, _headers, callback) => {
@@ -113,19 +114,18 @@ describe('CreateOrganizationPage', () => {
 
     renderWithAuth(authorize);
 
-    fireEvent.change(screen.getByPlaceholderText('eg: Acme Voice Studio'), {
-      target: { value: 'My Org' },
-    });
-    fireEvent.change(
-      screen.getByPlaceholderText('eg: Agency services, healthcare, finance'),
-      {
-        target: { value: 'Software' },
-      },
+    const organizationName = screen.getByPlaceholderText(
+      'eg: Acme Voice Studio',
     );
-    fireEvent.change(screen.getByRole('combobox'), {
-      target: { value: 'agency' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(organizationName);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste('My Org');
+    await user.type(
+      screen.getByPlaceholderText('eg: Agency services, healthcare, finance'),
+      'Software',
+    );
+    await user.selectOptions(screen.getByRole('combobox'), 'agency');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     await waitFor(() => {
       expect(CreateOrganization).toHaveBeenCalled();
@@ -138,6 +138,7 @@ describe('CreateOrganizationPage', () => {
   });
 
   it('shows generic error when API returns service error', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (CreateOrganization as jest.Mock).mockImplementation(
       (_cfg, _name, _size, _industry, _headers, callback) => {
         callback(new Error('boom'), null);
@@ -146,16 +147,11 @@ describe('CreateOrganizationPage', () => {
 
     renderWithAuth();
 
-    fireEvent.change(screen.getByPlaceholderText('eg: Acme Voice Studio'), {
-      target: { value: 'My Org' },
-    });
-    fireEvent.change(
+    await user.type(
       screen.getByPlaceholderText('eg: Agency services, healthcare, finance'),
-      {
-        target: { value: 'Software' },
-      },
+      'Software',
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(
       await screen.findByText(
@@ -165,6 +161,7 @@ describe('CreateOrganizationPage', () => {
   });
 
   it('shows credential error when API returns unsuccessful response', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (CreateOrganization as jest.Mock).mockImplementation(
       (_cfg, _name, _size, _industry, _headers, callback) => {
         callback(null, { getSuccess: () => false });
@@ -173,16 +170,11 @@ describe('CreateOrganizationPage', () => {
 
     renderWithAuth();
 
-    fireEvent.change(screen.getByPlaceholderText('eg: Acme Voice Studio'), {
-      target: { value: 'My Org' },
-    });
-    fireEvent.change(
+    await user.type(
       screen.getByPlaceholderText('eg: Agency services, healthcare, finance'),
-      {
-        target: { value: 'Software' },
-      },
+      'Software',
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(
       await screen.findByText('Please provide valid credentials to sign in.'),

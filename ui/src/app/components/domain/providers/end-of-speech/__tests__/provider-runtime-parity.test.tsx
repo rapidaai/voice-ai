@@ -1,9 +1,13 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import { EndOfSpeechProvider } from '@/app/components/domain/providers/end-of-speech';
-import { EOS_MODEL_PATH_KEYS, GetDefaultEOSConfig } from '@/app/components/domain/providers/end-of-speech/provider';
+import {
+  EOS_MODEL_PATH_KEYS,
+  GetDefaultEOSConfig,
+} from '@/app/components/domain/providers/end-of-speech/provider';
 import { loadProviderConfig } from '@/providers/config-loader';
 
 jest.mock('@/utils', () => ({
@@ -90,7 +94,8 @@ describe('EOS provider runtime parity', () => {
     ['livekit_eos', 'extended_timeout', 'Maximum Endpoint Delay (ms)', '2400'],
   ])(
     '%s edits %s without mutating input metadata',
-    (provider, key, label, value) => {
+    async (provider, key, label, value) => {
+      const user = userEvent.setup();
       const parameters = GetDefaultEOSConfig(provider, [
         meta('listen.model', 'nova-3'),
         meta('microphone.eos.extended_timeout', '2000'),
@@ -118,7 +123,9 @@ describe('EOS provider runtime parity', () => {
         `input[id="slider-microphone.eos.${key}-input-for-slider"]`,
       );
       expect(input).not.toBeNull();
-      fireEvent.change(input!, { target: { value } });
+      await user.click(input!);
+      await user.keyboard('{Control>}a{/Control}');
+      await user.paste(String(value));
 
       const updated = onChangeParameter.mock.calls.at(-1)![0] as Metadata[];
       expect(
@@ -137,7 +144,8 @@ describe('EOS provider runtime parity', () => {
     },
   );
 
-  it('edits LiveKit history without a maximum and preserves saved model selection', () => {
+  it('edits LiveKit history without a maximum and preserves saved model selection', async () => {
+    const user = userEvent.setup();
     const parameters = GetDefaultEOSConfig('livekit_eos', [
       meta('microphone.eos.model', 'multilingual'),
     ]);
@@ -159,7 +167,9 @@ describe('EOS provider runtime parity', () => {
     expect(history).toHaveAttribute('min', '1');
     expect(history).toHaveAttribute('step', '1');
     expect(history).not.toHaveAttribute('max');
-    fireEvent.change(history, { target: { value: '1000' } });
+    await user.click(history);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('1000'));
 
     const updated = onChangeParameter.mock.calls.at(-1)![0] as Metadata[];
     expect(
@@ -185,7 +195,8 @@ describe('EOS provider runtime parity', () => {
     ).toBe(6);
   });
 
-  it('switches providers through the dropdown and the existing caller-owned scope cleanup', () => {
+  it('switches providers through the dropdown and the existing caller-owned scope cleanup', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const unrelated = meta('listen.model', 'nova-3');
     const liveKitModelPath = meta(
       'microphone.eos.livekit.model_path',
@@ -231,10 +242,10 @@ describe('EOS provider runtime parity', () => {
       ['Pipecat Smart Turn', 'pipecat_smart_turn_eos'],
       ['LiveKit', 'livekit_eos'],
     ]) {
-      fireEvent.click(
+      await user.click(
         screen.getByRole('combobox', { name: 'End-of-speech provider' }),
       );
-      fireEvent.click(
+      await user.click(
         screen.getByRole('option', { name: new RegExp(name, 'i') }),
       );
       expect(onChangeProvider).toHaveBeenLastCalledWith(selected);

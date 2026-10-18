@@ -1,11 +1,6 @@
 import React from 'react';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ConfigureAssistantCallDeploymentPage } from '@/app/pages/assistant/actions/create-deployment/phone';
 import { EditAssistantCallDeploymentPage } from '@/app/pages/assistant/actions/create-deployment/phone/edit';
@@ -308,6 +303,7 @@ describe('Phone deployment create and edit flows', () => {
   });
 
   it('edit mode preserves telephony + audio payload when deploying', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (getAssistantDeploymentByType as jest.Mock).mockResolvedValue({
       getData: () => ({
         getGreeting: () => 'hello',
@@ -333,10 +329,10 @@ describe('Phone deployment create and edit flows', () => {
 
     render(<ConfigureAssistantCallDeploymentPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy Phone' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Deploy Phone' }));
 
     await waitFor(() =>
       expect(createAssistantDeploymentByType).toHaveBeenCalledTimes(1),
@@ -351,16 +347,17 @@ describe('Phone deployment create and edit flows', () => {
   });
 
   it('create mode deploys with default telephony + audio payload', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (getAssistantDeploymentByType as jest.Mock).mockResolvedValue({
       getData: () => null,
     });
 
     render(<ConfigureAssistantCallDeploymentPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy Phone' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Deploy Phone' }));
 
     await waitFor(() =>
       expect(createAssistantDeploymentByType).toHaveBeenCalledTimes(1),
@@ -375,6 +372,7 @@ describe('Phone deployment create and edit flows', () => {
   });
 
   it('blocks moving forward when telephony configuration is invalid', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockValidateTelephonyOptions.mockReturnValue(false);
     (getAssistantDeploymentByType as jest.Mock).mockResolvedValue({
       getData: () => null,
@@ -382,7 +380,7 @@ describe('Phone deployment create and edit flows', () => {
 
     render(<ConfigureAssistantCallDeploymentPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
 
     expect(
       screen.getByText('Please provide a valid telephony configuration.'),
@@ -391,6 +389,7 @@ describe('Phone deployment create and edit flows', () => {
   });
 
   it('blocks voice-input step when STT provider options are invalid', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockValidateSpeechToTextIfInvalid.mockReturnValue(
       'Please configure STT provider credentials.',
     );
@@ -400,9 +399,9 @@ describe('Phone deployment create and edit flows', () => {
 
     render(<ConfigureAssistantCallDeploymentPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
 
     expect(
       screen.getByText('Please configure STT provider credentials.'),
@@ -411,6 +410,7 @@ describe('Phone deployment create and edit flows', () => {
   });
 
   it('blocks deploy when TTS configuration is invalid', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockValidateTextToSpeechIfInvalid.mockReturnValue(
       'Please configure TTS provider credentials.',
     );
@@ -420,10 +420,10 @@ describe('Phone deployment create and edit flows', () => {
 
     render(<ConfigureAssistantCallDeploymentPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy Phone' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Deploy Phone' }));
 
     expect(
       screen.getByText('Please configure TTS provider credentials.'),
@@ -433,6 +433,7 @@ describe('Phone deployment create and edit flows', () => {
   });
 
   it('allows switching tabs without step-by-step progression', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (getAssistantDeploymentByType as jest.Mock).mockResolvedValue({
       getData: () => null,
     });
@@ -440,7 +441,7 @@ describe('Phone deployment create and edit flows', () => {
     render(<EditAssistantCallDeploymentPage />);
 
     expect(screen.getByText('telephony')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Voice Output' }));
+    await user.click(screen.getByRole('button', { name: 'Voice Output' }));
     expect(screen.getByText('audio-output')).toBeInTheDocument();
   });
 

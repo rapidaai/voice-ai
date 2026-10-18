@@ -204,7 +204,7 @@ export function ConfigPrompt({
             >
               <span className="flex w-full min-w-0 flex-col items-stretch gap-1 text-left">
                 <span className="flex w-full min-w-0 items-center justify-between gap-2">
-                  <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-gray-500 dark:text-gray-400">
+                  <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[var(--cds-text-secondary)]">
                     Reserved Variables
                   </span>
                   <ChevronDown

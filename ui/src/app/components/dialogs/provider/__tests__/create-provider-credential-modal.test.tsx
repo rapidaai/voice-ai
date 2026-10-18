@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import toast from 'react-hot-toast/headless';
 import { CreateProviderKey } from '@rapidaai/react';
@@ -260,6 +261,7 @@ describe('CreateProviderCredentialDialog', () => {
   });
 
   it('validates provider, key name, and required configuration before submit', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <CreateProviderCredentialDialog
         modalOpen
@@ -268,23 +270,24 @@ describe('CreateProviderCredentialDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
+    await user.click(screen.getByRole('button', { name: 'Configure' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Please select the provider which you want to create the key.',
     );
 
-    fireEvent.change(screen.getByLabelText('Select your provider'), {
-      target: { value: 'openai' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
+    await user.selectOptions(
+      screen.getByLabelText('Select your provider'),
+      String('openai'),
+    );
+    await user.click(screen.getByRole('button', { name: 'Configure' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Please provide a valid key name for the credential.',
     );
 
-    fireEvent.change(screen.getByLabelText('Key Name'), {
-      target: { value: 'Production key' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
+    await user.click(screen.getByLabelText('Key Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Production key'));
+    await user.click(screen.getByRole('button', { name: 'Configure' }));
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(
@@ -294,6 +297,7 @@ describe('CreateProviderCredentialDialog', () => {
   });
 
   it('creates a provider credential and clears the modal on success', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
     (CreateProviderKey as jest.Mock).mockResolvedValue(apiResponse(true));
 
@@ -306,16 +310,14 @@ describe('CreateProviderCredentialDialog', () => {
     );
 
     await screen.findByLabelText('API key');
-    fireEvent.change(screen.getByLabelText('Key Name'), {
-      target: { value: 'Production key' },
-    });
-    fireEvent.change(screen.getByLabelText('API key'), {
-      target: { value: 'secret' },
-    });
-    fireEvent.change(screen.getByLabelText('Mode'), {
-      target: { value: 'chat' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
+    await user.click(screen.getByLabelText('Key Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Production key'));
+    await user.click(screen.getByLabelText('API key'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
+    await user.selectOptions(screen.getByLabelText('Mode'), String('chat'));
+    await user.click(screen.getByRole('button', { name: 'Configure' }));
 
     await waitFor(() => expect(CreateProviderKey).toHaveBeenCalledTimes(1));
 
@@ -336,6 +338,7 @@ describe('CreateProviderCredentialDialog', () => {
   });
 
   it('shows API and rejected request errors', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (CreateProviderKey as jest.Mock).mockResolvedValue(
       apiResponse(false, 'Credential already exists'),
     );
@@ -349,16 +352,14 @@ describe('CreateProviderCredentialDialog', () => {
     );
 
     await screen.findByLabelText('API key');
-    fireEvent.change(screen.getByLabelText('Key Name'), {
-      target: { value: 'Production key' },
-    });
-    fireEvent.change(screen.getByLabelText('API key'), {
-      target: { value: 'secret' },
-    });
-    fireEvent.change(screen.getByLabelText('Mode'), {
-      target: { value: 'chat' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
+    await user.click(screen.getByLabelText('Key Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Production key'));
+    await user.click(screen.getByLabelText('API key'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
+    await user.selectOptions(screen.getByLabelText('Mode'), String('chat'));
+    await user.click(screen.getByRole('button', { name: 'Configure' }));
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(
@@ -367,7 +368,7 @@ describe('CreateProviderCredentialDialog', () => {
     );
 
     (CreateProviderKey as jest.Mock).mockRejectedValue(new Error('network'));
-    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
+    await user.click(screen.getByRole('button', { name: 'Configure' }));
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
@@ -376,7 +377,8 @@ describe('CreateProviderCredentialDialog', () => {
     );
   });
 
-  it('closes from the header and cancel actions', () => {
+  it('closes from the header and cancel actions', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
 
     render(
@@ -387,8 +389,8 @@ describe('CreateProviderCredentialDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(setModalOpen).toHaveBeenCalledWith(false);
     expect(setModalOpen).toHaveBeenCalledTimes(2);
@@ -396,7 +398,8 @@ describe('CreateProviderCredentialDialog', () => {
 });
 
 describe('ProviderCredentialForm', () => {
-  it('notifies callers when form controls change', () => {
+  it('notifies callers when form controls change', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onProviderChange = jest.fn();
     const onKeyNameChange = jest.fn();
     const onConfigChange = jest.fn();
@@ -421,24 +424,25 @@ describe('ProviderCredentialForm', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Key Name'), {
-      target: { value: 'New key' },
-    });
-    fireEvent.change(screen.getByLabelText('Base URL (optional)'), {
-      target: { value: 'https://api.example.test' },
-    });
-    fireEvent.change(screen.getByLabelText('Mode'), {
-      target: { value: 'responses' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add headers' }));
-    fireEvent.change(screen.getByLabelText('Key'), {
-      target: { value: 'X-Trace' },
-    });
-    fireEvent.change(screen.getByLabelText('Value'), {
-      target: { value: 'trace-1' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
+    await user.click(screen.getByLabelText('Key Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('New key'));
+    await user.click(screen.getByLabelText('Base URL (optional)'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('https://api.example.test'));
+    await user.selectOptions(
+      screen.getByLabelText('Mode'),
+      String('responses'),
+    );
+    await user.click(screen.getByRole('button', { name: 'Add headers' }));
+    await user.click(screen.getByLabelText('Key'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('X-Trace'));
+    await user.click(screen.getByLabelText('Value'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('trace-1'));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Configure' }));
 
     expect(onKeyNameChange).toHaveBeenCalledWith('New key');
     expect(onConfigChange).toHaveBeenCalledWith(
@@ -457,7 +461,8 @@ describe('ProviderCredentialForm', () => {
 });
 
 describe('CredentialKeyValueField', () => {
-  it('parses, edits, adds, and removes entries as JSON', () => {
+  it('parses, edits, adds, and removes entries as JSON', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -469,21 +474,22 @@ describe('CredentialKeyValueField', () => {
       />,
     );
 
-    fireEvent.change(screen.getByDisplayValue('Authorization'), {
-      target: { value: 'X-Trace' },
-    });
+    await user.click(screen.getByDisplayValue('Authorization'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('X-Trace'));
     expect(onChange).toHaveBeenLastCalledWith('{"X-Trace":"Bearer token"}');
 
-    fireEvent.change(screen.getByDisplayValue('Bearer token'), {
-      target: { value: 'trace-1' },
-    });
+    await user.click(screen.getByDisplayValue('Bearer token'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('trace-1'));
     expect(onChange).toHaveBeenLastCalledWith('{"X-Trace":"trace-1"}');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
     expect(onChange).toHaveBeenLastCalledWith('');
   });
 
-  it('handles invalid JSON and helper serialization', () => {
+  it('handles invalid JSON and helper serialization', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -496,13 +502,13 @@ describe('CredentialKeyValueField', () => {
     );
 
     expect(screen.getByText(/No entries yet/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Add headers' }));
-    fireEvent.change(screen.getByLabelText('Key'), {
-      target: { value: 'X-Request-ID' },
-    });
-    fireEvent.change(screen.getByLabelText('Value'), {
-      target: { value: 'req-1' },
-    });
+    await user.click(screen.getByRole('button', { name: 'Add headers' }));
+    await user.click(screen.getByLabelText('Key'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('X-Request-ID'));
+    await user.click(screen.getByLabelText('Value'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('req-1'));
 
     expect(onChange).toHaveBeenLastCalledWith('{"X-Request-ID":"req-1"}');
     expect(parseCredentialEntries('[]')).toEqual([]);

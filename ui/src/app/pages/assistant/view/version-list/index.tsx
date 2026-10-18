@@ -257,28 +257,30 @@ export function Version(props: VersionProps) {
   return (
     <TableSection>
       <TableToolbar>
-        <TableBatchActions
-          shouldShowBatchActions={!!selectedVersionId}
-          totalSelected={selectedVersionId ? 1 : 0}
-          onCancel={() => setSelectedVersionId(null)}
-          totalCount={filteredRows.length}
-          className="[&_[class*=divider]]:hidden [&_.cds--btn]:transition-colors [&_.cds--btn:hover]:!bg-primary [&_.cds--btn:hover]:!text-white"
-        >
-          <TableBatchAction
-            renderIcon={Rocket}
-            onClick={() => {
-              const row = filteredRows.find(
-                r => r.data.id === selectedVersionId,
-              );
-              if (row) {
-                deployRevision(row.data.deployType, row.data.id);
-                setSelectedVersionId(null);
-              }
-            }}
+        {selectedVersionId && (
+          <TableBatchActions
+            shouldShowBatchActions
+            totalSelected={1}
+            onCancel={() => setSelectedVersionId(null)}
+            totalCount={filteredRows.length}
+            className="[&_[class*=divider]]:hidden [&_.cds--btn]:transition-colors [&_.cds--btn:hover]:!bg-primary [&_.cds--btn:hover]:!text-white"
           >
-            Deploy version
-          </TableBatchAction>
-        </TableBatchActions>
+            <TableBatchAction
+              renderIcon={Rocket}
+              onClick={() => {
+                const row = filteredRows.find(
+                  r => r.data.id === selectedVersionId,
+                );
+                if (row) {
+                  deployRevision(row.data.deployType, row.data.id);
+                  setSelectedVersionId(null);
+                }
+              }}
+            >
+              Deploy version
+            </TableBatchAction>
+          </TableBatchActions>
+        )}
         <TableToolbarContent>
           <TableToolbarSearch
             placeholder="Search versions..."
@@ -332,7 +334,7 @@ export function Version(props: VersionProps) {
                   <RadioButton
                     id={`version-select-${data.id}`}
                     name="version-select"
-                    labelText=""
+                    labelText={`Select version ${data.id}`}
                     hideLabel
                     checked={selectedVersionId === data.id}
                     onChange={() =>

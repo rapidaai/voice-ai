@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { SingleEndpoint } from '@/app/pages/endpoint/listing/single-endpoint';
@@ -198,15 +199,18 @@ describe('endpoint listing table UX', () => {
     expect(screen.getByText('12%')).toHaveClass('text-red-600');
   });
 
-  it('uses flat icon actions like the activity tables', () => {
+  it('uses flat icon actions like the activity tables', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     renderEndpointRow();
 
-    fireEvent.click(screen.getByRole('button', { name: 'View detail' }));
+    await user.click(screen.getByRole('button', { name: 'View detail' }));
     expect(mockNavigate).toHaveBeenCalledWith(
       '/deployment/endpoint/endpoint-1',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create new version' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Create new version' }),
+    );
     expect(mockNavigate).toHaveBeenCalledWith(
       '/deployment/endpoint/endpoint-1/create-endpoint-version',
     );

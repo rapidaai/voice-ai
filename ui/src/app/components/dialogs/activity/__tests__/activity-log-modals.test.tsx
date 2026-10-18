@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import toast from 'react-hot-toast/headless';
 import {
@@ -247,7 +248,8 @@ describe('activity log modal content', () => {
     jest.clearAllMocks();
   });
 
-  it('renders conversation message, metrics, metadata, and tab changes', () => {
+  it('renders conversation message, metrics, metadata, and tab changes', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onTabChange = jest.fn();
 
     render(
@@ -265,7 +267,7 @@ describe('activity log modal content', () => {
     );
     expect(screen.getByText('assistant')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Metrics' }));
+    await user.click(screen.getByRole('tab', { name: 'Metrics' }));
     expect(onTabChange).toHaveBeenCalledWith(1);
   });
 

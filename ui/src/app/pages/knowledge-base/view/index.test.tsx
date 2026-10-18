@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { ViewKnowledgePage } from './index';
@@ -151,10 +152,11 @@ describe('ViewKnowledgePage', () => {
     await waitFor(() => expect(mockShowLoader).toHaveBeenCalledWith('overlay'));
   });
 
-  it('opens create document dialog for the current knowledge', () => {
+  it('opens create document dialog for the current knowledge', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ViewKnowledgePage />);
 
-    fireEvent.click(screen.getByRole('button', { name: /add new document/i }));
+    await user.click(screen.getByRole('button', { name: /add new document/i }));
 
     expect(screen.getByTestId('create-document-dialog')).toHaveTextContent(
       'knowledge-1',

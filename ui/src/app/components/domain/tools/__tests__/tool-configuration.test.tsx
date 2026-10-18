@@ -2,7 +2,9 @@
  * Component tests for tool configuration forms.
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { setRangeValue } from '@/test-utils/set-range-value';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 
@@ -270,21 +272,25 @@ describe('ConfigureMCP', () => {
     expect(screen.getByLabelText('Timeout (seconds)')).toBeInTheDocument();
   });
 
-  it('calls onChangeToolDefinition when Name input changes', () => {
+  it('calls onChangeToolDefinition when Name input changes', async () => {
+    const user = userEvent.setup();
     render(<ConfigureMCP {...defaultProps} />);
     const nameInput = screen.getByTestId('mcp-tool-name');
-    fireEvent.change(nameInput, { target: { value: 'new-name' } });
+    await user.click(nameInput);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('new-name'));
     expect(mockOnChangeToolDefinition).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'new-name' }),
     );
   });
 
-  it('calls onParameterChange when Server URL changes', () => {
+  it('calls onParameterChange when Server URL changes', async () => {
+    const user = userEvent.setup();
     render(<ConfigureMCP {...defaultProps} />);
     const urlInput = screen.getByTestId('mcp-server-url');
-    fireEvent.change(urlInput, {
-      target: { value: 'https://new.example.com' },
-    });
+    await user.click(urlInput);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('https://new.example.com'));
     expect(mockOnParameterChange).toHaveBeenCalled();
     const updatedParams = mockOnParameterChange.mock.calls[0][0] as Metadata[];
     const serverUrl = updatedParams.find(m => m.getKey() === 'mcp.server_url');
@@ -336,20 +342,24 @@ describe('ConfigureAPIRequest', () => {
     expect(screen.getByLabelText('Server URL')).toBeInTheDocument();
   });
 
-  it('calls onParameterChange when method select changes', () => {
+  it('calls onParameterChange when method select changes', async () => {
+    const user = userEvent.setup();
     render(<ConfigureAPIRequest {...defaultProps} />);
     const methodSelect = screen.getByTestId('api-request-method');
-    fireEvent.change(methodSelect, { target: { value: 'POST' } });
+    await user.selectOptions(methodSelect, String('POST'));
     expect(mockOnParameterChange).toHaveBeenCalled();
     const updatedParams = mockOnParameterChange.mock.calls[0][0] as Metadata[];
     const method = updatedParams.find(m => m.getKey() === 'tool.method');
     expect(method?.getValue()).toBe('POST');
   });
 
-  it('calls onParameterChange when Server URL changes', () => {
+  it('calls onParameterChange when Server URL changes', async () => {
+    const user = userEvent.setup();
     render(<ConfigureAPIRequest {...defaultProps} />);
     const urlInput = screen.getByTestId('api-request-server-url');
-    fireEvent.change(urlInput, { target: { value: 'https://new-api.com' } });
+    await user.click(urlInput);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('https://new-api.com'));
     expect(mockOnParameterChange).toHaveBeenCalled();
     const updatedParams = mockOnParameterChange.mock.calls[0][0] as Metadata[];
     const endpoint = updatedParams.find(m => m.getKey() === 'tool.endpoint');
@@ -409,10 +419,11 @@ describe('ConfigureKnowledgeRetrieval', () => {
     );
   });
 
-  it('calls onParameterChange when a search type tile is selected', () => {
+  it('calls onParameterChange when a search type tile is selected', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureKnowledgeRetrieval {...defaultProps} />);
 
-    fireEvent.click(screen.getByText('Semantic Search').closest('button')!);
+    await user.click(screen.getByText('Semantic Search').closest('button')!);
 
     expect(mockOnParameterChange).toHaveBeenCalled();
     const updatedParams = mockOnParameterChange.mock.calls[0][0] as Metadata[];
@@ -422,10 +433,12 @@ describe('ConfigureKnowledgeRetrieval', () => {
     expect(searchType?.getValue()).toBe('semantic_search');
   });
 
-  it('calls onParameterChange when top_k numeric input changes', () => {
+  it('calls onParameterChange when top_k numeric input changes', async () => {
+    const user = userEvent.setup();
     render(<ConfigureKnowledgeRetrieval {...defaultProps} />);
     const topKInput = screen.getByTestId('top-k');
-    fireEvent.change(topKInput, { target: { value: '8' } });
+    await user.click(topKInput);
+    setRangeValue(topKInput as HTMLInputElement, 8);
     expect(mockOnParameterChange).toHaveBeenCalled();
     const updatedParams = mockOnParameterChange.mock.calls[0][0] as Metadata[];
     const topK = updatedParams.find(m => m.getKey() === 'tool.top_k');

@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { CreateKnowledge } from './create-assistant-knowledge';
@@ -184,7 +185,8 @@ describe('assistant knowledge configuration forms', () => {
     );
   });
 
-  it('uses Carbon information icons in the create form tooltips', () => {
+  it('uses Carbon information icons in the create form tooltips', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateKnowledge assistantId="assistant-1" />);
 
     const icons = screen.getAllByTestId('information-icon');
@@ -193,7 +195,9 @@ describe('assistant knowledge configuration forms', () => {
       expect(icon).not.toHaveAttribute('data-stroke-width');
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /connect knowledge/i }));
+    await user.click(
+      screen.getByRole('button', { name: /connect knowledge/i }),
+    );
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Please select a valid knowledge.',

@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { DateFilter } from '../date-filter';
@@ -69,7 +70,8 @@ jest.mock('@carbon/react', () => ({
 }));
 
 describe('DateFilter', () => {
-  it('renders the Carbon trigger and opens a Carbon popover', () => {
+  it('renders the Carbon trigger and opens a Carbon popover', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<DateFilter onApply={jest.fn()} />);
 
     const trigger = screen.getByRole('button', { name: 'Filter by date' });
@@ -78,7 +80,7 @@ describe('DateFilter', () => {
     expect(screen.getByTestId('filter-icon')).toBeInTheDocument();
     expect(screen.queryByText('From')).not.toBeInTheDocument();
 
-    fireEvent.click(trigger);
+    await user.click(trigger);
 
     expect(screen.getByText('From')).toBeInTheDocument();
     expect(
@@ -88,14 +90,15 @@ describe('DateFilter', () => {
     ).toBeInTheDocument();
   });
 
-  it('applies the selected date range', () => {
+  it('applies the selected date range', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onApply = jest.fn();
 
     render(<DateFilter onApply={onApply} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Filter by date' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Select dates' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    await user.click(screen.getByRole('button', { name: 'Filter by date' }));
+    await user.click(screen.getByRole('button', { name: 'Select dates' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
 
     expect(onApply).toHaveBeenCalledWith(
       mockSelectedDates[0],
@@ -104,20 +107,21 @@ describe('DateFilter', () => {
     expect(screen.queryByText('From')).not.toBeInTheDocument();
   });
 
-  it('resets local dates and honors Carbon popover close requests', () => {
+  it('resets local dates and honors Carbon popover close requests', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onReset = jest.fn();
 
     render(<DateFilter onApply={jest.fn()} onReset={onReset} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Filter by date' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Select dates' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    await user.click(screen.getByRole('button', { name: 'Filter by date' }));
+    await user.click(screen.getByRole('button', { name: 'Select dates' }));
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
 
     expect(onReset).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('From')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Filter by date' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Close popover' }));
+    await user.click(screen.getByRole('button', { name: 'Filter by date' }));
+    await user.click(screen.getByRole('button', { name: 'Close popover' }));
 
     expect(screen.queryByText('From')).not.toBeInTheDocument();
   });

@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ConfigureEndpointPromptDialog } from '../configure-endpoint-prompt-modal';
 import { EndpointArguments } from '../endpoint-trace-arguments';
@@ -230,7 +231,8 @@ describe('endpoint dialogs', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('selects an endpoint template and returns it', () => {
+  it('selects an endpoint template and returns it', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onSelectTemplate = jest.fn();
     const setModalOpen = jest.fn();
 
@@ -244,12 +246,12 @@ describe('endpoint dialogs', () => {
 
     expect(screen.getByRole('button', { name: 'Use template' })).toBeDisabled();
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', {
         name: /Churn Risk Detection/,
       }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Use template' }));
+    await user.click(screen.getByRole('button', { name: 'Use template' }));
 
     expect(onSelectTemplate).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Churn Risk Detection' }),
@@ -257,24 +259,26 @@ describe('endpoint dialogs', () => {
     expect(setModalOpen).toHaveBeenCalledWith(false);
   });
 
-  it('closes after selecting a template when no selection callback is provided', () => {
+  it('closes after selecting a template when no selection callback is provided', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
 
     render(
       <ConfigureEndpointPromptDialog modalOpen setModalOpen={setModalOpen} />,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', {
         name: /Churn Risk Detection/,
       }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Use template' }));
+    await user.click(screen.getByRole('button', { name: 'Use template' }));
 
     expect(setModalOpen).toHaveBeenCalledWith(false);
   });
 
-  it('closes the template dialog without selecting a template', () => {
+  it('closes the template dialog without selecting a template', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onSelectTemplate = jest.fn();
     const setModalOpen = jest.fn();
 
@@ -286,7 +290,7 @@ describe('endpoint dialogs', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(onSelectTemplate).not.toHaveBeenCalled();
     expect(setModalOpen).toHaveBeenCalledWith(false);

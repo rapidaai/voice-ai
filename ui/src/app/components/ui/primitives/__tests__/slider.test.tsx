@@ -1,8 +1,10 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import { Slider } from '../slider';
+import userEvent from '@testing-library/user-event';
+import { setRangeValue } from '@/test-utils/set-range-value';
 
 jest.mock('@carbon/react', () => {
   const React = require('react');
@@ -48,7 +50,8 @@ jest.mock('@carbon/react', () => {
 });
 
 describe('Slider', () => {
-  it('renders Carbon Slider with converted numeric values and onSlide support', () => {
+  it('renders Carbon Slider with converted numeric values and onSlide support', async () => {
+    const user = userEvent.setup();
     const onSlide = jest.fn();
 
     render(
@@ -77,12 +80,14 @@ describe('Slider', () => {
     expect(slider).toHaveClass('w-full');
     expect(slider).toHaveClass('max-w-48');
 
-    fireEvent.change(slider, { target: { value: '0.5' } });
+    await user.click(slider);
+    setRangeValue(slider as HTMLInputElement, 0.5);
 
     expect(onSlide).toHaveBeenCalledWith(0.5);
   });
 
-  it('keeps Carbon-style onChange and visible labels', () => {
+  it('keeps Carbon-style onChange and visible labels', async () => {
+    const user = userEvent.setup();
     const onChange = jest.fn();
 
     render(
@@ -103,7 +108,8 @@ describe('Slider', () => {
     expect(slider).toHaveAttribute('id', 'transfer-delay');
     expect(screen.getByText('Transfer Delay')).toBeVisible();
 
-    fireEvent.change(slider, { target: { value: '1500' } });
+    await user.click(slider);
+    setRangeValue(slider as HTMLInputElement, 1500);
 
     expect(onChange).toHaveBeenCalledWith({ value: 1500 });
   });

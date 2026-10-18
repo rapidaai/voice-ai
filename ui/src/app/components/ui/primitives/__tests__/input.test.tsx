@@ -1,9 +1,10 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import { Input } from '../input';
 import { InputHelper } from '../input-helper';
+import userEvent from '@testing-library/user-event';
 
 jest.mock('@carbon/react', () => {
   const React = require('react');
@@ -44,7 +45,8 @@ jest.mock('@carbon/react', () => {
 });
 
 describe('Input', () => {
-  it('renders the Carbon text input with the existing name-based id contract', () => {
+  it('renders the Carbon text input with the existing name-based id contract', async () => {
+    const user = userEvent.setup();
     const onChange = jest.fn();
 
     render(
@@ -65,7 +67,9 @@ describe('Input', () => {
     expect(input).toHaveClass('w-full');
     expect(input).toHaveClass('max-w-80');
 
-    fireEvent.change(input, { target: { value: 'Support workspace' } });
+    await user.click(input);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support workspace'));
 
     expect(onChange).toHaveBeenCalledTimes(1);
   });

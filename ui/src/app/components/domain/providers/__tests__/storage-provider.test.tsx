@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import {
@@ -193,7 +194,8 @@ describe('storage file helpers', () => {
 });
 
 describe('StorageFileSelector', () => {
-  it('renders recording files and updates checked file state', () => {
+  it('renders recording files and updates checked file state', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -212,13 +214,13 @@ describe('StorageFileSelector', () => {
     const userFile = screen.getByLabelText('recording.user');
     expect(userFile).toBeChecked();
 
-    fireEvent.click(screen.getByLabelText('recording.conversation'));
+    await user.click(screen.getByLabelText('recording.conversation'));
     expect(onChange).toHaveBeenCalledWith([
       'recording.user',
       'recording.conversation',
     ]);
 
-    fireEvent.click(userFile);
+    await user.click(userFile);
     expect(onChange).toHaveBeenCalledWith([]);
   });
 });
@@ -305,7 +307,8 @@ describe('storage provider configuration', () => {
 });
 
 describe('CloudStorageProvider', () => {
-  it('selects a provider and initializes provider defaults', () => {
+  it('selects a provider and initializes provider defaults', async () => {
+    const user = userEvent.setup();
     const onChangeProvider = jest.fn();
     const onChangeParameter = jest.fn();
     const defaults = [createMetadata('container', 'support')];
@@ -329,8 +332,8 @@ describe('CloudStorageProvider', () => {
     const select = screen.getByRole('combobox', {
       name: 'Select storage provider',
     });
-    fireEvent.change(select, { target: { value: 'aws' } });
-    fireEvent.change(select, { target: { value: '' } });
+    await user.selectOptions(select, String('aws'));
+    await user.selectOptions(select, String(''));
 
     expect(onChangeProvider).toHaveBeenCalledWith('aws');
     expect(onChangeProvider).toHaveBeenCalledTimes(1);
@@ -340,7 +343,8 @@ describe('CloudStorageProvider', () => {
     ).toBe('support');
   });
 
-  it('renders credential and config controls for a selected provider', () => {
+  it('renders credential and config controls for a selected provider', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeParameter = jest.fn();
     mockLoadProviderConfig.mockReturnValue({ storage: { parameters: [] } });
 
@@ -358,7 +362,7 @@ describe('CloudStorageProvider', () => {
     expect(credentialButton).toHaveAttribute('data-provider', 'aws');
     expect(screen.getByTestId('config-storage')).toHaveTextContent('aws');
 
-    fireEvent.click(credentialButton);
+    await user.click(credentialButton);
 
     expect(
       getMetadataValue(
@@ -368,7 +372,8 @@ describe('CloudStorageProvider', () => {
     ).toBe('credential-next');
   });
 
-  it('adds a credential metadata value when one does not exist yet', () => {
+  it('adds a credential metadata value when one does not exist yet', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeParameter = jest.fn();
     mockLoadProviderConfig.mockReturnValue({ storage: { parameters: [] } });
 
@@ -381,7 +386,7 @@ describe('CloudStorageProvider', () => {
       />,
     );
 
-    fireEvent.click(screen.getByText('Pick credential'));
+    await user.click(screen.getByText('Pick credential'));
 
     const nextParameters = onChangeParameter.mock.calls[0][0] as Metadata[];
     expect(getMetadataValue(nextParameters, 'container')).toBe('support');

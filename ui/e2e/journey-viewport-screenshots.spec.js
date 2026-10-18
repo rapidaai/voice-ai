@@ -9,7 +9,6 @@ const {
 const { routeJourneys } = require('./route-manifest');
 
 const emptyJourneyIds = new Set([
-  'deployment.assistant',
   'deployment.endpoint',
   'deployment.endpointVersions',
   'integration.projectCredential',
@@ -17,6 +16,13 @@ const emptyJourneyIds = new Set([
   'logs.traces',
   'organization.users',
   'organization.projects',
+  'deployment.assistantDeployments',
+  'deployment.assistantTools',
+  'deployment.assistantWebhooks',
+  'deployment.assistantAuthentication',
+  'deployment.assistantTelemetry',
+  'deployment.assistantStorage',
+  'deployment.assistantAnalysis',
 ]);
 
 const screenshotJourneys = routeJourneys.filter(

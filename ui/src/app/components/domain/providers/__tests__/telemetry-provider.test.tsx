@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import { TelemetryProvider } from '../telemetry';
@@ -116,7 +117,8 @@ beforeEach(() => {
 });
 
 describe('telemetry provider configuration', () => {
-  it('selects a provider and initializes telemetry defaults', () => {
+  it('selects a provider and initializes telemetry defaults', async () => {
+    const user = userEvent.setup();
     const onChangeProvider = jest.fn();
     const onChangeParameter = jest.fn();
     const defaults = [createMetadata('public_key', 'pk_test')];
@@ -144,8 +146,8 @@ describe('telemetry provider configuration', () => {
     const select = screen.getByRole('combobox', {
       name: 'Select telemetry provider',
     });
-    fireEvent.change(select, { target: { value: 'langfuse' } });
-    fireEvent.change(select, { target: { value: '' } });
+    await user.selectOptions(select, String('langfuse'));
+    await user.selectOptions(select, String(''));
 
     expect(onChangeProvider).toHaveBeenCalledWith('langfuse');
     expect(onChangeProvider).toHaveBeenCalledTimes(1);
@@ -159,7 +161,8 @@ describe('telemetry provider configuration', () => {
     );
   });
 
-  it('updates an existing credential metadata value', () => {
+  it('updates an existing credential metadata value', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeParameter = jest.fn();
     mockLoadProviderConfig.mockReturnValue({ telemetry: { parameters: [] } });
 
@@ -182,7 +185,7 @@ describe('telemetry provider configuration', () => {
       'langfuse',
     );
 
-    fireEvent.click(credentialButton);
+    await user.click(credentialButton);
 
     const nextParameters = onChangeParameter.mock.calls[0][0] as Metadata[];
     expect(getMetadataValue(nextParameters, 'rapida.credential_id')).toBe(
@@ -191,7 +194,8 @@ describe('telemetry provider configuration', () => {
     expect(getMetadataValue(nextParameters, 'public_key')).toBe('pk_test');
   });
 
-  it('adds credential metadata when no credential exists yet', () => {
+  it('adds credential metadata when no credential exists yet', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeParameter = jest.fn();
     mockLoadProviderConfig.mockReturnValue({ telemetry: { parameters: [] } });
 
@@ -204,7 +208,7 @@ describe('telemetry provider configuration', () => {
       />,
     );
 
-    fireEvent.click(screen.getByText('Pick credential'));
+    await user.click(screen.getByText('Pick credential'));
 
     const nextParameters = onChangeParameter.mock.calls[0][0] as Metadata[];
     expect(getMetadataValue(nextParameters, 'endpoint')).toBe(

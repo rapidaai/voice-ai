@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ConfigureAssistantToolDialog } from '../assistant-configure-tool-modal';
 
@@ -157,7 +158,8 @@ describe('ConfigureAssistantToolDialog', () => {
     mockValidateToolDefaultOptions.mockReturnValue(undefined);
   });
 
-  it('submits valid create payload via onChange', () => {
+  it('submits valid create payload via onChange', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -169,10 +171,10 @@ describe('ConfigureAssistantToolDialog', () => {
       />,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set Valid Definition' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Save tool' }));
+    await user.click(screen.getByRole('button', { name: 'Save tool' }));
 
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange.mock.calls[0][0]).toMatchObject({
@@ -182,7 +184,8 @@ describe('ConfigureAssistantToolDialog', () => {
     });
   });
 
-  it('shows validation error for invalid JSON parameters', () => {
+  it('shows validation error for invalid JSON parameters', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <ConfigureAssistantToolDialog
         modalOpen
@@ -191,10 +194,10 @@ describe('ConfigureAssistantToolDialog', () => {
       />,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set Invalid JSON Definition' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Save tool' }));
+    await user.click(screen.getByRole('button', { name: 'Save tool' }));
 
     expect(
       screen.getByText(
@@ -203,7 +206,8 @@ describe('ConfigureAssistantToolDialog', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows validation errors for missing required definition fields', () => {
+  it('shows validation errors for missing required definition fields', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const { rerender } = render(
       <ConfigureAssistantToolDialog
         modalOpen
@@ -212,8 +216,8 @@ describe('ConfigureAssistantToolDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Set Missing Name' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save tool' }));
+    await user.click(screen.getByRole('button', { name: 'Set Missing Name' }));
+    await user.click(screen.getByRole('button', { name: 'Save tool' }));
     expect(
       screen.getByText('Please provide a valid name for tool.'),
     ).toBeInTheDocument();
@@ -225,8 +229,8 @@ describe('ConfigureAssistantToolDialog', () => {
         initialData={null}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Set Invalid Name' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save tool' }));
+    await user.click(screen.getByRole('button', { name: 'Set Invalid Name' }));
+    await user.click(screen.getByRole('button', { name: 'Save tool' }));
     expect(
       screen.getByText(
         'Name should only contain letters, numbers, and underscores.',
@@ -240,10 +244,10 @@ describe('ConfigureAssistantToolDialog', () => {
         initialData={null}
       />,
     );
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set Missing Description' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Save tool' }));
+    await user.click(screen.getByRole('button', { name: 'Save tool' }));
     expect(
       screen.getByText('Please provide a valid description for the tool.'),
     ).toBeInTheDocument();
@@ -255,16 +259,17 @@ describe('ConfigureAssistantToolDialog', () => {
         initialData={null}
       />,
     );
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set Missing Parameters' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Save tool' }));
+    await user.click(screen.getByRole('button', { name: 'Save tool' }));
     expect(
       screen.getByText('Please provide a valid parameters for the tool.'),
     ).toBeInTheDocument();
   });
 
-  it('surfaces tool option validation errors', () => {
+  it('surfaces tool option validation errors', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockValidateToolDefaultOptions.mockReturnValue('Select a valid tool.');
 
     render(
@@ -275,15 +280,16 @@ describe('ConfigureAssistantToolDialog', () => {
       />,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set Valid Definition' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Save tool' }));
+    await user.click(screen.getByRole('button', { name: 'Save tool' }));
 
     expect(screen.getByText('Select a valid tool.')).toBeInTheDocument();
   });
 
-  it('surfaces parent onValidateConfig error and blocks submit', () => {
+  it('surfaces parent onValidateConfig error and blocks submit', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
 
     render(
@@ -296,10 +302,10 @@ describe('ConfigureAssistantToolDialog', () => {
       />,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set Valid Definition' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Save tool' }));
+    await user.click(screen.getByRole('button', { name: 'Save tool' }));
 
     expect(
       screen.getByText('Please provide a unique tool name for tools.'),
@@ -307,7 +313,8 @@ describe('ConfigureAssistantToolDialog', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('loads initial data on edit and validates using its tool code', () => {
+  it('loads initial data on edit and validates using its tool code', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <ConfigureAssistantToolDialog
         modalOpen
@@ -324,14 +331,15 @@ describe('ConfigureAssistantToolDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save tool' }));
+    await user.click(screen.getByRole('button', { name: 'Save tool' }));
     expect(mockValidateToolDefaultOptions).toHaveBeenCalledWith(
       'knowledge_retrieval',
       [],
     );
   });
 
-  it('falls back to the default tool code when edit data has no code', () => {
+  it('falls back to the default tool code when edit data has no code', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <ConfigureAssistantToolDialog
         modalOpen
@@ -349,14 +357,15 @@ describe('ConfigureAssistantToolDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save tool' }));
+    await user.click(screen.getByRole('button', { name: 'Save tool' }));
     expect(mockValidateToolDefaultOptions).toHaveBeenCalledWith(
       'knowledge_retrieval',
       [],
     );
   });
 
-  it('resets local validation state after the dialog is closed', () => {
+  it('resets local validation state after the dialog is closed', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const { rerender } = render(
       <ConfigureAssistantToolDialog
         modalOpen
@@ -365,8 +374,8 @@ describe('ConfigureAssistantToolDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Set Missing Name' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save tool' }));
+    await user.click(screen.getByRole('button', { name: 'Set Missing Name' }));
+    await user.click(screen.getByRole('button', { name: 'Save tool' }));
     expect(
       screen.getByText('Please provide a valid name for tool.'),
     ).toBeInTheDocument();
@@ -391,7 +400,8 @@ describe('ConfigureAssistantToolDialog', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('updates the built-in tool configuration and closes from cancel', () => {
+  it('updates the built-in tool configuration and closes from cancel', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChange = jest.fn();
     const setModalOpen = jest.fn();
 
@@ -404,9 +414,9 @@ describe('ConfigureAssistantToolDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use MCP' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Set MCP Config' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save tool' }));
+    await user.click(screen.getByRole('button', { name: 'Use MCP' }));
+    await user.click(screen.getByRole('button', { name: 'Set MCP Config' }));
+    await user.click(screen.getByRole('button', { name: 'Save tool' }));
 
     expect(onChange.mock.calls[0][0]).toMatchObject({
       name: 'mcp_tool',
@@ -415,7 +425,7 @@ describe('ConfigureAssistantToolDialog', () => {
       },
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(setModalOpen).toHaveBeenCalledWith(false);
   });
 });

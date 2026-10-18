@@ -1,11 +1,6 @@
 import React from 'react';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { ConfigureAssistantDeploymentPage } from '@/app/pages/assistant/actions/create-deployment';
@@ -619,12 +614,13 @@ describe('Deployment and tool flows', () => {
   });
 
   it('create deployment allows channel selection and routes to web deployment', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureAssistantDeploymentPage />);
 
-    fireEvent.click(
+    await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    fireEvent.click(screen.getByRole('menuitem', { name: /Web Widget/i }));
+    await user.click(screen.getByRole('menuitem', { name: /Web Widget/i }));
 
     expect(mockGlobalNavigation.goToConfigureWeb).toHaveBeenCalledWith(
       'assistant-1',
@@ -633,6 +629,7 @@ describe('Deployment and tool flows', () => {
   });
 
   it('create deployment empty state shows add deployment action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAssistant as jest.Mock).mockResolvedValue({
       getSuccess: () => true,
       getData: () => ({
@@ -653,10 +650,10 @@ describe('Deployment and tool flows', () => {
       expect(screen.getByText('No deployments found')).toBeInTheDocument();
     });
 
-    fireEvent.click(
+    await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    fireEvent.click(screen.getByRole('menuitem', { name: /Debugger/i }));
+    await user.click(screen.getByRole('menuitem', { name: /Debugger/i }));
     expect(mockGlobalNavigation.goToConfigureDebugger).toHaveBeenCalledWith(
       'assistant-1',
     );
@@ -664,28 +661,29 @@ describe('Deployment and tool flows', () => {
   });
 
   it('create deployment routes to API, phone and debugger channels from add deployment menu', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureAssistantDeploymentPage />);
 
-    fireEvent.click(
+    await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    fireEvent.click(screen.getByRole('menuitem', { name: /SDK \/ API/i }));
+    await user.click(screen.getByRole('menuitem', { name: /SDK \/ API/i }));
     expect(mockGlobalNavigation.goToConfigureApi).toHaveBeenCalledWith(
       'assistant-1',
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    fireEvent.click(screen.getByRole('menuitem', { name: /Phone Call/i }));
+    await user.click(screen.getByRole('menuitem', { name: /Phone Call/i }));
     expect(mockGlobalNavigation.goToConfigureCall).toHaveBeenCalledWith(
       'assistant-1',
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    fireEvent.click(screen.getByRole('menuitem', { name: /Debugger/i }));
+    await user.click(screen.getByRole('menuitem', { name: /Debugger/i }));
     expect(mockGlobalNavigation.goToConfigureDebugger).toHaveBeenCalledWith(
       'assistant-1',
     );
@@ -693,6 +691,7 @@ describe('Deployment and tool flows', () => {
   });
 
   it('create deployment shows edit action for existing API deployment', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAssistantApiDeployment as jest.Mock).mockResolvedValue({
       getData: () => ({
         getGreeting: () => '',
@@ -714,7 +713,7 @@ describe('Deployment and tool flows', () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit deployment' }));
+    await user.click(screen.getByRole('button', { name: 'Edit deployment' }));
     expect(mockGlobalNavigation.goToEditApi).toHaveBeenCalledWith(
       'assistant-1',
       'api-dep-1',
@@ -723,6 +722,7 @@ describe('Deployment and tool flows', () => {
   });
 
   it('debugger edit routes to debugger edit page', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAssistant as jest.Mock).mockResolvedValue({
       getSuccess: () => true,
       getData: () => ({
@@ -754,46 +754,49 @@ describe('Deployment and tool flows', () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit deployment' }));
+    await user.click(screen.getByRole('button', { name: 'Edit deployment' }));
     expect(mockGlobalNavigation.goToEditDebugger).toHaveBeenCalledWith(
       'assistant-1',
       'debugger-dep-1',
     );
   });
 
-  it('create tool validates missing name before submit', () => {
+  it('create tool validates missing name before submit', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateTool assistantId="assistant-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Configure Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Configure Tool' }));
 
     expect(
       screen.getByText('Please provide a valid name for tool.'),
     ).toBeInTheDocument();
   });
 
-  it('update tool validates missing name before submit', () => {
+  it('update tool validates missing name before submit', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<UpdateTool assistantId="assistant-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Update Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Update Tool' }));
 
     expect(
       screen.getByText('Please provide a valid name for tool.'),
     ).toBeInTheDocument();
   });
 
-  it('create tool validates invalid JSON parameters on definition step', () => {
+  it('create tool validates invalid JSON parameters on definition step', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateTool assistantId="assistant-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.change(screen.getByLabelText('Tool Name'), {
-      target: { value: 'valid_tool' },
-    });
-    fireEvent.change(screen.getByLabelText('Tool Parameters'), {
-      target: { value: '{not-json' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Configure Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByLabelText('Tool Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('valid_tool'));
+    await user.click(screen.getByLabelText('Tool Parameters'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('{not-json'));
+    await user.click(screen.getByRole('button', { name: 'Configure Tool' }));
 
     expect(
       screen.getByText(
@@ -802,7 +805,8 @@ describe('Deployment and tool flows', () => {
     ).toBeInTheDocument();
   });
 
-  it('update tool validates missing description on definition step', () => {
+  it('update tool validates missing description on definition step', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAssistantTool as jest.Mock).mockImplementation(
       (_cfg, _assistantId, _toolId, cb) =>
         cb(null, {
@@ -818,33 +822,33 @@ describe('Deployment and tool flows', () => {
 
     render(<UpdateTool assistantId="assistant-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.change(screen.getByLabelText('Tool Description'), {
-      target: { value: '' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Update Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.clear(screen.getByLabelText('Tool Description'));
+    await user.click(screen.getByRole('button', { name: 'Update Tool' }));
 
     expect(
       screen.getByText('Please provide a description for the tool.'),
     ).toBeInTheDocument();
   });
 
-  it('create tool submits directly for MCP from action step', () => {
+  it('create tool submits directly for MCP from action step', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateTool assistantId="assistant-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use MCP Tool' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Configure Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Use MCP Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Configure Tool' }));
 
     expect(CreateAssistantTool).toHaveBeenCalledTimes(1);
     expect((CreateAssistantTool as jest.Mock).mock.calls[0][5]).toBe('mcp');
   });
 
-  it('create tool submits mcp metadata options from action step', () => {
+  it('create tool submits mcp metadata options from action step', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateTool assistantId="assistant-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use MCP Tool' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Set MCP Config' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Configure Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Use MCP Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Set MCP Config' }));
+    await user.click(screen.getByRole('button', { name: 'Configure Tool' }));
 
     expect(CreateAssistantTool).toHaveBeenCalledTimes(1);
     expect((CreateAssistantTool as jest.Mock).mock.calls[0][2]).toBe(
@@ -863,20 +867,21 @@ describe('Deployment and tool flows', () => {
     expect(byKey['mcp.headers']).toContain('Authorization');
   });
 
-  it('create tool submits end_of_conversation execution method', () => {
+  it('create tool submits end_of_conversation execution method', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateTool assistantId="assistant-1" />);
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Use End Of Conversation Tool' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.change(screen.getByLabelText('Tool Name'), {
-      target: { value: 'end_tool' },
-    });
-    fireEvent.change(screen.getByLabelText('Tool Parameters'), {
-      target: { value: '{"reason":"user said goodbye"}' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Configure Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByLabelText('Tool Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('end_tool'));
+    await user.click(screen.getByLabelText('Tool Parameters'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('{"reason":"user said goodbye"}'));
+    await user.click(screen.getByRole('button', { name: 'Configure Tool' }));
 
     expect(CreateAssistantTool).toHaveBeenCalledTimes(1);
     expect((CreateAssistantTool as jest.Mock).mock.calls[0][5]).toBe(
@@ -887,20 +892,21 @@ describe('Deployment and tool flows', () => {
     expect(executionOptions).toEqual([]);
   });
 
-  it('create tool includes tool.condition metadata in execution options', () => {
+  it('create tool includes tool.condition metadata in execution options', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateTool assistantId="assistant-1" />);
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set Condition Phone' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.change(screen.getByLabelText('Tool Name'), {
-      target: { value: 'valid_tool' },
-    });
-    fireEvent.change(screen.getByLabelText('Tool Parameters'), {
-      target: { value: '{"context":"ok"}' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Configure Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByLabelText('Tool Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('valid_tool'));
+    await user.click(screen.getByLabelText('Tool Parameters'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('{"context":"ok"}'));
+    await user.click(screen.getByRole('button', { name: 'Configure Tool' }));
 
     expect(CreateAssistantTool).toHaveBeenCalledTimes(1);
     const executionOptions = (CreateAssistantTool as jest.Mock).mock
@@ -914,6 +920,7 @@ describe('Deployment and tool flows', () => {
   });
 
   it('update tool loads existing tool.condition metadata and submits it', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAssistantTool as jest.Mock).mockImplementation(
       (_cfg, _assistantId, _toolId, cb) => {
         const { Metadata } = require('@rapidaai/react');
@@ -942,8 +949,8 @@ describe('Deployment and tool flows', () => {
       );
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Update Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Update Tool' }));
 
     expect(UpdateAssistantTool).toHaveBeenCalledTimes(1);
     const executionOptions = (UpdateAssistantTool as jest.Mock).mock
@@ -956,6 +963,7 @@ describe('Deployment and tool flows', () => {
   });
 
   it('update tool loads mcp options and submits directly from action step', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAssistantTool as jest.Mock).mockImplementation(
       (_cfg, _assistantId, _toolId, cb) => {
         const { Metadata } = require('@rapidaai/react');
@@ -1001,7 +1009,7 @@ describe('Deployment and tool flows', () => {
       );
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Update Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Update Tool' }));
 
     expect(UpdateAssistantTool).toHaveBeenCalledTimes(1);
     expect((UpdateAssistantTool as jest.Mock).mock.calls[0][6]).toBe('mcp');
@@ -1018,6 +1026,7 @@ describe('Deployment and tool flows', () => {
   });
 
   it('update tool loads end_of_conversation and submits update', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAssistantTool as jest.Mock).mockImplementation(
       (_cfg, _assistantId, _toolId, cb) =>
         cb(null, {
@@ -1041,8 +1050,8 @@ describe('Deployment and tool flows', () => {
       );
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Update Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Update Tool' }));
 
     expect(UpdateAssistantTool).toHaveBeenCalledTimes(1);
     expect((UpdateAssistantTool as jest.Mock).mock.calls[0][5]).toEqual({
@@ -1056,21 +1065,22 @@ describe('Deployment and tool flows', () => {
     expect(executionOptions).toEqual([]);
   });
 
-  it('create tool submits api_request execution method with api metadata options', () => {
+  it('create tool submits api_request execution method with api metadata options', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateTool assistantId="assistant-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use API Tool' }));
-    fireEvent.click(
+    await user.click(screen.getByRole('button', { name: 'Use API Tool' }));
+    await user.click(
       screen.getByRole('button', { name: 'Set API Request Config' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.change(screen.getByLabelText('Tool Name'), {
-      target: { value: 'api_tool' },
-    });
-    fireEvent.change(screen.getByLabelText('Tool Parameters'), {
-      target: { value: '{"context":"ok"}' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Configure Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByLabelText('Tool Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('api_tool'));
+    await user.click(screen.getByLabelText('Tool Parameters'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('{"context":"ok"}'));
+    await user.click(screen.getByRole('button', { name: 'Configure Tool' }));
 
     expect(CreateAssistantTool).toHaveBeenCalledTimes(1);
     expect((CreateAssistantTool as jest.Mock).mock.calls[0][5]).toBe(
@@ -1088,6 +1098,7 @@ describe('Deployment and tool flows', () => {
   });
 
   it('update tool loads api_request options and preserves them on submit', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAssistantTool as jest.Mock).mockImplementation(
       (_cfg, _assistantId, _toolId, cb) => {
         const { Metadata } = require('@rapidaai/react');
@@ -1124,8 +1135,8 @@ describe('Deployment and tool flows', () => {
       expect(screen.getByTestId('loaded-method').textContent).toBe('PATCH');
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Update Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Update Tool' }));
 
     expect(UpdateAssistantTool).toHaveBeenCalledTimes(1);
     expect((UpdateAssistantTool as jest.Mock).mock.calls[0][5]).toEqual({
@@ -1145,21 +1156,22 @@ describe('Deployment and tool flows', () => {
     expect(byKey['tool.parameters']).toContain('tool.argument');
   });
 
-  it('create tool submits endpoint execution method with endpoint metadata options', () => {
+  it('create tool submits endpoint execution method with endpoint metadata options', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateTool assistantId="assistant-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use Endpoint Tool' }));
-    fireEvent.click(
+    await user.click(screen.getByRole('button', { name: 'Use Endpoint Tool' }));
+    await user.click(
       screen.getByRole('button', { name: 'Set Endpoint Config' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.change(screen.getByLabelText('Tool Name'), {
-      target: { value: 'endpoint_tool' },
-    });
-    fireEvent.change(screen.getByLabelText('Tool Parameters'), {
-      target: { value: '{"context":"ok"}' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Configure Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByLabelText('Tool Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('endpoint_tool'));
+    await user.click(screen.getByLabelText('Tool Parameters'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('{"context":"ok"}'));
+    await user.click(screen.getByRole('button', { name: 'Configure Tool' }));
 
     expect(CreateAssistantTool).toHaveBeenCalledTimes(1);
     expect((CreateAssistantTool as jest.Mock).mock.calls[0][5]).toBe(
@@ -1175,6 +1187,7 @@ describe('Deployment and tool flows', () => {
   });
 
   it('update tool loads endpoint options and preserves them on submit', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (GetAssistantTool as jest.Mock).mockImplementation(
       (_cfg, _assistantId, _toolId, cb) => {
         const { Metadata } = require('@rapidaai/react');
@@ -1207,8 +1220,8 @@ describe('Deployment and tool flows', () => {
       );
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Update Tool' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Update Tool' }));
 
     expect(UpdateAssistantTool).toHaveBeenCalledTimes(1);
     expect((UpdateAssistantTool as jest.Mock).mock.calls[0][5]).toEqual({

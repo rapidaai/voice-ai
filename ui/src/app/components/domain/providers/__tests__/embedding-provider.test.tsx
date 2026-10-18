@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import { EmbeddingConfigComponent, EmbeddingProvider } from '../embedding';
@@ -97,7 +98,8 @@ const getMetadataValue = (parameters: Metadata[], key: string) =>
   parameters.find(parameter => parameter.getKey() === key)?.getValue();
 
 describe('EmbeddingProvider', () => {
-  it('renders the provider selector and ignores empty selections', () => {
+  it('renders the provider selector and ignores empty selections', async () => {
+    const user = userEvent.setup();
     const onChangeProvider = jest.fn();
 
     render(
@@ -121,14 +123,15 @@ describe('EmbeddingProvider', () => {
     const select = screen.getByRole('combobox', {
       name: 'Select embedding provider',
     });
-    fireEvent.change(select, { target: { value: 'openai' } });
-    fireEvent.change(select, { target: { value: '' } });
+    await user.selectOptions(select, String('openai'));
+    await user.selectOptions(select, String(''));
 
     expect(onChangeProvider).toHaveBeenCalledWith('openai');
     expect(onChangeProvider).toHaveBeenCalledTimes(1);
   });
 
-  it('adds and replaces credential metadata for a selected provider', () => {
+  it('adds and replaces credential metadata for a selected provider', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeParameter = jest.fn();
 
     const { rerender } = render(
@@ -140,7 +143,7 @@ describe('EmbeddingProvider', () => {
       />,
     );
 
-    fireEvent.click(screen.getByText('Pick credential'));
+    await user.click(screen.getByText('Pick credential'));
 
     let nextParameters = onChangeParameter.mock.calls[0][0] as Metadata[];
     expect(getMetadataValue(nextParameters, 'model.id')).toBe(
@@ -166,7 +169,7 @@ describe('EmbeddingProvider', () => {
     expect(credentialButton).toHaveAttribute('data-current', 'credential-old');
     expect(credentialButton).toHaveAttribute('data-provider', 'cohere');
 
-    fireEvent.click(credentialButton);
+    await user.click(credentialButton);
     nextParameters = onChangeParameter.mock.calls[
       onChangeParameter.mock.calls.length - 1
     ][0] as Metadata[];
@@ -180,39 +183,43 @@ describe('EmbeddingProvider', () => {
     ['cohere', COHERE_EMBEDDING_MODEL[1].id, COHERE_EMBEDDING_MODEL[1].name],
     ['voyageai', VOYAGE_EMBEDDING_MODEL[1].id, VOYAGE_EMBEDDING_MODEL[1].name],
     ['gemini', 'gemini-embedding-2', 'gemini-embedding-002'],
-  ])('updates %s embedding model metadata', (provider, modelId, modelName) => {
-    const onChangeParameter = jest.fn();
+  ])(
+    'updates %s embedding model metadata',
+    async (provider, modelId, modelName) => {
+      const user = userEvent.setup();
+      const onChangeParameter = jest.fn();
 
-    render(
-      <EmbeddingConfigComponent
-        provider={provider}
-        parameters={[
-          createMetadata('model.id', 'old-id'),
-          createMetadata('model.name', 'old-name'),
-          createMetadata('custom.key', 'custom'),
-        ]}
-        onChangeProvider={() => undefined}
-        onChangeParameter={onChangeParameter}
-      />,
-    );
+      render(
+        <EmbeddingConfigComponent
+          provider={provider}
+          parameters={[
+            createMetadata('model.id', 'old-id'),
+            createMetadata('model.name', 'old-name'),
+            createMetadata('custom.key', 'custom'),
+          ]}
+          onChangeProvider={() => undefined}
+          onChangeParameter={onChangeParameter}
+        />,
+      );
 
-    const modelIdPrefix = provider === 'voyageai' ? 'voyage' : provider;
-    expect(
-      screen.getByTestId(`${modelIdPrefix}-embedding-model-empty-name`),
-    ).toBeEmptyDOMElement();
+      const modelIdPrefix = provider === 'voyageai' ? 'voyage' : provider;
+      expect(
+        screen.getByTestId(`${modelIdPrefix}-embedding-model-empty-name`),
+      ).toBeEmptyDOMElement();
 
-    const select = screen.getByRole('combobox', {
-      name: 'Select embedding model',
-    });
-    fireEvent.change(select, { target: { value: modelId } });
-    fireEvent.change(select, { target: { value: '' } });
+      const select = screen.getByRole('combobox', {
+        name: 'Select embedding model',
+      });
+      await user.selectOptions(select, String(modelId));
+      await user.selectOptions(select, String(''));
 
-    const nextParameters = onChangeParameter.mock.calls[0][0] as Metadata[];
-    expect(getMetadataValue(nextParameters, 'model.id')).toBe(modelId);
-    expect(getMetadataValue(nextParameters, 'model.name')).toBe(modelName);
-    expect(getMetadataValue(nextParameters, 'custom.key')).toBe('custom');
-    expect(onChangeParameter).toHaveBeenCalledTimes(1);
-  });
+      const nextParameters = onChangeParameter.mock.calls[0][0] as Metadata[];
+      expect(getMetadataValue(nextParameters, 'model.id')).toBe(modelId);
+      expect(getMetadataValue(nextParameters, 'model.name')).toBe(modelName);
+      expect(getMetadataValue(nextParameters, 'custom.key')).toBe('custom');
+      expect(onChangeParameter).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('returns null config for unknown provider', () => {
     render(

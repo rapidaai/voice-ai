@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { HelmetProvider } from 'react-helmet-async';
 import developmentConfig from '@/configs/config.development.json';
 import { ThemeProvider, useTheme } from '@/theme/theme-provider';
@@ -44,6 +45,7 @@ describe('Helmet', () => {
   });
 
   it('uses the configured brand in the page title', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <HelmetProvider>
         <ThemeProvider theme={tenantTheme}>
@@ -61,7 +63,7 @@ describe('Helmet', () => {
     expect(icons).toHaveLength(1);
     expect(icons[0].getAttribute('href')).toBe(tenantTheme.brand.favicon);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle mode' }));
+    await user.click(screen.getByRole('button', { name: 'Toggle mode' }));
     await waitFor(() =>
       expect(document.title).toBe('Dashboard - Tenant Voice'),
     );

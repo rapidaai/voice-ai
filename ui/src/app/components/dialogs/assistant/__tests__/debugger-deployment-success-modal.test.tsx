@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { DebuggerDeploymentSuccessDialog } from '../debugger-deployment-success-modal';
@@ -38,7 +39,8 @@ describe('DebuggerDeploymentSuccessDialog', () => {
     window.open = originalOpen;
   });
 
-  it('closes from the secondary action', () => {
+  it('closes from the secondary action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
 
     render(
@@ -49,12 +51,13 @@ describe('DebuggerDeploymentSuccessDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(setModalOpen).toHaveBeenCalledWith(false);
   });
 
-  it('opens the assistant preview with the standard action icon', () => {
+  it('opens the assistant preview with the standard action icon', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <DebuggerDeploymentSuccessDialog
         modalOpen
@@ -68,7 +71,7 @@ describe('DebuggerDeploymentSuccessDialog', () => {
     });
     expect(screen.getByTestId('preview-icon')).toBeInTheDocument();
 
-    fireEvent.click(previewButton);
+    await user.click(previewButton);
 
     expect(window.open).toHaveBeenCalledWith(
       '/preview/chat/assistant-1',

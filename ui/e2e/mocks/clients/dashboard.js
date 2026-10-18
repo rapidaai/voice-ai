@@ -93,7 +93,7 @@ function buildActivity() {
 function buildAssistants() {
   return [
     [
-      'assistant-1',
+      '2301664620831571968',
       'Support bot',
       528,
       97.2,
@@ -102,7 +102,7 @@ function buildAssistants() {
       DashboardAssistantHealth.DASHBOARD_ASSISTANT_HEALTH_HEALTHY,
     ],
     [
-      'assistant-2',
+      '2301664620831571969',
       'Sales assistant',
       431,
       92.1,
@@ -111,7 +111,7 @@ function buildAssistants() {
       DashboardAssistantHealth.DASHBOARD_ASSISTANT_HEALTH_WATCH,
     ],
     [
-      'assistant-3',
+      '2301664620831571970',
       'Appointment booking',
       325,
       84.8,
@@ -135,8 +135,8 @@ function buildAssistants() {
 function buildFailures() {
   return [
     [
-      'conversation-1',
-      'assistant-1',
+      '2301664620831572101',
+      '2301664620831571968',
       'Support bot',
       'Phone',
       94000,
@@ -144,8 +144,8 @@ function buildFailures() {
       DashboardFailureCode.DASHBOARD_FAILURE_CODE_PROVIDER,
     ],
     [
-      'conversation-2',
-      'assistant-2',
+      '2301664620831572102',
+      '2301664620831571969',
       'Sales assistant',
       'Web',
       38000,
@@ -153,8 +153,8 @@ function buildFailures() {
       DashboardFailureCode.DASHBOARD_FAILURE_CODE_NETWORK,
     ],
     [
-      'conversation-3',
-      'assistant-3',
+      '2301664620831572103',
+      '2301664620831571970',
       'Appointment booking',
       'Phone',
       67000,

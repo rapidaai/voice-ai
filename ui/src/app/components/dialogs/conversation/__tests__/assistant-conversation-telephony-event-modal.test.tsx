@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import {
   AssistantConversationTelephonyEventDialog,
@@ -72,7 +73,8 @@ const makeEvent = (overrides: Partial<MockEvent> = {}): MockEvent => ({
 });
 
 describe('AssistantConversationTelephonyEventDialog', () => {
-  it('renders JSON payload using json language when row is expanded', () => {
+  it('renders JSON payload using json language when row is expanded', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <AssistantConversationTelephonyEventDialog
         modalOpen
@@ -81,7 +83,7 @@ describe('AssistantConversationTelephonyEventDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByText('evt_1').closest('button')!);
+    await user.click(screen.getByText('evt_1').closest('button')!);
 
     expect(screen.getByText('evt_1').closest('button')).toHaveAttribute(
       'data-carbon-button-kind',
@@ -92,7 +94,7 @@ describe('AssistantConversationTelephonyEventDialog', () => {
       'json',
     );
 
-    fireEvent.click(screen.getByText('evt_1').closest('button')!);
+    await user.click(screen.getByText('evt_1').closest('button')!);
     expect(screen.queryByTestId('payload')).not.toBeInTheDocument();
   });
 

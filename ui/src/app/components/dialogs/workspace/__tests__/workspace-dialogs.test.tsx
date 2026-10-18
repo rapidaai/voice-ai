@@ -1,11 +1,6 @@
 import React from 'react';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { AuthContext } from '@/context/auth-context';
 import {
@@ -328,12 +323,8 @@ function renderWithAuth(ui: React.ReactElement) {
 }
 
 async function submitFormByButton(name: string) {
-  const form = screen.getByRole('button', { name }).closest('form');
-  if (!form) throw new Error(`No form found for ${name}`);
-  await act(async () => {
-    fireEvent.submit(form);
-    await Promise.resolve();
-  });
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name }));
 }
 
 describe('workspace dialogs', () => {
@@ -345,6 +336,7 @@ describe('workspace dialogs', () => {
   });
 
   it('creates a project and closes after the auth context refresh succeeds', async () => {
+    const user = userEvent.setup();
     const setModalOpen = jest.fn();
     const afterCreateProject = jest.fn();
     mockCreateProject.mockImplementation(
@@ -360,12 +352,12 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Project Name'), {
-      target: { value: 'Support operations' },
-    });
-    fireEvent.change(screen.getByLabelText('Project Description'), {
-      target: { value: 'Support workspace' },
-    });
+    await user.click(screen.getByLabelText('Project Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support operations'));
+    await user.click(screen.getByLabelText('Project Description'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support workspace'));
     await submitFormByButton('Create Project');
 
     await waitFor(() => {
@@ -391,6 +383,7 @@ describe('workspace dialogs', () => {
   });
 
   it('shows create project service errors without closing', async () => {
+    const user = userEvent.setup();
     const setModalOpen = jest.fn();
     mockCreateProject.mockImplementation(
       (_config, _name, _description, _metadata, callback) =>
@@ -405,12 +398,12 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Project Name'), {
-      target: { value: 'Support operations' },
-    });
-    fireEvent.change(screen.getByLabelText('Project Description'), {
-      target: { value: 'Support workspace' },
-    });
+    await user.click(screen.getByLabelText('Project Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support operations'));
+    await user.click(screen.getByLabelText('Project Description'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support workspace'));
     await submitFormByButton('Create Project');
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -421,6 +414,7 @@ describe('workspace dialogs', () => {
   });
 
   it('shows create project transport and generic response errors', async () => {
+    const user = userEvent.setup();
     mockCreateProject.mockImplementationOnce(
       (_config, _name, _description, _metadata, callback) =>
         callback({ message: 'network failed' }, null),
@@ -434,12 +428,12 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Project Name'), {
-      target: { value: 'Support operations' },
-    });
-    fireEvent.change(screen.getByLabelText('Project Description'), {
-      target: { value: 'Support workspace' },
-    });
+    await user.click(screen.getByLabelText('Project Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support operations'));
+    await user.click(screen.getByLabelText('Project Description'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support workspace'));
     await submitFormByButton('Create Project');
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -460,12 +454,12 @@ describe('workspace dialogs', () => {
         />
       </AuthContext.Provider>,
     );
-    fireEvent.change(screen.getByLabelText('Project Name'), {
-      target: { value: 'Support operations' },
-    });
-    fireEvent.change(screen.getByLabelText('Project Description'), {
-      target: { value: 'Support workspace' },
-    });
+    await user.click(screen.getByLabelText('Project Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support operations'));
+    await user.click(screen.getByLabelText('Project Description'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support workspace'));
     await submitFormByButton('Create Project');
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -474,6 +468,7 @@ describe('workspace dialogs', () => {
   });
 
   it('shows create project authorization refresh failures', async () => {
+    const user = userEvent.setup();
     authContextValue.authorize.mockImplementationOnce(
       (_onSuccess: () => void, onFailure?: () => void) => onFailure?.(),
     );
@@ -490,12 +485,12 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Project Name'), {
-      target: { value: 'Support operations' },
-    });
-    fireEvent.change(screen.getByLabelText('Project Description'), {
-      target: { value: 'Support workspace' },
-    });
+    await user.click(screen.getByLabelText('Project Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support operations'));
+    await user.click(screen.getByLabelText('Project Description'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support workspace'));
     await submitFormByButton('Create Project');
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -505,6 +500,7 @@ describe('workspace dialogs', () => {
   });
 
   it('hides the create project loader when auth refresh is unavailable', async () => {
+    const user = userEvent.setup();
     mockCreateProject.mockImplementation(
       (_config, _name, _description, _metadata, callback) =>
         callback(null, successResponse()),
@@ -522,12 +518,12 @@ describe('workspace dialogs', () => {
       </AuthContext.Provider>,
     );
 
-    fireEvent.change(screen.getByLabelText('Project Name'), {
-      target: { value: 'Support operations' },
-    });
-    fireEvent.change(screen.getByLabelText('Project Description'), {
-      target: { value: 'Support workspace' },
-    });
+    await user.click(screen.getByLabelText('Project Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support operations'));
+    await user.click(screen.getByLabelText('Project Description'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Support workspace'));
     await submitFormByButton('Create Project');
 
     await waitFor(() =>
@@ -536,6 +532,7 @@ describe('workspace dialogs', () => {
   });
 
   it('updates a project and hides the loader after success', async () => {
+    const user = userEvent.setup();
     const setModalOpen = jest.fn();
     const afterUpdateProject = jest.fn();
     mockUpdateProject.mockImplementation((_config, _projectId, callback) =>
@@ -557,12 +554,12 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Project Name'), {
-      target: { value: 'Updated project' },
-    });
-    fireEvent.change(screen.getByLabelText('Project Description'), {
-      target: { value: 'Updated description' },
-    });
+    await user.click(screen.getByLabelText('Project Name'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Updated project'));
+    await user.click(screen.getByLabelText('Project Description'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('Updated description'));
     await submitFormByButton('Update');
 
     await waitFor(() => {
@@ -698,7 +695,8 @@ describe('workspace dialogs', () => {
     );
   });
 
-  it('validates organization invitations before calling the API', () => {
+  it('validates organization invitations before calling the API', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     renderWithAuth(
       <InviteOrganizationUserDialog
         modalOpen
@@ -707,34 +705,34 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Please provide a valid email to invite user.',
     );
 
-    fireEvent.change(screen.getByLabelText('Email address'), {
-      target: { value: 'member@example.com' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByLabelText('Email address'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('member@example.com'));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Please select an organization role.',
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Select organization role' }),
     );
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set incomplete project role' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Select both project and role for each project role row.',
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set duplicate project roles' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'A project can only be assigned once.',
     );
@@ -742,6 +740,7 @@ describe('workspace dialogs', () => {
   });
 
   it('sends organization invitations with optional project roles', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
     const onSuccess = jest.fn();
     mockInviteUserToOrganization.mockResolvedValue(successResponse());
@@ -754,16 +753,16 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Email address'), {
-      target: { value: 'member@example.com' },
-    });
-    fireEvent.click(
+    await user.click(screen.getByLabelText('Email address'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('member@example.com'));
+    await user.click(
       screen.getByRole('button', { name: 'Select organization role' }),
     );
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set valid project role' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
 
     await waitFor(() => expect(setModalOpen).toHaveBeenCalledWith(false));
     const request = mockInviteUserToOrganization.mock.calls[0][1];
@@ -788,6 +787,7 @@ describe('workspace dialogs', () => {
   });
 
   it('shows organization invitation API errors', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockInviteUserToOrganization.mockResolvedValue(
       errorResponse('Invitation failed'),
     );
@@ -800,13 +800,13 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Email address'), {
-      target: { value: 'member@example.com' },
-    });
-    fireEvent.click(
+    await user.click(screen.getByLabelText('Email address'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('member@example.com'));
+    await user.click(
       screen.getByRole('button', { name: 'Select organization role' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Invitation failed',
@@ -815,6 +815,7 @@ describe('workspace dialogs', () => {
   });
 
   it('shows organization invitation thrown errors', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockInviteUserToOrganization.mockRejectedValue({
       getHumanmessage: () => 'Transport failed',
     });
@@ -827,13 +828,13 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Email address'), {
-      target: { value: 'member@example.com' },
-    });
-    fireEvent.click(
+    await user.click(screen.getByLabelText('Email address'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('member@example.com'));
+    await user.click(
       screen.getByRole('button', { name: 'Select organization role' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Transport failed',
@@ -878,7 +879,8 @@ describe('workspace dialogs', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Unable to load users');
   });
 
-  it('validates project invitations before calling the API', () => {
+  it('validates project invitations before calling the API', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     renderWithAuth(
       <InviteProjectUserDialog
         modalOpen
@@ -887,29 +889,29 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Please select a user.',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Select user' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Select user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Please add at least one project role.',
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set incomplete project role' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Please select project and role.',
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set duplicate project roles' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'A project can only be assigned once.',
     );
@@ -917,6 +919,7 @@ describe('workspace dialogs', () => {
   });
 
   it('adds a selected user to projects', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
     const onSuccess = jest.fn();
     mockAddUserToProjects.mockResolvedValue(successResponse());
@@ -929,11 +932,11 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Select user' }));
-    fireEvent.click(
+    await user.click(screen.getByRole('button', { name: 'Select user' }));
+    await user.click(
       screen.getByRole('button', { name: 'Set valid project role' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
 
     await waitFor(() => expect(setModalOpen).toHaveBeenCalledWith(false));
     const request = mockAddUserToProjects.mock.calls[0][1];
@@ -948,6 +951,7 @@ describe('workspace dialogs', () => {
   });
 
   it('adds a fixed user to a fixed project', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
     mockAddUserToProjects.mockResolvedValue(successResponse());
 
@@ -965,10 +969,10 @@ describe('workspace dialogs', () => {
       'Priyanka Iyer (p_iyer@outlook.com)',
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set valid project role' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
 
     await waitFor(() => expect(setModalOpen).toHaveBeenCalledWith(false));
     const request = mockAddUserToProjects.mock.calls[0][1];
@@ -979,6 +983,7 @@ describe('workspace dialogs', () => {
   });
 
   it('shows project invitation API errors', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockAddUserToProjects.mockResolvedValue(errorResponse('Access failed'));
 
     renderWithAuth(
@@ -991,16 +996,17 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set valid project role' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Access failed');
     expect(mockToast.error).toHaveBeenCalledWith('Access failed');
   });
 
   it('shows project invitation thrown errors', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockAddUserToProjects.mockRejectedValue(new Error('Project access failed'));
 
     renderWithAuth(
@@ -1013,10 +1019,10 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Set valid project role' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Invite user' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Project access failed',

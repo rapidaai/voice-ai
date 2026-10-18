@@ -1,5 +1,6 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { CodeEditor } from '../code-editor';
 import { CodeHighlighting } from '../code-highlighting';
@@ -158,7 +159,8 @@ describe('editor components', () => {
     jest.useRealTimers();
   });
 
-  it('renders JsonEditor with theme and forwards changes', () => {
+  it('renders JsonEditor with theme and forwards changes', async () => {
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     const onChange = jest.fn();
     const dispose = jest.fn();
 
@@ -185,14 +187,21 @@ describe('editor components', () => {
       'json-editor-placeholder',
     );
 
-    fireEvent.change(editor, { target: { value: '{"a":2}' } });
+    await user.click(editor);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('{"a":2}'));
     expect(onChange).toHaveBeenCalledWith('{"a":2}');
 
     unmount();
     expect(dispose).toHaveBeenCalledTimes(1);
   });
 
-  it('renders CodeEditor controls and handles copy, expand, and edits', () => {
+  it('renders CodeEditor controls and handles copy, expand, and edits', async () => {
+    const user = userEvent.setup({
+      advanceTimers: jest.advanceTimersByTime,
+      writeToClipboard: false,
+    });
+    const writeText = jest.spyOn(navigator.clipboard, 'writeText');
     const onChange = jest.fn();
 
     render(
@@ -208,15 +217,13 @@ describe('editor components', () => {
     expect(screen.getByText('Parameters')).toBeInTheDocument();
     expect(screen.getByText('JSON body')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('json-editor'), {
-      target: { value: '{"enabled":false}' },
-    });
+    await user.click(screen.getByLabelText('json-editor'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('{"enabled":false}'));
     expect(onChange).toHaveBeenCalledWith('{"enabled":false}');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      '{"enabled":true}',
-    );
+    await user.click(screen.getByRole('button', { name: 'Copy' }));
+    expect(writeText).toHaveBeenCalledWith('{"enabled":true}');
     expect(screen.getByTestId('checkmark-icon')).toBeInTheDocument();
 
     act(() => {
@@ -224,7 +231,7 @@ describe('editor components', () => {
     });
     expect(screen.getByTestId('copy-icon')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Maximize' }));
+    await user.click(screen.getByRole('button', { name: 'Maximize' }));
     expect(
       screen.getByRole('button', { name: 'Minimize' }),
     ).toBeInTheDocument();

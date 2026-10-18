@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import {
@@ -129,7 +130,8 @@ beforeEach(() => {
 });
 
 describe('TextProvider', () => {
-  it('renders configured providers and ignores empty selections', () => {
+  it('renders configured providers and ignores empty selections', async () => {
+    const user = userEvent.setup();
     const onChangeProvider = jest.fn();
 
     render(
@@ -178,14 +180,15 @@ describe('TextProvider', () => {
     expect(selectorGroup).not.toHaveClass('w-fit');
     expect(selectorGroup).not.toHaveClass('gap-3');
 
-    fireEvent.change(select, { target: { value: 'openai' } });
-    fireEvent.change(select, { target: { value: '' } });
+    await user.selectOptions(select, String('openai'));
+    await user.selectOptions(select, String(''));
 
     expect(onChangeProvider).toHaveBeenCalledWith('openai');
     expect(onChangeProvider).toHaveBeenCalledTimes(1);
   });
 
-  it('adds and replaces credential metadata for a selected provider', () => {
+  it('adds and replaces credential metadata for a selected provider', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeParameter = jest.fn();
 
     const { rerender } = render(
@@ -204,7 +207,7 @@ describe('TextProvider', () => {
         .closest('.flex'),
     ).toHaveClass('w-full');
 
-    fireEvent.click(screen.getByText('Pick credential'));
+    await user.click(screen.getByText('Pick credential'));
 
     let nextParameters = onChangeParameter.mock.calls[0][0] as Metadata[];
     expect(getMetadataValue(nextParameters, 'model.id')).toBe(
@@ -230,7 +233,7 @@ describe('TextProvider', () => {
     expect(credentialButton).toHaveAttribute('data-current', 'credential-old');
     expect(credentialButton).toHaveAttribute('data-provider', 'openai');
 
-    fireEvent.click(credentialButton);
+    await user.click(credentialButton);
     nextParameters = onChangeParameter.mock.calls[
       onChangeParameter.mock.calls.length - 1
     ][0] as Metadata[];

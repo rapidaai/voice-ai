@@ -1,11 +1,7 @@
 import React from 'react';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { setRangeValue } from '@/test-utils/set-range-value';
 import '@testing-library/jest-dom';
 
 import { AudioPlayer } from '../audio-player';
@@ -122,6 +118,7 @@ describe('AudioPlayer', () => {
   });
 
   it('plays and pauses synchronized tracks once both are ready', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onPlay = jest.fn();
     const onPause = jest.fn();
     const assistantWave = createWaveSurfer();
@@ -139,7 +136,7 @@ describe('AudioPlayer', () => {
 
     const playButton = screen.getByTestId('play-icon').closest('button')!;
     await act(async () => {
-      fireEvent.click(playButton);
+      await user.click(playButton);
     });
 
     expect(userWave.seekTo).toHaveBeenCalledWith(0.1);
@@ -148,7 +145,7 @@ describe('AudioPlayer', () => {
     expect(onPlay).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      fireEvent.click(screen.getByTestId('pause-icon').closest('button')!);
+      await user.click(screen.getByTestId('pause-icon').closest('button')!);
     });
 
     expect(assistantWave.pause).toHaveBeenCalled();
@@ -157,6 +154,7 @@ describe('AudioPlayer', () => {
   });
 
   it('updates volume and downloads the selected recording', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onVolumeChange = jest.fn();
     const assistantWave = createWaveSurfer();
     const userWave = createWaveSurfer();
@@ -180,10 +178,10 @@ describe('AudioPlayer', () => {
       userWave.handlers.ready();
     });
 
-    fireEvent.change(screen.getByRole('slider', { name: 'Volume' }), {
-      target: { value: '0.5' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /conversation/i }));
+    const volume = screen.getByRole('slider', { name: 'Volume' });
+    await user.click(volume);
+    setRangeValue(volume as HTMLInputElement, 0.5);
+    await user.click(screen.getByRole('button', { name: /conversation/i }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith('/conversation.wav');

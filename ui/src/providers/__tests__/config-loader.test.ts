@@ -106,7 +106,10 @@ describe('loadProviderData', () => {
   });
 
   it('supports google-speech-service alias when loading data', () => {
-    const data = loadProviderData('google-speech-service', 'speech-to-text-language.json');
+    const data = loadProviderData(
+      'google-speech-service',
+      'speech-to-text-language.json',
+    );
     expect(data).toBeInstanceOf(Array);
     expect(data.length).toBeGreaterThan(0);
     expect(data[0]).toHaveProperty('code');
@@ -168,7 +171,9 @@ describe('resolveCategoryParameters', () => {
     const defaultTemperature = resolvedDefault.find(
       p => p.key === 'model.temperature',
     );
-    const miniTemperature = resolvedMini.find(p => p.key === 'model.temperature');
+    const miniTemperature = resolvedMini.find(
+      p => p.key === 'model.temperature',
+    );
 
     expect(defaultTemperature?.default).toBe('0.7');
     expect(miniTemperature?.default).toBe('0.3');
@@ -220,12 +225,20 @@ describe('resolveCategoryParameters', () => {
     );
 
     expect(resolved.find(p => p.key === 'model.id')).toBeDefined();
-    expect(resolved.find(p => p.key === 'model.max_completion_tokens')).toBeDefined();
-    expect(resolved.find(p => p.key === 'model.reasoning_effort')).toBeDefined();
+    expect(
+      resolved.find(p => p.key === 'model.max_completion_tokens'),
+    ).toBeDefined();
+    expect(
+      resolved.find(p => p.key === 'model.reasoning_effort'),
+    ).toBeDefined();
     expect(resolved.find(p => p.key === 'model.temperature')).toBeUndefined();
     expect(resolved.find(p => p.key === 'model.top_p')).toBeUndefined();
-    expect(resolved.find(p => p.key === 'model.frequency_penalty')).toBeUndefined();
-    expect(resolved.find(p => p.key === 'model.presence_penalty')).toBeUndefined();
+    expect(
+      resolved.find(p => p.key === 'model.frequency_penalty'),
+    ).toBeUndefined();
+    expect(
+      resolved.find(p => p.key === 'model.presence_penalty'),
+    ).toBeUndefined();
     expect(resolved.find(p => p.key === 'model.seed')).toBeUndefined();
   });
 
@@ -234,15 +247,10 @@ describe('resolveCategoryParameters', () => {
     expect(config?.text).toBeDefined();
 
     const resolveChoices = (model: string) =>
-      resolveCategoryParameters(
-        'openai',
-        'text',
-        config!.text!,
-        [
-          createMetadata('model.id', `openai/${model}`),
-          createMetadata('model.name', model),
-        ],
-      ).find(p => p.key === 'model.reasoning_effort')?.choices;
+      resolveCategoryParameters('openai', 'text', config!.text!, [
+        createMetadata('model.id', `openai/${model}`),
+        createMetadata('model.name', model),
+      ]).find(p => p.key === 'model.reasoning_effort')?.choices;
 
     const gpt55Choices = resolveChoices('gpt-5.5')?.map(c => c.value);
     const gpt52Choices = resolveChoices('gpt-5.2')?.map(c => c.value);
@@ -250,11 +258,37 @@ describe('resolveCategoryParameters', () => {
     const gpt54MiniChoices = resolveChoices('gpt-5.4-mini')?.map(c => c.value);
     const gpt54NanoChoices = resolveChoices('gpt-5.4-nano')?.map(c => c.value);
 
-    expect(gpt55Choices).toEqual(['none', 'low', 'medium', 'high', 'xhigh', 'xhigh']);
-    expect(gpt52Choices).toEqual(['none', 'low', 'medium', 'high', 'xhigh', 'xhigh']);
+    expect(gpt55Choices).toEqual([
+      'none',
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+      'xhigh',
+    ]);
+    expect(gpt52Choices).toEqual([
+      'none',
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+      'xhigh',
+    ]);
     expect(gpt51Choices).toEqual(['none', 'low', 'medium', 'high', 'xhigh']);
-    expect(gpt54MiniChoices).toEqual(['none', 'low', 'medium', 'high', 'xhigh']);
-    expect(gpt54NanoChoices).toEqual(['none', 'low', 'medium', 'high', 'xhigh']);
+    expect(gpt54MiniChoices).toEqual([
+      'none',
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+    ]);
+    expect(gpt54NanoChoices).toEqual([
+      'none',
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+    ]);
   });
 
   it('uses the configured reasoning effort help text for gpt-5 family', () => {
@@ -271,7 +305,9 @@ describe('resolveCategoryParameters', () => {
       ],
     );
 
-    const reasoningParam = resolved.find(p => p.key === 'model.reasoning_effort');
+    const reasoningParam = resolved.find(
+      p => p.key === 'model.reasoning_effort',
+    );
     expect(reasoningParam).toBeDefined();
     expect(reasoningParam?.helpText).toBeUndefined();
   });

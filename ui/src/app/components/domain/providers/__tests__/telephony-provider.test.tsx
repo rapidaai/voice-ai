@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import {
@@ -189,7 +190,8 @@ describe('Telephony provider runtime parity', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('updates provider and ignores empty provider selections', () => {
+  it('updates provider and ignores empty provider selections', async () => {
+    const user = userEvent.setup();
     const onChangeProvider = jest.fn();
     const onChangeParameter = jest.fn();
     render(
@@ -209,9 +211,10 @@ describe('Telephony provider runtime parity', () => {
       screen.getByTestId('telephony-provider-empty-name'),
     ).toBeEmptyDOMElement();
 
-    fireEvent.change(screen.getByLabelText('Select telephony provider'), {
-      target: { value: 'vonage' },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Select telephony provider'),
+      String('vonage'),
+    );
     expect(onChangeProvider).toHaveBeenCalledWith('vonage');
     expect(onChangeParameter).toHaveBeenCalledTimes(1);
     const providerDefaults = onChangeParameter.mock.calls[0][0] as Metadata[];
@@ -221,14 +224,16 @@ describe('Telephony provider runtime parity', () => {
     ]);
     expect(getMetadataValue(providerDefaults, 'phone')).toBe('+15551234567');
 
-    fireEvent.change(screen.getByLabelText('Select telephony provider'), {
-      target: { value: '' },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Select telephony provider'),
+      String(''),
+    );
     expect(onChangeProvider).toHaveBeenCalledTimes(1);
     expect(onChangeParameter).toHaveBeenCalledTimes(1);
   });
 
-  it('adds and replaces credential metadata from TelephonyProvider UI interactions', () => {
+  it('adds and replaces credential metadata from TelephonyProvider UI interactions', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeParameter = jest.fn();
     const { rerender } = render(
       <TelephonyProvider
@@ -239,7 +244,7 @@ describe('Telephony provider runtime parity', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pick credential' }));
+    await user.click(screen.getByRole('button', { name: 'Pick credential' }));
     expect(onChangeParameter).toHaveBeenCalled();
     const params = onChangeParameter.mock.calls[
       onChangeParameter.mock.calls.length - 1
@@ -266,7 +271,7 @@ describe('Telephony provider runtime parity', () => {
     expect(credentialButton).toHaveAttribute('data-current', 'cred-old');
     expect(credentialButton).toHaveAttribute('data-provider', 'twilio');
 
-    fireEvent.click(credentialButton);
+    await user.click(credentialButton);
     const replacedParams = onChangeParameter.mock.calls[
       onChangeParameter.mock.calls.length - 1
     ][0] as Metadata[];
@@ -352,7 +357,8 @@ describe('Telephony provider runtime parity', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders provider-specific json fields when switching providers', () => {
+  it('renders provider-specific json fields when switching providers', async () => {
+    const user = userEvent.setup();
     const Harness = () => {
       const [provider, setProvider] = React.useState('exotel');
       const [parameters, setParameters] = React.useState<Metadata[]>(
@@ -378,9 +384,10 @@ describe('Telephony provider runtime parity', () => {
       screen.getByPlaceholderText('Enter exotel applet app_id'),
     ).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Select telephony provider'), {
-      target: { value: 'sip' },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Select telephony provider'),
+      String('sip'),
+    );
 
     expect(
       screen.queryByPlaceholderText('Enter exotel applet app_id'),
@@ -390,9 +397,10 @@ describe('Telephony provider runtime parity', () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Accept inbound calls')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Select telephony provider'), {
-      target: { value: 'asterisk' },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Select telephony provider'),
+      String('asterisk'),
+    );
 
     expect(screen.getByPlaceholderText('e.g., internal')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('e.g., 1002')).toBeInTheDocument();

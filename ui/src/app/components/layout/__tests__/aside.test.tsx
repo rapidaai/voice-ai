@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Aside } from '../aside';
 
 let mockOpen = true;
@@ -58,7 +59,8 @@ describe('Aside', () => {
     expect(screen.getByTestId('aside')).not.toHaveClass('w-64');
   });
 
-  it('composes caller hover handlers with sidebar open state changes', () => {
+  it('composes caller hover handlers with sidebar open state changes', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onMouseEnter = jest.fn();
     const onMouseLeave = jest.fn();
 
@@ -73,8 +75,8 @@ describe('Aside', () => {
       </Aside>,
     );
 
-    fireEvent.mouseEnter(screen.getByTestId('aside'));
-    fireEvent.mouseLeave(screen.getByTestId('aside'));
+    await user.hover(screen.getByTestId('aside'));
+    await user.unhover(screen.getByTestId('aside'));
 
     expect(onMouseEnter).toHaveBeenCalledTimes(1);
     expect(onMouseLeave).toHaveBeenCalledTimes(1);

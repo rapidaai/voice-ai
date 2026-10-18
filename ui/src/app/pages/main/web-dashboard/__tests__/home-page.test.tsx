@@ -1,6 +1,7 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import userEvent from '@testing-library/user-event';
 
 import {
   DashboardAssistantHealth,
@@ -233,6 +234,7 @@ describe('Dashboard HomePage', () => {
   });
 
   it('shows a retry action when the initial request fails', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockGetProjectDashboardRange
       .mockRejectedValueOnce(new Error('unavailable'))
       .mockResolvedValueOnce(dashboardResponse());
@@ -250,7 +252,7 @@ describe('Dashboard HomePage', () => {
     expect(
       screen.queryByRole('heading', { name: 'Project overview' }),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
 
     expect(await screen.findByText('12,486')).toBeInTheDocument();
     expect(mockGetProjectDashboardRange).toHaveBeenCalledTimes(2);
@@ -305,6 +307,7 @@ describe('Dashboard HomePage', () => {
   });
 
   it('ignores a stale response after the date range changes', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     let resolveFirst: (value: never) => void = () => undefined;
     const firstRequest = new Promise<never>(resolve => {
       resolveFirst = resolve;
@@ -314,8 +317,8 @@ describe('Dashboard HomePage', () => {
       .mockResolvedValueOnce(dashboardResponse({ sessions: 3248 }));
 
     render(<HomePage />);
-    fireEvent.click(screen.getByRole('combobox', { name: 'Date range' }));
-    fireEvent.click(screen.getByRole('option', { name: 'Last 7 days' }));
+    await user.click(screen.getByRole('combobox', { name: 'Date range' }));
+    await user.click(screen.getByRole('option', { name: 'Last 7 days' }));
 
     expect(await screen.findByText('3,248')).toBeInTheDocument();
     await act(async () => {
@@ -376,6 +379,7 @@ describe('Dashboard HomePage', () => {
   });
 
   it('keeps the last dashboard when an automatic refresh fails', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     let refresh: TimerHandler = () => undefined;
     const interval = jest
       .spyOn(window, 'setInterval')
@@ -387,8 +391,8 @@ describe('Dashboard HomePage', () => {
     render(<HomePage />);
     expect(await screen.findByText('12,486')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('combobox', { name: 'Auto-refresh' }));
-    fireEvent.click(screen.getByRole('option', { name: 'Every 5 min' }));
+    await user.click(screen.getByRole('combobox', { name: 'Auto-refresh' }));
+    await user.click(screen.getByRole('option', { name: 'Every 5 min' }));
     mockGetProjectDashboardRange.mockRejectedValueOnce(
       new Error('refresh unavailable'),
     );

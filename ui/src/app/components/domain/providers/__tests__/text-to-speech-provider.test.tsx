@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import { TextToSpeechProvider } from '../text-to-speech';
@@ -116,7 +117,8 @@ beforeEach(() => {
 });
 
 describe('TextToSpeechProvider', () => {
-  it('renders the provider selector and ignores empty selections', () => {
+  it('renders the provider selector and ignores empty selections', async () => {
+    const user = userEvent.setup();
     const onChangeProvider = jest.fn();
 
     render(
@@ -140,14 +142,15 @@ describe('TextToSpeechProvider', () => {
     const select = screen.getByRole('combobox', {
       name: 'Select voice output provider',
     });
-    fireEvent.change(select, { target: { value: 'openai' } });
-    fireEvent.change(select, { target: { value: '' } });
+    await user.selectOptions(select, String('openai'));
+    await user.selectOptions(select, String(''));
 
     expect(onChangeProvider).toHaveBeenCalledWith('openai');
     expect(onChangeProvider).toHaveBeenCalledTimes(1);
   });
 
-  it('adds and replaces credential metadata for a selected provider', () => {
+  it('adds and replaces credential metadata for a selected provider', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const onChangeParameter = jest.fn();
     mockLoadProviderConfig.mockReturnValue({ tts: { parameters: [] } });
 
@@ -162,7 +165,7 @@ describe('TextToSpeechProvider', () => {
 
     expect(screen.getByTestId('config-tts')).toHaveTextContent('openai');
 
-    fireEvent.click(screen.getByText('Pick credential'));
+    await user.click(screen.getByText('Pick credential'));
 
     let nextParameters = onChangeParameter.mock.calls[0][0] as Metadata[];
     expect(getMetadataValue(nextParameters, 'speak.voice.id')).toBe('voice-1');
@@ -186,7 +189,7 @@ describe('TextToSpeechProvider', () => {
     expect(credentialButton).toHaveAttribute('data-current', 'credential-old');
     expect(credentialButton).toHaveAttribute('data-provider', 'custom-tts');
 
-    fireEvent.click(credentialButton);
+    await user.click(credentialButton);
 
     nextParameters = onChangeParameter.mock.calls[
       onChangeParameter.mock.calls.length - 1

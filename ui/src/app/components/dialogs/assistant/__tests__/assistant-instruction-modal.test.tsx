@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { AssistantWebwidgetDeploymentDialog } from '../assistant-instruction-modal';
@@ -74,7 +75,8 @@ describe('AssistantWebwidgetDeploymentDialog', () => {
     expect(screen.getByText(/assistant-123/)).toBeInTheDocument();
   });
 
-  it('opens documentation with the standard action icon', () => {
+  it('opens documentation with the standard action icon', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <AssistantWebwidgetDeploymentDialog
         modalOpen
@@ -88,7 +90,7 @@ describe('AssistantWebwidgetDeploymentDialog', () => {
     });
     expect(screen.getByTestId('documentation-icon')).toBeInTheDocument();
 
-    fireEvent.click(documentationButton);
+    await user.click(documentationButton);
 
     expect(window.open).toHaveBeenCalledWith(
       'https://docs.example.test',
@@ -96,7 +98,8 @@ describe('AssistantWebwidgetDeploymentDialog', () => {
     );
   });
 
-  it('closes from the secondary action', () => {
+  it('closes from the secondary action', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
 
     render(
@@ -107,7 +110,7 @@ describe('AssistantWebwidgetDeploymentDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(setModalOpen).toHaveBeenCalledWith(false);
   });

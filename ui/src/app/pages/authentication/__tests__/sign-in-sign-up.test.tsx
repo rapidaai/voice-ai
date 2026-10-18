@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { SignInPage } from '@/app/pages/authentication/sign-in';
@@ -202,6 +203,7 @@ describe('Authentication pages', () => {
   });
 
   it('sign-in submits credentials and navigates to dashboard on success', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const setAuthentication = jest.fn((_auth, cb) => cb());
     (AuthenticateUser as jest.Mock).mockImplementation(
       (_cfg, _email, _password, callback) => {
@@ -214,13 +216,13 @@ describe('Authentication pages', () => {
 
     renderWithAuth(<SignInPage />, setAuthentication);
 
-    fireEvent.change(screen.getByPlaceholderText('eg: john@example.com'), {
-      target: { value: 'john@example.com' },
-    });
-    fireEvent.change(screen.getByPlaceholderText('******'), {
-      target: { value: 'secret' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByPlaceholderText('eg: john@example.com'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('john@example.com'));
+    await user.click(screen.getByPlaceholderText('******'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     await waitFor(() => {
       expect(AuthenticateUser).toHaveBeenCalled();
@@ -269,7 +271,8 @@ describe('Authentication pages', () => {
     expect(mockShowLoader).toHaveBeenCalled();
   });
 
-  it('sign-up disabled shows 403 and routes back to signin', () => {
+  it('sign-up disabled shows 403 and routes back to signin', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockWorkspace.authentication.signUp.enable = false;
 
     renderWithAuth(<SignUpPage />);
@@ -279,11 +282,12 @@ describe('Authentication pages', () => {
       screen.getByText('Account creation unavailable'),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Go to sign in' }));
+    await user.click(screen.getByRole('button', { name: 'Go to sign in' }));
     expect(mockGoTo).toHaveBeenCalledWith('/');
   });
 
   it('sign-up prefills email from location state and submits register', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     mockLocationState = { email: 'prefilled@example.com' };
     mockParams = { next: '/workspace/overview' };
 
@@ -306,14 +310,14 @@ describe('Authentication pages', () => {
       expect(emailInput.value).toBe('prefilled@example.com');
     });
 
-    fireEvent.change(screen.getByPlaceholderText('eg: John Doe'), {
-      target: { value: 'John Doe' },
-    });
-    fireEvent.change(screen.getByPlaceholderText('********'), {
-      target: { value: 'secret' },
-    });
+    await user.click(screen.getByPlaceholderText('eg: John Doe'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('John Doe'));
+    await user.click(screen.getByPlaceholderText('********'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
 
     await waitFor(() => {
       expect(RegisterUser).toHaveBeenCalled();
@@ -356,6 +360,7 @@ describe('Authentication pages', () => {
   });
 
   it('sign-up shows API human error message on register failure', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     (RegisterUser as jest.Mock).mockImplementation(
       (_cfg, _email, _password, _name, callback) => {
         callback(null, {
@@ -367,17 +372,17 @@ describe('Authentication pages', () => {
 
     renderWithAuth(<SignUpPage />);
 
-    fireEvent.change(screen.getByPlaceholderText('eg: John Doe'), {
-      target: { value: 'John Doe' },
-    });
-    fireEvent.change(screen.getByPlaceholderText('eg: john@example.com'), {
-      target: { value: 'john@example.com' },
-    });
-    fireEvent.change(screen.getByPlaceholderText('********'), {
-      target: { value: 'secret' },
-    });
+    await user.click(screen.getByPlaceholderText('eg: John Doe'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('John Doe'));
+    await user.click(screen.getByPlaceholderText('eg: john@example.com'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('john@example.com'));
+    await user.click(screen.getByPlaceholderText('********'));
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste(String('secret'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
 
     expect(await screen.findByText('Email already exists')).toBeInTheDocument();
   });
