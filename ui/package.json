@@ -76,8 +76,10 @@
     "verify:ui:e2e": "node scripts/verify-ui.mjs --e2e"
   },
   "dependencies": {
+    "@carbon/ai-chat": "1.22.0",
     "@carbon/react": "1.104.0",
     "@carbon/styles": "1.103.0",
+    "@carbon/web-components": "2.65.0",
     "@floating-ui/react": "0.26.9",
     "@formatjs/intl-localematcher": "0.5.4",
     "@grpc/proto-loader": "0.7.13",

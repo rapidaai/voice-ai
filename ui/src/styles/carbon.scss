@@ -34,6 +34,7 @@
 @use '@carbon/react/scss/components/tile';
 @use '@carbon/react/scss/components/tag';
 @use '@carbon/react/scss/components/loading';
+@use '@carbon/react/scss/components/inline-loading';
 @use '@carbon/react/scss/components/code-snippet';
 @use '@carbon/react/scss/components/content-switcher';
 @use '@carbon/react/scss/components/progress-indicator';
@@ -46,6 +47,22 @@
 @use '@carbon/react/scss/components/date-picker';
 @use '@carbon/react/scss/components/tabs';
 @use '@carbon/react/scss/components/structured-list';
+@use '@carbon/react/scss/components/accordion';
+
+.debugger-configuration-accordion > .cds--accordion__item:first-child {
+  border-block-start: 0;
+}
+
+.debugger-configuration-accordion .cds--accordion__content {
+  margin-inline-start: 0;
+  padding-inline: 0;
+}
+
+.debugger-configuration-accordion
+  .cds--accordion__item--active
+  > .cds--accordion__wrapper {
+  padding-block: 0;
+}
 
 // ─── DatePicker calendar background ─────────────────────────────────────────
 .flatpickr-calendar,

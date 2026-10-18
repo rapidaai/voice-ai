@@ -813,6 +813,11 @@ const sourceRouteInventory = {
         'Chat preview needs assistant-specific realtime fixtures.',
     },
     {
+      path: 'v2/chat/:assistantId',
+      deferredReason:
+        'Debugger v2 is a design preview pending approved realtime wiring.',
+    },
+    {
       path: 'public/assistant/:assistantId',
       deferredReason:
         'Public preview needs assistant-specific realtime fixtures.',
