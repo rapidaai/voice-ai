@@ -251,7 +251,7 @@ function PanelHeader({
   action?: ReactNode;
 }) {
   return (
-    <header className="flex min-h-[76px] items-start justify-between gap-4 border-b border-[var(--cds-border-subtle-01)] px-6 py-4">
+    <header className="flex min-h-[76px] items-start justify-between gap-4 border-b border-gray-200 px-6 py-4 dark:border-gray-800">
       <div>
         <h2 className="text-lg font-semibold text-[var(--cds-text-primary)]">
           {title}
@@ -269,13 +269,15 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
   return (
     <article
       data-dashboard-kpi
-      className="flex h-40 flex-col justify-between bg-[var(--cds-layer)] p-6"
+      className="flex h-[156px] flex-col border border-gray-200 bg-white dark:border-gray-800 dark:bg-[#262626]"
     >
-      <div>
-        <h2 className="text-sm font-medium text-[var(--cds-text-secondary)]">
+      <div className="flex h-10 shrink-0 items-center border-b border-gray-200 px-4 dark:border-gray-800">
+        <h2 className="truncate text-sm font-semibold text-[var(--cds-text-primary)]">
           {metric.label}
         </h2>
-        <p className="mt-4 text-4xl font-light leading-none tracking-tight tabular-nums text-[var(--cds-text-primary)]">
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col justify-between p-4">
+        <p className="text-4xl font-light leading-none tracking-tight tabular-nums text-[var(--cds-text-primary)]">
           {metric.value}
           {metric.unit && (
             <span className="ml-1 text-base font-normal tracking-normal text-[var(--cds-text-secondary)]">
@@ -283,16 +285,16 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
             </span>
           )}
         </p>
+        <p
+          className={`text-xs font-semibold ${
+            metric.comparisonTone === 'danger'
+              ? 'text-[var(--cds-support-error)]'
+              : 'text-[var(--cds-text-secondary)]'
+          }`}
+        >
+          {metric.comparison}
+        </p>
       </div>
-      <p
-        className={`text-xs font-semibold ${
-          metric.comparisonTone === 'danger'
-            ? 'text-[var(--cds-support-error)]'
-            : 'text-[var(--cds-text-secondary)]'
-        }`}
-      >
-        {metric.comparison}
-      </p>
     </article>
   );
 }
@@ -316,7 +318,10 @@ function ActivityPanel({
   }));
 
   return (
-    <section className="h-full bg-[var(--cds-layer)]">
+    <section
+      data-dashboard-panel
+      className="h-full border border-gray-200 bg-white dark:border-gray-800 dark:bg-[#262626]"
+    >
       <PanelHeader
         title="Conversation activity"
         subtitle="Sessions and failures during the selected period"
@@ -434,12 +439,15 @@ function HealthPanel({ analytics }: { analytics: ProjectDashboardAnalytics }) {
   const threshold = health?.getSlowsessionthresholdms() || 0;
 
   return (
-    <section className="h-full bg-[var(--cds-layer)] lg:border-l lg:border-[var(--cds-border-subtle-01)]">
+    <section
+      data-dashboard-panel
+      className="h-full border border-gray-200 bg-white dark:border-gray-800 dark:bg-[#262626]"
+    >
       <PanelHeader
         title="Health summary"
         subtitle="Signals that may need attention"
       />
-      <ul className="divide-y divide-[var(--cds-border-subtle-01)] px-6">
+      <ul className="divide-y divide-gray-200 px-6 dark:divide-gray-800">
         <li className="flex min-h-[106px] items-start gap-4 py-5">
           <WarningAltFilled
             size={24}
@@ -536,7 +544,7 @@ function StatePanel({
       ? 'Analytics are unavailable'
       : `${title} is unavailable`;
   return (
-    <Tile className="h-full border! border-[var(--cds-border-subtle-01)]! p-0!">
+    <Tile className="h-full border! border-gray-200! bg-white! p-0! dark:border-gray-800! dark:bg-[#262626]!">
       <PanelHeader title={title} subtitle={subtitle} />
       <EmptyContent
         title={isEmpty ? `No ${title.toLowerCase()} yet` : unavailableTitle}
@@ -560,7 +568,7 @@ function BreakdownPanel({
   values: DashboardBreakdown[];
 }) {
   return (
-    <Tile className="h-full border! border-[var(--cds-border-subtle-01)]! p-0!">
+    <Tile className="h-full border! border-gray-200! bg-white! p-0! dark:border-gray-800! dark:bg-[#262626]!">
       <PanelHeader title={title} subtitle={subtitle} />
       {values.length ? (
         <div className="grid gap-6 p-6 sm:grid-cols-2">
@@ -572,7 +580,7 @@ function BreakdownPanel({
                   {value.value}
                 </span>
               </div>
-              <div className="h-1 bg-[var(--cds-border-subtle-01)]">
+              <div className="h-1 bg-gray-200 dark:bg-gray-800">
                 <div
                   data-dashboard-bar
                   className="h-full bg-[var(--cds-interactive)]"
@@ -618,7 +626,7 @@ function RecentFailuresTable({
   );
 
   return (
-    <Tile className="h-full border! border-[var(--cds-border-subtle-01)]! p-0!">
+    <Tile className="h-full border! border-gray-200! bg-white! p-0! dark:border-gray-800! dark:bg-[#262626]!">
       <PanelHeader
         title="Recent failures"
         subtitle="Latest sessions that need investigation"
@@ -718,7 +726,7 @@ function AssistantsTable({
   );
 
   return (
-    <Tile className="border! border-[var(--cds-border-subtle-01)]! p-0!">
+    <Tile className="border! border-gray-200! bg-white! p-0! dark:border-gray-800! dark:bg-[#262626]!">
       <PanelHeader
         title="Top assistants"
         subtitle="Assistants ranked by conversation volume"
@@ -818,10 +826,11 @@ function DashboardLoading() {
       aria-label="Loading project dashboard"
     >
       <span className="sr-only">Loading project dashboard</span>
-      <div className="grid grid-cols-1 gap-px border border-[var(--cds-border-subtle-01)] bg-[var(--cds-border-subtle-01)] md:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map(item => (
           <div
-            className="h-40 bg-[var(--cds-layer)] p-6"
+            data-dashboard-loading-card
+            className="h-[156px] border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-[#262626]"
             key={item}
             aria-hidden="true"
           >
@@ -831,13 +840,19 @@ function DashboardLoading() {
           </div>
         ))}
       </div>
-      <div className="mb-6 grid border-x border-b border-[var(--cds-border-subtle-01)] lg:grid-cols-16">
-        <div className="h-[396px] bg-[var(--cds-layer)] p-6 lg:col-span-11">
+      <div className="mb-4 grid gap-4 lg:grid-cols-16">
+        <div
+          data-dashboard-loading-card
+          className="h-[396px] border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-[#262626] lg:col-span-11"
+        >
           <SkeletonText width="30%" heading />
           <SkeletonText width="45%" />
           <SkeletonPlaceholder className="mt-8 h-[260px]! w-full!" />
         </div>
-        <div className="h-[396px] border-t border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer)] p-6 lg:col-span-5 lg:border-l lg:border-t-0">
+        <div
+          data-dashboard-loading-card
+          className="h-[396px] border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-[#262626] lg:col-span-5"
+        >
           <SkeletonText width="55%" heading />
           <SkeletonText width="75%" />
           <SkeletonText className="mt-10" width="100%" />
@@ -848,7 +863,8 @@ function DashboardLoading() {
       <div className="grid gap-4 lg:grid-cols-2">
         {[0, 1].map(item => (
           <div
-            className="h-[260px] border border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer)] p-6"
+            data-dashboard-loading-card
+            className="h-[260px] border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-[#262626]"
             key={item}
             aria-hidden="true"
           >
@@ -1051,7 +1067,7 @@ export const HomePage = () => {
     return (
       <main
         data-dashboard-page
-        className="flex min-h-0 flex-1 overflow-auto bg-[var(--cds-background)] text-[var(--cds-text-primary)]"
+        className="flex min-h-0 flex-1 overflow-auto bg-gray-100 text-[var(--cds-text-primary)] dark:bg-[#161616]"
       >
         <div data-dashboard-content className="flex min-h-full flex-1">
           <EmptyState
@@ -1070,13 +1086,13 @@ export const HomePage = () => {
   return (
     <main
       data-dashboard-page
-      className="min-h-0 flex-1 overflow-auto bg-[var(--cds-background)] text-[var(--cds-text-primary)]"
+      className="min-h-0 flex-1 overflow-auto bg-gray-100 text-[var(--cds-text-primary)] dark:bg-[#161616]"
     >
       <div
         data-dashboard-content
-        className="mx-auto grid max-w-[1584px] grid-cols-4 gap-x-4 px-4 py-6 md:grid-cols-8 md:px-8 lg:grid-cols-16"
+        className="mx-auto grid max-w-[1584px] grid-cols-4 gap-x-4 p-4 md:grid-cols-8 lg:grid-cols-16"
       >
-        <div className="col-span-full mb-6">
+        <div className="col-span-full mb-4">
           <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="flex items-center gap-2">
@@ -1152,14 +1168,14 @@ export const HomePage = () => {
               <>
                 <div
                   data-dashboard-kpi-strip
-                  className="col-span-full grid grid-cols-1 gap-px border border-[var(--cds-border-subtle-01)] bg-[var(--cds-border-subtle-01)] md:grid-cols-2 xl:grid-cols-4"
+                  className="col-span-full mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"
                 >
                   {metrics.map(metric => (
                     <MetricCard key={metric.label} metric={metric} />
                   ))}
                 </div>
 
-                <div className="col-span-full mb-6 grid border-x border-b border-[var(--cds-border-subtle-01)] lg:grid-cols-16">
+                <div className="col-span-full mb-4 grid gap-4 lg:grid-cols-16">
                   <div className="min-w-0 lg:col-span-11">
                     <ActivityPanel
                       analytics={analytics}
@@ -1169,13 +1185,13 @@ export const HomePage = () => {
                       }
                     />
                   </div>
-                  <div className="border-t border-[var(--cds-border-subtle-01)] lg:col-span-5 lg:border-t-0">
+                  <div className="lg:col-span-5">
                     <HealthPanel analytics={analytics} />
                   </div>
                 </div>
               </>
             ) : (
-              <div className="col-span-full mb-6">
+              <div className="col-span-full mb-4">
                 <StatePanel
                   title="Analytics"
                   subtitle="Sessions, reliability, and assistant health"
@@ -1187,7 +1203,7 @@ export const HomePage = () => {
               </div>
             )}
 
-            <div className="col-span-full mb-6 min-w-0 xl:col-span-8">
+            <div className="col-span-full mb-4 min-w-0 xl:col-span-8">
               {usage && isUsageReady ? (
                 <BreakdownPanel
                   title="Component usage"
@@ -1206,7 +1222,7 @@ export const HomePage = () => {
               )}
             </div>
 
-            <div className="col-span-full mb-6 min-w-0 xl:col-span-8">
+            <div className="col-span-full mb-4 min-w-0 xl:col-span-8">
               {analytics ? (
                 <RecentFailuresTable
                   failures={analytics.getRecentfailuresList()}
@@ -1224,7 +1240,7 @@ export const HomePage = () => {
             </div>
 
             {analytics && (
-              <div className="col-span-full mb-6">
+              <div className="col-span-full mb-4">
                 <AssistantsTable analytics={analytics} />
               </div>
             )}

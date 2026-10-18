@@ -222,15 +222,45 @@ describe('Dashboard HomePage', () => {
     );
   });
 
+  it('uses the assistant dashboard surface and bordered card layout', async () => {
+    const { container } = render(<HomePage />);
+
+    expect(await screen.findByText('12,486')).toBeInTheDocument();
+    expect(container.querySelector('[data-dashboard-page]')).toHaveClass(
+      'bg-gray-100',
+      'dark:bg-[#161616]',
+    );
+    expect(container.querySelector('[data-dashboard-kpi-strip]')).toHaveClass(
+      'gap-4',
+    );
+
+    const cards = container.querySelectorAll(
+      '[data-dashboard-kpi], [data-dashboard-panel]',
+    );
+    expect(cards).toHaveLength(6);
+    cards.forEach(card => {
+      expect(card).toHaveClass(
+        'border',
+        'border-gray-200',
+        'bg-white',
+        'dark:border-gray-800',
+        'dark:bg-[#262626]',
+      );
+    });
+  });
+
   it('shows a layout skeleton while the first request is pending', () => {
     mockGetProjectDashboardRange.mockReturnValue(new Promise(() => {}));
 
-    render(<HomePage />);
+    const { container } = render(<HomePage />);
 
     expect(
       screen.getByRole('status', { name: 'Loading project dashboard' }),
     ).toBeInTheDocument();
     expect(screen.queryByText('Top assistants')).not.toBeInTheDocument();
+    expect(
+      container.querySelectorAll('[data-dashboard-loading-card]'),
+    ).toHaveLength(8);
   });
 
   it('shows a retry action when the initial request fails', async () => {
