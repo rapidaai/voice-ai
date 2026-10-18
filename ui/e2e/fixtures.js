@@ -106,6 +106,20 @@ async function gotoJourney(page, journey) {
 
   await page.goto(journey.path);
   await page.waitForLoadState('domcontentloaded');
+
+  if (viewport?.width < 768) {
+    await page.mouse.move(viewport.width - 1, viewport.height - 1);
+    const sidebar = page
+      .locator('aside')
+      .filter({
+        has: page.getByRole('button', { name: 'Expand sidebar' }),
+      })
+      .first();
+    if ((await sidebar.count()) > 0) {
+      await expect(sidebar).toHaveCSS('width', '48px');
+    }
+  }
+
   await expect(page.locator('body')).toContainText(journey.expectText);
   if (journey.readyText) {
     await expect(page.locator('body')).toContainText(journey.readyText);
