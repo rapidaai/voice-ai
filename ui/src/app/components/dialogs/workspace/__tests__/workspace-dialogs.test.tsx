@@ -340,6 +340,23 @@ async function submitFormByButton(name: string) {
   await user.click(screen.getByRole('button', { name }));
 }
 
+function renderOrganizationInviteDialog() {
+  renderWithAuth(
+    <InviteOrganizationUserDialog
+      modalOpen
+      setModalOpen={jest.fn()}
+      onSuccess={jest.fn()}
+    />,
+  );
+}
+
+async function enterOrganizationInviteEmail(
+  user: ReturnType<typeof userEvent.setup>,
+) {
+  await user.click(screen.getByLabelText('Email address'));
+  await user.paste(String('member@example.com'));
+}
+
 describe('workspace dialogs', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -708,15 +725,9 @@ describe('workspace dialogs', () => {
     );
   });
 
-  it('validates organization invitations before calling the API', async () => {
+  it('describes optional project access and requires a valid invitation email', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
-    renderWithAuth(
-      <InviteOrganizationUserDialog
-        modalOpen
-        setModalOpen={jest.fn()}
-        onSuccess={jest.fn()}
-      />,
-    );
+    renderOrganizationInviteDialog();
 
     expect(
       screen.queryByText(
@@ -733,15 +744,26 @@ describe('workspace dialogs', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Please provide a valid email to invite user.',
     );
+    expect(mockInviteUserToOrganization).not.toHaveBeenCalled();
+  });
 
-    await user.click(screen.getByLabelText('Email address'));
-    await user.keyboard('{Control>}a{/Control}');
-    await user.paste(String('member@example.com'));
+  it('requires an organization role before sending an invitation', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    renderOrganizationInviteDialog();
+
+    await enterOrganizationInviteEmail(user);
     await user.click(screen.getByRole('button', { name: 'Invite user' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Please select an organization role.',
     );
+    expect(mockInviteUserToOrganization).not.toHaveBeenCalled();
+  });
 
+  it('rejects incomplete project roles on organization invitations', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    renderOrganizationInviteDialog();
+
+    await enterOrganizationInviteEmail(user);
     await user.click(
       screen.getByRole('button', { name: 'Select organization role' }),
     );
@@ -752,7 +774,17 @@ describe('workspace dialogs', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Select both project and role for each project role row.',
     );
+    expect(mockInviteUserToOrganization).not.toHaveBeenCalled();
+  });
 
+  it('rejects duplicate project roles on organization invitations', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    renderOrganizationInviteDialog();
+
+    await enterOrganizationInviteEmail(user);
+    await user.click(
+      screen.getByRole('button', { name: 'Select organization role' }),
+    );
     await user.click(
       screen.getByRole('button', { name: 'Set duplicate project roles' }),
     );
