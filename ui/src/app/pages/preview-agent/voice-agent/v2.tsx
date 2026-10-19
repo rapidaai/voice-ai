@@ -176,6 +176,10 @@ function PreviewVoiceAgentV2Workspace({
   const chatInstanceRef = useRef<ChatInstance | null>(null);
   const pendingRequestIdsRef = useRef<string[]>([]);
   const voiceTranscriptIdRef = useRef<string>();
+  const pendingVoiceConnectionRef = useRef<Promise<void> | null>(null);
+  const runtimeResetRef = useRef<Promise<void> | null>(null);
+  const isVoiceRequestedRef = useRef(false);
+  const argumentsRequireReconnectRef = useRef(false);
   const responseSequence = useRef(0);
   const voiceAgent = useMemo(
     () =>
@@ -298,6 +302,43 @@ function PreviewVoiceAgentV2Workspace({
     );
   }, []);
 
+  const resetRuntime = useCallback(() => {
+    if (runtimeResetRef.current) return runtimeResetRef.current;
+
+    const pendingVoiceConnection = pendingVoiceConnectionRef.current;
+    const reset = (async () => {
+      try {
+        try {
+          await voiceAgent.disconnect();
+        } finally {
+          if (pendingVoiceConnection) {
+            await pendingVoiceConnection.catch(() => undefined);
+            await voiceAgent.disconnect();
+          }
+        }
+      } finally {
+        voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
+        voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
+      }
+    })();
+    runtimeResetRef.current = reset;
+    const clearReset = () => {
+      if (runtimeResetRef.current === reset) runtimeResetRef.current = null;
+    };
+    reset.then(clearReset, clearReset);
+    return reset;
+  }, [voiceAgent]);
+
+  const applyPendingArguments = useCallback(async () => {
+    const activeReset = runtimeResetRef.current;
+    if (activeReset) await activeReset;
+    if (!argumentsRequireReconnectRef.current) return;
+    if (voiceAgent.isConnected || pendingVoiceConnectionRef.current) {
+      await resetRuntime();
+    }
+    argumentsRequireReconnectRef.current = false;
+  }, [resetRuntime, voiceAgent]);
+
   const loadConversationHistory = useCallback(
     async (instance: ChatInstance): Promise<HistoryItem[]> => {
       chatInstanceRef.current = instance;
@@ -382,6 +423,7 @@ function PreviewVoiceAgentV2Workspace({
         setVoicePhase('connecting');
       } else if (
         state === 'connected' &&
+        isVoiceRequestedRef.current &&
         voiceAgent.agentConfiguration.inputOptions.channel === Channel.Audio
       ) {
         setVoicePhase('listening');
@@ -393,6 +435,7 @@ function PreviewVoiceAgentV2Workspace({
     };
     const handleAgentError = (_type: string, error: string) => {
       if (!isActive) return;
+      isVoiceRequestedRef.current = false;
       pendingRequestIdsRef.current = [];
       voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
       voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
@@ -484,9 +527,12 @@ function PreviewVoiceAgentV2Workspace({
   useEffect(
     () => () => {
       chatInstanceRef.current = null;
-      void voiceAgent.disconnect();
+      isVoiceRequestedRef.current = false;
+      voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
+      voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
+      void resetRuntime();
     },
-    [voiceAgent],
+    [resetRuntime, voiceAgent],
   );
 
   useEffect(() => {
@@ -521,9 +567,11 @@ function PreviewVoiceAgentV2Workspace({
         return;
       }
 
-      if (request.id) pendingRequestIdsRef.current.push(request.id);
       setRuntimeError('');
       try {
+        await applyPendingArguments();
+        if (options.signal.aborted) return;
+        if (request.id) pendingRequestIdsRef.current.push(request.id);
         await voiceAgent.onSendText(message);
       } catch (error) {
         pendingRequestIdsRef.current = pendingRequestIdsRef.current.filter(
@@ -532,7 +580,7 @@ function PreviewVoiceAgentV2Workspace({
         throw error;
       }
     },
-    [voiceAgent],
+    [applyPendingArguments, voiceAgent],
   );
 
   const closePanel = useCallback(() => {
@@ -577,17 +625,33 @@ function PreviewVoiceAgentV2Workspace({
   }, []);
 
   const startVoiceSession = useCallback(async () => {
+    isVoiceRequestedRef.current = true;
     setRuntimeError('');
     setVoicePhase('connecting');
+    let pendingConnection: Promise<void> | null = null;
     try {
-      await voiceAgent.setInputChannel(Channel.Audio);
+      await applyPendingArguments();
+      if (!isVoiceRequestedRef.current) return;
+      pendingConnection = voiceAgent.setInputChannel(Channel.Audio);
+      pendingVoiceConnectionRef.current = pendingConnection;
+      await pendingConnection;
     } catch (error) {
-      setVoicePhase('idle');
-      handleRuntimeError(error);
+      if (isVoiceRequestedRef.current) {
+        isVoiceRequestedRef.current = false;
+        voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
+        voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
+        setVoicePhase('idle');
+        handleRuntimeError(error);
+      }
+    } finally {
+      if (pendingVoiceConnectionRef.current === pendingConnection) {
+        pendingVoiceConnectionRef.current = null;
+      }
     }
-  }, [handleRuntimeError, voiceAgent]);
+  }, [applyPendingArguments, handleRuntimeError, voiceAgent]);
 
   const switchToText = useCallback(async () => {
+    isVoiceRequestedRef.current = false;
     try {
       await voiceAgent.setInputChannel(Channel.Text);
       setVoicePhase('idle');
@@ -600,19 +664,20 @@ function PreviewVoiceAgentV2Workspace({
 
   const endVoiceSession = useCallback(
     async (shouldFocusText = false) => {
-      try {
-        await voiceAgent.disconnect();
-      } catch (error) {
-        handleRuntimeError(error);
-      }
+      isVoiceRequestedRef.current = false;
       voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
       voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
       setVoicePhase('idle');
       setIsVoiceMuted(false);
       setIsEndConfirmationOpen(false);
+      try {
+        await resetRuntime();
+      } catch (error) {
+        handleRuntimeError(error);
+      }
       if (shouldFocusText) focusTextComposer();
     },
-    [focusTextComposer, handleRuntimeError, voiceAgent],
+    [focusTextComposer, handleRuntimeError, resetRuntime, voiceAgent],
   );
 
   const toggleMute = useCallback(() => {
@@ -1016,6 +1081,22 @@ function PreviewVoiceAgentV2Workspace({
                                     variable.name,
                                     value,
                                   );
+                                  argumentsRequireReconnectRef.current = true;
+                                  if (voicePhase !== 'idle') {
+                                    isVoiceRequestedRef.current = false;
+                                    voiceAgent.agentConfiguration.inputOptions.channel =
+                                      Channel.Text;
+                                    voiceAgent.agentConfiguration.outputOptions.channel =
+                                      Channel.Text;
+                                    setVoicePhase('idle');
+                                    setIsVoiceMuted(false);
+                                    void resetRuntime()
+                                      .then(() => {
+                                        argumentsRequireReconnectRef.current =
+                                          false;
+                                      })
+                                      .catch(handleRuntimeError);
+                                  }
                                 }}
                               />
                             ))}

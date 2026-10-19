@@ -84,6 +84,7 @@ const mockAgentConfiguration = {
 };
 const mockVoiceAgent = {
   agentConfiguration: mockAgentConfiguration,
+  isConnected: false,
   messages: [] as Array<{ id: string; messages: string[] }>,
   getAssistant: mockGetAssistant,
   registerCallback: mockRegisterCallback,
@@ -204,8 +205,13 @@ describe('PreviewVoiceAgentV2', () => {
     });
     mockAddMessage.mockReset().mockResolvedValue(undefined);
     mockSend.mockReset().mockResolvedValue(undefined);
-    mockOnSendText.mockReset().mockResolvedValue(undefined);
-    mockDisconnect.mockReset().mockResolvedValue(undefined);
+    mockOnSendText.mockReset().mockImplementation(async () => {
+      mockVoiceAgent.isConnected = true;
+    });
+    mockDisconnect.mockReset().mockImplementation(async () => {
+      mockVoiceAgent.isConnected = false;
+      mockConnectionStateHandler?.('disconnected');
+    });
     mockToggleMute.mockReset().mockReturnValue(true);
     mockSetActiveMediaDevice.mockReset().mockResolvedValue(undefined);
     mockAddArgument
@@ -232,6 +238,7 @@ describe('PreviewVoiceAgentV2', () => {
           resolveVoiceConnection = () => {
             mockVoiceAgent.agentConfiguration.inputOptions.channel = channel;
             mockVoiceAgent.agentConfiguration.outputOptions.channel = channel;
+            mockVoiceAgent.isConnected = true;
             mockConnectionStateHandler?.('connected');
             resolve();
           };
@@ -242,6 +249,7 @@ describe('PreviewVoiceAgentV2', () => {
       return Promise.resolve();
     });
     mockVoiceAgent.messages = [];
+    mockVoiceAgent.isConnected = false;
     mockVoiceAgent.agentConfiguration = mockAgentConfiguration;
     mockAgentConfiguration.inputOptions.channel = 'text';
     mockAgentConfiguration.outputOptions.channel = 'text';
@@ -783,6 +791,159 @@ describe('PreviewVoiceAgentV2', () => {
     expect(mockAddMessage).toHaveBeenLastCalledWith(
       expect.objectContaining({ request_id: 'retry-request' }),
     );
+  });
+
+  it('reconnects before the next text turn after editing an active argument', async () => {
+    const user = userEvent.setup({
+      pointerEventsCheck: PointerEventsCheckLevel.Never,
+      skipHover: true,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/preview/v2/chat/assistant-123']}>
+        <Routes>
+          <Route
+            path="/preview/v2/chat/:assistantId"
+            element={<PreviewVoiceAgentV2 />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
+    const chatInstance = {
+      messaging: { addMessage: mockAddMessage },
+      send: mockSend,
+    };
+    await mockCarbonChatProps.messaging.customLoadHistory(chatInstance);
+    await mockCarbonChatProps.messaging.customSendMessage(
+      {
+        id: 'initial-request',
+        input: { message_type: 'text', text: 'Initial turn' },
+      },
+      { signal: new AbortController().signal, silent: false },
+      chatInstance,
+    );
+    await user.click(screen.getByRole('button', { name: 'Configuration' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Arguments, 2 variables' }),
+    );
+    const customerName = screen.getByRole('textbox', {
+      name: '{{customer_name}}',
+    });
+    await user.clear(customerName);
+    await user.type(customerName, 'Avery');
+
+    await mockCarbonChatProps.messaging.customSendMessage(
+      {
+        id: 'updated-request',
+        input: { message_type: 'text', text: 'Updated turn' },
+      },
+      { signal: new AbortController().signal, silent: false },
+      chatInstance,
+    );
+
+    expect(mockDisconnect).toHaveBeenCalledTimes(1);
+    expect(mockDisconnect.mock.invocationCallOrder[0]).toBeLessThan(
+      mockOnSendText.mock.invocationCallOrder[1],
+    );
+    expect(mockAddArgument).toHaveBeenLastCalledWith('customer_name', 'Avery');
+  });
+
+  it('finishes disconnecting when voice connection is cancelled in flight', async () => {
+    const user = userEvent.setup({
+      pointerEventsCheck: PointerEventsCheckLevel.Never,
+      skipHover: true,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/preview/v2/chat/assistant-123']}>
+        <Routes>
+          <Route
+            path="/preview/v2/chat/:assistantId"
+            element={<PreviewVoiceAgentV2 />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
+    await user.click(
+      screen.getByRole('button', { name: 'Start voice conversation' }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Cancel voice connection' }),
+    );
+    await act(async () => resolveVoiceConnection?.());
+
+    await waitFor(() => expect(mockDisconnect).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('Listening')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Start voice conversation' }),
+    ).toBeInTheDocument();
+  });
+
+  it('waits for cancelled connection cleanup before starting voice again', async () => {
+    const user = userEvent.setup({
+      pointerEventsCheck: PointerEventsCheckLevel.Never,
+      skipHover: true,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/preview/v2/chat/assistant-123']}>
+        <Routes>
+          <Route
+            path="/preview/v2/chat/:assistantId"
+            element={<PreviewVoiceAgentV2 />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
+    await user.click(
+      screen.getByRole('button', { name: 'Start voice conversation' }),
+    );
+    const finishCancelledConnection = resolveVoiceConnection;
+    await user.click(
+      screen.getByRole('button', { name: 'Cancel voice connection' }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Start voice conversation' }),
+    );
+
+    expect(mockSetInputChannel).toHaveBeenCalledTimes(1);
+    await act(async () => finishCancelledConnection?.());
+    await waitFor(() => expect(mockDisconnect).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockSetInputChannel).toHaveBeenCalledTimes(2));
+    await act(async () => resolveVoiceConnection?.());
+    expect(await screen.findByText('Listening')).toBeInTheDocument();
+  });
+
+  it('finishes disconnecting an in-flight voice connection on unmount', async () => {
+    const user = userEvent.setup({
+      pointerEventsCheck: PointerEventsCheckLevel.Never,
+      skipHover: true,
+    });
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/preview/v2/chat/assistant-123']}>
+        <Routes>
+          <Route
+            path="/preview/v2/chat/:assistantId"
+            element={<PreviewVoiceAgentV2 />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
+    await user.click(
+      screen.getByRole('button', { name: 'Start voice conversation' }),
+    );
+    unmount();
+    await act(async () => resolveVoiceConnection?.());
+
+    await waitFor(() => expect(mockDisconnect).toHaveBeenCalledTimes(2));
   });
 
   it('confirms before ending an active voice conversation', async () => {
