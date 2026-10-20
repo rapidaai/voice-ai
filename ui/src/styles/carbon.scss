@@ -13,6 +13,8 @@
 @use '@carbon/react/scss/components/checkbox';
 @use '@carbon/react/scss/components/text-input';
 @use '@carbon/react/scss/components/text-area';
+@use '@carbon/react/scss/components/fluid-text-input';
+@use '@carbon/react/scss/components/fluid-text-area';
 @use '@carbon/react/scss/components/list-box';
 @use '@carbon/react/scss/components/dropdown';
 @use '@carbon/react/scss/components/multiselect';
@@ -22,6 +24,7 @@
 @use '@carbon/react/scss/components/pagination';
 @use '@carbon/react/scss/components/radio-button';
 @use '@carbon/react/scss/components/number-input';
+@use '@carbon/react/scss/components/fluid-number-input';
 @use '@carbon/react/scss/components/slider';
 @use '@carbon/react/scss/components/skeleton-styles';
 @use '@carbon/react/scss/components/data-table';

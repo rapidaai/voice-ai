@@ -17,6 +17,15 @@ describe('Carbon component styles', () => {
     expect(carbonStyles).toContain(
       "@use '@carbon/react/scss/components/structured-list';",
     );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/react/scss/components/fluid-text-input';",
+    );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/react/scss/components/fluid-text-area';",
+    );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/react/scss/components/fluid-number-input';",
+    );
     expect(carbonStyles).toContain('.debugger-configuration-accordion');
     expect(carbonStyles).toContain('border-block-start: 0;');
     expect(carbonStyles).toContain('margin-inline-start: 0;');

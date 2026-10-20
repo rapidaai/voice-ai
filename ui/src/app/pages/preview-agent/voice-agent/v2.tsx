@@ -1,4 +1,6 @@
 import {
+  type ComponentProps,
+  type ChangeEvent as ReactChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   useCallback,
@@ -46,6 +48,8 @@ import {
   AccordionItem,
   Dropdown,
   FluidForm,
+  FluidNumberInput,
+  FluidTextArea,
   FluidTextInput,
   IconButton as CarbonIconButton,
   InlineLoading,
@@ -55,20 +59,58 @@ import {
   StructuredListCell,
   StructuredListRow,
   StructuredListWrapper,
+  Toggletip as CarbonToggletip,
+  ToggletipActions,
+  ToggletipButton,
+  ToggletipContent,
 } from '@carbon/react';
-import { IconOnlyButton } from '@/app/components/ui/primitives';
+import {
+  CopyButton,
+  IconOnlyButton,
+  PrimaryButton,
+} from '@/app/components/ui/primitives';
 import { ConfirmDialog } from '@/app/components/dialogs/shared';
 import { createVoiceAgentDebuggerConnection } from '@/clients/runtime.client';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useTheme } from '@/theme/theme-provider';
+import { InputVarType } from '@/models/common';
 import { cn } from '@/utils';
 import { PreviewAgentHeader } from './preview-agent-header';
 
+const Toggletip =
+  (CarbonToggletip as unknown as { default?: typeof CarbonToggletip })
+    .default ?? CarbonToggletip;
+
 type VoicePhase = 'idle' | 'connecting' | 'listening';
+
+function VoiceActionIcon(props: ComponentProps<typeof VoiceMode>) {
+  return (
+    <VoiceMode
+      {...props}
+      style={{ ...props.style, fill: 'var(--cds-link-primary)' }}
+    />
+  );
+}
+
+function StopActionIcon(props: ComponentProps<typeof StopFilledAlt>) {
+  return (
+    <StopFilledAlt
+      {...props}
+      style={{ ...props.style, fill: 'var(--cds-support-error)' }}
+    />
+  );
+}
 
 type PromptVariable = {
   name: string;
+  type: string;
   value: string;
+};
+
+type ActiveAssistantStream = {
+  itemId: string;
+  requestId?: string;
+  text: string;
 };
 
 type ConfigurationOption = {
@@ -78,6 +120,26 @@ type ConfigurationOption = {
   value: string;
 };
 
+const EDITABLE_ARGUMENT_TYPES = new Set<string>([
+  InputVarType.stringInput,
+  InputVarType.textInput,
+  InputVarType.paragraph,
+  InputVarType.number,
+  InputVarType.json,
+  InputVarType.url,
+]);
+
+const MULTILINE_ARGUMENT_TYPES = new Set<string>([
+  InputVarType.textInput,
+  InputVarType.paragraph,
+  InputVarType.json,
+]);
+
+function formatArgumentType(type: string) {
+  if (type === InputVarType.json) return 'JSON';
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
 function formatConfigurationLabel(key: string) {
   if (key.includes('voice')) return 'Voice';
   if (key.endsWith('model') || key === 'model.name') return 'Model';
@@ -85,6 +147,26 @@ function formatConfigurationLabel(key: string) {
 
   const name = key.split('.').at(-1)?.replaceAll('_', ' ') || key;
   return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+function isVisibleConfigurationKey(key: string) {
+  const configurationKey = key.toLowerCase();
+  return (
+    configurationKey !== 'credential' &&
+    !configurationKey.endsWith('credential_id')
+  );
+}
+
+function isCopyableConfigurationKey(key: string) {
+  const configurationKey = key.toLowerCase();
+  return (
+    configurationKey === 'model.name' ||
+    configurationKey.endsWith('.model') ||
+    configurationKey.endsWith('.url') ||
+    configurationKey.endsWith('_url') ||
+    configurationKey.endsWith('.id') ||
+    configurationKey.endsWith('_id')
+  );
 }
 
 function VoiceMicrophoneSelector({
@@ -169,12 +251,17 @@ function PreviewVoiceAgentV2Workspace({
 }) {
   const navigate = useNavigate();
   const { resolvedMode } = useTheme();
+  const chatBackgroundColor = resolvedMode === 'dark' ? '#161616' : '#f4f4f4';
+  const chatActionColor = resolvedMode === 'dark' ? '#262626' : '#ffffff';
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const conversationRef = useRef<HTMLElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const panelTriggerRef = useRef<HTMLButtonElement | null>(null);
   const chatInstanceRef = useRef<ChatInstance | null>(null);
   const pendingRequestIdsRef = useRef<string[]>([]);
+  const activeAssistantStreamsRef = useRef<Map<string, ActiveAssistantStream>>(
+    new Map(),
+  );
   const voiceTranscriptIdRef = useRef<string>();
   const pendingVoiceConnectionRef = useRef<Promise<void> | null>(null);
   const runtimeResetRef = useRef<Promise<void> | null>(null);
@@ -202,6 +289,7 @@ function PreviewVoiceAgentV2Workspace({
   );
   const [assistant, setAssistant] = useState<Assistant | null>(null);
   const [isConfigurationOpen, setIsConfigurationOpen] = useState(false);
+  const [isSessionConnected, setIsSessionConnected] = useState(false);
   const [voicePhase, setVoicePhase] = useState<VoicePhase>('idle');
   const [isVoiceMuted, setIsVoiceMuted] = useState(false);
   const [isEndConfirmationOpen, setIsEndConfirmationOpen] = useState(false);
@@ -210,6 +298,11 @@ function PreviewVoiceAgentV2Workspace({
     () =>
       typeof window !== 'undefined' &&
       window.matchMedia('(max-width: 1055px)').matches,
+  );
+  const [isSmallViewport, setIsSmallViewport] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia('(max-width: 671px)').matches,
   );
   const [promptVariables, setPromptVariables] = useState<PromptVariable[]>([]);
 
@@ -240,12 +333,15 @@ function PreviewVoiceAgentV2Workspace({
                 key: 'provider',
                 value: model.getModelprovidername(),
               },
-              ...model.getAssistantmodeloptionsList().map(option => ({
-                id: `model-${option.getKey()}`,
-                label: formatConfigurationLabel(option.getKey()),
-                key: option.getKey(),
-                value: option.getValue(),
-              })),
+              ...model
+                .getAssistantmodeloptionsList()
+                .filter(option => isVisibleConfigurationKey(option.getKey()))
+                .map(option => ({
+                  id: `model-${option.getKey()}`,
+                  label: formatConfigurationLabel(option.getKey()),
+                  key: option.getKey(),
+                  value: option.getValue(),
+                })),
             ]
           : unavailableConfiguration,
       },
@@ -261,12 +357,15 @@ function PreviewVoiceAgentV2Workspace({
                 key: 'provider',
                 value: speechToText.getAudioprovider(),
               },
-              ...speechToText.getAudiooptionsList().map(option => ({
-                id: `stt-${option.getKey()}`,
-                label: formatConfigurationLabel(option.getKey()),
-                key: option.getKey(),
-                value: option.getValue(),
-              })),
+              ...speechToText
+                .getAudiooptionsList()
+                .filter(option => isVisibleConfigurationKey(option.getKey()))
+                .map(option => ({
+                  id: `stt-${option.getKey()}`,
+                  label: formatConfigurationLabel(option.getKey()),
+                  key: option.getKey(),
+                  value: option.getValue(),
+                })),
             ]
           : unavailableConfiguration,
       },
@@ -282,12 +381,15 @@ function PreviewVoiceAgentV2Workspace({
                 key: 'provider',
                 value: textToSpeech.getAudioprovider(),
               },
-              ...textToSpeech.getAudiooptionsList().map(option => ({
-                id: `tts-${option.getKey()}`,
-                label: formatConfigurationLabel(option.getKey()),
-                key: option.getKey(),
-                value: option.getValue(),
-              })),
+              ...textToSpeech
+                .getAudiooptionsList()
+                .filter(option => isVisibleConfigurationKey(option.getKey()))
+                .map(option => ({
+                  id: `tts-${option.getKey()}`,
+                  label: formatConfigurationLabel(option.getKey()),
+                  key: option.getKey(),
+                  value: option.getValue(),
+                })),
             ]
           : unavailableConfiguration,
       },
@@ -356,13 +458,67 @@ function PreviewVoiceAgentV2Workspace({
     transcript?.setAttribute('tabindex', '0');
   }, []);
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 1055px)');
-    const updatePanelMode = () => setIsOverlayPanel(mediaQuery.matches);
-    updatePanelMode();
-    mediaQuery.addEventListener('change', updatePanelMode);
+  const stopAssistantStreams = useCallback(async () => {
+    const instance = chatInstanceRef.current;
+    const streams = Array.from(activeAssistantStreamsRef.current.entries());
+    activeAssistantStreamsRef.current.clear();
+    if (!instance) return;
 
-    return () => mediaQuery.removeEventListener('change', updatePanelMode);
+    await Promise.all(
+      streams.map(([responseId, stream]) =>
+        instance.messaging.addMessageChunk({
+          streaming_metadata: { response_id: responseId },
+          final_response: {
+            id: responseId,
+            request_id: stream.requestId,
+            output: {
+              generic: [
+                {
+                  response_type: MessageResponseTypes.TEXT,
+                  text: stream.text,
+                  streaming_metadata: {
+                    id: stream.itemId,
+                    stream_stopped: true,
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      ),
+    );
+  }, []);
+
+  const disconnectChatSession = useCallback(async () => {
+    setIsSessionConnected(false);
+    setRuntimeError('');
+    pendingRequestIdsRef.current = [];
+    try {
+      await stopAssistantStreams();
+      await resetRuntime();
+    } catch (error) {
+      handleRuntimeError(error);
+    }
+  }, [handleRuntimeError, resetRuntime, stopAssistantStreams]);
+
+  useEffect(() => {
+    const panelMediaQuery = window.matchMedia('(max-width: 1055px)');
+    const smallViewportMediaQuery = window.matchMedia('(max-width: 671px)');
+    const updatePanelMode = () => setIsOverlayPanel(panelMediaQuery.matches);
+    const updateSmallViewport = () =>
+      setIsSmallViewport(smallViewportMediaQuery.matches);
+    updatePanelMode();
+    updateSmallViewport();
+    panelMediaQuery.addEventListener('change', updatePanelMode);
+    smallViewportMediaQuery.addEventListener('change', updateSmallViewport);
+
+    return () => {
+      panelMediaQuery.removeEventListener('change', updatePanelMode);
+      smallViewportMediaQuery.removeEventListener(
+        'change',
+        updateSmallViewport,
+      );
+    };
   }, []);
 
   useEffect(() => {
@@ -392,6 +548,7 @@ function PreviewVoiceAgentV2Workspace({
         setPromptVariables(
           variables.map(variable => ({
             name: variable.getName(),
+            type: variable.getType() || InputVarType.stringInput,
             value: variable.getDefaultvalue(),
           })),
         );
@@ -419,51 +576,112 @@ function PreviewVoiceAgentV2Workspace({
     let isActive = true;
     const handleConnectionState = (state: string) => {
       if (!isActive) return;
-      if (state === 'connecting') {
-        setVoicePhase('connecting');
-      } else if (
-        state === 'connected' &&
+      const isVoiceConnection =
         isVoiceRequestedRef.current &&
-        voiceAgent.agentConfiguration.inputOptions.channel === Channel.Audio
-      ) {
+        voiceAgent.agentConfiguration.inputOptions.channel === Channel.Audio;
+      if (state === 'connecting' && isVoiceConnection) {
+        setVoicePhase('connecting');
+      } else if (state === 'connected' && isVoiceConnection) {
         setVoicePhase('listening');
+      }
+      if (state === 'connected') {
+        setIsSessionConnected(true);
       } else if (state === 'disconnected') {
         pendingRequestIdsRef.current = [];
+        setIsSessionConnected(false);
         setVoicePhase('idle');
         setIsVoiceMuted(false);
+        void stopAssistantStreams().catch(handleRuntimeError);
       }
     };
     const handleAgentError = (_type: string, error: string) => {
       if (!isActive) return;
       isVoiceRequestedRef.current = false;
       pendingRequestIdsRef.current = [];
+      setIsSessionConnected(false);
       voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
       voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
       setVoicePhase('idle');
       setIsVoiceMuted(false);
       setRuntimeError(error || 'Voice session failed.');
+      void stopAssistantStreams().catch(handleRuntimeError);
     };
 
     voiceAgent.on('onConnectionStateEvent', handleConnectionState);
     voiceAgent.on('onErrorEvent', handleAgentError);
     voiceAgent.registerCallback({
       onAssistantMessage: message => {
-        if (!isActive || !message || message.completed === false) return;
+        if (!isActive || !message) return;
         const instance = chatInstanceRef.current;
         if (!instance) return;
 
+        const responseId =
+          message.id || `assistant-response-${++responseSequence.current}`;
+        if (message.completed === false) {
+          const chunkText = message.messageText || '';
+          if (!chunkText) return;
+
+          let stream = activeAssistantStreamsRef.current.get(responseId);
+          if (!stream) {
+            stream = {
+              itemId: `${responseId}-text`,
+              requestId: pendingRequestIdsRef.current.shift(),
+              text: '',
+            };
+            activeAssistantStreamsRef.current.set(responseId, stream);
+          }
+          stream.text += chunkText;
+          void instance.messaging
+            .addMessageChunk({
+              streaming_metadata: { response_id: responseId },
+              partial_item: {
+                response_type: MessageResponseTypes.TEXT,
+                text: chunkText,
+                streaming_metadata: { id: stream.itemId },
+              },
+            })
+            .catch(handleRuntimeError);
+          return;
+        }
+
         const storedMessage = voiceAgent.messages.find(
-          current => current.id === message.id,
+          current => current.id === message.id && current.role === 'system',
         );
+        const stream = activeAssistantStreamsRef.current.get(responseId);
         const text =
-          storedMessage?.messages.join('') || message.messageText?.trim();
+          storedMessage?.messages.join('') ||
+          stream?.text ||
+          message.messageText?.trim();
         if (!text) return;
 
-        responseSequence.current += 1;
-        const requestId = pendingRequestIdsRef.current.shift();
+        const requestId =
+          stream?.requestId ?? pendingRequestIdsRef.current.shift();
+        if (stream) {
+          activeAssistantStreamsRef.current.delete(responseId);
+          void instance.messaging
+            .addMessageChunk({
+              streaming_metadata: { response_id: responseId },
+              final_response: {
+                id: responseId,
+                request_id: requestId,
+                output: {
+                  generic: [
+                    {
+                      response_type: MessageResponseTypes.TEXT,
+                      text,
+                      streaming_metadata: { id: stream.itemId },
+                    },
+                  ],
+                },
+              },
+            })
+            .catch(handleRuntimeError);
+          return;
+        }
+
         void instance.messaging
           .addMessage({
-            id: message.id || `assistant-response-${responseSequence.current}`,
+            id: responseId,
             request_id: requestId,
             output: {
               generic: [
@@ -512,7 +730,9 @@ function PreviewVoiceAgentV2Workspace({
       onConversationError: error => {
         if (isActive) {
           pendingRequestIdsRef.current = [];
+          setIsSessionConnected(false);
           setRuntimeError(error.message || 'Voice session failed.');
+          void stopAssistantStreams().catch(handleRuntimeError);
         }
       },
     });
@@ -522,7 +742,7 @@ function PreviewVoiceAgentV2Workspace({
       voiceAgent.off('onConnectionStateEvent', handleConnectionState);
       voiceAgent.off('onErrorEvent', handleAgentError);
     };
-  }, [handleRuntimeError, voiceAgent]);
+  }, [handleRuntimeError, stopAssistantStreams, voiceAgent]);
 
   useEffect(
     () => () => {
@@ -558,10 +778,26 @@ function PreviewVoiceAgentV2Workspace({
     ) => {
       if (options.signal.aborted) return;
 
+      chatInstanceRef.current = instance;
+      if (request.history?.is_welcome_request) {
+        await instance.messaging.addMessage({
+          id: request.id ? `welcome-${request.id}` : 'debugger-welcome',
+          request_id: request.id,
+          output: {
+            generic: [
+              {
+                response_type: MessageResponseTypes.TEXT,
+                text: 'Hello! How can I help you today?',
+              },
+            ],
+          },
+        });
+        return;
+      }
+
       const message = request.input.text?.trim();
       if (!message) return;
 
-      chatInstanceRef.current = instance;
       if (voiceTranscriptIdRef.current === request.id) {
         voiceTranscriptIdRef.current = undefined;
         return;
@@ -625,6 +861,8 @@ function PreviewVoiceAgentV2Workspace({
   }, []);
 
   const startVoiceSession = useCallback(async () => {
+    if (!assistant?.getDebuggerdeployment()?.getInputaudio()) return;
+
     isVoiceRequestedRef.current = true;
     setRuntimeError('');
     setVoicePhase('connecting');
@@ -648,7 +886,7 @@ function PreviewVoiceAgentV2Workspace({
         pendingVoiceConnectionRef.current = null;
       }
     }
-  }, [applyPendingArguments, handleRuntimeError, voiceAgent]);
+  }, [applyPendingArguments, assistant, handleRuntimeError, voiceAgent]);
 
   const switchToText = useCallback(async () => {
     isVoiceRequestedRef.current = false;
@@ -685,6 +923,35 @@ function PreviewVoiceAgentV2Workspace({
   }, [voiceAgent]);
 
   const assistantName = assistant?.getName() || 'Voice assistant';
+  const isVoiceAvailable = Boolean(
+    assistant?.getDebuggerdeployment()?.getInputaudio(),
+  );
+
+  const updatePromptVariable = (
+    index: number,
+    variable: PromptVariable,
+    value: string,
+  ) => {
+    setPromptVariables(current =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, value } : item,
+      ),
+    );
+    voiceAgent.agentConfiguration.addArgument(variable.name, value);
+    argumentsRequireReconnectRef.current = true;
+    if (voicePhase === 'idle') return;
+
+    isVoiceRequestedRef.current = false;
+    voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
+    voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
+    setVoicePhase('idle');
+    setIsVoiceMuted(false);
+    void resetRuntime()
+      .then(() => {
+        argumentsRequireReconnectRef.current = false;
+      })
+      .catch(handleRuntimeError);
+  };
 
   const chatSlots = useMemo(
     () => ({
@@ -797,7 +1064,7 @@ function PreviewVoiceAgentV2Workspace({
                     <IconOnlyButton
                       kind="ghost"
                       size="sm"
-                      renderIcon={StopFilledAlt}
+                      renderIcon={StopActionIcon}
                       iconDescription="End voice conversation"
                       tooltipPosition="top"
                       className="!text-[var(--cds-support-error)]"
@@ -811,23 +1078,68 @@ function PreviewVoiceAgentV2Workspace({
         ),
       [WriteableElementName.PROMPT_LINE_SEND_BUTTON_START]:
         voicePhase === 'idle' ? (
-          <IconOnlyButton
-            kind="ghost"
-            size="sm"
-            renderIcon={VoiceMode}
-            iconDescription="Start voice conversation"
-            tooltipPosition="top"
-            onClick={() => void startVoiceSession()}
-          />
+          <div
+            role="group"
+            aria-label="Chat input controls"
+            className="flex h-8 items-center gap-2"
+          >
+            {isVoiceAvailable ? (
+              <IconOnlyButton
+                kind="ghost"
+                size="sm"
+                renderIcon={VoiceActionIcon}
+                iconDescription="Start voice conversation"
+                tooltipPosition="top"
+                onClick={() => void startVoiceSession()}
+              />
+            ) : (
+              <Toggletip align="top-end" autoAlign>
+                <ToggletipButton
+                  label="Voice is not configured"
+                  className="!flex !h-8 !w-8 items-center justify-center hover:bg-[var(--cds-background-hover)]"
+                >
+                  <VoiceActionIcon size={16} />
+                </ToggletipButton>
+                <ToggletipContent>
+                  <p>Configure speech to text to start a voice conversation.</p>
+                  <ToggletipActions>
+                    <PrimaryButton
+                      size="sm"
+                      onClick={() =>
+                        navigate(
+                          `/deployment/assistant/${assistantId}/deployment/debugger`,
+                        )
+                      }
+                    >
+                      Configure voice
+                    </PrimaryButton>
+                  </ToggletipActions>
+                </ToggletipContent>
+              </Toggletip>
+            )}
+            {isSessionConnected ? (
+              <IconOnlyButton
+                kind="ghost"
+                size="sm"
+                renderIcon={StopActionIcon}
+                iconDescription="Stop chat session"
+                tooltipPosition="top"
+                onClick={() => void disconnectChatSession()}
+              />
+            ) : null}
+          </div>
         ) : null,
     }),
     [
       assistantId,
       assistantName,
+      disconnectChatSession,
       endVoiceSession,
       handleRuntimeError,
       isConfigurationOpen,
+      isSessionConnected,
       isVoiceMuted,
+      isVoiceAvailable,
       navigate,
       startVoiceSession,
       switchToText,
@@ -917,13 +1229,17 @@ function PreviewVoiceAgentV2Workspace({
                 renderWriteableElements={chatSlots}
                 layout={{
                   showFrame: false,
-                  hasContentMaxWidth: true,
+                  hasContentMaxWidth: !isSmallViewport,
                   customProperties: {
                     'messages-max-width': '45rem',
+                    '$chat-shell-background': chatBackgroundColor,
+                    '$chat-prompt-background': chatActionColor,
+                    '$ai-aura-start-sm': chatBackgroundColor,
+                    '$ai-aura-end': chatBackgroundColor,
                   },
                 }}
                 messaging={{
-                  skipWelcome: true,
+                  skipWelcome: false,
                   customLoadHistory: loadConversationHistory,
                   customSendMessage: sendRuntimeMessage,
                 }}
@@ -1025,10 +1341,23 @@ function PreviewVoiceAgentV2Workspace({
                                         {option.key}
                                       </span>
                                     </StructuredListCell>
-                                    <StructuredListCell className="min-w-0 !py-2 !pl-2 !pr-4 text-right align-top">
-                                      <span className="block break-all text-sm text-[var(--cds-text-primary)]">
-                                        {option.value}
-                                      </span>
+                                    <StructuredListCell className="min-w-0 !py-2 !pl-2 !pr-4 align-top">
+                                      <div className="flex min-w-0 items-start justify-end gap-1 text-right">
+                                        <span className="min-w-0 break-all pt-1.5 text-sm text-[var(--cds-text-primary)]">
+                                          {option.value}
+                                        </span>
+                                        {isCopyableConfigurationKey(
+                                          option.key,
+                                        ) ? (
+                                          <CopyButton
+                                            className="shrink-0"
+                                            copyDescription={`Copy ${option.label}`}
+                                            copiedDescription={`${option.label} copied`}
+                                          >
+                                            {option.value}
+                                          </CopyButton>
+                                        ) : null}
+                                      </div>
                                     </StructuredListCell>
                                   </StructuredListRow>
                                 ))}
@@ -1058,49 +1387,131 @@ function PreviewVoiceAgentV2Workspace({
                           data-testid="arguments-accordion-content"
                           className="px-4 pb-4 pt-2"
                         >
-                          <FluidForm
-                            aria-label="Arguments"
-                            onSubmit={event => event.preventDefault()}
-                          >
-                            {promptVariables.map((variable, index) => (
-                              <FluidTextInput
-                                key={variable.name}
-                                id={`prompt-variable-${variable.name}`}
-                                labelText={`{{${variable.name}}}`}
-                                value={variable.value}
-                                onChange={event => {
-                                  const value = event.target.value;
-                                  setPromptVariables(current =>
-                                    current.map((item, itemIndex) =>
-                                      itemIndex === index
-                                        ? { ...item, value }
-                                        : item,
-                                    ),
+                          {promptVariables.length === 0 ? (
+                            <div className="flex min-h-32 items-center justify-center px-4 text-center">
+                              <div>
+                                <p className="text-sm font-semibold text-[var(--cds-text-primary)]">
+                                  No arguments defined
+                                </p>
+                                <p className="mt-1 text-sm text-[var(--cds-text-secondary)]">
+                                  This assistant does not expose prompt
+                                  variables.
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <FluidForm
+                              aria-label="Arguments"
+                              onSubmit={event => event.preventDefault()}
+                            >
+                              {promptVariables.map((variable, index) => {
+                                const id = `prompt-variable-${variable.name}`;
+                                const label = `{{${variable.name}}}`;
+                                const helperText = formatArgumentType(
+                                  variable.type,
+                                );
+                                const labelContent = (
+                                  <span className="flex items-center justify-between gap-3">
+                                    <span className="truncate font-mono">
+                                      {label}
+                                    </span>
+                                    <span
+                                      aria-hidden="true"
+                                      className="text-xs font-normal text-[var(--cds-text-helper)]"
+                                    >
+                                      {helperText}
+                                    </span>
+                                  </span>
+                                );
+                                const onChange = (
+                                  event: ReactChangeEvent<
+                                    HTMLInputElement | HTMLTextAreaElement
+                                  >,
+                                ) =>
+                                  updatePromptVariable(
+                                    index,
+                                    variable,
+                                    event.target.value,
                                   );
-                                  voiceAgent.agentConfiguration.addArgument(
-                                    variable.name,
-                                    value,
+
+                                if (
+                                  !EDITABLE_ARGUMENT_TYPES.has(variable.type)
+                                ) {
+                                  return (
+                                    <div
+                                      key={variable.name}
+                                      className="border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-field-01)] px-4 py-3 last:border-b-0"
+                                    >
+                                      <p className="mb-2 font-mono text-sm font-medium text-[var(--cds-text-primary)]">
+                                        {label}
+                                      </p>
+                                      <InlineNotification
+                                        kind="warning"
+                                        lowContrast
+                                        hideCloseButton
+                                        title="Not editable in debugger"
+                                        subtitle={`${helperText} arguments cannot be edited in this debugger.`}
+                                        className="!m-0 !max-w-full"
+                                      />
+                                    </div>
                                   );
-                                  argumentsRequireReconnectRef.current = true;
-                                  if (voicePhase !== 'idle') {
-                                    isVoiceRequestedRef.current = false;
-                                    voiceAgent.agentConfiguration.inputOptions.channel =
-                                      Channel.Text;
-                                    voiceAgent.agentConfiguration.outputOptions.channel =
-                                      Channel.Text;
-                                    setVoicePhase('idle');
-                                    setIsVoiceMuted(false);
-                                    void resetRuntime()
-                                      .then(() => {
-                                        argumentsRequireReconnectRef.current =
-                                          false;
-                                      })
-                                      .catch(handleRuntimeError);
-                                  }
-                                }}
-                              />
-                            ))}
-                          </FluidForm>
+                                }
+
+                                if (
+                                  MULTILINE_ARGUMENT_TYPES.has(variable.type)
+                                ) {
+                                  return (
+                                    <FluidTextArea
+                                      key={variable.name}
+                                      id={id}
+                                      labelText={labelContent}
+                                      rows={
+                                        variable.type === InputVarType.json
+                                          ? 6
+                                          : 4
+                                      }
+                                      value={variable.value}
+                                      className={cn(
+                                        variable.type === InputVarType.json &&
+                                          '[&_textarea]:font-mono',
+                                      )}
+                                      onChange={onChange}
+                                    />
+                                  );
+                                }
+
+                                if (variable.type === InputVarType.number) {
+                                  return (
+                                    <FluidNumberInput
+                                      key={variable.name}
+                                      id={id}
+                                      label={labelContent}
+                                      type="number"
+                                      allowEmpty
+                                      value={variable.value}
+                                      onChange={(_event, { value }) =>
+                                        updatePromptVariable(
+                                          index,
+                                          variable,
+                                          String(value),
+                                        )
+                                      }
+                                    />
+                                  );
+                                }
+
+                                return (
+                                  <FluidTextInput
+                                    key={variable.name}
+                                    id={id}
+                                    labelText={labelContent}
+                                    value={variable.value}
+                                    onChange={onChange}
+                                  />
+                                );
+                              })}
+                            </FluidForm>
+                          )}
                         </div>
                       </AccordionItem>
                     </Accordion>
