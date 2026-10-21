@@ -457,14 +457,14 @@ const routeJourneys = [
     id: 'onboarding.organization',
     path: '/onboarding/organization',
     auth: true,
-    expectText: 'Set up your organization',
+    expectText: 'Create your organization',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
     id: 'onboarding.root',
     path: '/onboarding',
     auth: true,
-    expectText: 'Set up your organization',
+    expectText: 'Create your organization',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {

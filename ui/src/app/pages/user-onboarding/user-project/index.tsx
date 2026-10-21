@@ -1,15 +1,16 @@
 import { useCallback, useContext, useState } from 'react';
 import type { CreateProjectResponse, ServiceError } from '@rapidaai/react';
 import { ArrowRight } from '@carbon/icons-react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { Notification } from '@/app/components/ui/feedback';
 import {
+  FluidForm,
+  FluidTextArea,
+  FluidTextInput,
   PrimaryButton,
-  Stack,
-  TextArea,
-  TextInput,
+  Text,
 } from '@/app/components/ui/primitives';
 import { createWorkspaceProject } from '@/clients';
 import { AuthContext } from '@/context/auth-context';
@@ -21,7 +22,7 @@ type ProjectFormValues = {
   projectDescription: string;
 };
 
-const PROJECT_ERROR = 'Unable to create your project. Please try again.';
+const PROJECT_ERROR = "We couldn't create your project. Try again.";
 
 export function CreateProjectPage() {
   const navigate = useNavigate();
@@ -31,13 +32,14 @@ export function CreateProjectPage() {
   const profileName = user?.name?.trim();
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<ProjectFormValues>({
     mode: 'onBlur',
     reValidateMode: 'onChange',
     defaultValues: {
-      projectName: profileName ? `${profileName}'s workspace` : '',
+      projectName: profileName ? `${profileName}'s project` : '',
       projectDescription: '',
     },
   });
@@ -59,7 +61,7 @@ export function CreateProjectPage() {
 
       if (!authorize) {
         hideLoader();
-        setError('Unable to refresh your workspace. Please sign in again.');
+        setError("We couldn't refresh your workspace. Log in again.");
         return;
       }
 
@@ -70,7 +72,7 @@ export function CreateProjectPage() {
         },
         () => {
           hideLoader();
-          setError('Unable to refresh your workspace. Please sign in again.');
+          setError("We couldn't refresh your workspace. Log in again.");
         },
       );
     },
@@ -82,7 +84,7 @@ export function CreateProjectPage() {
     showLoader('overlay');
     createWorkspaceProject({
       name: data.projectName,
-      description: data.projectDescription,
+      description: data.projectDescription.trim(),
       auth: { token, userId: authId },
       callback: afterCreateProject,
     });
@@ -91,31 +93,29 @@ export function CreateProjectPage() {
   return (
     <>
       <Helmet title="Onboarding: Create a project" />
-      <div className="mb-8">
-        <h1 className="text-2xl font-light tracking-tight">
+      <div className="mb-10">
+        <Text as="h1" variant="heading-05" className="m-0">
           Create your first project
-        </h1>
-        <p className="mt-3 text-sm leading-5 text-muted">
-          Projects separate client accounts, brands, regions, or internal
-          product teams.
-        </p>
+        </Text>
+        <Text as="p" variant="body-02" className="mt-2 text-muted">
+          Use projects to organize work by client, brand, region, or team.
+        </Text>
       </div>
 
-      <form
+      <FluidForm
         noValidate
+        data-testid="project-form"
         onChange={() => {
           if (error) setError('');
         }}
         onSubmit={handleSubmit(onCreateProject)}
       >
-        <Stack gap={6}>
-          <TextInput
+        <div className="flex flex-col" data-testid="project-fields">
+          <FluidTextInput
             id="project-name"
             labelText="Project name"
             type="text"
             required
-            placeholder="e.g., Acme Support Operations"
-            helperText="Use one project per client, brand, region, or team."
             invalid={Boolean(errors.projectName)}
             invalidText={errors.projectName?.message}
             {...register('projectName', {
@@ -123,23 +123,32 @@ export function CreateProjectPage() {
               setValueAs: value => value.trim(),
             })}
           />
-          <TextArea
-            id="project-description"
-            labelText="Project description (optional)"
-            rows={3}
-            placeholder="e.g., White-label inbound voice agents for healthcare support across US and UK"
-            helperText="Capture the ownership or scope of this project."
-            {...register('projectDescription', {
-              setValueAs: value => value.trim(),
-            })}
+          <Controller
+            name="projectDescription"
+            control={control}
+            render={({ field }) => (
+              <FluidTextArea
+                id="project-description"
+                labelText="Project description (optional)"
+                rows={3}
+                name={field.name}
+                value={field.value}
+                onBlur={field.onBlur}
+                onChange={field.onChange}
+              />
+            )}
           />
-          {error && (
+        </div>
+        {error && (
+          <div className="mt-6">
             <Notification
               kind="error"
               title="Project not created"
               subtitle={error}
             />
-          )}
+          </div>
+        )}
+        <div className="mt-12" data-testid="project-actions">
           <PrimaryButton
             size="lg"
             renderIcon={ArrowRight}
@@ -149,8 +158,8 @@ export function CreateProjectPage() {
           >
             Create project
           </PrimaryButton>
-        </Stack>
-      </form>
+        </div>
+      </FluidForm>
     </>
   );
 }

@@ -44,8 +44,12 @@ jest.mock('@/app/components/app-shell/helmet', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives/form', () => ({
-  Stack: ({ children }: any) => <div>{children}</div>,
-  TextInput: require('react').forwardRef(
+  FluidForm: ({ children, ...props }: any) => (
+    <form data-fluid-form="true" {...props}>
+      {children}
+    </form>
+  ),
+  FluidTextInput: require('react').forwardRef(
     (
       { labelText, helperText, invalid, invalidText, ...props }: any,
       ref: any,
@@ -53,6 +57,20 @@ jest.mock('@/app/components/ui/primitives/form', () => ({
       <label>
         {labelText}
         <input ref={ref} aria-invalid={invalid} {...props} />
+        {invalid ? <span>{invalidText}</span> : null}
+      </label>
+    ),
+  ),
+  FluidSelect: require('react').forwardRef(
+    (
+      { labelText, helperText, children, invalid, invalidText, ...props }: any,
+      ref: any,
+    ) => (
+      <label>
+        {labelText}
+        <select ref={ref} aria-invalid={invalid} {...props}>
+          {children}
+        </select>
         {invalid ? <span>{invalidText}</span> : null}
       </label>
     ),
@@ -70,20 +88,6 @@ jest.mock('@/app/components/ui/feedback/notification', () => ({
 }));
 
 jest.mock('@carbon/react', () => ({
-  Select: require('react').forwardRef(
-    (
-      { labelText, helperText, children, invalid, invalidText, ...props }: any,
-      ref: any,
-    ) => (
-      <label>
-        {labelText}
-        <select ref={ref} aria-invalid={invalid} {...props}>
-          {children}
-        </select>
-        {invalid ? <span>{invalidText}</span> : null}
-      </label>
-    ),
-  ),
   SelectItem: ({ value, text }: any) => <option value={value}>{text}</option>,
 }));
 
@@ -108,9 +112,7 @@ describe('CreateOrganizationPage', () => {
     const user = userEvent.setup({ writeToClipboard: false });
     renderWithAuth();
 
-    const industry = screen.getByPlaceholderText(
-      'e.g., Agency services, healthcare, finance',
-    );
+    const industry = screen.getByLabelText('Industry');
     await user.clear(screen.getByLabelText('Organization name'));
     await user.type(screen.getByLabelText('Organization name'), '   ');
     await user.type(industry, '   ');
@@ -123,25 +125,22 @@ describe('CreateOrganizationPage', () => {
     ).toBeInTheDocument();
     expect(industry).toBeInvalid();
     expect(
-      await screen.findByText('Enter your organization industry.'),
+      await screen.findByText('Enter an industry.'),
     ).toBeInTheDocument();
     expect(CreateOrganization).not.toHaveBeenCalled();
   });
 
-  it('requires an operating model before submission', async () => {
+  it('requires an organization type before submission', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     renderWithAuth();
 
-    await user.type(
-      screen.getByPlaceholderText('e.g., Agency services, healthcare, finance'),
-      'Software',
-    );
+    await user.type(screen.getByLabelText('Industry'), 'Software');
     await user.click(
       screen.getByRole('button', { name: 'Create organization' }),
     );
 
     expect(
-      await screen.findByText('Select an operating model.'),
+      await screen.findByText('Select an organization type.'),
     ).toBeInTheDocument();
     expect(CreateOrganization).not.toHaveBeenCalled();
   });
@@ -158,6 +157,51 @@ describe('CreateOrganizationPage', () => {
     expect(screen.getByLabelText('Organization name')).toHaveValue('');
   });
 
+  it('uses sign-in typography and a hint-free Carbon fluid form', () => {
+    renderWithAuth();
+
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Create your organization',
+      }),
+    ).toHaveClass(
+      'text-[2rem]',
+      'leading-[2.5rem]',
+      'font-normal',
+      'tracking-[0]',
+      'm-0',
+    );
+    expect(
+      screen.getByText(
+        'Tell us about your organization to set up your workspace.',
+      ),
+    ).toHaveClass('text-[1rem]', 'leading-[1.5rem]', 'tracking-[0]');
+    expect(screen.getByTestId('organization-form')).toHaveAttribute(
+      'data-fluid-form',
+      'true',
+    );
+    expect(screen.getByTestId('organization-fields')).not.toHaveClass('gap-8');
+    expect(screen.getByLabelText('Organization name')).not.toHaveAttribute(
+      'placeholder',
+    );
+    expect(screen.getByLabelText('Industry')).not.toHaveAttribute(
+      'placeholder',
+    );
+    expect(
+      screen.queryByText('Use your agency, brand, or operating company name.'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('This helps tailor setup guidance for your team.'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Used to suggest relevant integrations and templates.',
+      ),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('organization-actions')).toHaveClass('mt-12');
+  });
+
   it('submits and navigates to onboarding project on success', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     let finishAuthorization: (() => void) | undefined;
@@ -172,16 +216,11 @@ describe('CreateOrganizationPage', () => {
 
     renderWithAuth(authorize);
 
-    const organizationName = screen.getByPlaceholderText(
-      'e.g., Acme Voice Studio',
-    );
+    const organizationName = screen.getByLabelText('Organization name');
     await user.click(organizationName);
     await user.keyboard('{Control>}a{/Control}');
     await user.paste('My Org');
-    await user.type(
-      screen.getByPlaceholderText('e.g., Agency services, healthcare, finance'),
-      'Software',
-    );
+    await user.type(screen.getByLabelText('Industry'), 'Software');
     await user.selectOptions(screen.getByRole('combobox'), 'agency');
     await user.click(
       screen.getByRole('button', { name: 'Create organization' }),
@@ -211,10 +250,7 @@ describe('CreateOrganizationPage', () => {
 
     renderWithAuth();
 
-    await user.type(
-      screen.getByPlaceholderText('e.g., Agency services, healthcare, finance'),
-      'Software',
-    );
+    await user.type(screen.getByLabelText('Industry'), 'Software');
     await user.selectOptions(screen.getByRole('combobox'), 'agency');
     await user.click(
       screen.getByRole('button', { name: 'Create organization' }),
@@ -222,15 +258,13 @@ describe('CreateOrganizationPage', () => {
 
     expect(
       await screen.findByText(
-        'Unable to create your organization. Please try again.',
+        "We couldn't create your organization. Try again.",
       ),
     ).toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Organization name'), ' updated');
     expect(
-      screen.queryByText(
-        'Unable to create your organization. Please try again.',
-      ),
+      screen.queryByText("We couldn't create your organization. Try again."),
     ).not.toBeInTheDocument();
   });
 
@@ -249,10 +283,7 @@ describe('CreateOrganizationPage', () => {
 
     renderWithAuth();
 
-    await user.type(
-      screen.getByPlaceholderText('e.g., Agency services, healthcare, finance'),
-      'Software',
-    );
+    await user.type(screen.getByLabelText('Industry'), 'Software');
     await user.selectOptions(screen.getByRole('combobox'), 'agency');
     await user.click(
       screen.getByRole('button', { name: 'Create organization' }),

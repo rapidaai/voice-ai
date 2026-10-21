@@ -44,8 +44,12 @@ jest.mock('@/app/components/app-shell/helmet', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives/form', () => ({
-  Stack: ({ children }: any) => <div>{children}</div>,
-  TextInput: require('react').forwardRef(
+  FluidForm: ({ children, ...props }: any) => (
+    <form data-fluid-form="true" {...props}>
+      {children}
+    </form>
+  ),
+  FluidTextInput: require('react').forwardRef(
     (
       { labelText, helperText, invalid, invalidText, ...props }: any,
       ref: any,
@@ -57,10 +61,11 @@ jest.mock('@/app/components/ui/primitives/form', () => ({
       </label>
     ),
   ),
-  TextArea: require('react').forwardRef(
-    ({ labelText, helperText, ...props }: any, ref: any) => (
-      <textarea ref={ref} {...props} />
-    ),
+  FluidTextArea: ({ labelText, helperText, ...props }: any) => (
+    <label>
+      {labelText}
+      <textarea {...props} />
+    </label>
   ),
 }));
 
@@ -105,16 +110,10 @@ describe('CreateProjectPage', () => {
 
     renderWithAuth(authorize);
 
-    await user.click(
-      screen.getByPlaceholderText('e.g., Acme Support Operations'),
-    );
+    await user.click(screen.getByLabelText('Project name'));
     await user.keyboard('{Control>}a{/Control}');
     await user.paste(String('Support Bot'));
-    await user.click(
-      screen.getByPlaceholderText(
-        'e.g., White-label inbound voice agents for healthcare support across US and UK',
-      ),
-    );
+    await user.click(screen.getByLabelText('Project description (optional)'));
     await user.keyboard('{Control>}a{/Control}');
     await user.paste(String('Project description'));
     await user.click(screen.getByRole('button', { name: 'Create project' }));
@@ -160,6 +159,52 @@ describe('CreateProjectPage', () => {
     expect(screen.getByLabelText('Project name')).toHaveValue('');
   });
 
+  it('uses project terminology in the suggested project name', () => {
+    renderWithAuth();
+
+    expect(screen.getByLabelText('Project name')).toHaveValue("John's project");
+  });
+
+  it('uses sign-in typography and a hint-free Carbon fluid form', () => {
+    renderWithAuth();
+
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Create your first project',
+      }),
+    ).toHaveClass(
+      'text-[2rem]',
+      'leading-[2.5rem]',
+      'font-normal',
+      'tracking-[0]',
+      'm-0',
+    );
+    expect(
+      screen.getByText(
+        'Use projects to organize work by client, brand, region, or team.',
+      ),
+    ).toHaveClass('text-[1rem]', 'leading-[1.5rem]', 'tracking-[0]');
+    expect(screen.getByTestId('project-form')).toHaveAttribute(
+      'data-fluid-form',
+      'true',
+    );
+    expect(screen.getByTestId('project-fields')).not.toHaveClass('gap-8');
+    expect(screen.getByLabelText('Project name')).not.toHaveAttribute(
+      'placeholder',
+    );
+    expect(
+      screen.getByLabelText('Project description (optional)'),
+    ).not.toHaveAttribute('placeholder');
+    expect(
+      screen.queryByText('Use one project per client, brand, region, or team.'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Capture the ownership or scope of this project.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('project-actions')).toHaveClass('mt-12');
+  });
+
   it('does not return to the completed organization step', () => {
     renderWithAuth();
 
@@ -167,7 +212,9 @@ describe('CreateProjectPage', () => {
       name: 'Create project',
     });
     expect(createButton).toHaveClass('!w-full', '!max-w-none');
-    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Back' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows generic error when API returns service error', async () => {
@@ -180,22 +227,18 @@ describe('CreateProjectPage', () => {
 
     renderWithAuth();
 
-    await user.click(
-      screen.getByPlaceholderText('e.g., Acme Support Operations'),
-    );
+    await user.click(screen.getByLabelText('Project name'));
     await user.keyboard('{Control>}a{/Control}');
     await user.paste(String('Support Bot'));
     await user.click(screen.getByRole('button', { name: 'Create project' }));
 
     expect(
-      await screen.findByText(
-        'Unable to create your project. Please try again.',
-      ),
+      await screen.findByText("We couldn't create your project. Try again."),
     ).toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Project name'), ' updated');
     expect(
-      screen.queryByText('Unable to create your project. Please try again.'),
+      screen.queryByText("We couldn't create your project. Try again."),
     ).not.toBeInTheDocument();
   });
 
@@ -214,9 +257,7 @@ describe('CreateProjectPage', () => {
 
     renderWithAuth();
 
-    await user.click(
-      screen.getByPlaceholderText('e.g., Acme Support Operations'),
-    );
+    await user.click(screen.getByLabelText('Project name'));
     await user.keyboard('{Control>}a{/Control}');
     await user.paste(String('Support Bot'));
     await user.click(screen.getByRole('button', { name: 'Create project' }));

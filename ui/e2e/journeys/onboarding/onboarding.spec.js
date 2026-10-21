@@ -41,7 +41,7 @@ test('new account completes onboarding before opening the dashboard', async ({
   await submitSignUp(page);
 
   await expect(page).toHaveURL(/\/onboarding\/organization$/);
-  await page.getByLabel('Operating model').selectOption('agency');
+  await page.getByLabel('Organization type').selectOption('agency');
   await page.getByLabel('Industry').fill('Agency services');
   await page.getByRole('button', { name: 'Create organization' }).click();
 
@@ -67,16 +67,23 @@ test('organization-only account resumes at project creation', async ({
   ).toBeVisible();
 });
 
-test('onboarding uses semantic progress without mobile overflow', async ({
+test('onboarding uses the shared shell and step context without mobile overflow', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await gotoJourney(page, onboardingJourney('organization'));
 
   await expect(page.getByText('Step 1 of 2')).toBeVisible();
-  await expect(
-    page.getByRole('progressbar', { name: 'Onboarding progress' }),
-  ).toHaveAttribute('aria-valuenow', '1');
+  await expect(page.getByRole('banner')).toBeVisible();
+  await expect(page.getByRole('contentinfo')).toBeVisible();
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
+  await expect(page.getByTestId('organization-form')).toHaveClass(
+    /cds--form--fluid/,
+  );
+  await expect(page.getByLabel('Organization name')).not.toHaveAttribute(
+    'placeholder',
+  );
+  await expect(page.getByLabel('Industry')).not.toHaveAttribute('placeholder');
   await expect(
     page.getByRole('button', { name: 'Create organization' }),
   ).toBeVisible();
@@ -94,10 +101,17 @@ test('project setup cannot return to completed organization creation', async ({
   await gotoJourney(page, onboardingJourney('project'));
 
   await expect(page.getByText('Step 2 of 2')).toBeVisible();
-  await expect(
-    page.getByRole('progressbar', { name: 'Onboarding progress' }),
-  ).toHaveAttribute('aria-valuenow', '2');
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
+  await expect(page.getByTestId('project-form')).toHaveClass(
+    /cds--form--fluid/,
+  );
+  await expect(page.getByLabel('Project name')).not.toHaveAttribute(
+    'placeholder',
+  );
+  await expect(
+    page.getByLabel('Project description (optional)'),
+  ).toHaveAttribute('placeholder', '');
 
   const projectName = await page.getByLabel('Project name').boundingBox();
   const createProject = await page
@@ -115,7 +129,7 @@ test('onboarding remains centered on a wide screen', async ({ page }) => {
   });
   const bounds = await workspaceSetup.boundingBox();
 
-  expect(bounds?.width).toBe(640);
-  expect(bounds?.x).toBe(320);
+  expect(bounds?.width).toBe(592);
+  expect(bounds?.x).toBe(344);
   await expect(page.getByRole('complementary')).toHaveCount(0);
 });

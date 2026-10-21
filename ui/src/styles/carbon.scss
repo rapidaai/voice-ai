@@ -15,12 +15,14 @@
 @use '@carbon/react/scss/components/text-input';
 @use '@carbon/react/scss/components/fluid-text-input';
 @use '@carbon/react/scss/components/text-area';
+@use '@carbon/react/scss/components/fluid-text-area';
 @use '@carbon/react/scss/components/list-box';
 @use '@carbon/react/scss/components/dropdown';
 @use '@carbon/react/scss/components/multiselect';
 @use '@carbon/react/scss/components/search';
 @use '@carbon/react/scss/components/combo-box';
 @use '@carbon/react/scss/components/select';
+@use '@carbon/react/scss/components/fluid-select';
 @use '@carbon/react/scss/components/pagination';
 @use '@carbon/react/scss/components/radio-button';
 @use '@carbon/react/scss/components/number-input';
@@ -175,11 +177,7 @@
   --cds-link-primary: var(--brand-primary);
   --cds-link-primary-hover: var(--brand-primary-hover);
   // Filled buttons need a darker primary ramp so white labels retain contrast.
-  --cds-button-primary: color-mix(
-    in srgb,
-    var(--brand-primary) 45%,
-    black
-  );
+  --cds-button-primary: color-mix(in srgb, var(--brand-primary) 45%, black);
   --cds-button-primary-hover: color-mix(
     in srgb,
     var(--brand-primary) 35%,

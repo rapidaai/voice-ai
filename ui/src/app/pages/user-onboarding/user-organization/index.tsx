@@ -1,15 +1,17 @@
 import { useCallback, useContext, useState } from 'react';
 import type { CreateOrganizationResponse, ServiceError } from '@rapidaai/react';
-import { Select, SelectItem } from '@carbon/react';
+import { SelectItem } from '@carbon/react';
 import { ArrowRight } from '@carbon/icons-react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { Notification } from '@/app/components/ui/feedback';
 import {
+  FluidForm,
+  FluidSelect,
+  FluidTextInput,
   PrimaryButton,
-  Stack,
-  TextInput,
+  Text,
 } from '@/app/components/ui/primitives';
 import { createWorkspaceOrganization } from '@/clients';
 import { AuthContext } from '@/context/auth-context';
@@ -22,8 +24,7 @@ type OrganizationFormValues = {
   organizationIndustry: string;
 };
 
-const ORGANIZATION_ERROR =
-  'Unable to create your organization. Please try again.';
+const ORGANIZATION_ERROR = "We couldn't create your organization. Try again.";
 
 export function CreateOrganizationPage() {
   const navigate = useNavigate();
@@ -62,7 +63,7 @@ export function CreateOrganizationPage() {
 
       if (!authorize) {
         hideLoader();
-        setError('Unable to refresh your workspace. Please sign in again.');
+        setError("We couldn't refresh your workspace. Log in again.");
         return;
       }
 
@@ -73,7 +74,7 @@ export function CreateOrganizationPage() {
         },
         () => {
           hideLoader();
-          setError('Unable to refresh your workspace. Please sign in again.');
+          setError("We couldn't refresh your workspace. Log in again.");
         },
       );
     },
@@ -95,31 +96,29 @@ export function CreateOrganizationPage() {
   return (
     <>
       <Helmet title="Onboarding: Create an organization" />
-      <div className="mb-8">
-        <h1 className="text-2xl font-light tracking-tight">
-          Set up your organization
-        </h1>
-        <p className="mt-3 text-sm leading-5 text-muted">
-          Create the workspace that owns your assistants, credentials, and
-          governance settings.
-        </p>
+      <div className="mb-10">
+        <Text as="h1" variant="heading-05" className="m-0">
+          Create your organization
+        </Text>
+        <Text as="p" variant="body-02" className="mt-2 text-muted">
+          Tell us about your organization to set up your workspace.
+        </Text>
       </div>
 
-      <form
+      <FluidForm
         noValidate
+        data-testid="organization-form"
         onChange={() => {
           if (error) setError('');
         }}
         onSubmit={handleSubmit(onCreateOrganization)}
       >
-        <Stack gap={6}>
-          <TextInput
+        <div className="flex flex-col" data-testid="organization-fields">
+          <FluidTextInput
             id="org-name"
             labelText="Organization name"
             type="text"
             required
-            placeholder="e.g., Acme Voice Studio"
-            helperText="Use your agency, brand, or operating company name."
             invalid={Boolean(errors.organizationName)}
             invalidText={errors.organizationName?.message}
             {...register('organizationName', {
@@ -127,46 +126,47 @@ export function CreateOrganizationPage() {
               setValueAs: value => value.trim(),
             })}
           />
-          <Select
+          <FluidSelect
             id="org-size"
-            labelText="Operating model"
-            helperText="This helps tailor setup guidance for your team."
+            labelText="Organization type"
             required
             invalid={Boolean(errors.organizationSize)}
             invalidText={errors.organizationSize?.message}
             {...register('organizationSize', {
-              required: 'Select an operating model.',
+              required: 'Select an organization type.',
             })}
           >
-            <SelectItem value="" text="Select an operating model" />
+            <SelectItem value="" text="Select an organization type" />
             <SelectItem value="agency" text="Agency or system integrator" />
             <SelectItem value="in-house" text="In-house product team" />
             <SelectItem
               value="enterprise"
-              text="Enterprise or multi-team organization"
+              text="Enterprise with multiple teams"
             />
-          </Select>
-          <TextInput
+          </FluidSelect>
+          <FluidTextInput
             id="org-industry"
             labelText="Industry"
             type="text"
             required
-            placeholder="e.g., Agency services, healthcare, finance"
-            helperText="Used to suggest relevant integrations and templates."
             invalid={Boolean(errors.organizationIndustry)}
             invalidText={errors.organizationIndustry?.message}
             {...register('organizationIndustry', {
-              required: 'Enter your organization industry.',
+              required: 'Enter an industry.',
               setValueAs: value => value.trim(),
             })}
           />
-          {error && (
+        </div>
+        {error && (
+          <div className="mt-6">
             <Notification
               kind="error"
               title="Organization not created"
               subtitle={error}
             />
-          )}
+          </div>
+        )}
+        <div className="mt-12" data-testid="organization-actions">
           <PrimaryButton
             size="lg"
             renderIcon={ArrowRight}
@@ -176,8 +176,8 @@ export function CreateOrganizationPage() {
           >
             Create organization
           </PrimaryButton>
-        </Stack>
-      </form>
+        </div>
+      </FluidForm>
     </>
   );
 }
