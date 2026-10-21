@@ -55,7 +55,11 @@ describe('layout container structure', () => {
 
   it('renders centered content with theme token classes and caller attributes', () => {
     render(
-      <CenterBox className="custom-center" data-testid="center-box">
+      <CenterBox
+        className="custom-center"
+        data-testid="center-box"
+        mainLabel="Centered example"
+      >
         <p>Centered content</p>
       </CenterBox>,
     );
@@ -64,7 +68,9 @@ describe('layout container structure', () => {
       'custom-center',
       'bg-surface',
       'text-foreground',
+      'grid-cols-[0_0_minmax(0,var(--container-2xl))_0_0]',
     );
+    expect(screen.getByRole('main')).toHaveAccessibleName('Centered example');
     expect(screen.getByText('Centered content')).toBeInTheDocument();
   });
 

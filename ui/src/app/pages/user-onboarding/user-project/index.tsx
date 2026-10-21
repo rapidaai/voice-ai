@@ -1,48 +1,84 @@
-import React, { useCallback, useContext, useState } from 'react';
-import { Helmet } from '@/app/components/app-shell/helmet';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useContext, useState } from 'react';
+import type { CreateProjectResponse, ServiceError } from '@rapidaai/react';
+import { ArrowRight } from '@carbon/icons-react';
 import { useForm } from 'react-hook-form';
-import { CreateProjectResponse } from '@rapidaai/react';
+import { useNavigate } from 'react-router-dom';
+import { Helmet } from '@/app/components/app-shell/helmet';
+import { Notification } from '@/app/components/ui/feedback';
+import {
+  PrimaryButton,
+  Stack,
+  TextArea,
+  TextInput,
+} from '@/app/components/ui/primitives';
+import { createWorkspaceProject } from '@/clients';
+import { AuthContext } from '@/context/auth-context';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useRapidaStore } from '@/stores/app';
-import { ServiceError } from '@rapidaai/react';
-import { AuthContext } from '@/context/auth-context';
-import { Stack, TextInput, TextArea } from '@/app/components/ui/primitives';
-import { PrimaryButton } from '@/app/components/ui/primitives';
-import { Notification } from '@/app/components/ui/feedback';
-import { ArrowRight } from '@carbon/icons-react';
-import { createWorkspaceProject } from '@/clients';
+
+type ProjectFormValues = {
+  projectName: string;
+  projectDescription: string;
+};
+
+const PROJECT_ERROR = 'Unable to create your project. Please try again.';
 
 export function CreateProjectPage() {
   const navigate = useNavigate();
   const { loading, showLoader, hideLoader } = useRapidaStore();
   const { authorize } = useContext(AuthContext);
   const { authId, token, user } = useCurrentCredential();
-  const { register, handleSubmit } = useForm();
+  const profileName = user?.name?.trim();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ProjectFormValues>({
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
+    defaultValues: {
+      projectName: profileName ? `${profileName}'s workspace` : '',
+      projectDescription: '',
+    },
+  });
   const [error, setError] = useState('');
 
   const afterCreateProject = useCallback(
-    async (err: ServiceError | null, cpr: CreateProjectResponse | null) => {
-      hideLoader();
+    (err: ServiceError | null, project: CreateProjectResponse | null) => {
       if (err) {
-        setError('Unable to process your request. Please try again later.');
+        hideLoader();
+        setError(PROJECT_ERROR);
         return;
       }
-      if (cpr?.getSuccess()) {
-        authorize &&
-          authorize(
-            () => navigate('/dashboard'),
-            () =>
-              setError('Unable to create project. Please check the details.'),
-          );
-      } else {
-        setError('Unable to create project. Please check the details.');
+
+      if (!project?.getSuccess()) {
+        hideLoader();
+        setError(project?.getError()?.getHumanmessage() || PROJECT_ERROR);
+        return;
       }
+
+      if (!authorize) {
+        hideLoader();
+        setError('Unable to refresh your workspace. Please sign in again.');
+        return;
+      }
+
+      authorize(
+        () => {
+          hideLoader();
+          navigate('/dashboard');
+        },
+        () => {
+          hideLoader();
+          setError('Unable to refresh your workspace. Please sign in again.');
+        },
+      );
     },
-    [],
+    [authorize, hideLoader, navigate],
   );
 
-  const onCreateProject = data => {
+  const onCreateProject = (data: ProjectFormValues) => {
+    setError('');
     showLoader('overlay');
     createWorkspaceProject({
       name: data.projectName,
@@ -54,39 +90,55 @@ export function CreateProjectPage() {
 
   return (
     <>
-      <Helmet title="Onboarding: Create a Project" />
-      <div className="mb-4">
-        <h1 className="text-xl font-light tracking-tight">
+      <Helmet title="Onboarding: Create a project" />
+      <div className="mb-8">
+        <h1 className="text-2xl font-light tracking-tight">
           Create your first project
         </h1>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Projects help you separate client accounts, brands, regions, or
-          internal product teams.
+        <p className="mt-3 text-sm leading-5 text-muted">
+          Projects separate client accounts, brands, regions, or internal
+          product teams.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit(onCreateProject)}>
-        <Stack gap={5}>
+      <form
+        noValidate
+        onChange={() => {
+          if (error) setError('');
+        }}
+        onSubmit={handleSubmit(onCreateProject)}
+      >
+        <Stack gap={6}>
           <TextInput
             id="project-name"
-            labelText="Project Name"
+            labelText="Project name"
             type="text"
             required
-            defaultValue={`${user?.name}'s Workspace`}
-            placeholder="eg: Acme Support Operations"
-            helperText="Use one project per client, brand, region, or internal team."
-            {...register('projectName')}
+            placeholder="e.g., Acme Support Operations"
+            helperText="Use one project per client, brand, region, or team."
+            invalid={Boolean(errors.projectName)}
+            invalidText={errors.projectName?.message}
+            {...register('projectName', {
+              required: 'Enter a project name.',
+              setValueAs: value => value.trim(),
+            })}
           />
           <TextArea
             id="project-description"
-            labelText="Project Description"
+            labelText="Project description (optional)"
             rows={3}
-            placeholder="eg: White-label inbound voice agents for healthcare support across US and UK"
-            helperText="Optional — capture ownership, scale target, or governance scope for this program."
-            {...register('projectDescription')}
+            placeholder="e.g., White-label inbound voice agents for healthcare support across US and UK"
+            helperText="Capture the ownership or scope of this project."
+            {...register('projectDescription', {
+              setValueAs: value => value.trim(),
+            })}
           />
           {error && (
-            <Notification kind="error" title="Error" subtitle={error} />
+            <Notification
+              kind="error"
+              title="Project not created"
+              subtitle={error}
+            />
           )}
           <PrimaryButton
             size="lg"
@@ -95,7 +147,7 @@ export function CreateProjectPage() {
             isLoading={loading}
             className="!w-full !max-w-none !justify-between"
           >
-            Go to dashboard
+            Create project
           </PrimaryButton>
         </Stack>
       </form>

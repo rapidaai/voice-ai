@@ -1,110 +1,147 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Helmet } from '@/app/components/app-shell/helmet';
-import { ForgotPasswordResponse } from '@rapidaai/react';
+import { ForgotPasswordResponse, ServiceError } from '@rapidaai/react';
 import { useForm } from 'react-hook-form';
 import { useRapidaStore } from '@/stores/app';
-import { ServiceError } from '@rapidaai/react';
-import { Stack, TextInput } from '@/app/components/ui/primitives';
-import { PrimaryButton } from '@/app/components/ui/primitives';
+import {
+  FluidTextInput,
+  PrimaryButton,
+  Text,
+} from '@/app/components/ui/primitives';
 import { Notification } from '@/app/components/ui/feedback';
 import { ArrowRight } from '@carbon/icons-react';
 import { Link } from '@carbon/react';
 import { useTheme } from '@/theme/theme-provider';
 import { forgotPassword } from '@/clients';
 
+interface ForgotPasswordFormValues {
+  email: string;
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function ForgotPasswordPage() {
   const { theme } = useTheme();
-  const { register, handleSubmit } = useForm();
+  const {
+    register,
+    handleSubmit,
+    setFocus,
+    formState: { errors },
+  } = useForm<ForgotPasswordFormValues>({ mode: 'onBlur' });
   const { loading, showLoader, hideLoader } = useRapidaStore();
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const supportContact = theme.links.support.replace(/^mailto:/, '');
 
   const afterForgotPassword = useCallback(
-    (err: ServiceError | null, fpr: ForgotPasswordResponse | null) => {
+    (err: ServiceError | null, response: ForgotPasswordResponse | null) => {
       hideLoader();
-      if (err) {
-        setError('Unable to process your request. Please try again later.');
-      }
-      if (fpr?.getSuccess()) {
+      if (response?.getSuccess()) {
         setError('');
         setSuccessMessage(
           `Thanks! An email was sent that will ask you to click on a link to verify that you own this account. If you don't get the email, please contact support at ${supportContact}.`,
         );
-      } else {
-        let errorMessage = fpr?.getError();
-        if (errorMessage) setError(errorMessage.getHumanmessage());
-        else
-          setError('Unable to process your request. Please try again later.');
         return;
       }
+
+      const message = response?.getError()?.getHumanmessage();
+      if (!message) console.error(err);
+      setSuccessMessage('');
+      setError(message || "We couldn't send a reset link. Try again.");
+      setFocus('email');
     },
-    [hideLoader, supportContact],
+    [hideLoader, setFocus, supportContact],
   );
 
-  const onForgotPassword = data => {
+  const onForgotPassword = (data: ForgotPasswordFormValues) => {
+    setError('');
+    setSuccessMessage('');
     showLoader('overlay');
     forgotPassword(data.email, afterForgotPassword);
   };
 
   return (
-    <Stack gap={6}>
-      <Helmet title="Forgot your password" />
-      <Stack gap={2}>
-        <h1 className="m-0 text-[1.8rem] leading-tight">Reset your password</h1>
-        <p className="mt-1.5 text-sm leading-[1.4286] text-(--cds-text-secondary)">
+    <div
+      className="flex w-full max-w-[37rem] flex-col bg-surface"
+      data-testid="forgot-password-panel"
+    >
+      <Helmet title="Reset your password" />
+      <header className="p-6 sm:p-8" data-testid="forgot-password-header">
+        <Text as="h1" variant="heading-05" className="m-0">
+          Reset your password
+        </Text>
+        <Text as="p" variant="body-02" className="mt-2 text-muted">
           Enter your email and we will send you a reset link.
-        </p>
+        </Text>
+      </header>
+
+      <form
+        noValidate
+        className="p-0"
+        data-testid="forgot-password-form"
+        onSubmit={handleSubmit(onForgotPassword)}
+      >
         <div
-          aria-hidden="true"
-          className={`h-px bg-gray-300 dark:bg-gray-900 mt-3`}
-        />
-      </Stack>
-      <form className="mt-6" onSubmit={handleSubmit(onForgotPassword)}>
-        <Stack gap={5}>
-          <TextInput
+          className="mx-6 flex flex-col sm:mx-8"
+          data-testid="forgot-password-input-stack"
+        >
+          <FluidTextInput
             id="forgot-email"
-            labelText="Email Address"
+            labelText="Email address"
             type="email"
             required
             autoComplete="email"
             disabled={loading}
-            placeholder="eg: john@example.com"
-            {...register('email')}
+            placeholder="name@example.com"
+            invalid={Boolean(errors.email)}
+            invalidText={errors.email?.message}
+            {...register('email', {
+              required: 'Enter your email address.',
+              pattern: {
+                value: EMAIL_PATTERN,
+                message: 'Enter a valid email address.',
+              },
+            })}
           />
+        </div>
+
+        <div className="p-6 sm:p-8" data-testid="forgot-password-actions">
           {error && (
-            <Notification kind="error" title="Error" subtitle={error} />
+            <div className="mb-6">
+              <Notification
+                kind="error"
+                title="Unable to send reset link"
+                subtitle={error}
+              />
+            </div>
           )}
           {successMessage && (
-            <Notification
-              kind="success"
-              title="Email sent"
-              subtitle={successMessage}
-            />
+            <div className="mb-6">
+              <Notification
+                kind="success"
+                title="Email sent"
+                subtitle={successMessage}
+              />
+            </div>
           )}
+
           <PrimaryButton
             size="lg"
             renderIcon={ArrowRight}
             type="submit"
             isLoading={loading}
-            className="!w-full !max-w-none !justify-between"
+            className="w-full! max-w-none! justify-between!"
           >
             Send reset link
           </PrimaryButton>
-        </Stack>
-        <div
-          aria-hidden="true"
-          className={`h-px bg-gray-300 dark:bg-gray-900 mt-3`}
-        />
-      </form>
 
-      <Stack gap={2}>
-        <p className="text-center">
-          <Link href="/auth/signin" className="text-sm !underline">
-            Back to sign in
-          </Link>
-        </p>
-      </Stack>
-    </Stack>
+          <div className="mt-6">
+            <Link href="/auth/signin" inline>
+              <Text variant="body-compact-01">Back to log in</Text>
+            </Link>
+          </div>
+        </div>
+      </form>
+    </div>
   );
 }

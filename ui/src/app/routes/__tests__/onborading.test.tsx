@@ -8,9 +8,12 @@ import { OnboardingLayout } from '../onborading';
 
 const theme = developmentConfig.theme as unknown as ThemeManifest;
 
-const renderLayout = (configuredTheme: ThemeManifest) =>
+const renderLayout = (
+  configuredTheme: ThemeManifest,
+  initialEntry = '/onboarding/organization',
+) =>
   render(
-    <MemoryRouter initialEntries={['/onboarding/organization']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <ThemeProvider theme={configuredTheme}>
         <OnboardingLayout />
       </ThemeProvider>
@@ -29,12 +32,13 @@ describe('OnboardingLayout', () => {
     });
   });
 
-  it('uses the inverse full logo and resolved mobile logo', () => {
+  it('uses the full logo resolved for the active theme', () => {
     renderLayout(theme);
 
-    const logos = screen.getAllByRole('img', { name: 'Rapida AI' });
-    expect(logos[0]).toHaveAttribute('src', theme.brand.logos?.full.dark);
-    expect(logos[1]).toHaveAttribute('src', theme.brand.logos?.compact.light);
+    expect(screen.getByRole('img', { name: 'Rapida AI' })).toHaveAttribute(
+      'src',
+      theme.brand.logos?.full.light,
+    );
   });
 
   it('falls back to the configured brand name without logos', () => {
@@ -46,6 +50,25 @@ describe('OnboardingLayout', () => {
     renderLayout(brandOnlyTheme);
 
     expect(screen.queryByRole('img', { name: 'Customer Voice' })).toBeNull();
-    expect(screen.getAllByText('Customer Voice')).toHaveLength(2);
+    expect(screen.getByText('Customer Voice')).toBeInTheDocument();
+  });
+
+  it('uses non-interactive Carbon progress for the two-step flow', () => {
+    renderLayout(theme);
+
+    expect(screen.getByText('Step 1 of 2')).toBeInTheDocument();
+    expect(
+      screen.getByRole('progressbar', { name: 'Onboarding progress' }),
+    ).toHaveAttribute('aria-valuenow', '1');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('reflects the project step in the visible and semantic progress', () => {
+    renderLayout(theme, '/onboarding/project');
+
+    expect(screen.getByText('Step 2 of 2')).toBeInTheDocument();
+    expect(
+      screen.getByRole('progressbar', { name: 'Onboarding progress' }),
+    ).toHaveAttribute('aria-valuenow', '2');
   });
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
@@ -46,8 +46,15 @@ jest.mock('@/app/components/app-shell/helmet', () => ({
 jest.mock('@/app/components/ui/primitives/form', () => ({
   Stack: ({ children }: any) => <div>{children}</div>,
   TextInput: require('react').forwardRef(
-    ({ labelText, helperText, ...props }: any, ref: any) => (
-      <input ref={ref} {...props} />
+    (
+      { labelText, helperText, invalid, invalidText, ...props }: any,
+      ref: any,
+    ) => (
+      <label>
+        {labelText}
+        <input ref={ref} aria-invalid={invalid} {...props} />
+        {invalid ? <span>{invalidText}</span> : null}
+      </label>
     ),
   ),
   TextArea: require('react').forwardRef(
@@ -86,7 +93,10 @@ describe('CreateProjectPage', () => {
 
   it('submits and navigates to dashboard on success', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
-    const authorize = jest.fn(success => success());
+    let finishAuthorization: (() => void) | undefined;
+    const authorize = jest.fn(success => {
+      finishAuthorization = success;
+    });
     (CreateProject as jest.Mock).mockImplementation(
       (_cfg, _name, _description, _headers, callback) => {
         callback(null, { getSuccess: () => true });
@@ -96,27 +106,68 @@ describe('CreateProjectPage', () => {
     renderWithAuth(authorize);
 
     await user.click(
-      screen.getByPlaceholderText('eg: Acme Support Operations'),
+      screen.getByPlaceholderText('e.g., Acme Support Operations'),
     );
     await user.keyboard('{Control>}a{/Control}');
     await user.paste(String('Support Bot'));
     await user.click(
       screen.getByPlaceholderText(
-        'eg: White-label inbound voice agents for healthcare support across US and UK',
+        'e.g., White-label inbound voice agents for healthcare support across US and UK',
       ),
     );
     await user.keyboard('{Control>}a{/Control}');
     await user.paste(String('Project description'));
-    await user.click(screen.getByRole('button', { name: 'Go to dashboard' }));
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
 
     await waitFor(() => {
       expect(CreateProject).toHaveBeenCalled();
     });
 
     expect(mockShowLoader).toHaveBeenCalledWith('overlay');
-    expect(mockHideLoader).toHaveBeenCalled();
     expect(authorize).toHaveBeenCalled();
+    expect(mockHideLoader).not.toHaveBeenCalled();
+
+    act(() => finishAuthorization?.());
+
+    expect(mockHideLoader).toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('requires a project name before submission', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    renderWithAuth();
+
+    const projectName = screen.getByLabelText('Project name');
+    await user.clear(projectName);
+    await user.type(projectName, '   ');
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+
+    expect(
+      await screen.findByText('Enter a project name.'),
+    ).toBeInTheDocument();
+    expect(CreateProject).not.toHaveBeenCalled();
+  });
+
+  it('leaves the project name empty when the profile has no name', () => {
+    mockCredential = {
+      user: {} as any,
+      authId: 'auth-1',
+      token: 'token-1',
+    };
+
+    renderWithAuth();
+
+    expect(screen.getByLabelText('Project name')).toHaveValue('');
+  });
+
+  it('does not return to the completed organization step', () => {
+    renderWithAuth();
+
+    const createButton = screen.getByRole('button', {
+      name: 'Create project',
+    });
+    expect(createButton).toHaveClass('!w-full', '!max-w-none');
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
   });
 
   it('shows generic error when API returns service error', async () => {
@@ -130,40 +181,48 @@ describe('CreateProjectPage', () => {
     renderWithAuth();
 
     await user.click(
-      screen.getByPlaceholderText('eg: Acme Support Operations'),
+      screen.getByPlaceholderText('e.g., Acme Support Operations'),
     );
     await user.keyboard('{Control>}a{/Control}');
     await user.paste(String('Support Bot'));
-    await user.click(screen.getByRole('button', { name: 'Go to dashboard' }));
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
 
     expect(
       await screen.findByText(
-        'Unable to process your request. Please try again later.',
+        'Unable to create your project. Please try again.',
       ),
     ).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Project name'), ' updated');
+    expect(
+      screen.queryByText('Unable to create your project. Please try again.'),
+    ).not.toBeInTheDocument();
   });
 
   it('shows project details error when API returns unsuccessful response', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     (CreateProject as jest.Mock).mockImplementation(
       (_cfg, _name, _description, _headers, callback) => {
-        callback(null, { getSuccess: () => false });
+        callback(null, {
+          getSuccess: () => false,
+          getError: () => ({
+            getHumanmessage: () => 'A project with this name already exists.',
+          }),
+        });
       },
     );
 
     renderWithAuth();
 
     await user.click(
-      screen.getByPlaceholderText('eg: Acme Support Operations'),
+      screen.getByPlaceholderText('e.g., Acme Support Operations'),
     );
     await user.keyboard('{Control>}a{/Control}');
     await user.paste(String('Support Bot'));
-    await user.click(screen.getByRole('button', { name: 'Go to dashboard' }));
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
 
     expect(
-      await screen.findByText(
-        'Unable to create project. Please check the details.',
-      ),
+      await screen.findByText('A project with this name already exists.'),
     ).toBeInTheDocument();
   });
 });

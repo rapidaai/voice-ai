@@ -38,6 +38,12 @@ describe('GeneralFooter', () => {
     expect(
       screen.getByRole('link', { name: `${theme.brand.name} Platform` }),
     ).toHaveAttribute('href', '/');
+    expect(screen.getByText(`${theme.brand.name} Platform`)).toHaveClass(
+      'text-[0.875rem]',
+      'font-[600]',
+      'leading-[1.125rem]',
+      'tracking-[0.16px]',
+    );
     expect(screen.getByRole('navigation')).toHaveAttribute(
       'aria-label',
       `${theme.brand.name} footer links`,
@@ -60,7 +66,15 @@ describe('GeneralFooter', () => {
     ] as const;
 
     links.forEach(([name, href]) => {
-      expect(screen.getByRole('link', { name })).toHaveAttribute('href', href);
+      const link = screen.getByRole('link', { name });
+      expect(link).toHaveAttribute('href', href);
+      expect(link.closest('li')).toHaveClass('[&>a]:bg-transparent!');
+      expect(screen.getByText(name)).toHaveClass(
+        'text-[0.875rem]',
+        'font-normal',
+        'leading-[1.125rem]',
+        'tracking-[0.16px]',
+      );
     });
   });
 });

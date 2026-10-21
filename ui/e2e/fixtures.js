@@ -29,8 +29,10 @@ const {
 } = require('./mocks/clients/credential');
 const {
   ORGANIZATION_PATH,
+  WORKSPACE_CREATION_PATHS,
   WORKSPACE_LIST_PATHS,
   installWorkspaceClientMock,
+  mockWorkspaceCreation,
 } = require('./mocks/clients/workspace');
 
 const COLOR_MODES = ['light', 'dark'];
@@ -41,37 +43,45 @@ const SCREENSHOT_VIEWPORTS = [
   { name: '2xl', width: 1536, height: 960 },
 ];
 
-const authState = {
-  state: {
-    currentUser: {
-      id: '101',
-      name: 'E2E User',
-      email: 'e2e@example.test',
-    },
-    token: {
-      token: 'token-e2e',
-    },
-    organizationRole: {
-      id: '201',
-      organizationid: '202',
-      role: 'admin',
-    },
-    projectRoles: [
-      {
-        id: '301',
-        projectid: '302',
-        role: 'admin',
+function createAuthState({ organization = true, project = true } = {}) {
+  return {
+    state: {
+      currentUser: {
+        id: '101',
+        name: 'E2E User',
+        email: 'e2e@example.test',
       },
-    ],
-    currentProjectRole: {
-      id: '301',
-      projectid: '302',
-      role: 'admin',
+      token: {
+        token: 'token-e2e',
+      },
+      organizationRole: organization
+        ? {
+            id: '201',
+            organizationid: '202',
+            role: 'admin',
+          }
+        : {},
+      projectRoles: project
+        ? [
+            {
+              id: '301',
+              projectid: '302',
+              role: 'admin',
+            },
+          ]
+        : [],
+      currentProjectRole: project
+        ? {
+            id: '301',
+            projectid: '302',
+            role: 'admin',
+          }
+        : {},
+      featurePermissions: [],
     },
-    featurePermissions: [],
-  },
-  version: 1,
-};
+    version: 1,
+  };
+}
 
 async function installBrowserFixtures(page) {
   await page.route('https://www.googletagmanager.com/**', route =>
@@ -89,11 +99,11 @@ async function installBrowserFixtures(page) {
   await installGrpcWebPreflightMock(page);
 }
 
-async function authenticatePage(page) {
+async function authenticatePage(page, options) {
   await page.addInitScript(state => {
     window.localStorage.setItem('rpd::__user', JSON.stringify(state));
     window.localStorage.setItem('rapida-sidebar-open', 'true');
-  }, authState);
+  }, createAuthState(options));
 }
 
 async function gotoJourney(page, journey) {
@@ -211,12 +221,14 @@ module.exports = {
   DASHBOARD_PATH,
   ENDPOINT_LIST_PATH,
   ORGANIZATION_PATH,
+  WORKSPACE_CREATION_PATHS,
   WORKSPACE_LIST_PATHS,
   authenticatePage,
   checkA11y,
   expandDashboardForScreenshot,
   gotoJourney,
   mockAuthenticationOperation,
+  mockWorkspaceCreation,
   setColorMode,
   screenshotBaselinePath,
 };

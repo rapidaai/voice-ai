@@ -15,7 +15,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Authentication provider actions with labels matched to sign-in or account creation.',
+          'Authentication provider actions with labels matched to login or account creation.',
       },
     },
   },
@@ -25,7 +25,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const SignIn: Story = {};
+export const LogIn: Story = {};
 
 export const SignUp: Story = {
   args: {

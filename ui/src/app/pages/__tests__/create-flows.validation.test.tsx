@@ -403,9 +403,9 @@ describe('Requested create/update flow pages', () => {
       screen.getByText('Enter your email and we will send you a reset link.'),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Back to sign in' }),
+      screen.getByRole('link', { name: 'Back to log in' }),
     ).toHaveAttribute('href', '/auth/signin');
-    await user.click(screen.getByPlaceholderText('eg: john@example.com'));
+    await user.click(screen.getByLabelText('Email address'));
     await user.keyboard('{Control>}a{/Control}');
     await user.paste(String('user@x.com'));
     await user.click(screen.getByRole('button', { name: 'Send reset link' }));
@@ -413,6 +413,29 @@ describe('Requested create/update flow pages', () => {
     expect(
       await screen.findByText(/Thanks! An email was sent/i),
     ).toBeInTheDocument();
+  });
+
+  it('forgot password shows a field error before calling the client', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    renderWithTheme(<ForgotPasswordPage />);
+
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
+
+    expect(await screen.findByText('Enter your email address.')).toBeVisible();
+    expect(ForgotPassword).not.toHaveBeenCalled();
+  });
+
+  it('forgot password rejects a malformed email before calling the client', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    renderWithTheme(<ForgotPasswordPage />);
+
+    await user.type(screen.getByLabelText('Email address'), 'not-an-email');
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
+
+    expect(
+      await screen.findByText('Enter a valid email address.'),
+    ).toBeVisible();
+    expect(ForgotPassword).not.toHaveBeenCalled();
   });
 
   it('create endpoint blocks continue when prompt template variables are missing', async () => {

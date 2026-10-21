@@ -16,18 +16,18 @@ const providers = {
 };
 
 describe('SocialButtonGroup', () => {
-  it('uses sign-in labels by default', () => {
+  it('uses Carbon login terminology by default', () => {
     render(<SocialButtonGroup {...providers} />);
 
-    expect(
-      screen.getByRole('button', { name: 'Sign in with Google' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Sign in with LinkedIn' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Sign in with GitHub' }),
-    ).toBeInTheDocument();
+    const buttons = [
+      screen.getByRole('button', { name: 'Log in with Google' }),
+      screen.getByRole('button', { name: 'Log in with LinkedIn' }),
+      screen.getByRole('button', { name: 'Log in with GitHub' }),
+    ];
+
+    buttons.forEach(button => {
+      expect(button).toHaveClass('!w-full', '!max-w-none');
+    });
   });
 
   it('uses sign-up labels for account creation', () => {

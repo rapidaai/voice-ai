@@ -3,6 +3,47 @@ import { SkeletonText } from '@carbon/react';
 import { cn } from '@/utils';
 
 export const typographyClassNames = {
+  'code-01':
+    'font-mono text-[0.75rem] font-normal leading-[1rem] tracking-[0.32px]',
+  'code-02':
+    'font-mono text-[0.875rem] font-normal leading-[1.25rem] tracking-[0.32px]',
+  'label-01':
+    'font-sans text-[0.75rem] font-normal leading-[1rem] tracking-[0.32px]',
+  'label-02':
+    'font-sans text-[0.875rem] font-normal leading-[1.125rem] tracking-[0.16px]',
+  'helper-text-01':
+    'font-sans text-[0.75rem] font-normal leading-[1rem] tracking-[0.32px]',
+  'helper-text-02':
+    'font-sans text-[0.875rem] font-normal leading-[1.125rem] tracking-[0.16px]',
+  'legal-01':
+    'font-sans text-[0.75rem] font-normal leading-[1rem] tracking-[0.32px]',
+  'legal-02':
+    'font-sans text-[0.875rem] font-normal leading-[1.125rem] tracking-[0.16px]',
+  'body-compact-01':
+    'font-sans text-[0.875rem] font-normal leading-[1.125rem] tracking-[0.16px]',
+  'body-compact-02':
+    'font-sans text-[1rem] font-normal leading-[1.375rem] tracking-[0]',
+  'body-01':
+    'font-sans text-[0.875rem] font-normal leading-[1.25rem] tracking-[0.16px]',
+  'body-02': 'font-sans text-[1rem] font-normal leading-[1.5rem] tracking-[0]',
+  'heading-compact-01':
+    'font-sans text-[0.875rem] font-[600] leading-[1.125rem] tracking-[0.16px]',
+  'heading-compact-02':
+    'font-sans text-[1rem] font-[600] leading-[1.375rem] tracking-[0]',
+  'heading-01':
+    'font-sans text-[0.875rem] font-[600] leading-[1.25rem] tracking-[0.16px]',
+  'heading-02':
+    'font-sans text-[1rem] font-[600] leading-[1.5rem] tracking-[0]',
+  'heading-03':
+    'font-sans text-[1.25rem] font-normal leading-[1.75rem] tracking-[0]',
+  'heading-04':
+    'font-sans text-[1.75rem] font-normal leading-[2.25rem] tracking-[0]',
+  'heading-05':
+    'font-sans text-[2rem] font-normal leading-[2.5rem] tracking-[0]',
+  'heading-06':
+    'font-sans text-[2.625rem] font-light leading-[3.125rem] tracking-[0]',
+  'heading-07':
+    'font-sans text-[3.375rem] font-light leading-[4rem] tracking-[0]',
   pageTitle: 'text-2xl font-semibold leading-8',
   sectionTitle: 'text-lg font-semibold leading-6',
   componentTitle: 'text-sm font-semibold leading-5',
@@ -17,6 +58,7 @@ export type TypographyVariant = keyof typeof typographyClassNames;
 export interface CarbonTextProps {
   children: ReactNode;
   className?: string;
+  id?: string;
   isLoading?: boolean;
   /** Show skeleton as a heading block (taller). */
   heading?: boolean;
@@ -34,6 +76,7 @@ export interface CarbonTextProps {
 export function Text({
   children,
   className,
+  id,
   isLoading = false,
   heading = false,
   skeletonWidth = '75%',
@@ -58,5 +101,9 @@ export function Text({
     );
   }
 
-  return <Tag className={textClassName}>{children}</Tag>;
+  return (
+    <Tag id={id} className={textClassName}>
+      {children}
+    </Tag>
+  );
 }

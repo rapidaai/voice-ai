@@ -87,7 +87,17 @@ jest.mock('@/app/pages/user-onboarding', () => ({
 }));
 
 jest.mock('@/theme/theme-provider', () => ({
-  useTheme: () => ({ theme: { brand: { name: 'Rapida AI' } } }),
+  useTheme: () => ({
+    theme: {
+      brand: { name: 'Rapida AI' },
+      links: {
+        documentation: '/docs',
+        privacy: '/privacy',
+        support: '/support',
+        terms: '/terms',
+      },
+    },
+  }),
 }));
 
 jest.mock('@/app/components/layout/brand/branded-logo', () => ({

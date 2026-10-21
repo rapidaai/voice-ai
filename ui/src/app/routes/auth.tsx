@@ -4,21 +4,17 @@ import {
   AuthForgotPasswordPage,
   AuthChangePasswordPage,
 } from '@/app/pages/authentication';
-import { CenterBox } from '@/app/components/layout/container/center-box';
+import { AuthenticationLayout } from '@/app/components/layout/authentication/authentication-layout';
 import { IgnoreBox } from '@/app/components/layout/container/protected-box';
-import { Outlet, Route, Routes } from 'react-router-dom';
-import { FlexBox } from '@/app/components/layout/container/flex-box';
+import { Route, Routes } from 'react-router-dom';
+
 export function AuthRoute() {
   return (
     <Routes>
       <Route
         element={
           <IgnoreBox>
-            <FlexBox>
-              <CenterBox>
-                <Outlet />
-              </CenterBox>
-            </FlexBox>
+            <AuthenticationLayout />
           </IgnoreBox>
         }
       >

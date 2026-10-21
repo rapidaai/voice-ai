@@ -1,7 +1,10 @@
 import type { HTMLAttributes } from 'react';
 import { HeaderMenuItem, HeaderName, HeaderNavigation } from '@carbon/react';
+import { Text } from '@/app/components/ui/primitives/text';
 import { useTheme } from '@/theme/theme-provider';
 import { cn } from '@/utils';
+
+const footerMenuItemClassName = '[&>a]:bg-transparent!';
 
 export function GeneralFooter({
   className,
@@ -20,24 +23,39 @@ export function GeneralFooter({
         className,
       )}
     >
-      <HeaderName href="/" prefix={theme.brand.name}>
-        Platform
+      <HeaderName href="/" prefix="">
+        <Text variant="heading-compact-01">{theme.brand.name} Platform</Text>
       </HeaderName>
       <HeaderNavigation aria-label={`${theme.brand.name} footer links`}>
-        <HeaderMenuItem href={theme.links.terms}>
-          <span className="opacity-80">Terms and Conditions</span>
+        <HeaderMenuItem
+          className={footerMenuItemClassName}
+          href={theme.links.terms}
+        >
+          <Text variant="body-compact-01">Terms and Conditions</Text>
         </HeaderMenuItem>
-        <HeaderMenuItem href={theme.links.privacy}>
-          <span className="opacity-80">Privacy Policy</span>
+        <HeaderMenuItem
+          className={footerMenuItemClassName}
+          href={theme.links.privacy}
+        >
+          <Text variant="body-compact-01">Privacy Policy</Text>
         </HeaderMenuItem>
-        <HeaderMenuItem href={theme.links.documentation}>
-          <span className="opacity-80">Documentation</span>
+        <HeaderMenuItem
+          className={footerMenuItemClassName}
+          href={theme.links.documentation}
+        >
+          <Text variant="body-compact-01">Documentation</Text>
         </HeaderMenuItem>
-        <HeaderMenuItem href={theme.links.source}>
-          <span className="opacity-80">Source</span>
+        <HeaderMenuItem
+          className={footerMenuItemClassName}
+          href={theme.links.source}
+        >
+          <Text variant="body-compact-01">Source</Text>
         </HeaderMenuItem>
-        <HeaderMenuItem href={theme.links.support}>
-          <span className="opacity-80">Support</span>
+        <HeaderMenuItem
+          className={footerMenuItemClassName}
+          href={theme.links.support}
+        >
+          <Text variant="body-compact-01">Support</Text>
         </HeaderMenuItem>
       </HeaderNavigation>
     </footer>

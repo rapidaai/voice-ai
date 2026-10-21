@@ -41,6 +41,26 @@ const journeySubjourneys = [
     'journeys/auth/authentication.spec.js',
   ),
   covered(
+    'onboarding.organization.responsiveLayout',
+    'onboarding.organization',
+    'journeys/onboarding/onboarding.spec.js',
+  ),
+  covered(
+    'onboarding.project.completedOrganizationGuard',
+    'onboarding.project',
+    'journeys/onboarding/onboarding.spec.js',
+  ),
+  covered(
+    'onboarding.signup.completeFlow',
+    'auth.signup',
+    'journeys/onboarding/onboarding.spec.js',
+  ),
+  covered(
+    'onboarding.project.resumeIncompleteAccount',
+    'onboarding.project',
+    'journeys/onboarding/onboarding.spec.js',
+  ),
+  covered(
     'dashboard.loading',
     'dashboard.home',
     'journeys/dashboard/state-screenshots.spec.js',
