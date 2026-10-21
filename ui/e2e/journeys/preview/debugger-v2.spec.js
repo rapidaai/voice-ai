@@ -21,7 +21,7 @@ for (const viewport of SCREENSHOT_VIEWPORTS) {
       await authenticatePage(page);
       await mockDebuggerAssistant(page);
 
-      await page.goto(`/preview/v2/chat/${ASSISTANT_ID}`);
+      await page.goto(`/deployment/assistant/${ASSISTANT_ID}/playground/chat`);
       await expect(
         page.getByRole('heading', {
           name: 'Delivery concierge',
@@ -34,6 +34,23 @@ for (const viewport of SCREENSHOT_VIEWPORTS) {
       await expect(
         page.getByRole('button', { name: 'Start voice conversation' }),
       ).toBeEnabled();
+      await expect(
+        page.getByRole('button', { name: 'Back to assistant' }),
+      ).toHaveCount(0);
+
+      if (viewport.width >= 1280) {
+        const assistantNavBounds = await page
+          .getByRole('navigation', { name: 'Assistant actions' })
+          .boundingBox();
+        const conversationBounds = await page
+          .getByRole('region', { name: 'Conversation' })
+          .boundingBox();
+        expect(assistantNavBounds).not.toBeNull();
+        expect(conversationBounds).not.toBeNull();
+        expect(conversationBounds.x).toBeGreaterThanOrEqual(
+          assistantNavBounds.x + assistantNavBounds.width - 1,
+        );
+      }
 
       await page.getByRole('button', { name: 'Configuration' }).click();
       const languageModel = page.getByRole('button', {
@@ -96,6 +113,33 @@ const configurationViewport = SCREENSHOT_VIEWPORTS.find(
 );
 
 for (const colorMode of COLOR_MODES) {
+  test(`phone debugger configuration in ${colorMode} mode`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(configurationViewport);
+    await setColorMode(page, colorMode);
+    await authenticatePage(page);
+    await mockDebuggerAssistant(page);
+
+    await page.goto(`/deployment/assistant/${ASSISTANT_ID}/playground/phone`);
+    await page.getByRole('button', { name: 'Configuration' }).click();
+    await expect(
+      page.getByRole('complementary', { name: 'Session configuration' }),
+    ).toBeVisible();
+    await expect(page.getByText('Twilio')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Arguments' }),
+    ).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+
+    await expect(page).toHaveScreenshot(
+      ['preview', 'phone-debugger', 'configuration', `${colorMode}.png`],
+      { fullPage: true, maxDiffPixelRatio: 0.01 },
+    );
+  });
+}
+
+for (const colorMode of COLOR_MODES) {
   test(`debugger v2 copyable configuration in ${colorMode} mode`, async ({
     page,
   }) => {
@@ -104,7 +148,7 @@ for (const colorMode of COLOR_MODES) {
     await authenticatePage(page);
     await mockDebuggerAssistant(page);
 
-    await page.goto(`/preview/v2/chat/${ASSISTANT_ID}`);
+    await page.goto(`/deployment/assistant/${ASSISTANT_ID}/playground/chat`);
     await page.getByRole('button', { name: 'Configuration' }).click();
     await page
       .getByRole('button', { name: /Speech to text, Deepgram, nova-3/ })
@@ -143,7 +187,7 @@ for (const viewport of SCREENSHOT_VIEWPORTS) {
       await authenticatePage(page);
       await mockDebuggerAssistant(page, { withSpeechToText: false });
 
-      await page.goto(`/preview/v2/chat/${ASSISTANT_ID}`);
+      await page.goto(`/deployment/assistant/${ASSISTANT_ID}/playground/chat`);
       await expect(
         page.getByText('Hello! How can I help you today?', { exact: true }),
       ).toBeVisible();
@@ -168,6 +212,45 @@ for (const viewport of SCREENSHOT_VIEWPORTS) {
           'preview',
           'debugger-v2',
           'voice-unavailable',
+          `${viewport.name}-${colorMode}.png`,
+        ],
+        { fullPage: true, maxDiffPixelRatio: 0.01 },
+      );
+    });
+  }
+}
+
+for (const viewport of SCREENSHOT_VIEWPORTS) {
+  for (const colorMode of COLOR_MODES) {
+    test(`phone debugger success screenshot at ${viewport.name} in ${colorMode} mode`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await setColorMode(page, colorMode);
+      await authenticatePage(page);
+      await mockDebuggerAssistant(page);
+
+      await page.goto(`/deployment/assistant/${ASSISTANT_ID}/playground/phone`);
+      await expect(
+        page.getByRole('heading', { name: 'Debug Phone Call' }),
+      ).toBeVisible();
+      const startCallButton = page.getByRole('button', { name: 'Start Call' });
+      await expect(startCallButton).toBeEnabled();
+      const startCallBox = await startCallButton.boundingBox();
+      expect(startCallBox).not.toBeNull();
+      expect(
+        Math.abs(startCallBox.y + startCallBox.height - viewport.height),
+      ).toBeLessThanOrEqual(1);
+      await expect(
+        page.getByRole('link', { name: 'Chat', exact: true }),
+      ).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+
+      await expect(page).toHaveScreenshot(
+        [
+          'preview',
+          'phone-debugger',
+          'success',
           `${viewport.name}-${colorMode}.png`,
         ],
         { fullPage: true, maxDiffPixelRatio: 0.01 },

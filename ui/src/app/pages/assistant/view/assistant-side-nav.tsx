@@ -182,6 +182,7 @@ export const AssistantSideNav: FC<AssistantSideNavProps> = ({
       <SideNav
         aria-label="Assistant actions"
         expanded={expanded}
+        isFixedNav
         isRail={!expanded}
         className="relative! inset-auto! h-auto! flex-1 w-full! border-none! z-0!"
       >

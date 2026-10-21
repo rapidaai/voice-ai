@@ -92,10 +92,10 @@ export const useGlobalNavigation = () => {
   };
 
   const goToAssistantPreview = (assistantId: string) =>
-    window.open(`/preview/chat/${assistantId}`);
+    navigate(`/deployment/assistant/${assistantId}/playground/chat`);
 
   const goToAssistantPreviewCall = (assistantId: string) =>
-    window.open(`/preview/call/${assistantId}`);
+    navigate(`/deployment/assistant/${assistantId}/playground/phone`);
 
   const goToKnowledge = (knowledgeId: string) => {
     navigate(`/knowledge/${knowledgeId}`);

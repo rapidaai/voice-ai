@@ -217,7 +217,11 @@ function VoiceMicrophoneSelector({
   );
 }
 
-export function PreviewVoiceAgentV2() {
+export function PreviewVoiceAgentV2({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const { assistantId } = useParams();
   const { user, authId, token, projectId } = useCurrentCredential();
 
@@ -232,6 +236,7 @@ export function PreviewVoiceAgentV2() {
       authId={authId}
       token={token}
       projectId={projectId}
+      embedded={embedded}
     />
   );
 }
@@ -242,12 +247,14 @@ function PreviewVoiceAgentV2Workspace({
   authId,
   token,
   projectId,
+  embedded,
 }: {
   assistantId: string;
   userName: string;
   authId: string;
   token: string;
   projectId: string;
+  embedded: boolean;
 }) {
   const navigate = useNavigate();
   const { resolvedMode } = useTheme();
@@ -961,16 +968,18 @@ function PreviewVoiceAgentV2Workspace({
           aria-label="Conversation toolbar"
           className="flex h-12 w-full items-center border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)]"
         >
-          <IconOnlyButton
-            kind="ghost"
-            size="md"
-            renderIcon={ArrowLeft}
-            iconDescription="Back to assistant"
-            className="!h-12 !w-12 shrink-0"
-            onClick={() =>
-              navigate(`/deployment/assistant/${assistantId}/overview`)
-            }
-          />
+          {!embedded ? (
+            <IconOnlyButton
+              kind="ghost"
+              size="md"
+              renderIcon={ArrowLeft}
+              iconDescription="Back to assistant"
+              className="!h-12 !w-12 shrink-0"
+              onClick={() =>
+                navigate(`/deployment/assistant/${assistantId}/overview`)
+              }
+            />
+          ) : null}
           <h1 className="min-w-0 flex-1 truncate px-1 text-sm font-semibold text-[var(--cds-text-primary)]">
             {assistantName}
           </h1>
@@ -1147,6 +1156,7 @@ function PreviewVoiceAgentV2Workspace({
       toggleMute,
       voiceAgent,
       voicePhase,
+      embedded,
     ],
   );
 
@@ -1187,8 +1197,13 @@ function PreviewVoiceAgentV2Workspace({
   };
 
   return (
-    <div className="flex h-dvh min-h-0 flex-col bg-white text-sm dark:bg-gray-950">
-      <PreviewAgentHeader />
+    <div
+      className={cn(
+        'flex min-h-0 flex-col bg-white text-sm dark:bg-gray-950',
+        embedded ? 'h-full' : 'h-dvh',
+      )}
+    >
+      {!embedded ? <PreviewAgentHeader /> : null}
 
       <div className="flex min-h-0 flex-1">
         <main className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-white dark:bg-gray-950">

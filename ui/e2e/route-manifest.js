@@ -173,6 +173,22 @@ const routeJourneys = [
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
+    id: 'deployment.assistantPlaygroundChat',
+    path: '/deployment/assistant/2301664620831571968/playground/chat',
+    auth: true,
+    expectText: 'Support bot',
+    readyText: 'Hello! How can I help you today?',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantPlaygroundPhone',
+    path: '/deployment/assistant/2301664620831571968/playground/phone',
+    auth: true,
+    expectText: 'Debug Phone Call',
+    readyText: 'Start Call',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
     id: 'deployment.assistantSessions',
     path: '/deployment/assistant/2301664620831571968/sessions',
     auth: true,
@@ -586,6 +602,14 @@ const sourceRouteInventory = {
     {
       path: 'assistant/:assistantId',
       journey: 'deployment.assistantOverview',
+    },
+    {
+      path: 'playground/chat',
+      journey: 'deployment.assistantPlaygroundChat',
+    },
+    {
+      path: 'playground/phone',
+      journey: 'deployment.assistantPlaygroundPhone',
     },
     {
       path: 'sessions/:sessionId',

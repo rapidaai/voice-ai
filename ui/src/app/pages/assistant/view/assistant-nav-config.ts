@@ -236,17 +236,15 @@ export const assistantNavSections: AssistantNavSection[] = [
     items: [
       {
         key: 'debugging',
-        label: 'Debugging',
+        label: 'Chat',
         icon: Debug,
-        path: 'preview',
-        action: 'preview',
+        path: 'playground/chat',
       },
       {
         key: 'phone-preview',
-        label: 'Phone Preview',
+        label: 'Phone call',
         icon: Phone,
-        path: 'preview-call',
-        action: 'preview-call',
+        path: 'playground/phone',
         visible: (assistant: any) => !!assistant?.getPhonedeployment?.(),
       },
     ],

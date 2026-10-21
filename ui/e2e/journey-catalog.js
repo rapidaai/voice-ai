@@ -157,6 +157,16 @@ const journeySubjourneys = [
     'journeys/deployment/assistant-state-screenshots.spec.js',
   ),
   covered(
+    'deployment.assistant.playgroundChat',
+    'deployment.assistantPlaygroundChat',
+    'journeys/preview/debugger-v2.spec.js',
+  ),
+  covered(
+    'deployment.assistant.playgroundPhone',
+    'deployment.assistantPlaygroundPhone',
+    'journeys/preview/debugger-v2.spec.js',
+  ),
+  covered(
     'deployment.assistant.sessions',
     'deployment.assistantSessions',
     'journeys/deployment/assistant-detail.spec.js',

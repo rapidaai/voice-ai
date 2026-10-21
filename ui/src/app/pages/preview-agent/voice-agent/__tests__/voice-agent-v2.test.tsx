@@ -629,6 +629,29 @@ describe('PreviewVoiceAgentV2', () => {
     await waitFor(() => expect(configurationButton).toHaveFocus());
   });
 
+  it('uses the assistant shell chrome when embedded', async () => {
+    render(
+      <MemoryRouter
+        initialEntries={['/deployment/assistant/assistant-123/playground/chat']}
+      >
+        <Routes>
+          <Route
+            path="/deployment/assistant/:assistantId/playground/chat"
+            element={<PreviewVoiceAgentV2 embedded />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Delivery concierge' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Product header')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Back to assistant' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('removes the Carbon composer bottom margin on small screens', async () => {
     mockIsSmallViewport = true;
 

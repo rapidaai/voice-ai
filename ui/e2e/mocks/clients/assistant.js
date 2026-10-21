@@ -16,6 +16,7 @@ const {
   AssistantDashboardSummary,
   AssistantDashboardUsage,
   AssistantDebuggerDeployment,
+  AssistantPhoneDeployment,
   AssistantProviderModel,
   DeploymentAudioProvider,
   GetAllAssistantConversationResponse,
@@ -185,6 +186,22 @@ function buildDebuggerAssistantDetailResponse({
     ]),
   );
   assistant.setDebuggerdeployment(deployment);
+
+  const phoneDeployment = new AssistantPhoneDeployment();
+  phoneDeployment.setPhoneprovidername('Twilio');
+  phoneDeployment.setInputaudio(
+    audioProvider('Deepgram', 'speech-to-text', [
+      ['listen.model', 'nova-3'],
+      ['listen.language', 'en'],
+    ]),
+  );
+  phoneDeployment.setOutputaudio(
+    audioProvider('Cartesia', 'text-to-speech', [
+      ['speak.model', 'sonic-2'],
+      ['speak.voice.id', 'Professional English'],
+    ]),
+  );
+  assistant.setPhonedeployment(phoneDeployment);
 
   const response = new GetAssistantResponse();
   response.setCode(200);
