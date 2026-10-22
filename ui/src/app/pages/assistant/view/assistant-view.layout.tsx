@@ -26,11 +26,7 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
     () => !window.matchMedia?.('(max-width: 767px)').matches,
   );
 
-  const {
-    goToAssistantPreview,
-    goToAssistantPreviewCall,
-    goToAssistantListing,
-  } = useGlobalNavigation();
+  const { goToAssistantListing } = useGlobalNavigation();
 
   const [unknownState, setUnknownState] = useState(false);
 
@@ -110,10 +106,6 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
           assistant={currentAssistant}
           expanded={navExpanded}
           onToggle={() => setNavExpanded(expanded => !expanded)}
-          actions={{
-            preview: () => goToAssistantPreview(assistantId),
-            'preview-call': () => goToAssistantPreviewCall(assistantId),
-          }}
         />
       )}
 

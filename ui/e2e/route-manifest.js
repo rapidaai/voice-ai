@@ -173,6 +173,22 @@ const routeJourneys = [
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
+    id: 'deployment.assistantPlaygroundChat',
+    path: '/deployment/assistant/2301664620831571968/playground/chat',
+    auth: true,
+    expectText: 'Support bot',
+    readyText: 'Hello! How can I help you today?',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
+    id: 'deployment.assistantPlaygroundPhone',
+    path: '/deployment/assistant/2301664620831571968/playground/phone',
+    auth: true,
+    expectText: 'Debug Phone Call',
+    readyText: 'Start Call',
+    checks: ['smoke', 'a11y', 'screenshot'],
+  },
+  {
     id: 'deployment.assistantSessions',
     path: '/deployment/assistant/2301664620831571968/sessions',
     auth: true,
@@ -588,6 +604,14 @@ const sourceRouteInventory = {
       journey: 'deployment.assistantOverview',
     },
     {
+      path: 'playground/chat',
+      journey: 'deployment.assistantPlaygroundChat',
+    },
+    {
+      path: 'playground/phone',
+      journey: 'deployment.assistantPlaygroundPhone',
+    },
+    {
       path: 'sessions/:sessionId',
       journey: 'deployment.assistantSessionDetail',
     },
@@ -811,6 +835,10 @@ const sourceRouteInventory = {
       path: 'chat/:assistantId',
       deferredReason:
         'Chat preview needs assistant-specific realtime fixtures.',
+    },
+    {
+      path: 'v2/chat/:assistantId',
+      deferredReason: 'Debugger v2 needs assistant-specific realtime fixtures.',
     },
     {
       path: 'public/assistant/:assistantId',

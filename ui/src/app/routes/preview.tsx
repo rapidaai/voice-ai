@@ -3,6 +3,7 @@ import { Outlet, Route, Routes } from 'react-router-dom';
 import {
   PreviewPhoneAgentPage,
   PreviewVoiceAgentPage,
+  PreviewVoiceAgentV2Page,
   PublicPreviewVoiceAgentPage,
 } from '@/app/pages/preview-agent';
 
@@ -30,6 +31,11 @@ export function PreviewRoute() {
           key="/assistant/chat"
           path="chat/:assistantId"
           element={<PreviewVoiceAgentPage />}
+        />
+        <Route
+          key="/assistant/v2/chat"
+          path="v2/chat/:assistantId"
+          element={<PreviewVoiceAgentV2Page />}
         />
       </Route>
       <Route

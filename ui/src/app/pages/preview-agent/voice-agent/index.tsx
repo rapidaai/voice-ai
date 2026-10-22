@@ -5,9 +5,8 @@ import {
 } from '@/app/components/ui/primitives';
 import { Dropdown } from '@/app/components/ui/primitives';
 import { Form, Stack, TextInput } from '@/app/components/ui/primitives';
-import { ArrowLeft, PhoneOutgoing } from '@carbon/icons-react';
+import { ArrowLeft, Close, Model, PhoneOutgoing } from '@carbon/icons-react';
 import { Notification } from '@/app/components/ui/feedback';
-import { Tabs } from '@/app/components/ui/primitives';
 import { Text } from '@/app/components/ui/primitives';
 import {
   ArgumentList,
@@ -111,12 +110,13 @@ export const PreviewVoiceAgent = () => {
 // ---------------------------------------------------------------------------
 
 type PhoneCallStatus = 'idle' | 'calling' | 'success' | 'failed';
-type PhoneDebugTab = 'configuration' | 'arguments';
-const PHONE_DEBUG_TABS: PhoneDebugTab[] = ['configuration', 'arguments'];
-const PHONE_DEBUG_TAB_LABELS = ['Configuration', 'Arguments'];
 
 //
-export const PreviewPhoneAgent = () => {
+export const PreviewPhoneAgent = ({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) => {
   const { authId, token, projectId } = useCurrentCredential();
 
   const { assistantId } = useParams();
@@ -126,6 +126,7 @@ export const PreviewPhoneAgent = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [callStatus, setCallStatus] = useState<PhoneCallStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isConfigurationOpen, setIsConfigurationOpen] = useState(false);
   const [argumentMap, setArgumentMap] = useState<Map<string, string>>(
     new Map(),
   );
@@ -256,34 +257,62 @@ export const PreviewPhoneAgent = () => {
   const model = assistant?.getAssistantprovidermodel() ?? null;
 
   return (
-    <div className="flex h-screen min-h-0 w-full flex-col text-sm/6">
-      <PreviewAgentHeader />
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        {/* ── Left: phone call form ───────────────────────────────────── */}
-        <div className="flex flex-col overflow-hidden h-full w-full lg:w-[70%] border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
-          {/* Header */}
-          <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-200 dark:border-gray-800 shrink-0">
-            <IconOnlyButton
-              kind="ghost"
-              size="sm"
-              renderIcon={ArrowLeft}
-              iconDescription="Back to Assistant"
-              onClick={() => {
-                window.location.href = `/deployment/assistant/${assistantId}/overview`;
-              }}
-            />
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              Back to Assistant
-            </span>
-          </div>
+    <div
+      className={`flex min-h-0 w-full flex-col text-sm/6 ${
+        embedded ? 'h-full' : 'h-screen'
+      }`}
+    >
+      {!embedded ? <PreviewAgentHeader /> : null}
+      <div
+        role="toolbar"
+        aria-label="Phone debugger toolbar"
+        className="flex h-12 shrink-0 items-center border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)]"
+      >
+        <h1 className="min-w-0 flex-1 truncate px-4 text-sm font-semibold text-[var(--cds-text-primary)]">
+          {assistant?.getName() || 'Phone debugger'}
+        </h1>
+        <IconOnlyButton
+          kind="ghost"
+          size="md"
+          renderIcon={Model}
+          iconDescription="Configuration"
+          aria-controls="phone-debugger-details-panel"
+          aria-expanded={isConfigurationOpen}
+          aria-pressed={isConfigurationOpen}
+          className={`!h-12 !w-12 shrink-0 !border-b-2 ${
+            isConfigurationOpen
+              ? '!border-b-[var(--cds-border-interactive)] !bg-[var(--cds-layer-selected-01)]'
+              : '!border-b-transparent'
+          }`}
+          onClick={() => setIsConfigurationOpen(open => !open)}
+        />
+      </div>
 
-          {/* Body */}
-          <div className="flex-1 flex flex-col items-center justify-center px-5 md:px-8">
-            <Form
-              className="w-full max-w-[42rem]"
-              onSubmit={e => e.preventDefault()}
-            >
-              <Stack gap={7}>
+      <div className="relative flex min-h-0 flex-1">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--cds-background)]">
+          {!embedded ? (
+            <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-200 dark:border-gray-800 shrink-0">
+              <IconOnlyButton
+                kind="ghost"
+                size="sm"
+                renderIcon={ArrowLeft}
+                iconDescription="Back to Assistant"
+                onClick={() => {
+                  window.location.href = `/deployment/assistant/${assistantId}/overview`;
+                }}
+              />
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                Back to Assistant
+              </span>
+            </div>
+          ) : null}
+
+          <Form
+            className="flex min-h-0 flex-1 flex-col"
+            onSubmit={e => e.preventDefault()}
+          >
+            <div className="flex flex-1 items-center justify-center px-5 md:px-8">
+              <Stack gap={7} className="w-full max-w-[42rem]">
                 <div className="space-y-1">
                   <Text
                     as="h2"
@@ -298,7 +327,7 @@ export const PreviewPhoneAgent = () => {
                     as="p"
                     isLoading={!assistant}
                     skeletonWidth="80%"
-                    className="text-gray-500 dark:text-gray-400"
+                    className="text-[var(--cds-text-secondary)]"
                   >
                     Place a live test call to validate your phone deployment
                     end-to-end.
@@ -309,7 +338,7 @@ export const PreviewPhoneAgent = () => {
                   <Text as="label" className="block mb-2 text-sm font-medium">
                     Phone number
                   </Text>
-                  <div className="grid grid-cols-[16rem_minmax(0,1fr)] gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[16rem_minmax(0,1fr)]">
                     <Dropdown<Country>
                       id="phone-country"
                       titleText=""
@@ -355,41 +384,69 @@ export const PreviewPhoneAgent = () => {
                     subtitle="Call has been created successfully."
                   />
                 )}
-
-                <div className="flex items-center justify-between">
-                  {callStatus === 'success' ? (
-                    <GhostButton size="sm" onClick={handleReset}>
-                      Make another call
-                    </GhostButton>
-                  ) : (
-                    <span />
-                  )}
-                  <PrimaryButton
-                    size="md"
-                    renderIcon={PhoneOutgoing}
-                    onClick={handleSubmit}
-                    isLoading={callStatus === 'calling'}
-                  >
-                    Start Call
-                  </PrimaryButton>
-                </div>
               </Stack>
-            </Form>
-          </div>
-        </div>
+            </div>
 
-        {/* ── Right: debugger panel ───────────────────────────────────── */}
-        <div className="shrink-0 flex flex-col overflow-hidden border-t lg:border-t-0 border-gray-200 dark:border-gray-800 w-full lg:w-[30%] bg-white dark:bg-gray-950">
-          <PhoneAgentDebugger
-            assistant={assistant}
-            deployment={deployment ? deployment : undefined}
-            stt={stt}
-            tts={tts}
-            model={model}
-            variables={variables}
-            onChangeArgument={onChangeArgument}
-          />
-        </div>
+            <div className="flex h-12 shrink-0 items-stretch justify-end border-t border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)]">
+              {callStatus === 'success' ? (
+                <GhostButton
+                  size="md"
+                  className="mr-auto !h-12"
+                  onClick={handleReset}
+                >
+                  Make another call
+                </GhostButton>
+              ) : null}
+              <PrimaryButton
+                size="md"
+                className="!h-12"
+                renderIcon={PhoneOutgoing}
+                onClick={handleSubmit}
+                isLoading={callStatus === 'calling'}
+              >
+                Start Call
+              </PrimaryButton>
+            </div>
+          </Form>
+        </main>
+
+        {isConfigurationOpen ? (
+          <>
+            <button
+              type="button"
+              aria-label="Close configuration overlay"
+              className="absolute inset-0 z-10 bg-[var(--cds-overlay)] xl:hidden"
+              onClick={() => setIsConfigurationOpen(false)}
+            />
+            <aside
+              id="phone-debugger-details-panel"
+              aria-label="Session configuration"
+              className="absolute inset-y-0 right-0 z-20 flex w-full flex-col border-l border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)] sm:w-[24rem] xl:relative xl:z-auto"
+            >
+              <div className="flex h-12 shrink-0 items-center border-b border-[var(--cds-border-subtle-01)] px-4">
+                <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--cds-text-primary)]">
+                  Session configuration
+                </h2>
+                <IconOnlyButton
+                  kind="ghost"
+                  size="sm"
+                  renderIcon={Close}
+                  iconDescription="Close configuration"
+                  onClick={() => setIsConfigurationOpen(false)}
+                />
+              </div>
+              <PhoneAgentDebugger
+                assistant={assistant}
+                deployment={deployment ? deployment : undefined}
+                stt={stt}
+                tts={tts}
+                model={model}
+                variables={variables}
+                onChangeArgument={onChangeArgument}
+              />
+            </aside>
+          </>
+        ) : null}
       </div>
     </div>
   );
@@ -416,129 +473,104 @@ const PhoneAgentDebugger: React.FC<{
   variables,
   onChangeArgument,
 }) => {
-  const [tab, setTab] = useState<PhoneDebugTab>('configuration');
   const loading = !assistant;
   const inputMode = 'Text' + (deployment?.getInputaudio() ? ', Audio' : '');
   const outputMode = 'Text' + (deployment?.getOutputaudio() ? ', Audio' : '');
 
   return (
     <div className="flex flex-col h-full overflow-hidden text-sm">
-      {/* Tab bar */}
-      <div className="border-b border-gray-200 dark:border-gray-800">
-        <Tabs
-          tabs={PHONE_DEBUG_TAB_LABELS}
-          selectedIndex={PHONE_DEBUG_TABS.indexOf(tab)}
-          onChange={idx => setTab(PHONE_DEBUG_TABS[idx])}
-          contained
-          aria-label="Phone debugger tabs"
-          isLoading={loading}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <ConfigBlock title="deployment" isLoading={loading} skeletonRows={4}>
+          {assistant && (
+            <>
+              <InfoRow
+                label="telephony"
+                value={deployment?.getPhoneprovidername() || 'not configured'}
+              />
+              <InfoRow
+                label="model"
+                value={model?.getModelprovidername() || 'not configured'}
+              />
+              <InfoRow label="input mode" value={inputMode} />
+              <InfoRow label="output mode" value={outputMode} />
+            </>
+          )}
+        </ConfigBlock>
+
+        <ConfigBlock title="assistant" isLoading={loading} skeletonRows={2}>
+          {assistant && (
+            <>
+              <InfoRow label="name" value={assistant.getName()} />
+              <InfoRow label="arguments" value={String(variables.length)} />
+              {assistant.getDescription() && (
+                <InfoRow
+                  label="description"
+                  value={assistant.getDescription()}
+                />
+              )}
+            </>
+          )}
+        </ConfigBlock>
+
+        <ConfigBlock title="stt" isLoading={loading} skeletonRows={2}>
+          {stt ? (
+            <>
+              <InfoRow label="provider" value={stt.getAudioprovider()} />
+              {stt.getAudiooptionsList().map((d: any) => (
+                <InfoRow
+                  key={d.getKey()}
+                  label={d.getKey()}
+                  value={d.getValue()}
+                />
+              ))}
+            </>
+          ) : (
+            <ConfigEmpty label="Audio input is not configured." />
+          )}
+        </ConfigBlock>
+
+        <ConfigBlock title="tts" isLoading={loading} skeletonRows={2}>
+          {tts ? (
+            <>
+              <InfoRow label="provider" value={tts.getAudioprovider()} />
+              {tts.getAudiooptionsList().map((d: any) => (
+                <InfoRow
+                  key={d.getKey()}
+                  label={d.getKey()}
+                  value={d.getValue()}
+                />
+              ))}
+            </>
+          ) : (
+            <ConfigEmpty label="Audio output is not configured." />
+          )}
+        </ConfigBlock>
+
+        <ConfigBlock title="llm" isLoading={loading} skeletonRows={2}>
+          {model ? (
+            <>
+              <InfoRow label="provider" value={model.getModelprovidername()} />
+              {model.getAssistantmodeloptionsList().map((m: any) => (
+                <InfoRow
+                  key={m.getKey()}
+                  label={m.getKey()}
+                  value={m.getValue()}
+                />
+              ))}
+            </>
+          ) : (
+            <ConfigEmpty label="Model configuration is not available." />
+          )}
+        </ConfigBlock>
+        <DebuggerTabHeader
+          title="Arguments"
+          subtitle={`${variables.length} prompt variables`}
+        />
+        <ArgumentList
+          variables={variables}
+          onChangeArgument={onChangeArgument}
         />
       </div>
-
-      {/* ── configuration tab ── */}
-      {tab === 'configuration' && (
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <ConfigBlock title="deployment" isLoading={loading} skeletonRows={4}>
-            {assistant && (
-              <>
-                <InfoRow
-                  label="telephony"
-                  value={deployment?.getPhoneprovidername() || 'not configured'}
-                />
-                <InfoRow
-                  label="model"
-                  value={model?.getModelprovidername() || 'not configured'}
-                />
-                <InfoRow label="input mode" value={inputMode} />
-                <InfoRow label="output mode" value={outputMode} />
-              </>
-            )}
-          </ConfigBlock>
-
-          <ConfigBlock title="assistant" isLoading={loading} skeletonRows={2}>
-            {assistant && (
-              <>
-                <InfoRow label="name" value={assistant.getName()} />
-                <InfoRow label="arguments" value={String(variables.length)} />
-                {assistant.getDescription() && (
-                  <InfoRow
-                    label="description"
-                    value={assistant.getDescription()}
-                  />
-                )}
-              </>
-            )}
-          </ConfigBlock>
-
-          <ConfigBlock title="stt" isLoading={loading} skeletonRows={2}>
-            {stt ? (
-              <>
-                <InfoRow label="provider" value={stt.getAudioprovider()} />
-                {stt.getAudiooptionsList().map((d: any) => (
-                  <InfoRow
-                    key={d.getKey()}
-                    label={d.getKey()}
-                    value={d.getValue()}
-                  />
-                ))}
-              </>
-            ) : (
-              <ConfigEmpty label="Audio input is not configured." />
-            )}
-          </ConfigBlock>
-
-          <ConfigBlock title="tts" isLoading={loading} skeletonRows={2}>
-            {tts ? (
-              <>
-                <InfoRow label="provider" value={tts.getAudioprovider()} />
-                {tts.getAudiooptionsList().map((d: any) => (
-                  <InfoRow
-                    key={d.getKey()}
-                    label={d.getKey()}
-                    value={d.getValue()}
-                  />
-                ))}
-              </>
-            ) : (
-              <ConfigEmpty label="Audio output is not configured." />
-            )}
-          </ConfigBlock>
-
-          <ConfigBlock title="llm" isLoading={loading} skeletonRows={2}>
-            {model ? (
-              <>
-                <InfoRow
-                  label="provider"
-                  value={model.getModelprovidername()}
-                />
-                {model.getAssistantmodeloptionsList().map((m: any) => (
-                  <InfoRow
-                    key={m.getKey()}
-                    label={m.getKey()}
-                    value={m.getValue()}
-                  />
-                ))}
-              </>
-            ) : (
-              <ConfigEmpty label="Model configuration is not available." />
-            )}
-          </ConfigBlock>
-        </div>
-      )}
-
-      {/* ── arguments tab ── */}
-      {tab === 'arguments' && (
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <DebuggerTabHeader
-            title="Arguments"
-            subtitle={`${variables.length} prompt variables`}
-          />
-          <ArgumentList
-            variables={variables}
-            onChangeArgument={onChangeArgument}
-          />
-        </div>
-      )}
     </div>
   );
 };

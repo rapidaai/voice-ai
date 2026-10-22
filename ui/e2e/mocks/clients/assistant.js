@@ -15,7 +15,10 @@ const {
   AssistantDashboardLatency,
   AssistantDashboardSummary,
   AssistantDashboardUsage,
+  AssistantDebuggerDeployment,
+  AssistantPhoneDeployment,
   AssistantProviderModel,
+  DeploymentAudioProvider,
   GetAllAssistantConversationResponse,
   GetAllAssistantProviderResponse,
   GetAllAssistantResponse,
@@ -26,6 +29,8 @@ const {
   Metadata,
   Metric,
   Paginated,
+  TextChatCompletePrompt,
+  Variable,
 } = require('@rapidaai/react');
 if (previousWindow === undefined) delete global.window;
 else global.window = previousWindow;
@@ -121,6 +126,95 @@ function buildAssistantDetailResponse() {
   response.setSuccess(true);
   response.setData(buildAssistant());
   return Buffer.from(response.serializeBinary());
+}
+
+function buildDebuggerAssistantDetailResponse({
+  withSpeechToText = true,
+} = {}) {
+  const assistant = buildAssistant();
+  assistant.setName('Delivery concierge');
+
+  const provider = assistant.getAssistantprovidermodel();
+  const prompt = new TextChatCompletePrompt();
+  prompt.setPromptvariablesList(
+    [
+      ['customer_name', 'string', 'Prashant'],
+      [
+        'delivery_instructions',
+        'paragraph',
+        'Leave the package with reception if no one answers.',
+      ],
+      ['order_context', 'json', '{ "priority": "express" }'],
+    ].map(([name, type, defaultValue]) => {
+      const item = new Variable();
+      item.setName(name);
+      item.setType(type);
+      item.setDefaultvalue(defaultValue);
+      return item;
+    }),
+  );
+  provider.setTemplate(prompt);
+  provider.setAssistantmodeloptionsList([
+    metadata('model.name', 'gpt-4.1-mini'),
+    metadata('model.temperature', '0.7'),
+    metadata('model.top_p', '1'),
+    metadata('rapida.credential_id', 'credential-secret-123'),
+  ]);
+
+  const audioProvider = (name, type, options) => {
+    const audio = new DeploymentAudioProvider();
+    audio.setAudioprovider(name);
+    audio.setAudiotype(type);
+    audio.setAudiooptionsList(
+      options.map(([key, value]) => metadata(key, value)),
+    );
+    return audio;
+  };
+  const deployment = new AssistantDebuggerDeployment();
+  if (withSpeechToText) {
+    deployment.setInputaudio(
+      audioProvider('Deepgram', 'speech-to-text', [
+        ['listen.model', 'nova-3'],
+        ['listen.language', 'en'],
+      ]),
+    );
+  }
+  deployment.setOutputaudio(
+    audioProvider('Cartesia', 'text-to-speech', [
+      ['speak.model', 'sonic-2'],
+      ['speak.voice.id', 'Professional English'],
+    ]),
+  );
+  assistant.setDebuggerdeployment(deployment);
+
+  const phoneDeployment = new AssistantPhoneDeployment();
+  phoneDeployment.setPhoneprovidername('Twilio');
+  phoneDeployment.setInputaudio(
+    audioProvider('Deepgram', 'speech-to-text', [
+      ['listen.model', 'nova-3'],
+      ['listen.language', 'en'],
+    ]),
+  );
+  phoneDeployment.setOutputaudio(
+    audioProvider('Cartesia', 'text-to-speech', [
+      ['speak.model', 'sonic-2'],
+      ['speak.voice.id', 'Professional English'],
+    ]),
+  );
+  assistant.setPhonedeployment(phoneDeployment);
+
+  const response = new GetAssistantResponse();
+  response.setCode(200);
+  response.setSuccess(true);
+  response.setData(assistant);
+  return Buffer.from(response.serializeBinary());
+}
+
+async function mockDebuggerAssistant(page, options) {
+  await page.route(ASSISTANT_DETAIL_PATH, route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    return fulfillGrpcWeb(route, buildDebuggerAssistantDetailResponse(options));
+  });
 }
 
 function buildAssistantDashboardResponse() {
@@ -345,9 +439,11 @@ module.exports = {
   POPULATED_ASSISTANT_LIST_RESPONSE,
   buildAssistantDashboardResponse,
   buildAssistantDetailResponse,
+  buildDebuggerAssistantDetailResponse,
   buildConversationDetailResponse,
   buildConversationListResponse,
   buildMessageListResponse,
   fulfillGrpcWeb,
   installAssistantClientMock,
+  mockDebuggerAssistant,
 };
