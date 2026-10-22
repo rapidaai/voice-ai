@@ -39,7 +39,12 @@ export function DebuggerDeploymentSuccessDialog({
         <PrimaryButton
           size="lg"
           type="button"
-          onClick={() => window.open(`/preview/chat/${assistantId}`, '_blank')}
+          onClick={() =>
+            window.open(
+              `/deployment/assistant/${assistantId}/playground/chat`,
+              '_blank',
+            )
+          }
           renderIcon={Launch}
         >
           Preview assistant

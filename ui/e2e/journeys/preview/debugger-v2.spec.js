@@ -11,6 +11,38 @@ const {
   mockDebuggerAssistant,
 } = require('../../mocks/clients/assistant');
 
+for (const legacyRoute of [
+  {
+    path: `/preview/chat/${ASSISTANT_ID}`,
+    destination: `/deployment/assistant/${ASSISTANT_ID}/playground/chat`,
+    heading: 'Delivery concierge',
+  },
+  {
+    path: `/preview/v2/chat/${ASSISTANT_ID}`,
+    destination: `/deployment/assistant/${ASSISTANT_ID}/playground/chat`,
+    heading: 'Delivery concierge',
+  },
+  {
+    path: `/preview/call/${ASSISTANT_ID}`,
+    destination: `/deployment/assistant/${ASSISTANT_ID}/playground/phone`,
+    heading: 'Debug Phone Call',
+  },
+]) {
+  test(`legacy debugger route ${legacyRoute.path} redirects to the assistant playground`, async ({
+    page,
+  }) => {
+    await authenticatePage(page);
+    await mockDebuggerAssistant(page);
+
+    await page.goto(legacyRoute.path);
+
+    await expect(page).toHaveURL(legacyRoute.destination);
+    await expect(
+      page.getByRole('heading', { name: legacyRoute.heading }),
+    ).toBeVisible();
+  });
+}
+
 for (const viewport of SCREENSHOT_VIEWPORTS) {
   for (const colorMode of COLOR_MODES) {
     test(`debugger v2 success screenshot at ${viewport.name} in ${colorMode} mode`, async ({

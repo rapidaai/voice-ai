@@ -15,7 +15,7 @@ const routeRoots = [
   {
     root: '/preview',
     deferredReason:
-      'Preview pages need assistant-specific realtime fixtures before browser coverage is stable.',
+      'Public assistant preview needs realtime SDK fixtures before browser coverage is stable.',
   },
   {
     root: '/connect-common',
@@ -822,23 +822,19 @@ const sourceRouteInventory = {
   ],
   'preview.tsx': [
     {
-      path: '/',
-      deferredReason:
-        'Preview layout needs assistant-specific realtime fixtures.',
-    },
-    {
       path: 'call/:assistantId/',
       deferredReason:
-        'Phone preview needs assistant-specific realtime fixtures.',
+        'Legacy phone preview redirects to the assistant playground.',
     },
     {
       path: 'chat/:assistantId',
       deferredReason:
-        'Chat preview needs assistant-specific realtime fixtures.',
+        'Legacy chat preview redirects to the assistant playground.',
     },
     {
       path: 'v2/chat/:assistantId',
-      deferredReason: 'Debugger v2 needs assistant-specific realtime fixtures.',
+      deferredReason:
+        'Legacy debugger v2 redirects to the assistant playground.',
     },
     {
       path: 'public/assistant/:assistantId',

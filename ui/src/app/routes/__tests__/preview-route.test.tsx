@@ -11,9 +11,6 @@ jest.mock('@/app/components/layout/container/protected-box', () => ({
 }));
 
 jest.mock('@/app/pages/preview-agent', () => ({
-  PreviewPhoneAgentPage: () => <div>Phone preview</div>,
-  PreviewVoiceAgentPage: () => <div>Classic debugger</div>,
-  PreviewVoiceAgentV2Page: () => <div>Debugger v2</div>,
   PublicPreviewVoiceAgentPage: () => <div>Public preview</div>,
 }));
 
@@ -22,21 +19,32 @@ const renderPreviewRoute = (path: string) =>
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/preview/*" element={<PreviewRoute />} />
+        <Route
+          path="/deployment/assistant/:assistantId/playground/chat"
+          element={<div>Assistant chat debugger</div>}
+        />
+        <Route
+          path="/deployment/assistant/:assistantId/playground/phone"
+          element={<div>Assistant phone debugger</div>}
+        />
       </Routes>
     </MemoryRouter>,
   );
 
 describe('PreviewRoute', () => {
-  it('renders the coded debugger design on the v2 URL', () => {
-    renderPreviewRoute('/preview/v2/chat/assistant-123');
+  it.each([
+    ['/preview/chat/assistant-123', 'Assistant chat debugger'],
+    ['/preview/v2/chat/assistant-123', 'Assistant chat debugger'],
+    ['/preview/call/assistant-123', 'Assistant phone debugger'],
+  ])('redirects %s to the assistant playground', (path, destination) => {
+    renderPreviewRoute(path);
 
-    expect(screen.getByText('Debugger v2')).toBeInTheDocument();
+    expect(screen.getByText(destination)).toBeInTheDocument();
   });
 
-  it('keeps the existing debugger URL on the classic page', () => {
-    renderPreviewRoute('/preview/chat/assistant-123');
+  it('preserves the public assistant preview', () => {
+    renderPreviewRoute('/preview/public/assistant/assistant-123');
 
-    expect(screen.getByText('Classic debugger')).toBeInTheDocument();
-    expect(screen.queryByText('Debugger v2')).not.toBeInTheDocument();
+    expect(screen.getByText('Public preview')).toBeInTheDocument();
   });
 });
