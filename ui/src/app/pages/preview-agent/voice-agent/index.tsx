@@ -36,7 +36,6 @@ import {
 import { getAssistantByIdWithApi } from '@/clients/assistant.client';
 import {
   createPreviewPhoneCall,
-  createVoiceAgentDebuggerConnection,
   createVoiceAgentSDKConnection,
 } from '@/clients/runtime.client';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -69,38 +68,6 @@ export const PublicPreviewVoiceAgent = () => {
       )
         .addMetadata('authId', StringToAny('' + (authId || 'public_user')))
         .setUserIdentifier(authId || randomMeaningfullName('public'))}
-    />
-  );
-};
-
-//
-export const PreviewVoiceAgent = () => {
-  const { user, authId, token, projectId } = useCurrentCredential();
-  const { assistantId } = useParams();
-
-  if (!assistantId || !user?.name) {
-    return <Navigate to="/404" replace />;
-  }
-
-  return (
-    <VoiceAgent
-      debug={true}
-      connectConfig={createVoiceAgentDebuggerConnection({
-        token,
-        userId: authId,
-        projectId,
-      })}
-      agentConfig={new AgentConfig(
-        assistantId,
-        new InputOptions([Channel.Audio, Channel.Text], Channel.Text),
-      )
-        .setUserIdentifier(authId, user.name)
-        .addKeywords([user.name])
-        .addMetadata('authId', StringToAny(authId))
-        .addMetadata('projectId', StringToAny(projectId))}
-      // .addCustomOption('listen.language', StringToAny('en'))
-      // .addCustomOption('speak.language', StringToAny('en'))
-      // .addCustomOption('listen.model', StringToAny('nova-3'))}
     />
   );
 };
