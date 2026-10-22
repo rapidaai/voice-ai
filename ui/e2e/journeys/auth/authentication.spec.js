@@ -184,6 +184,39 @@ test('authentication shell keeps account access aligned at medium widths', async
   await expect(page.getByTestId('auth-illustration')).toHaveCount(0);
 });
 
+test('primary action uses the Carbon primary color in dark mode', async ({
+  page,
+}) => {
+  await setColorMode(page, 'dark');
+  await gotoJourney(page, authJourney('signin'));
+
+  const buttonPrimary = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    document.body.appendChild(probe);
+
+    probe.style.backgroundColor = 'var(--cds-button-primary)';
+    const color = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+
+    return color;
+  });
+  const buttonStyles = await page
+    .getByRole('button', { name: 'Log in', exact: true })
+    .evaluate(element => {
+      const style = getComputedStyle(element);
+      return {
+        backgroundColor: style.backgroundColor,
+        color: style.color,
+      };
+    });
+
+  expect(buttonPrimary).toBe('rgb(15, 98, 254)');
+  expect(buttonStyles).toEqual({
+    backgroundColor: buttonPrimary,
+    color: 'rgb(255, 255, 255)',
+  });
+});
+
 for (const authForm of [
   {
     journey: 'signup',
@@ -257,6 +290,21 @@ test('dark primary actions keep white content and accessible contrast for the fa
   });
 
   const button = page.getByRole('button', { name: 'Log in', exact: true });
+  const tokenColors = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    document.body.appendChild(probe);
+    const resolveColor = token => {
+      probe.style.backgroundColor = `var(${token})`;
+      return getComputedStyle(probe).backgroundColor;
+    };
+    const colors = {
+      primary: resolveColor('--cds-button-primary'),
+      hover: resolveColor('--cds-button-primary-hover'),
+      active: resolveColor('--cds-button-primary-active'),
+    };
+    probe.remove();
+    return colors;
+  });
   const buttonColors = () =>
     button.evaluate(element => {
       const style = getComputedStyle(element);
@@ -274,16 +322,23 @@ test('dark primary actions keep white content and accessible contrast for the fa
 
   const defaultColors = await buttonColors();
   expect(defaultColors).toMatchObject({
+    backgroundColor: tokenColors.primary,
     color: 'rgb(255, 255, 255)',
     iconFill: 'rgb(255, 255, 255)',
   });
   await button.hover();
+  await expect
+    .poll(() => buttonColors().then(colors => colors.backgroundColor))
+    .toBe(tokenColors.hover);
   const hoverColors = await buttonColors();
   expect(hoverColors).toMatchObject({
     color: 'rgb(255, 255, 255)',
     iconFill: 'rgb(255, 255, 255)',
   });
   await page.mouse.down();
+  await expect
+    .poll(() => buttonColors().then(colors => colors.backgroundColor))
+    .toBe(tokenColors.active);
   const activeColors = await buttonColors();
   expect(activeColors).toMatchObject({
     color: 'rgb(255, 255, 255)',

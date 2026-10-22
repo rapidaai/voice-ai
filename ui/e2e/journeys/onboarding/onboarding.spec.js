@@ -50,7 +50,7 @@ test('new account completes onboarding before opening the dashboard', async ({
 
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(
-    page.getByRole('heading', { name: 'Project overview' }),
+    page.getByRole('heading', { name: 'Top assistants' }),
   ).toBeVisible();
 });
 

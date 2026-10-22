@@ -14,22 +14,14 @@ const dashboardJourney = routeJourneys.find(
   journey => journey.id === 'dashboard.home',
 );
 
-test('dashboard requests each selected range exactly once', async ({
-  page,
-}) => {
+test('dashboard requests the default range exactly once', async ({ page }) => {
   await gotoJourney(page, dashboardJourney);
   await expect.poll(() => getDashboardRequests(page).length).toBe(1);
   expect(getDashboardRequests(page)[0].durationMs).toBe(
     30 * 24 * 60 * 60 * 1000,
   );
-
-  await page.getByLabel('Date range').click();
-  await page.getByText('Last 7 days', { exact: true }).click();
-
-  await expect.poll(() => getDashboardRequests(page).length).toBe(2);
-  expect(getDashboardRequests(page)[1].durationMs).toBe(
-    7 * 24 * 60 * 60 * 1000,
-  );
+  await expect(page.getByLabel('Date range')).toHaveCount(0);
+  await expect(page.getByLabel('Auto-refresh')).toHaveCount(0);
 });
 
 test('mobile sidebar expands without reducing dashboard width', async ({
@@ -53,6 +45,32 @@ test('mobile sidebar expands without reducing dashboard width', async ({
   await page.getByRole('button', { name: 'Collapse sidebar' }).click();
   await expect(sidebar).toHaveCSS('width', '48px');
   await expect(dashboard).toHaveCSS('width', '342px');
+});
+
+test('dashboard stacks activity and health panels at lg width', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await gotoJourney(page, dashboardJourney);
+
+  const activity = page
+    .getByRole('heading', { name: 'Conversation activity' })
+    .locator('xpath=ancestor::section');
+  const health = page
+    .getByRole('heading', { name: 'Health summary' })
+    .locator('xpath=ancestor::section');
+  const [activityBounds, healthBounds] = await Promise.all([
+    activity.boundingBox(),
+    health.boundingBox(),
+  ]);
+
+  expect(activityBounds).not.toBeNull();
+  expect(healthBounds).not.toBeNull();
+  expect(healthBounds.y).toBeGreaterThanOrEqual(
+    activityBounds.y + activityBounds.height,
+  );
+  expect(healthBounds.x).toBe(activityBounds.x);
+  expect(healthBounds.width).toBe(activityBounds.width);
 });
 
 for (const viewport of [

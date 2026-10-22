@@ -104,7 +104,7 @@ const routeJourneys = [
     id: 'dashboard.home',
     path: '/dashboard',
     auth: true,
-    expectText: 'Project overview',
+    expectText: 'Top assistants',
     readyText: 'Top assistants',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
