@@ -1,26 +1,15 @@
 import { Helmet } from '@/app/components/app-shell/helmet';
-import { EmptyState } from '@/app/components/ui/feedback';
-import { IconOnlyButton } from '@/app/components/ui/primitives';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import {
-  Renew,
-  View,
-  Edit,
-  Launch,
-  Copy,
-  Checkmark,
-  Microphone,
-  VolumeUp,
+  Api,
+  ApplicationWeb,
+  ArrowUpRight,
+  Debug,
+  Phone,
   Deploy,
 } from '@carbon/icons-react';
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Assistant } from '@rapidaai/react';
 import toast from 'react-hot-toast/headless';
@@ -34,29 +23,31 @@ import {
   AssistantDeploymentType,
   AssistantDeploymentVersionsModal,
 } from '@/app/components/dialogs/assistant';
-import SourceIndicator from '@/app/components/domain/indicators/source';
 import { RecordStatusIndicator } from '@/app/components/ui/feedback';
-import { OverflowMenu, OverflowMenuItem } from '@/app/components/ui/primitives';
+import { VersionIndicator } from '@/app/components/domain/indicators/version';
+import { HelpToggletip } from '@/app/components/domain/providers/help-label';
+import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  Button,
-  MenuButton,
-  MenuItem,
-  MenuItemDivider,
+  Modal,
+  ModalBody,
+  ModalHeader,
+  OverflowMenu,
+  OverflowMenuItem,
+  Text,
+  typographyClassNames,
+} from '@/app/components/ui/primitives';
+import {
+  ClickableTile,
+  DataTable,
   Table,
-  TableHead,
-  TableRow,
-  TableHeader,
   TableBody,
   TableCell,
-  TableToolbar,
-  TableToolbarContent,
-  TableToolbarSearch,
-  TableBatchActions,
-  TableBatchAction,
-  RadioButton,
-  Tag,
+  TableExpandedRow,
+  TableExpandHeader,
+  TableExpandRow,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@carbon/react';
 import {
   disableAssistantDeploymentByType,
@@ -64,6 +55,21 @@ import {
 } from '@/clients/assistant.client';
 
 type DeploymentType = 'debugger' | 'api' | 'web' | 'phone';
+type SupportedDeployment =
+  | NonNullable<ReturnType<Assistant['getDebuggerdeployment']>>
+  | NonNullable<ReturnType<Assistant['getApideployment']>>
+  | NonNullable<ReturnType<Assistant['getPhonedeployment']>>
+  | NonNullable<ReturnType<Assistant['getWebplugindeployment']>>;
+const NOT_AVAILABLE = 'Not available';
+const deploymentTableHeaders = [
+  { key: 'name', header: 'Deployment' },
+  { key: 'version', header: 'Version' },
+  { key: 'sttProvider', header: 'Speech to text' },
+  { key: 'ttsProvider', header: 'Text to speech' },
+  { key: 'status', header: 'Status' },
+  { key: 'created', header: 'Created' },
+  { key: 'actions', header: 'Actions' },
+];
 
 export const ConfigureAssistantDeploymentPage = () => {
   const { assistantId } = useParams();
@@ -76,15 +82,10 @@ export const ConfigureAssistantDeploymentPage = () => {
   const [isApiExpanded, setIsApiExpanded] = useState(false);
   const [isPhoneExpanded, setIsPhoneExpanded] = useState(false);
   const [isWidgetExpanded, setIsWidgetExpanded] = useState(false);
+  const [isAddDeploymentOpen, setIsAddDeploymentOpen] = useState(false);
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
   const [versionType, setVersionType] =
     useState<AssistantDeploymentType | null>(null);
-  const [openActionMenuType, setOpenActionMenuType] =
-    useState<DeploymentType | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [copiedVersion, setCopiedVersion] = useState<string | null>(null);
-  const [selectedDeploymentType, setSelectedDeploymentType] =
-    useState<DeploymentType | null>(null);
 
   const get = useCallback(
     (id: typeof assistantId) => {
@@ -128,13 +129,18 @@ export const ConfigureAssistantDeploymentPage = () => {
 
   const rows: Array<{
     type: DeploymentType;
-    source: string;
     name: string;
-    version: string;
+    versionId: string | null;
     status: string;
     sttProvider: string;
     ttsProvider: string;
-    updated: string;
+    created: string;
+    assistantId: string;
+    lastUpdated: string;
+    maxSessionDuration: string;
+    idleTimeout: string;
+    greetingInterruptible: string;
+    unclearInputTimeout: string;
     onEdit: () => void;
     onDetails: () => void;
     onPreview?: () => void;
@@ -160,7 +166,6 @@ export const ConfigureAssistantDeploymentPage = () => {
         });
         if (response?.getSuccess()) {
           toast.success(`${labelByType[type]} deployment disabled.`);
-          setSelectedDeploymentType(null);
           get(assistantId);
           return;
         }
@@ -179,15 +184,17 @@ export const ConfigureAssistantDeploymentPage = () => {
     const deployment = assistant.getDebuggerdeployment()!;
     rows.push({
       type: 'debugger',
-      source: 'debugger',
       name: 'Debugger',
-      version: deployment.getId() ? `vrsn_${deployment.getId()}` : '—',
+      versionId: deployment.getId() ? String(deployment.getId()) : null,
       status: getDeploymentStatus(deployment),
-      sttProvider: deployment.getInputaudio()?.getAudioprovider() || '—',
-      ttsProvider: deployment.getOutputaudio()?.getAudioprovider() || '—',
-      updated: deployment.getCreateddate()
+      sttProvider:
+        deployment.getInputaudio()?.getAudioprovider() || NOT_AVAILABLE,
+      ttsProvider:
+        deployment.getOutputaudio()?.getAudioprovider() || NOT_AVAILABLE,
+      created: deployment.getCreateddate()
         ? toHumanReadableDateTime(deployment.getCreateddate()!)
-        : '—',
+        : NOT_AVAILABLE,
+      ...getGeneralDeploymentDetails(deployment),
       onEdit: () =>
         navi.goToEditDebugger(
           assistantId!,
@@ -203,15 +210,17 @@ export const ConfigureAssistantDeploymentPage = () => {
     const deployment = assistant.getApideployment()!;
     rows.push({
       type: 'api',
-      source: 'sdk',
       name: 'SDK / API',
-      version: deployment.getId() ? `vrsn_${deployment.getId()}` : '—',
+      versionId: deployment.getId() ? String(deployment.getId()) : null,
       status: getDeploymentStatus(deployment),
-      sttProvider: deployment.getInputaudio()?.getAudioprovider() || '—',
-      ttsProvider: deployment.getOutputaudio()?.getAudioprovider() || '—',
-      updated: deployment.getCreateddate()
+      sttProvider:
+        deployment.getInputaudio()?.getAudioprovider() || NOT_AVAILABLE,
+      ttsProvider:
+        deployment.getOutputaudio()?.getAudioprovider() || NOT_AVAILABLE,
+      created: deployment.getCreateddate()
         ? toHumanReadableDateTime(deployment.getCreateddate()!)
-        : '—',
+        : NOT_AVAILABLE,
+      ...getGeneralDeploymentDetails(deployment),
       onEdit: () =>
         navi.goToEditApi(assistantId!, String(deployment.getId() || 'latest')),
       onDetails: () => setIsApiExpanded(true),
@@ -223,15 +232,17 @@ export const ConfigureAssistantDeploymentPage = () => {
     const deployment = assistant.getPhonedeployment()!;
     rows.push({
       type: 'phone',
-      source: 'phone-call',
       name: 'Phone Call',
-      version: deployment.getId() ? `vrsn_${deployment.getId()}` : '—',
+      versionId: deployment.getId() ? String(deployment.getId()) : null,
       status: getDeploymentStatus(deployment),
-      sttProvider: deployment.getInputaudio()?.getAudioprovider() || '—',
-      ttsProvider: deployment.getOutputaudio()?.getAudioprovider() || '—',
-      updated: deployment.getCreateddate()
+      sttProvider:
+        deployment.getInputaudio()?.getAudioprovider() || NOT_AVAILABLE,
+      ttsProvider:
+        deployment.getOutputaudio()?.getAudioprovider() || NOT_AVAILABLE,
+      created: deployment.getCreateddate()
         ? toHumanReadableDateTime(deployment.getCreateddate()!)
-        : '—',
+        : NOT_AVAILABLE,
+      ...getGeneralDeploymentDetails(deployment),
       onEdit: () =>
         navi.goToEditCall(assistantId!, String(deployment.getId() || 'latest')),
       onDetails: () => setIsPhoneExpanded(true),
@@ -244,15 +255,17 @@ export const ConfigureAssistantDeploymentPage = () => {
     const deployment = assistant.getWebplugindeployment()!;
     rows.push({
       type: 'web',
-      source: 'web-plugin',
       name: 'Web Widget',
-      version: deployment.getId() ? `vrsn_${deployment.getId()}` : '—',
+      versionId: deployment.getId() ? String(deployment.getId()) : null,
       status: getDeploymentStatus(deployment),
-      sttProvider: deployment.getInputaudio()?.getAudioprovider() || '—',
-      ttsProvider: deployment.getOutputaudio()?.getAudioprovider() || '—',
-      updated: deployment.getCreateddate()
+      sttProvider:
+        deployment.getInputaudio()?.getAudioprovider() || NOT_AVAILABLE,
+      ttsProvider:
+        deployment.getOutputaudio()?.getAudioprovider() || NOT_AVAILABLE,
+      created: deployment.getCreateddate()
         ? toHumanReadableDateTime(deployment.getCreateddate()!)
-        : '—',
+        : NOT_AVAILABLE,
+      ...getGeneralDeploymentDetails(deployment),
       onEdit: () =>
         navi.goToEditWeb(assistantId!, String(deployment.getId() || 'latest')),
       onDetails: () => setIsWidgetExpanded(true),
@@ -260,66 +273,25 @@ export const ConfigureAssistantDeploymentPage = () => {
     });
   }
 
-  const copyVersion = useCallback((version: string) => {
-    navigator.clipboard.writeText(version);
-    setCopiedVersion(version);
-    setTimeout(() => setCopiedVersion(null), 2000);
-  }, []);
+  const deploymentRowsByType = new Map(rows.map(row => [row.type, row]));
+  const deploymentTableRows = rows.map(row => ({
+    id: row.type,
+    name: row.name,
+    version: row.versionId || NOT_AVAILABLE,
+    sttProvider: getAudioProviderLabel(row.sttProvider),
+    ttsProvider: getAudioProviderLabel(row.ttsProvider),
+    status: row.status,
+    created: row.created,
+    actions: '',
+  }));
 
-  const addDeploymentMenu = useMemo(
-    () => (
-      <MenuButton
-        className="deployment-add-menu"
-        label="Add deployment"
-        size="md"
-        kind="primary"
-        menuBorder
-        menuBackgroundToken="background"
-      >
-        <MenuItem
-          label="Debugger"
-          onClick={() => navi.goToConfigureDebugger(assistantId!)}
-        />
-        <MenuItemDivider />
-        <MenuItem
-          label="Web Widget"
-          onClick={() => navi.goToConfigureWeb(assistantId!)}
-        />
-        <MenuItemDivider />
-        <MenuItem
-          label="SDK / API"
-          onClick={() => navi.goToConfigureApi(assistantId!)}
-        />
-        <MenuItemDivider />
-        <MenuItem
-          label="Phone Call"
-          onClick={() => navi.goToConfigureCall(assistantId!)}
-        />
-      </MenuButton>
-    ),
-    [assistantId, navi],
-  );
-
-  const normalizedSearch = searchTerm.trim().toLowerCase();
-  const filteredRows = normalizedSearch
-    ? rows.filter(row =>
-        [
-          row.name,
-          row.version,
-          row.status,
-          row.sttProvider,
-          row.ttsProvider,
-          row.updated,
-        ]
-          .join(' ')
-          .toLowerCase()
-          .includes(normalizedSearch),
-      )
-    : rows;
-
-  const selectedDeployment = filteredRows.find(
-    row => row.type === selectedDeploymentType,
-  );
+  const openDeploymentSetup = (type: DeploymentType) => {
+    setIsAddDeploymentOpen(false);
+    if (type === 'debugger') navi.goToConfigureDebugger(assistantId!);
+    if (type === 'web') navi.goToConfigureWeb(assistantId!);
+    if (type === 'api') navi.goToConfigureApi(assistantId!);
+    if (type === 'phone') navi.goToConfigureCall(assistantId!);
+  };
 
   return (
     <div className="flex flex-col w-full flex-1 overflow-auto">
@@ -363,228 +335,411 @@ export const ConfigureAssistantDeploymentPage = () => {
           projectId={projectId}
         />
       )}
+      <AddDeploymentDialog
+        open={isAddDeploymentOpen}
+        onClose={() => setIsAddDeploymentOpen(false)}
+        onSelect={openDeploymentSetup}
+      />
       <Helmet title="Assistant deployment" />
 
-      {/* Page header */}
-      <div className="px-4 pt-4 pb-6 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <div>
-          <Breadcrumb noTrailingSlash className="mb-2">
-            <BreadcrumbItem
-              href={`/deployment/assistant/${assistantId}/overview`}
+      <AssistantSettingsShellHeader
+        title="Deployments"
+        href={`/deployment/assistant/${assistantId}/deployment/`}
+        onReload={() => get(assistantId)}
+        reloadLabel="Reload deployments"
+        primaryAction={{
+          label: 'Add deployment',
+          onClick: () => setIsAddDeploymentOpen(true),
+        }}
+      />
+
+      <div className="flex flex-1 flex-col bg-[var(--cds-background)]">
+        <div className="flex w-full flex-1 flex-col">
+          {hasAnyDeployment ? (
+            <div
+              aria-label="Deployment channels"
+              className="no-scrollbar w-full overflow-x-auto"
             >
-              Assistant
-            </BreadcrumbItem>
-          </Breadcrumb>
-          <h1 className="text-2xl font-light tracking-tight">Deployments</h1>
-        </div>
-      </div>
-
-      <TableToolbar>
-        <TableBatchActions
-          shouldShowBatchActions={!!selectedDeployment}
-          totalSelected={selectedDeployment ? 1 : 0}
-          totalCount={filteredRows.length}
-          onCancel={() => setSelectedDeploymentType(null)}
-          className="[&_[class*=divider]]:hidden [&_.cds--btn]:transition-colors [&_.cds--btn:hover]:!bg-primary [&_.cds--btn:hover]:!text-white"
-        >
-          {selectedDeployment && (
-            <>
-              <TableBatchAction
-                renderIcon={Edit}
-                onClick={() => {
-                  selectedDeployment.onEdit();
-                  setSelectedDeploymentType(null);
-                }}
+              <DataTable
+                rows={deploymentTableRows}
+                headers={deploymentTableHeaders}
               >
-                Edit deployment
-              </TableBatchAction>
-            </>
-          )}
-        </TableBatchActions>
-        <TableToolbarContent>
-          <TableToolbarSearch
-            placeholder="Search deployments"
-            onChange={(e: any) => setSearchTerm(e.target?.value || '')}
-          />
-          <IconOnlyButton
-            kind="ghost"
-            size="lg"
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            onClick={() => get(assistantId)}
-          />
-          {addDeploymentMenu}
-        </TableToolbarContent>
-      </TableToolbar>
-
-      {hasAnyDeployment ? (
-        <>
-          {filteredRows.length > 0 ? (
-            <div className="overflow-auto flex-1">
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHeader className="!w-12" />
-                    <TableHeader>Channel</TableHeader>
-                    <TableHeader>Version</TableHeader>
-                    <TableHeader>Status</TableHeader>
-                    <TableHeader>STT Provider</TableHeader>
-                    <TableHeader>TTS Provider</TableHeader>
-                    <TableHeader>Date</TableHeader>
-                    <TableHeader>Actions</TableHeader>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredRows.map(row => (
-                    <TableRow
-                      key={row.type}
-                      isSelected={selectedDeploymentType === row.type}
-                      onClick={() =>
-                        setSelectedDeploymentType(
-                          selectedDeploymentType === row.type ? null : row.type,
-                        )
-                      }
-                      className="cursor-pointer"
-                    >
-                      <TableCell
-                        className="!w-12 !pr-0"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <RadioButton
-                          id={`deployment-select-${row.type}`}
-                          name="deployment-select"
-                          labelText=""
-                          hideLabel
-                          checked={selectedDeploymentType === row.type}
-                          onChange={() =>
-                            setSelectedDeploymentType(
-                              selectedDeploymentType === row.type
-                                ? null
-                                : row.type,
-                            )
-                          }
+                {({
+                  rows: tableRows,
+                  headers,
+                  getTableProps,
+                  getHeaderProps,
+                  getRowProps,
+                  getExpandHeaderProps,
+                  getExpandedRowProps,
+                }) => (
+                  <Table
+                    {...getTableProps()}
+                    size="lg"
+                    className="min-w-[1240px]"
+                  >
+                    <TableHead>
+                      <TableRow>
+                        <TableExpandHeader
+                          {...getExpandHeaderProps()}
+                          id="deployment-expand"
+                          aria-label="Expand all deployment details"
                         />
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <SourceIndicator source={row.source} />
-                      </TableCell>
-                      <TableCell className="font-mono text-[13px]">
-                        {row.version !== '—' ? (
-                          <span className="inline-flex items-center gap-1">
-                            {row.version}
-                            <Button
-                              hasIconOnly
-                              renderIcon={
-                                copiedVersion === row.version ? Checkmark : Copy
-                              }
-                              iconDescription="Copy version id"
-                              kind="ghost"
-                              size="sm"
-                              onClick={() => copyVersion(row.version)}
-                              className="!min-h-0 !p-1"
-                            />
-                          </span>
-                        ) : (
-                          row.version
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <RecordStatusIndicator state={row.status} />
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <AudioProviderTag
-                          provider={row.sttProvider}
-                          icon={<Microphone size={14} />}
-                        />
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <AudioProviderTag
-                          provider={row.ttsProvider}
-                          icon={<VolumeUp size={14} />}
-                        />
-                      </TableCell>
-                      <TableCell className="text-[13px] whitespace-nowrap">
-                        {row.updated}
-                      </TableCell>
-                      <TableCell
-                        className="text-sm"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <div className="flex items-center gap-0">
-                          <IconOnlyButton
-                            kind="ghost"
-                            size="md"
-                            renderIcon={View}
-                            iconDescription="View details"
-                            onClick={row.onDetails}
-                          />
-                          <IconOnlyButton
-                            kind="ghost"
-                            size="md"
-                            renderIcon={Edit}
-                            iconDescription="Edit deployment"
-                            onClick={row.onEdit}
-                          />
-                          {row.onPreview && (
-                            <IconOnlyButton
-                              kind="ghost"
-                              size="md"
-                              renderIcon={Launch}
-                              iconDescription="Preview deployment"
-                              onClick={row.onPreview}
-                            />
-                          )}
-                          <OverflowMenu
-                            size="md"
-                            flipped
-                            iconDescription="Deployment actions"
-                            open={openActionMenuType === row.type}
-                            onOpen={() => setOpenActionMenuType(row.type)}
-                            onClose={() => setOpenActionMenuType(null)}
+                        {headers.map(header => (
+                          <TableHeader
+                            {...getHeaderProps({ header })}
+                            key={header.key}
+                            className={getDeploymentHeaderClassName(header.key)}
                           >
-                            <OverflowMenuItem
-                              itemText="View all versions"
-                              onClick={() => {
-                                setOpenActionMenuType(null);
-                                setVersionType(row.type);
-                                setIsVersionsOpen(true);
-                              }}
-                            />
-                            <OverflowMenuItem
-                              itemText="Disable deployment"
-                              isDelete
-                              hasDivider
-                              onClick={() => {
-                                setOpenActionMenuType(null);
-                                row.onDisable();
-                              }}
-                            />
-                          </OverflowMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                            {header.key === 'actions' ? (
+                              <span className="flex w-full justify-end">
+                                {header.header}
+                              </span>
+                            ) : (
+                              header.header
+                            )}
+                          </TableHeader>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {tableRows.map(tableRow => {
+                        const row = deploymentRowsByType.get(
+                          tableRow.id as DeploymentType,
+                        );
+                        if (!row) return null;
+
+                        const expandedRowId = `${row.type}-deployment-details`;
+
+                        return [
+                          <TableExpandRow
+                            {...getRowProps({ row: tableRow })}
+                            key={tableRow.id}
+                            aria-label={`${tableRow.isExpanded ? 'Collapse' : 'Expand'} ${row.name} deployment details`}
+                            aria-controls={expandedRowId}
+                            expandHeader="deployment-expand"
+                          >
+                            <TableCell>
+                              <Text as="h3" variant="heading-compact-01">
+                                {row.name}
+                              </Text>
+                            </TableCell>
+                            <TableCell>
+                              {row.versionId ? (
+                                <VersionIndicator id={row.versionId} />
+                              ) : (
+                                <Text
+                                  as="span"
+                                  variant="body-compact-01"
+                                  className="text-[var(--cds-text-secondary)]"
+                                >
+                                  {NOT_AVAILABLE}
+                                </Text>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Text as="span" variant="body-compact-01">
+                                {getAudioProviderLabel(row.sttProvider)}
+                              </Text>
+                            </TableCell>
+                            <TableCell>
+                              <Text as="span" variant="body-compact-01">
+                                {getAudioProviderLabel(row.ttsProvider)}
+                              </Text>
+                            </TableCell>
+                            <TableCell>
+                              <RecordStatusIndicator state={row.status} />
+                            </TableCell>
+                            <TableCell>
+                              <Text
+                                as="span"
+                                variant="body-compact-01"
+                                className="whitespace-nowrap text-[var(--cds-text-secondary)]"
+                              >
+                                {row.created}
+                              </Text>
+                            </TableCell>
+                            <TableCell className="w-20 min-w-20">
+                              <div className="flex w-full items-center justify-end">
+                                <OverflowMenu
+                                  size="md"
+                                  flipped
+                                  iconDescription={`Actions for ${row.name}`}
+                                >
+                                  <OverflowMenuItem
+                                    itemText="View deployment details"
+                                    onClick={row.onDetails}
+                                  />
+                                  <OverflowMenuItem
+                                    itemText="Edit deployment"
+                                    onClick={row.onEdit}
+                                  />
+                                  {row.onPreview && (
+                                    <OverflowMenuItem
+                                      itemText="Preview deployment"
+                                      onClick={row.onPreview}
+                                    />
+                                  )}
+                                  <OverflowMenuItem
+                                    itemText="View all versions"
+                                    onClick={() => {
+                                      setVersionType(row.type);
+                                      setIsVersionsOpen(true);
+                                    }}
+                                  />
+                                  <OverflowMenuItem
+                                    itemText="Disable deployment"
+                                    isDelete
+                                    hasDivider
+                                    onClick={row.onDisable}
+                                  />
+                                </OverflowMenu>
+                              </div>
+                            </TableCell>
+                          </TableExpandRow>,
+                          tableRow.isExpanded ? (
+                            <TableExpandedRow
+                              {...getExpandedRowProps({ row: tableRow })}
+                              id={expandedRowId}
+                              colSpan={8}
+                              key={`${tableRow.id}-details`}
+                            >
+                              <div className="grid grid-cols-1 gap-8 px-6 py-6 md:grid-cols-2">
+                                <section
+                                  aria-labelledby={`${row.type}-session-title`}
+                                >
+                                  <Text
+                                    as="h4"
+                                    id={`${row.type}-session-title`}
+                                    variant="heading-compact-01"
+                                  >
+                                    Session behavior
+                                  </Text>
+                                  <dl className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
+                                    <DeploymentDetail
+                                      label="Maximum session duration"
+                                      value={row.maxSessionDuration}
+                                      helpText="The maximum time a conversation can remain active before it ends automatically."
+                                    />
+                                    <DeploymentDetail
+                                      label="Idle timeout"
+                                      value={row.idleTimeout}
+                                      helpText="How long the assistant waits without user activity before applying its idle timeout behavior."
+                                    />
+                                    <DeploymentDetail
+                                      label="Greeting interruptible"
+                                      value={row.greetingInterruptible}
+                                      helpText="Whether a user can speak while the assistant is playing its greeting."
+                                    />
+                                    <DeploymentDetail
+                                      label="Unclear input timeout"
+                                      value={row.unclearInputTimeout}
+                                      helpText="How long the assistant waits for understandable input before using its unclear-input response."
+                                    />
+                                  </dl>
+                                </section>
+                                <section
+                                  aria-labelledby={`${row.type}-general-title`}
+                                >
+                                  <Text
+                                    as="h4"
+                                    id={`${row.type}-general-title`}
+                                    variant="heading-compact-01"
+                                  >
+                                    General information
+                                  </Text>
+                                  <dl className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-1">
+                                    <DeploymentDetail
+                                      label="Assistant ID"
+                                      value={row.assistantId}
+                                    />
+                                    <DeploymentDetail
+                                      label="Created"
+                                      value={row.created}
+                                    />
+                                    <DeploymentDetail
+                                      label="Last updated"
+                                      value={row.lastUpdated}
+                                    />
+                                  </dl>
+                                </section>
+                              </div>
+                            </TableExpandedRow>
+                          ) : null,
+                        ];
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </DataTable>
             </div>
           ) : (
-            <EmptyState
-              icon={Deploy}
-              title="No deployments found"
-              subtitle="No deployment matched your search."
-            />
+            <DeploymentEmptyState onSelect={openDeploymentSetup} />
           )}
-        </>
-      ) : (
-        <EmptyState
-          icon={Deploy}
-          title="No deployments found"
-          subtitle="Any assistant deployments you configure will be listed here."
-        />
-      )}
+        </div>
+      </div>
     </div>
   );
 };
+
+const addDeploymentOptions: Array<{
+  type: DeploymentType;
+  title: string;
+  description: string;
+  icon: typeof Debug;
+}> = [
+  {
+    type: 'web',
+    title: 'Web Widget',
+    description: 'Embed a voice experience on your website with a widget.',
+    icon: ApplicationWeb,
+  },
+  {
+    type: 'api',
+    title: 'SDK / API',
+    description:
+      'Integrate the assistant into your application using an SDK or real-time API.',
+    icon: Api,
+  },
+  {
+    type: 'phone',
+    title: 'Phone Call',
+    description:
+      'Connect the assistant to a phone number for live voice conversations.',
+    icon: Phone,
+  },
+  {
+    type: 'debugger',
+    title: 'Debugger',
+    description: 'Test voice conversations in your browser before deployment.',
+    icon: Debug,
+  },
+];
+
+function DeploymentEmptyState({
+  onSelect,
+}: {
+  onSelect: (type: DeploymentType) => void;
+}) {
+  return (
+    <section
+      aria-labelledby="deployment-empty-state-title"
+      className="flex flex-1 flex-col items-center justify-center px-4 py-12 text-center"
+    >
+      <Deploy size={32} className="text-[var(--cds-icon-secondary)]" />
+      <Text
+        as="h2"
+        id="deployment-empty-state-title"
+        variant="heading-04"
+        className="mt-6 text-[var(--cds-text-primary)]"
+      >
+        Deployment
+      </Text>
+      <Text
+        as="p"
+        variant="body-02"
+        className="mt-3 max-w-2xl text-[var(--cds-text-secondary)]"
+      >
+        Choose how you want to test or deliver your assistant.
+      </Text>
+
+      <div className="mt-8 grid w-full max-w-3xl grid-cols-1 gap-px border border-[var(--cds-border-subtle-01)] bg-[var(--cds-border-subtle-01)] text-left md:grid-cols-2">
+        {addDeploymentOptions.map(option => {
+          const Icon = option.icon;
+          return (
+            <ClickableTile
+              key={option.type}
+              onClick={() => onSelect(option.type)}
+              className="group !relative !flex !min-h-40 !flex-col !p-6"
+            >
+              <ArrowUpRight
+                aria-hidden
+                size={20}
+                className="absolute top-6 right-6 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100"
+              />
+              <Icon size={24} className="text-[var(--cds-icon-secondary)]" />
+              <Text
+                as="h3"
+                variant="heading-03"
+                className="mt-6 text-[var(--cds-text-primary)]"
+              >
+                {option.title}
+              </Text>
+              <Text
+                as="p"
+                variant="body-01"
+                className="mt-2 text-[var(--cds-text-secondary)]"
+              >
+                {option.description}
+              </Text>
+            </ClickableTile>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function AddDeploymentDialog({
+  open,
+  onClose,
+  onSelect,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSelect: (type: DeploymentType) => void;
+}) {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="lg"
+      containerClassName="!max-w-[1120px]"
+    >
+      <ModalHeader
+        label="Deployment"
+        labelClassName={typographyClassNames['label-01']}
+        title="Choose a deployment channel"
+        titleClassName={typographyClassNames['heading-03']}
+        onClose={onClose}
+      />
+      <ModalBody>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+          {addDeploymentOptions.map(option => {
+            const Icon = option.icon;
+            return (
+              <ClickableTile
+                key={option.type}
+                onClick={() => onSelect(option.type)}
+                className="group !flex !min-h-[220px] !flex-col !rounded-none !border !border-gray-200 !bg-gray-50 !p-0 transition-colors hover:!border-primary dark:!border-gray-700 dark:!bg-gray-800 dark:hover:!border-primary"
+              >
+                <div className="flex flex-1 flex-col p-5">
+                  <div className="flex size-12 shrink-0 items-center justify-center bg-primary/10 text-primary dark:bg-primary/10">
+                    <Icon size={24} />
+                  </div>
+                  <Text
+                    as="h3"
+                    variant="body-02"
+                    className="mt-4 text-gray-900 dark:text-white"
+                  >
+                    {option.title}
+                  </Text>
+                  <Text
+                    as="p"
+                    variant="body-01"
+                    className="mt-1 flex-1 text-gray-600 dark:text-gray-300"
+                  >
+                    {option.description}
+                  </Text>
+                </div>
+              </ClickableTile>
+            );
+          })}
+        </div>
+      </ModalBody>
+    </Modal>
+  );
+}
 
 const providerLabels: Record<string, string> = {
   openai: 'OpenAI',
@@ -613,25 +768,73 @@ function getDeploymentStatus(
   return deployment.getStatus() || 'unknown';
 }
 
-function AudioProviderTag({
-  provider,
-  icon,
-}: {
-  provider?: string;
-  icon: ReactNode;
-}) {
-  const key = provider?.toLowerCase() || '';
-  const label =
-    key && key !== '—'
-      ? providerLabels[key] || provider || 'Unknown'
-      : 'Unavailable';
+function getGeneralDeploymentDetails(deployment: SupportedDeployment) {
+  return {
+    assistantId: deployment.getAssistantid() || NOT_AVAILABLE,
+    lastUpdated: deployment.getUpdateddate()
+      ? toHumanReadableDateTime(deployment.getUpdateddate()!)
+      : NOT_AVAILABLE,
+    maxSessionDuration: deployment.getMaxsessionduration() || NOT_AVAILABLE,
+    idleTimeout: deployment.getIdealtimeout() || NOT_AVAILABLE,
+    greetingInterruptible: deployment.hasGreetinginterruptible()
+      ? deployment.getGreetinginterruptible()
+        ? 'Yes'
+        : 'No'
+      : NOT_AVAILABLE,
+    unclearInputTimeout: deployment.hasUnclearinputtimeout()
+      ? `${deployment.getUnclearinputtimeout()} seconds`
+      : NOT_AVAILABLE,
+  };
+}
 
+function getAudioProviderLabel(provider?: string) {
+  const key = provider?.toLowerCase() || '';
+  return key && key !== NOT_AVAILABLE.toLowerCase()
+    ? providerLabels[key] || provider || 'Unknown'
+    : NOT_AVAILABLE;
+}
+
+function getDeploymentHeaderClassName(key: string) {
+  const classNames: Record<string, string> = {
+    name: 'min-w-52',
+    version: 'min-w-64',
+    sttProvider: 'min-w-44',
+    ttsProvider: 'min-w-44',
+    status: 'w-32 min-w-32',
+    created: 'min-w-52',
+    actions: 'w-20 min-w-20',
+  };
+  return classNames[key];
+}
+
+function DeploymentDetail({
+  label,
+  value,
+  helpText,
+}: {
+  label: string;
+  value: string;
+  helpText?: string;
+}) {
   return (
-    <Tag size="sm" type="cool-gray">
-      <span className="flex items-center gap-1.5 leading-none">
-        {icon}
-        {label}
-      </span>
-    </Tag>
+    <div>
+      <Text
+        as="dt"
+        variant="label-01"
+        className="text-[var(--cds-text-secondary)]"
+      >
+        <span className="inline-flex items-center gap-1">
+          {label}
+          <HelpToggletip label={label} helpText={helpText} />
+        </span>
+      </Text>
+      <Text
+        as="dd"
+        variant="body-01"
+        className="mt-1 text-[var(--cds-text-primary)]"
+      >
+        {value || NOT_AVAILABLE}
+      </Text>
+    </div>
   );
 }

@@ -165,6 +165,16 @@ async function expandDashboardForScreenshot(page) {
 }
 
 async function checkA11y(page, journey) {
+  await page.evaluate(async () => {
+    const finiteAnimations = document
+      .getAnimations()
+      .filter(animation =>
+        Number.isFinite(animation.effect?.getComputedTiming().endTime),
+      );
+    await Promise.all(
+      finiteAnimations.map(animation => animation.finished.catch(() => {})),
+    );
+  });
   await page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
   const results = await page.evaluate(async () =>
     window.axe.run(document, {

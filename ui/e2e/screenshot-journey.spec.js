@@ -7,9 +7,9 @@ const {
   screenshotBaselinePath,
   test,
 } = require('./fixtures');
-const { journeysWithCheck } = require('./route-manifest');
+const { genericScreenshotJourneys } = require('./route-manifest');
 
-for (const journey of journeysWithCheck('screenshot')) {
+for (const journey of genericScreenshotJourneys) {
   for (const colorMode of COLOR_MODES) {
     test(`${journey.id} matches screenshot journey in ${colorMode} mode`, async ({
       page,

@@ -336,7 +336,7 @@ describe('PreviewVoiceAgentV2', () => {
       name: 'Conversation toolbar',
     });
     expect(toolbar).toBeInTheDocument();
-    expect(toolbar).toHaveClass('h-12');
+    expect(toolbar).toHaveClass('h-12!');
     expect(within(toolbar).getAllByRole('button')[0]).toHaveAccessibleName(
       'Back to assistant',
     );
@@ -788,10 +788,13 @@ describe('PreviewVoiceAgentV2', () => {
       });
     });
 
+    const streamingResponseId =
+      mockAddMessageChunk.mock.calls[0][0].streaming_metadata.response_id;
+    expect(streamingResponseId).toMatch(/^assistant-response-/);
     expect(mockAddMessageChunk).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        streaming_metadata: { response_id: 'markdown-response' },
+        streaming_metadata: { response_id: streamingResponseId },
         partial_item: expect.objectContaining({
           response_type: 'text',
           text: '**Delivery',
@@ -807,6 +810,7 @@ describe('PreviewVoiceAgentV2', () => {
     expect(mockAddMessageChunk).toHaveBeenLastCalledWith(
       expect.objectContaining({
         final_response: expect.objectContaining({
+          id: streamingResponseId,
           request_id: 'request-1',
           output: {
             generic: [expect.objectContaining({ text: '**Delivery Friday**' })],
@@ -815,6 +819,70 @@ describe('PreviewVoiceAgentV2', () => {
       }),
     );
     expect(mockAddMessage).not.toHaveBeenCalled();
+  });
+
+  it('preserves multiple assistant messages emitted for one runtime message id', async () => {
+    render(
+      <MemoryRouter initialEntries={['/preview/v2/chat/assistant-123']}>
+        <Routes>
+          <Route
+            path="/preview/v2/chat/:assistantId"
+            element={<PreviewVoiceAgentV2 />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
+    const chatInstance = {
+      messaging: { addMessage: mockAddMessage },
+      send: mockSend,
+    };
+    await mockCarbonChatProps.messaging.customLoadHistory(chatInstance);
+    await mockCarbonChatProps.messaging.customSendMessage(
+      {
+        id: 'request-1',
+        input: { message_type: 'text', text: 'Give me both updates' },
+      },
+      { signal: new AbortController().signal, silent: false },
+      chatInstance,
+    );
+
+    mockVoiceAgent.messages = [
+      {
+        id: 'shared-response-id',
+        role: 'system',
+        messages: ['First update.'],
+      },
+    ];
+    await act(async () => {
+      mockAgentCallback.onAssistantMessage?.({
+        id: 'shared-response-id',
+        messageText: 'First update.',
+        completed: true,
+      });
+    });
+
+    mockVoiceAgent.messages.push({
+      id: 'shared-response-id',
+      role: 'system',
+      messages: ['Second update.'],
+    });
+    await act(async () => {
+      mockAgentCallback.onAssistantMessage?.({
+        id: 'shared-response-id',
+        messageText: 'Second update.',
+        completed: true,
+      });
+    });
+
+    const firstMessage = mockAddMessage.mock.calls[0][0];
+    const secondMessage = mockAddMessage.mock.calls[1][0];
+    expect(firstMessage.output.generic[0].text).toBe('First update.');
+    expect(secondMessage.output.generic[0].text).toBe('Second update.');
+    expect(secondMessage.id).not.toBe(firstMessage.id);
+    expect(firstMessage.request_id).toBe('request-1');
+    expect(secondMessage.request_id).toBe('request-1');
   });
 
   it('does not show voice connecting for a text transport connection', async () => {
@@ -1291,6 +1359,56 @@ describe('PreviewVoiceAgentV2', () => {
     ).toBeInTheDocument();
     expect(mockCarbonChatProps.input.isVisible).toBe(true);
     expect(screen.queryByText('Listening')).not.toBeInTheDocument();
+  });
+
+  it('shows listening after adding voice to an existing text session', async () => {
+    const user = userEvent.setup({
+      pointerEventsCheck: PointerEventsCheckLevel.Never,
+      skipHover: true,
+    });
+    mockSetInputChannel.mockImplementation(async channel => {
+      mockVoiceAgent.agentConfiguration.inputOptions.channel = channel;
+      mockVoiceAgent.agentConfiguration.outputOptions.channel = channel;
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/preview/v2/chat/assistant-123']}>
+        <Routes>
+          <Route
+            path="/preview/v2/chat/:assistantId"
+            element={<PreviewVoiceAgentV2 />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
+    const chatInstance = {
+      messaging: { addMessage: mockAddMessage },
+      send: mockSend,
+    };
+    await mockCarbonChatProps.messaging.customLoadHistory(chatInstance);
+    await mockCarbonChatProps.messaging.customSendMessage(
+      {
+        id: 'text-request',
+        input: { message_type: 'text', text: 'Start with text' },
+      },
+      { signal: new AbortController().signal, silent: false },
+      chatInstance,
+    );
+    expect(mockVoiceAgent.isConnected).toBe(true);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Start voice conversation' }),
+    );
+
+    expect(await screen.findByText('Listening')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Cancel voice connection' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'End voice conversation' }),
+    ).toBeInTheDocument();
   });
 
   it('returns to text mode when voice connection setup emits an error', async () => {

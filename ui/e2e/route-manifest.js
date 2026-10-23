@@ -114,6 +114,7 @@ const routeJourneys = [
     auth: true,
     expectText: 'Assistants',
     checks: ['smoke', 'a11y', 'screenshot'],
+    screenshotOwner: 'focused',
   },
   {
     id: 'deployment.root',
@@ -171,6 +172,7 @@ const routeJourneys = [
     expectText: 'Assistant activity',
     readyText: '1,284',
     checks: ['smoke', 'a11y', 'screenshot'],
+    screenshotOwner: 'focused',
   },
   {
     id: 'deployment.assistantPlaygroundChat',
@@ -179,6 +181,7 @@ const routeJourneys = [
     expectText: 'Support bot',
     readyText: 'Hello! How can I help you today?',
     checks: ['smoke', 'a11y', 'screenshot'],
+    screenshotOwner: 'focused',
   },
   {
     id: 'deployment.assistantPlaygroundPhone',
@@ -187,6 +190,7 @@ const routeJourneys = [
     expectText: 'Debug Phone Call',
     readyText: 'Start Call',
     checks: ['smoke', 'a11y', 'screenshot'],
+    screenshotOwner: 'focused',
   },
   {
     id: 'deployment.assistantSessions',
@@ -195,6 +199,7 @@ const routeJourneys = [
     expectText: 'customer@example.test',
     readyText: '2301664620831572101',
     checks: ['smoke', 'a11y', 'screenshot'],
+    screenshotOwner: 'focused',
   },
   {
     id: 'deployment.assistantSessionDetail',
@@ -216,7 +221,7 @@ const routeJourneys = [
     id: 'deployment.assistantSettings',
     path: '/deployment/assistant/2301664620831571968/edit-assistant',
     auth: true,
-    expectText: 'General Settings',
+    expectText: 'General settings',
     readyText: 'Support bot',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
@@ -225,8 +230,9 @@ const routeJourneys = [
     path: '/deployment/assistant/2301664620831571968/deployment',
     auth: true,
     expectText: 'Deployments',
-    readyText: 'No deployments found',
+    readyText: 'Choose how you want to test or deliver your assistant.',
     checks: ['smoke', 'a11y', 'screenshot'],
+    screenshotOwner: 'focused',
   },
   {
     id: 'deployment.assistantTools',
@@ -851,7 +857,14 @@ const sourceRouteInventory = {
 const journeysWithCheck = check =>
   routeJourneys.filter(journey => journey.checks.includes(check));
 
+const genericScreenshotJourneys = routeJourneys.filter(
+  journey =>
+    journey.checks.includes('screenshot') &&
+    journey.screenshotOwner !== 'focused',
+);
+
 module.exports = {
+  genericScreenshotJourneys,
   routeRoots,
   routeJourneys,
   sourceRouteInventory,

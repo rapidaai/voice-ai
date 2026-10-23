@@ -1,8 +1,8 @@
 import {
+  type ComponentType,
   type ComponentProps,
   type ChangeEvent as ReactChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -51,7 +51,10 @@ import {
   FluidNumberInput,
   FluidTextArea,
   FluidTextInput,
-  IconButton as CarbonIconButton,
+  Header,
+  HeaderGlobalAction,
+  HeaderGlobalBar,
+  HeaderName,
   InlineLoading,
   InlineNotification,
   Layer,
@@ -68,6 +71,7 @@ import {
   CopyButton,
   IconOnlyButton,
   PrimaryButton,
+  Text,
 } from '@/app/components/ui/primitives';
 import { ConfirmDialog } from '@/app/components/dialogs/shared';
 import { createVoiceAgentDebuggerConnection } from '@/clients/runtime.client';
@@ -80,6 +84,9 @@ import { PreviewAgentHeader } from './preview-agent-header';
 const Toggletip =
   (CarbonToggletip as unknown as { default?: typeof CarbonToggletip })
     .default ?? CarbonToggletip;
+const ConversationHeader = Header as ComponentType<
+  ComponentProps<typeof Header> & { role?: string }
+>;
 
 type VoicePhase = 'idle' | 'connecting' | 'listening';
 
@@ -108,6 +115,7 @@ type PromptVariable = {
 };
 
 type ActiveAssistantStream = {
+  responseId: string;
   itemId: string;
   requestId?: string;
   text: string;
@@ -266,12 +274,16 @@ function PreviewVoiceAgentV2Workspace({
   const panelTriggerRef = useRef<HTMLButtonElement | null>(null);
   const chatInstanceRef = useRef<ChatInstance | null>(null);
   const pendingRequestIdsRef = useRef<string[]>([]);
+  const assistantRequestIdsRef = useRef<Map<string, string | undefined>>(
+    new Map(),
+  );
   const activeAssistantStreamsRef = useRef<Map<string, ActiveAssistantStream>>(
     new Map(),
   );
   const voiceTranscriptIdRef = useRef<string>();
   const pendingVoiceConnectionRef = useRef<Promise<void> | null>(null);
   const runtimeResetRef = useRef<Promise<void> | null>(null);
+  const isRuntimeResettingRef = useRef(false);
   const isVoiceRequestedRef = useRef(false);
   const argumentsRequireReconnectRef = useRef(false);
   const responseSequence = useRef(0);
@@ -415,6 +427,7 @@ function PreviewVoiceAgentV2Workspace({
     if (runtimeResetRef.current) return runtimeResetRef.current;
 
     const pendingVoiceConnection = pendingVoiceConnectionRef.current;
+    isRuntimeResettingRef.current = true;
     const reset = (async () => {
       try {
         try {
@@ -432,7 +445,10 @@ function PreviewVoiceAgentV2Workspace({
     })();
     runtimeResetRef.current = reset;
     const clearReset = () => {
-      if (runtimeResetRef.current === reset) runtimeResetRef.current = null;
+      if (runtimeResetRef.current === reset) {
+        runtimeResetRef.current = null;
+        isRuntimeResettingRef.current = false;
+      }
     };
     reset.then(clearReset, clearReset);
     return reset;
@@ -472,11 +488,11 @@ function PreviewVoiceAgentV2Workspace({
     if (!instance) return;
 
     await Promise.all(
-      streams.map(([responseId, stream]) =>
+      streams.map(([, stream]) =>
         instance.messaging.addMessageChunk({
-          streaming_metadata: { response_id: responseId },
+          streaming_metadata: { response_id: stream.responseId },
           final_response: {
-            id: responseId,
+            id: stream.responseId,
             request_id: stream.requestId,
             output: {
               generic: [
@@ -497,16 +513,22 @@ function PreviewVoiceAgentV2Workspace({
   }, []);
 
   const disconnectChatSession = useCallback(async () => {
+    isVoiceRequestedRef.current = false;
+    voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
+    voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
     setIsSessionConnected(false);
+    setVoicePhase('idle');
+    setIsVoiceMuted(false);
     setRuntimeError('');
     pendingRequestIdsRef.current = [];
+    assistantRequestIdsRef.current.clear();
     try {
       await stopAssistantStreams();
       await resetRuntime();
     } catch (error) {
       handleRuntimeError(error);
     }
-  }, [handleRuntimeError, resetRuntime, stopAssistantStreams]);
+  }, [handleRuntimeError, resetRuntime, stopAssistantStreams, voiceAgent]);
 
   useEffect(() => {
     const panelMediaQuery = window.matchMedia('(max-width: 1055px)');
@@ -594,7 +616,11 @@ function PreviewVoiceAgentV2Workspace({
       if (state === 'connected') {
         setIsSessionConnected(true);
       } else if (state === 'disconnected') {
+        if (!isRuntimeResettingRef.current) {
+          isVoiceRequestedRef.current = false;
+        }
         pendingRequestIdsRef.current = [];
+        assistantRequestIdsRef.current.clear();
         setIsSessionConnected(false);
         setVoicePhase('idle');
         setIsVoiceMuted(false);
@@ -605,6 +631,7 @@ function PreviewVoiceAgentV2Workspace({
       if (!isActive) return;
       isVoiceRequestedRef.current = false;
       pendingRequestIdsRef.current = [];
+      assistantRequestIdsRef.current.clear();
       setIsSessionConnected(false);
       voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
       voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
@@ -622,25 +649,36 @@ function PreviewVoiceAgentV2Workspace({
         const instance = chatInstanceRef.current;
         if (!instance) return;
 
-        const responseId =
-          message.id || `assistant-response-${++responseSequence.current}`;
+        const runtimeResponseId =
+          message.id || `runtime-response-${++responseSequence.current}`;
+        const getRequestId = () => {
+          if (!assistantRequestIdsRef.current.has(runtimeResponseId)) {
+            assistantRequestIdsRef.current.set(
+              runtimeResponseId,
+              pendingRequestIdsRef.current.shift(),
+            );
+          }
+          return assistantRequestIdsRef.current.get(runtimeResponseId);
+        };
         if (message.completed === false) {
           const chunkText = message.messageText || '';
           if (!chunkText) return;
 
-          let stream = activeAssistantStreamsRef.current.get(responseId);
+          let stream = activeAssistantStreamsRef.current.get(runtimeResponseId);
           if (!stream) {
+            const responseId = `assistant-response-${++responseSequence.current}`;
             stream = {
+              responseId,
               itemId: `${responseId}-text`,
-              requestId: pendingRequestIdsRef.current.shift(),
+              requestId: getRequestId(),
               text: '',
             };
-            activeAssistantStreamsRef.current.set(responseId, stream);
+            activeAssistantStreamsRef.current.set(runtimeResponseId, stream);
           }
           stream.text += chunkText;
           void instance.messaging
             .addMessageChunk({
-              streaming_metadata: { response_id: responseId },
+              streaming_metadata: { response_id: stream.responseId },
               partial_item: {
                 response_type: MessageResponseTypes.TEXT,
                 text: chunkText,
@@ -651,25 +689,33 @@ function PreviewVoiceAgentV2Workspace({
           return;
         }
 
-        const storedMessage = voiceAgent.messages.find(
-          current => current.id === message.id && current.role === 'system',
-        );
-        const stream = activeAssistantStreamsRef.current.get(responseId);
-        const text =
-          storedMessage?.messages.join('') ||
-          stream?.text ||
-          message.messageText?.trim();
+        const storedMessage = [...voiceAgent.messages]
+          .reverse()
+          .find(
+            current => current.id === message.id && current.role === 'system',
+          );
+        const stream = activeAssistantStreamsRef.current.get(runtimeResponseId);
+        const completedText = message.messageText?.trim() || '';
+        const storedText = storedMessage?.messages.join('') || '';
+        const text = stream
+          ? !completedText
+            ? storedText || stream.text
+            : completedText.startsWith(stream.text)
+              ? completedText
+              : stream.text.endsWith(completedText)
+                ? stream.text
+                : `${stream.text}${completedText}`
+          : completedText || storedText;
         if (!text) return;
 
-        const requestId =
-          stream?.requestId ?? pendingRequestIdsRef.current.shift();
+        const requestId = stream?.requestId ?? getRequestId();
         if (stream) {
-          activeAssistantStreamsRef.current.delete(responseId);
+          activeAssistantStreamsRef.current.delete(runtimeResponseId);
           void instance.messaging
             .addMessageChunk({
-              streaming_metadata: { response_id: responseId },
+              streaming_metadata: { response_id: stream.responseId },
               final_response: {
-                id: responseId,
+                id: stream.responseId,
                 request_id: requestId,
                 output: {
                   generic: [
@@ -686,6 +732,7 @@ function PreviewVoiceAgentV2Workspace({
           return;
         }
 
+        const responseId = `assistant-response-${++responseSequence.current}`;
         void instance.messaging
           .addMessage({
             id: responseId,
@@ -736,8 +783,14 @@ function PreviewVoiceAgentV2Workspace({
       },
       onConversationError: error => {
         if (isActive) {
+          isVoiceRequestedRef.current = false;
           pendingRequestIdsRef.current = [];
+          assistantRequestIdsRef.current.clear();
           setIsSessionConnected(false);
+          voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
+          voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
+          setVoicePhase('idle');
+          setIsVoiceMuted(false);
           setRuntimeError(error.message || 'Voice session failed.');
           void stopAssistantStreams().catch(handleRuntimeError);
         }
@@ -755,6 +808,7 @@ function PreviewVoiceAgentV2Workspace({
     () => () => {
       chatInstanceRef.current = null;
       isVoiceRequestedRef.current = false;
+      assistantRequestIdsRef.current.clear();
       voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
       voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
       void resetRuntime();
@@ -831,17 +885,13 @@ function PreviewVoiceAgentV2Workspace({
     window.requestAnimationFrame(() => panelTriggerRef.current?.focus());
   }, []);
 
-  const toggleConfiguration = useCallback(
-    (event: ReactMouseEvent<HTMLButtonElement>) => {
-      panelTriggerRef.current = event.currentTarget;
-      if (isConfigurationOpen) {
-        closePanel();
-        return;
-      }
-      setIsConfigurationOpen(true);
-    },
-    [closePanel, isConfigurationOpen],
-  );
+  const toggleConfiguration = useCallback(() => {
+    if (isConfigurationOpen) {
+      closePanel();
+      return;
+    }
+    setIsConfigurationOpen(true);
+  }, [closePanel, isConfigurationOpen]);
 
   useEffect(() => {
     if (!isConfigurationOpen || !isOverlayPanel) return;
@@ -880,6 +930,13 @@ function PreviewVoiceAgentV2Workspace({
       pendingConnection = voiceAgent.setInputChannel(Channel.Audio);
       pendingVoiceConnectionRef.current = pendingConnection;
       await pendingConnection;
+      if (
+        isVoiceRequestedRef.current &&
+        voiceAgent.agentConfiguration.inputOptions.channel === Channel.Audio
+      ) {
+        setIsSessionConnected(true);
+        setVoicePhase('listening');
+      }
     } catch (error) {
       if (isVoiceRequestedRef.current) {
         isVoiceRequestedRef.current = false;
@@ -963,43 +1020,63 @@ function PreviewVoiceAgentV2Workspace({
   const chatSlots = useMemo(
     () => ({
       [WriteableElementName.CUSTOM_HEADER]: (
-        <div
+        <ConversationHeader
           role="toolbar"
           aria-label="Conversation toolbar"
-          className="flex h-12 w-full items-center border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)]"
+          className="relative! inset-auto! z-auto! h-12! min-h-12! w-full! shrink-0 border-b! border-border-subtle! bg-[var(--cds-background)]! p-0!"
         >
           {!embedded ? (
-            <IconOnlyButton
-              kind="ghost"
-              size="md"
-              renderIcon={ArrowLeft}
-              iconDescription="Back to assistant"
-              className="!h-12 !w-12 shrink-0"
+            <HeaderGlobalAction
+              aria-label="Back to assistant"
+              tooltipAlignment="start"
               onClick={() =>
                 navigate(`/deployment/assistant/${assistantId}/overview`)
               }
-            />
+            >
+              <ArrowLeft size={16} />
+            </HeaderGlobalAction>
           ) : null}
-          <h1 className="min-w-0 flex-1 truncate px-1 text-sm font-semibold text-[var(--cds-text-primary)]">
-            {assistantName}
-          </h1>
-          <CarbonIconButton
-            label="Configuration"
-            kind="ghost"
-            size="md"
-            aria-controls="debugger-details-panel"
-            aria-expanded={isConfigurationOpen}
-            aria-pressed={isConfigurationOpen}
-            className={cn(
-              '!h-12 !w-12 shrink-0 !border-b-2 !border-b-transparent',
-              isConfigurationOpen &&
-                '!border-b-[var(--cds-border-interactive)] !bg-[var(--cds-layer-selected-01)]',
-            )}
-            onClick={toggleConfiguration}
+          <HeaderName
+            href={
+              embedded
+                ? `/deployment/assistant/${assistantId}/playground/chat`
+                : `/preview/v2/chat/${assistantId}`
+            }
+            prefix=""
+            className="h-full min-w-0"
           >
-            <Model size={16} />
-          </CarbonIconButton>
-        </div>
+            <span
+              role="heading"
+              aria-level={1}
+              className="block min-w-0 truncate"
+            >
+              <Text as="span" variant="heading-compact-01">
+                {assistantName}
+              </Text>
+            </span>
+          </HeaderName>
+          <HeaderGlobalBar
+            aria-label="Chat debugger header actions"
+            className="h-full items-center"
+          >
+            <HeaderGlobalAction
+              ref={panelTriggerRef}
+              aria-label="Configuration"
+              tooltipAlignment="end"
+              aria-controls="debugger-details-panel"
+              aria-expanded={isConfigurationOpen}
+              aria-pressed={isConfigurationOpen}
+              className={cn(
+                'h-12! w-12! shrink-0 border-b-2! border-b-transparent!',
+                isConfigurationOpen &&
+                  'border-b-[var(--cds-border-interactive)]! bg-[var(--cds-layer-selected-01)]!',
+              )}
+              onClick={toggleConfiguration}
+            >
+              <Model size={16} />
+            </HeaderGlobalAction>
+          </HeaderGlobalBar>
+        </ConversationHeader>
       ),
       [WriteableElementName.BEFORE_INPUT_ELEMENT]:
         voicePhase === 'idle' ? null : (

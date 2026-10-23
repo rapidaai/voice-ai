@@ -2,7 +2,7 @@ import React, { FC, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { toHumanReadableDateTime } from '@/utils/date';
-import { Add, ObjectStorage, Renew } from '@carbon/icons-react';
+import { ObjectStorage } from '@carbon/icons-react';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useRapidaStore } from '@/stores/app';
 import { SectionLoader } from '@/app/components/ui/feedback';
@@ -12,11 +12,8 @@ import { CreateAssistantStorage } from './create-assistant-storage';
 import { UpdateAssistantStorage } from './update-assistant-storage';
 import { useAssistantStoragePageStore } from '@/stores/assistant/actions';
 import { STORAGE_PROVIDER } from '@/providers';
-import { IconOnlyButton, PrimaryButton } from '@/app/components/ui/primitives';
 import { RecordStatusIndicator } from '@/app/components/ui/feedback';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
   Button,
   ComposedModal,
   ModalBody,
@@ -30,9 +27,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableToolbar,
-  TableToolbarContent,
-  TableToolbarSearch,
   Tag,
 } from '@carbon/react';
 import { AssistantConfiguration, Metadata } from '@rapidaai/react';
@@ -41,6 +35,7 @@ import {
   ScrollableTableSection,
   TableSection,
 } from '@/app/components/layout/sections/table-section';
+import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
 
 export function ConfigureAssistantStoragePage() {
   const { assistantId } = useParams();
@@ -98,7 +93,6 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
   const action = useAssistantStoragePageStore();
   const { authId, token, projectId } = useCurrentCredential();
   const { loading, showLoader, hideLoader } = useRapidaStore();
-  const [searchTerm, setSearchTerm] = useState('');
   const [pendingStorageAction, setPendingStorageAction] =
     useState<StorageAction | null>(null);
 
@@ -169,20 +163,6 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
     );
   };
 
-  const filteredStorages = searchTerm.trim()
-    ? action.storages.filter(row =>
-        [
-          providerNameByCode.get(row.getProvider()) || row.getProvider(),
-          row.getConfigurationtype(),
-          getStorageTarget(row),
-          row.getEnabled() ? 'enabled' : 'disabled',
-        ]
-          .join(' ')
-          .toLowerCase()
-          .includes(searchTerm.trim().toLowerCase()),
-      )
-    : action.storages;
-
   const modalTitle =
     pendingStorageAction?.kind === 'enable'
       ? 'Enable storage?'
@@ -252,44 +232,19 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
         </ModalFooter>
       </ComposedModal>
 
-      <div className="px-4 pt-4 pb-6 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <div>
-          <Breadcrumb noTrailingSlash className="mb-2">
-            <BreadcrumbItem
-              href={`/deployment/assistant/${assistantId}/overview`}
-            >
-              Assistant
-            </BreadcrumbItem>
-          </Breadcrumb>
-          <h1 className="text-2xl font-light tracking-tight">Storage</h1>
-        </div>
-      </div>
-
-      <TableToolbar>
-        <TableToolbarContent>
-          <TableToolbarSearch
-            placeholder="Search storage..."
-            onChange={(e: any) => setSearchTerm(e.target?.value || '')}
-          />
-          <IconOnlyButton
-            kind="ghost"
-            size="lg"
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            onClick={get}
-          />
-          <PrimaryButton
-            size="md"
-            renderIcon={Add}
-            onClick={() => navigation.goToCreateAssistantStorage(assistantId)}
-          >
-            Create new storage
-          </PrimaryButton>
-        </TableToolbarContent>
-      </TableToolbar>
+      <AssistantSettingsShellHeader
+        title="Storage"
+        href={`/deployment/assistant/${assistantId}/configure-storage`}
+        onReload={get}
+        reloadLabel="Reload storage"
+        primaryAction={{
+          label: 'Create new storage',
+          onClick: () => navigation.goToCreateAssistantStorage(assistantId),
+        }}
+      />
 
       <TableSection>
-        {action.storages.length > 0 && filteredStorages.length > 0 ? (
+        {action.storages.length > 0 ? (
           <>
             <ScrollableTableSection>
               <Table className="min-w-max">
@@ -304,7 +259,7 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filteredStorages.map(row => {
+                  {action.storages.map(row => {
                     const provider = row.getProvider();
                     const providerName =
                       providerNameByCode.get(provider) || provider;
@@ -391,13 +346,6 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
               }}
             />
           </>
-        ) : action.storages.length > 0 ? (
-          <EmptyState
-            className="w-full"
-            icon={ObjectStorage}
-            title="No storage found"
-            subtitle="No storage configuration matched your search."
-          />
         ) : (
           <EmptyState
             className="w-full"

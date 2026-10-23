@@ -26,7 +26,7 @@ test('populated assistant journeys expose overview, sessions, versions, and sett
 
   await page.getByRole('link', { name: 'General', exact: true }).click();
   await expect(
-    page.getByRole('heading', { name: 'General Settings' }),
+    page.getByRole('heading', { name: 'General settings' }),
   ).toBeVisible();
 });
 
@@ -78,7 +78,7 @@ test('assistant transport failure renders the full unavailable state', async ({
     page.getByRole('heading', { name: 'Assistant not available' }),
   ).toBeVisible();
   await expect(
-    page.getByRole('button', { name: 'Go to listing' }),
+    page.getByRole('button', { name: 'Back to assistants' }),
   ).toBeVisible();
   await expect(page.getByText('Assistant activity')).toHaveCount(0);
 });

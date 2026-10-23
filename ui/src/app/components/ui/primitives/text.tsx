@@ -69,7 +69,19 @@ export interface CarbonTextProps {
   /** Semantic type style shared across product surfaces. */
   variant?: TypographyVariant;
   /** Render as a specific HTML element. Default: span. */
-  as?: 'span' | 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'div' | 'label';
+  as?:
+    | 'span'
+    | 'p'
+    | 'h1'
+    | 'h2'
+    | 'h3'
+    | 'h4'
+    | 'h5'
+    | 'h6'
+    | 'div'
+    | 'label'
+    | 'dt'
+    | 'dd';
 }
 
 /** Carbon Text: renders children or a SkeletonText placeholder when loading. */

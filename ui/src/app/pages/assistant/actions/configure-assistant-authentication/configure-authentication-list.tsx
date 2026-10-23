@@ -1,30 +1,25 @@
 import { FC, useEffect, useMemo, useState } from 'react';
 import { AssistantConfiguration } from '@rapidaai/react';
 import {
-  Breadcrumb,
   Button as CarbonButton,
   ModalBody,
   ModalFooter,
   ModalHeader,
   ComposedModal,
-  BreadcrumbItem,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-  TableToolbar,
-  TableToolbarContent,
   OverflowMenu,
   OverflowMenuItem,
 } from '@carbon/react';
-import { Renew, Add } from '@carbon/icons-react';
+import { Add } from '@carbon/icons-react';
 import toast from 'react-hot-toast/headless';
 
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
-import { PrimaryButton, IconOnlyButton } from '@/app/components/ui/primitives';
 import { UrlTableCell } from '@/app/components/ui/table';
 import { SectionLoader } from '@/app/components/ui/feedback';
 import { TableSection } from '@/app/components/layout/sections/table-section';
@@ -42,6 +37,7 @@ import {
   listAssistantConfigurations,
   updateAssistantConfigurationEnabled,
 } from '@/clients/assistant.client';
+import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
 
 const authenticationConfigurationType = 'authentication';
 
@@ -246,37 +242,16 @@ export const ConfigureAuthenticationList: FC<
           </CarbonButton>
         </ModalFooter>
       </ComposedModal>
-      <div className="px-4 pt-4 pb-6 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <div>
-          <Breadcrumb noTrailingSlash className="mb-2">
-            <BreadcrumbItem
-              href={`/deployment/assistant/${assistantId}/overview`}
-            >
-              Assistant
-            </BreadcrumbItem>
-          </Breadcrumb>
-          <h1 className="text-2xl font-light tracking-tight">Authentication</h1>
-        </div>
-      </div>
-
-      <TableToolbar>
-        <TableToolbarContent>
-          <IconOnlyButton
-            kind="ghost"
-            size="lg"
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            onClick={load}
-          />
-          <PrimaryButton
-            size="md"
-            renderIcon={Add}
-            onClick={() => navigator.goTo(configureRoute)}
-          >
-            Configure authentication
-          </PrimaryButton>
-        </TableToolbarContent>
-      </TableToolbar>
+      <AssistantSettingsShellHeader
+        title="Authentication"
+        href={`/deployment/assistant/${assistantId}/configure-authentication`}
+        onReload={load}
+        reloadLabel="Reload authentication"
+        primaryAction={{
+          label: 'Configure authentication',
+          onClick: () => navigator.goTo(configureRoute),
+        }}
+      />
 
       <TableSection>
         {authentication ? (

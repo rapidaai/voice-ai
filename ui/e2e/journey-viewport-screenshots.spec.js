@@ -6,7 +6,7 @@ const {
   setColorMode,
   test,
 } = require('./fixtures');
-const { routeJourneys } = require('./route-manifest');
+const { genericScreenshotJourneys } = require('./route-manifest');
 
 const emptyJourneyIds = new Set([
   'deployment.endpoint',
@@ -16,7 +16,6 @@ const emptyJourneyIds = new Set([
   'logs.traces',
   'organization.users',
   'organization.projects',
-  'deployment.assistantDeployments',
   'deployment.assistantTools',
   'deployment.assistantWebhooks',
   'deployment.assistantAuthentication',
@@ -25,9 +24,8 @@ const emptyJourneyIds = new Set([
   'deployment.assistantAnalysis',
 ]);
 
-const screenshotJourneys = routeJourneys.filter(
-  journey =>
-    journey.id !== 'dashboard.home' && journey.checks.includes('screenshot'),
+const screenshotJourneys = genericScreenshotJourneys.filter(
+  journey => journey.id !== 'dashboard.home',
 );
 
 const slug = value =>

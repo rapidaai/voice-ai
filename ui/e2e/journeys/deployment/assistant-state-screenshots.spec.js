@@ -13,11 +13,13 @@ const {
   EMPTY_ASSISTANT_LIST_RESPONSE,
   buildConversationListResponse,
   fulfillGrpcWeb,
+  mockPopulatedAssistantDeployments,
 } = require('../../mocks/clients/assistant');
 
 const assistantPath = '/deployment/assistant';
 const overviewPath = '/deployment/assistant/2301664620831571968/overview';
 const sessionsPath = '/deployment/assistant/2301664620831571968/sessions';
+const deploymentsPath = '/deployment/assistant/2301664620831571968/deployment';
 
 const scenarios = [
   {
@@ -83,10 +85,45 @@ const scenarios = [
     path: overviewPath,
     setup: page =>
       page.route(ASSISTANT_DETAIL_PATH, route => route.abort('failed')),
-    assert: page =>
-      expect(
+    assert: async page => {
+      await expect(
         page.getByRole('heading', { name: 'Assistant not available' }),
-      ).toBeVisible(),
+      ).toBeVisible();
+      await expect(page.getByText('403', { exact: true })).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Back to assistants' }),
+      ).toBeVisible();
+    },
+  },
+  {
+    feature: 'deployments',
+    state: 'empty',
+    path: deploymentsPath,
+    setup: async () => {},
+    assert: async page => {
+      await expect(
+        page.getByRole('heading', { name: 'Deployment', exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByText(
+          'Choose how you want to test or deliver your assistant.',
+          { exact: true },
+        ),
+      ).toBeVisible();
+    },
+  },
+  {
+    feature: 'deployments',
+    state: 'populated',
+    path: deploymentsPath,
+    setup: page => mockPopulatedAssistantDeployments(page),
+    assert: async page => {
+      await expect(page.getByText('vrsn_2301664620831573001')).toBeVisible();
+      await expect(page.getByText('vrsn_2301664620831573002')).toBeVisible();
+      await expect(page.getByText('vrsn_2301664620831573003')).toBeVisible();
+      await expect(page.getByText('vrsn_2301664620831573004')).toBeVisible();
+      await expect(page.getByText('No deployments found')).toHaveCount(0);
+    },
   },
   {
     feature: 'sessions',

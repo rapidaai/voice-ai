@@ -2,7 +2,6 @@ import { Helmet } from '@/app/components/app-shell/helmet';
 import { useRapidaStore } from '@/stores/app';
 import { useCredential } from '@/hooks/use-credential';
 import { FC, HTMLAttributes, useEffect, useState } from 'react';
-import toast from 'react-hot-toast/headless';
 import { Outlet, useParams } from 'react-router-dom';
 import { cn } from '@/utils';
 import { useAssistantPageStore } from '@/stores/assistant/assistant.store';
@@ -59,15 +58,9 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
           }
 
           setUnknownState(true);
-          const error = epmr?.getError();
-          toast.error(
-            error?.getHumanmessage() ||
-              'Unable to get your assistant. please try again later.',
-          );
         })
         .catch(() => {
           setUnknownState(true);
-          toast.error('Unable to get your assistant. please try again later.');
           hideLoader();
         });
     }
@@ -88,7 +81,8 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
         <ErrorContainer
           onAction={goToAssistantListing}
           code="403"
-          actionLabel="Go to listing"
+          actionLabel="Back to assistants"
+          actionIcon={null}
           title="Assistant not available"
           description="This assistant may be archived or you don't have access to it. Please check with your administrator or try another assistant."
         />

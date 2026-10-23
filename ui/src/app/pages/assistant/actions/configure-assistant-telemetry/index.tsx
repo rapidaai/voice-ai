@@ -2,7 +2,7 @@ import React, { FC, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { toHumanReadableDateTime } from '@/utils/date';
-import { Activity, Edit, TrashCan, Add, Renew } from '@carbon/icons-react';
+import { Activity, Edit, TrashCan } from '@carbon/icons-react';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { SectionLoader } from '@/app/components/ui/feedback';
 import toast from 'react-hot-toast/headless';
@@ -11,11 +11,8 @@ import { CreateAssistantTelemetry } from './create-assistant-telemetry';
 import { UpdateAssistantTelemetry } from './update-assistant-telemetry';
 import { useAssistantTelemetryPageStore } from '@/stores/assistant/actions';
 import { TELEMETRY_PROVIDER } from '@/providers';
-import { IconOnlyButton, PrimaryButton } from '@/app/components/ui/primitives';
 import { CarbonShapeIndicator } from '@/app/components/ui/feedback';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
   Button,
   ComposedModal,
   ModalBody,
@@ -27,9 +24,6 @@ import {
   TableHeader,
   TableBody,
   TableCell,
-  TableToolbar,
-  TableToolbarContent,
-  TableToolbarSearch,
   OverflowMenu,
   OverflowMenuItem,
   Tag,
@@ -40,6 +34,7 @@ import {
   ScrollableTableSection,
   TableSection,
 } from '@/app/components/layout/sections/table-section';
+import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
 
 export function ConfigureAssistantTelemetryPage() {
   const { assistantId } = useParams();
@@ -87,7 +82,6 @@ const ConfigureAssistantTelemetry: FC<{ assistantId: string }> = ({
   const action = useAssistantTelemetryPageStore();
   const { authId, token, projectId } = useCurrentCredential();
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   const [pendingTelemetryAction, setPendingTelemetryAction] =
     useState<TelemetryAction | null>(null);
 
@@ -158,20 +152,6 @@ const ConfigureAssistantTelemetry: FC<{ assistantId: string }> = ({
     );
   };
 
-  const filteredTelemetries = searchTerm.trim()
-    ? action.telemetries.filter(row =>
-        [
-          providerNameByCode.get(row.getProvider()) || row.getProvider(),
-          row.getConfigurationtype(),
-          getTelemetryTarget(row),
-          row.getEnabled() ? 'enabled' : 'disabled',
-        ]
-          .join(' ')
-          .toLowerCase()
-          .includes(searchTerm.trim().toLowerCase()),
-      )
-    : action.telemetries;
-
   const modalTitle =
     pendingTelemetryAction?.kind === 'enable'
       ? 'Enable telemetry?'
@@ -233,49 +213,23 @@ const ConfigureAssistantTelemetry: FC<{ assistantId: string }> = ({
         </ModalFooter>
       </ComposedModal>
 
-      {/* Page header */}
-      <div className="px-4 pt-4 pb-6 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <div>
-          <Breadcrumb noTrailingSlash className="mb-2">
-            <BreadcrumbItem
-              href={`/deployment/assistant/${assistantId}/overview`}
-            >
-              Assistant
-            </BreadcrumbItem>
-          </Breadcrumb>
-          <h1 className="text-2xl font-light tracking-tight">Telemetry</h1>
-        </div>
-      </div>
-
-      <TableToolbar>
-        <TableToolbarContent>
-          <TableToolbarSearch
-            placeholder="Search telemetry..."
-            onChange={(e: any) => setSearchTerm(e.target?.value || '')}
-          />
-          <IconOnlyButton
-            kind="ghost"
-            size="lg"
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            onClick={get}
-          />
-          <PrimaryButton
-            size="md"
-            renderIcon={Add}
-            onClick={() => navigation.goToCreateAssistantTelemetry(assistantId)}
-          >
-            Add telemetry
-          </PrimaryButton>
-        </TableToolbarContent>
-      </TableToolbar>
+      <AssistantSettingsShellHeader
+        title="Telemetry"
+        href={`/deployment/assistant/${assistantId}/configure-telemetry`}
+        onReload={get}
+        reloadLabel="Reload telemetry"
+        primaryAction={{
+          label: 'Add telemetry',
+          onClick: () => navigation.goToCreateAssistantTelemetry(assistantId),
+        }}
+      />
 
       <TableSection>
         {loading ? (
           <div className="flex flex-col flex-1 items-center justify-center">
             <SectionLoader />
           </div>
-        ) : action.telemetries.length > 0 && filteredTelemetries.length > 0 ? (
+        ) : action.telemetries.length > 0 ? (
           <>
             <ScrollableTableSection>
               <Table className="min-w-max">
@@ -290,7 +244,7 @@ const ConfigureAssistantTelemetry: FC<{ assistantId: string }> = ({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filteredTelemetries.map(row => {
+                  {action.telemetries.map(row => {
                     const provider = row.getProvider();
                     const providerName =
                       providerNameByCode.get(provider) || provider;
@@ -378,13 +332,6 @@ const ConfigureAssistantTelemetry: FC<{ assistantId: string }> = ({
               }}
             />
           </>
-        ) : action.telemetries.length > 0 ? (
-          <EmptyState
-            className="w-full"
-            icon={Activity}
-            title="No telemetry providers found"
-            subtitle="No telemetry provider matched your search."
-          />
         ) : (
           <EmptyState
             className="w-full"

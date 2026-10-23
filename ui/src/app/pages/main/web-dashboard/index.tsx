@@ -1192,7 +1192,7 @@ export const HomePage = () => {
             <section className="flex items-center gap-2">
               <Text
                 as="h1"
-                variant="heading-05"
+                variant="heading-03"
                 className="text-[var(--cds-text-primary)]"
               >
                 Dashboard

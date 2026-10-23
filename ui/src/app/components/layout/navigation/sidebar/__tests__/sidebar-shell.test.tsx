@@ -50,6 +50,7 @@ jest.mock('@/stores/app', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives/text', () => ({
+  typographyClassNames: { 'label-01': 'label-01' },
   Text: ({
     children,
     isLoading,

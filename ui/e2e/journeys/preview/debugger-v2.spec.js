@@ -129,8 +129,8 @@ for (const viewport of SCREENSHOT_VIEWPORTS) {
 
       await expect(page).toHaveScreenshot(
         [
-          'preview',
-          'debugger-v2',
+          'assistant',
+          'chat',
           'success',
           `${viewport.name}-${colorMode}.png`,
         ],
@@ -165,7 +165,7 @@ for (const colorMode of COLOR_MODES) {
     await page.evaluate(() => document.fonts.ready);
 
     await expect(page).toHaveScreenshot(
-      ['preview', 'phone-debugger', 'configuration', `${colorMode}.png`],
+      ['assistant', 'phone', 'configuration', `${colorMode}.png`],
       { fullPage: true, maxDiffPixelRatio: 0.01 },
     );
   });
@@ -203,7 +203,7 @@ for (const colorMode of COLOR_MODES) {
     await page.evaluate(() => document.fonts.ready);
 
     await expect(page).toHaveScreenshot(
-      ['preview', 'debugger-v2', 'configuration', `${colorMode}.png`],
+      ['assistant', 'chat', 'configuration', `${colorMode}.png`],
       { fullPage: true, maxDiffPixelRatio: 0.01 },
     );
   });
@@ -241,8 +241,8 @@ for (const viewport of SCREENSHOT_VIEWPORTS) {
 
       await expect(page).toHaveScreenshot(
         [
-          'preview',
-          'debugger-v2',
+          'assistant',
+          'chat',
           'voice-unavailable',
           `${viewport.name}-${colorMode}.png`,
         ],
@@ -280,8 +280,8 @@ for (const viewport of SCREENSHOT_VIEWPORTS) {
 
       await expect(page).toHaveScreenshot(
         [
-          'preview',
-          'phone-debugger',
+          'assistant',
+          'phone',
           'success',
           `${viewport.name}-${colorMode}.png`,
         ],

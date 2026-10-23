@@ -88,7 +88,9 @@ describe('EditAssistant layout', () => {
     const { container } = render(<EditAssistant assistantId="assistant-1" />);
 
     await waitFor(() => {
-      expect(screen.getByText('General Settings')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'General settings', level: 1 }),
+      ).toBeInTheDocument();
     });
 
     const pageRoot = container.firstElementChild as HTMLElement;

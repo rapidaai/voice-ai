@@ -4,22 +4,19 @@ import toast from 'react-hot-toast/headless';
 import { useParams } from 'react-router-dom';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { EmptyState } from '@/app/components/ui/feedback';
-import { Add, Renew, Edit, TrashCan, ToolKit } from '@carbon/icons-react';
+import { Edit, TrashCan, ToolKit } from '@carbon/icons-react';
 import { CreateTool } from '@/app/pages/assistant/actions/configure-assistant-tool/create-assistant-tool';
 import { SectionLoader } from '@/app/components/ui/feedback';
 import { useAssistantToolPageStore } from '@/stores/assistant/actions';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { UpdateTool } from '@/app/pages/assistant/actions/configure-assistant-tool/update-assistant-tool';
 import { useConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-confirmation';
-import { IconOnlyButton, PrimaryButton } from '@/app/components/ui/primitives';
 import { BUILDIN_TOOLS } from '@/llm-tools';
 import {
   getToolConditionSource,
   getToolConditionSourceLabel,
 } from '@/app/components/domain/tools/common';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
   Button,
   Table,
   TableHead,
@@ -28,14 +25,13 @@ import {
   TableBody,
   TableCell,
   TableToolbar,
-  TableToolbarContent,
-  TableToolbarSearch,
   TableBatchActions,
   TableBatchAction,
   RadioButton,
   Tag,
 } from '@carbon/react';
 import { toHumanReadableDateTime } from '@/utils/date';
+import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
 
 export function ConfigureAssistantToolPage() {
   const { assistantId } = useParams();
@@ -62,7 +58,6 @@ const ConfigureAssistantTool: FC<{ assistantId: string }> = ({
   const axtion = useAssistantToolPageStore();
   const { authId, token, projectId } = useCurrentCredential();
   const { loading, showLoader, hideLoader } = useRapidaStore();
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -113,16 +108,6 @@ const ConfigureAssistantTool: FC<{ assistantId: string }> = ({
     );
   };
 
-  const normalizedSearch = searchTerm.trim().toLowerCase();
-  const filteredTools = normalizedSearch
-    ? axtion.tools.filter(itm =>
-        [itm.getName(), itm.getDescription(), itm.getExecutionmethod()]
-          .join(' ')
-          .toLowerCase()
-          .includes(normalizedSearch),
-      )
-    : axtion.tools;
-
   const refreshTools = () => {
     setSelectedToolId(null);
     showLoader('block');
@@ -141,76 +126,51 @@ const ConfigureAssistantTool: FC<{ assistantId: string }> = ({
     <div className="relative flex flex-col flex-1">
       <ConfirmDialogComponent />
 
-      {/* Page header */}
-      <div className="px-4 pt-4 pb-6 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <div>
-          <Breadcrumb noTrailingSlash className="mb-2">
-            <BreadcrumbItem
-              href={`/deployment/assistant/${assistantId}/overview`}
-            >
-              Assistant
-            </BreadcrumbItem>
-          </Breadcrumb>
-          <h1 className="text-2xl font-light tracking-tight">Tools & MCP</h1>
-        </div>
-      </div>
+      <AssistantSettingsShellHeader
+        title="Tools & MCP"
+        href={`/deployment/assistant/${assistantId}/configure-tool`}
+        onReload={refreshTools}
+        reloadLabel="Reload tools"
+        primaryAction={{
+          label: 'Add tool',
+          onClick: () => navigator.goToCreateAssistantTool(assistantId),
+        }}
+      />
 
-      <TableToolbar>
-        <TableBatchActions
-          shouldShowBatchActions={!!selectedToolId}
-          totalSelected={selectedToolId ? 1 : 0}
-          totalCount={axtion.tools.length}
-          onCancel={() => setSelectedToolId(null)}
-        >
-          {selectedToolId && (
-            <>
-              <TableBatchAction
-                renderIcon={Edit}
-                onClick={() => {
-                  navigation.goToEditAssistantTool(assistantId, selectedToolId);
-                  setSelectedToolId(null);
-                }}
-              >
-                Edit tool
-              </TableBatchAction>
-              <TableBatchAction
-                renderIcon={TrashCan}
-                onClick={() => {
-                  showDialog(() => {
-                    deleteAssistantTool(assistantId, selectedToolId);
-                  });
-                  setSelectedToolId(null);
-                }}
-              >
-                Delete tool
-              </TableBatchAction>
-            </>
-          )}
-        </TableBatchActions>
-        <TableToolbarContent>
-          <TableToolbarSearch
-            placeholder="Search tools..."
-            onChange={(e: any) => setSearchTerm(e.target?.value || '')}
-          />
-          <IconOnlyButton
-            kind="ghost"
-            size="lg"
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            onClick={refreshTools}
-          />
-          <PrimaryButton
-            size="md"
-            renderIcon={Add}
-            onClick={() => navigator.goToCreateAssistantTool(assistantId)}
+      {selectedToolId && (
+        <TableToolbar>
+          <TableBatchActions
+            shouldShowBatchActions
+            totalSelected={1}
+            totalCount={axtion.tools.length}
+            onCancel={() => setSelectedToolId(null)}
           >
-            Add tool
-          </PrimaryButton>
-        </TableToolbarContent>
-      </TableToolbar>
+            <TableBatchAction
+              renderIcon={Edit}
+              onClick={() => {
+                navigation.goToEditAssistantTool(assistantId, selectedToolId);
+                setSelectedToolId(null);
+              }}
+            >
+              Edit tool
+            </TableBatchAction>
+            <TableBatchAction
+              renderIcon={TrashCan}
+              onClick={() => {
+                showDialog(() => {
+                  deleteAssistantTool(assistantId, selectedToolId);
+                });
+                setSelectedToolId(null);
+              }}
+            >
+              Delete tool
+            </TableBatchAction>
+          </TableBatchActions>
+        </TableToolbar>
+      )}
 
       <div className="overflow-auto flex flex-col flex-1">
-        {axtion.tools.length > 0 && filteredTools.length > 0 ? (
+        {axtion.tools.length > 0 ? (
           <Table>
             <TableHead>
               <TableRow>
@@ -223,7 +183,7 @@ const ConfigureAssistantTool: FC<{ assistantId: string }> = ({
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredTools.map((itm, idx) => {
+              {axtion.tools.map((itm, idx) => {
                 const method = itm.getExecutionmethod();
                 const methodMeta = BUILDIN_TOOLS.find(x => x.code === method);
                 const isMcp = method === 'mcp';
@@ -327,12 +287,6 @@ const ConfigureAssistantTool: FC<{ assistantId: string }> = ({
               })}
             </TableBody>
           </Table>
-        ) : axtion.tools.length > 0 ? (
-          <EmptyState
-            icon={ToolKit}
-            title="No tools found"
-            subtitle="No tool matched your search."
-          />
         ) : (
           <EmptyState
             icon={ToolKit}
