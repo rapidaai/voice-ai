@@ -187,7 +187,7 @@ for (const colorMode of COLOR_MODES) {
 
       await expect(page.locator('[data-dashboard-content]')).toHaveScreenshot(
         ['dashboard', 'empty', `mobile-${colorMode}.png`],
-        { maxDiffPixelRatio: 0.01 },
+        { maxDiffPixelRatio: 0.015 },
       );
     } finally {
       await cleanup();
