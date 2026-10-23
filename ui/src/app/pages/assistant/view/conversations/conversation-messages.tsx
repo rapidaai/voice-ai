@@ -10,12 +10,12 @@ import { SectionLoader } from '@/app/components/ui/feedback';
 import { Renew, Download, Chat } from '@carbon/icons-react';
 import { GhostButton } from '@/app/components/ui/primitives';
 import { Tag, DefinitionTooltip } from '@carbon/react';
-import { EmptyState } from '@/app/components/ui/feedback';
 import { getStatusMetric } from '@/utils/metadata';
 import { CarbonStatusIndicator } from '@/app/components/ui/feedback';
 import { toHumanReadableDateTime } from '@/utils/date';
 import { AudioPlayer } from '@/app/components/ui/composites/audio-player';
 import { getRoleVisual } from '@/app/pages/assistant/view/conversations/conversation-messages.helpers';
+import { SessionEmptyState } from './session-empty-state';
 
 export const ConversationMessages: FC<{
   conversation: AssistantConversation;
@@ -143,13 +143,11 @@ export const ConversationMessages: FC<{
 
       {/* ── Empty state ── */}
       {conversations.length === 0 && (
-        <div className="flex flex-1 items-center justify-center py-12">
-          <EmptyState
-            icon={Chat}
-            title="No messages yet"
-            subtitle="There are no messages for this session yet."
-          />
-        </div>
+        <SessionEmptyState
+          icon={Chat}
+          title="No messages available"
+          description="This session does not contain any messages."
+        />
       )}
 
       <ul className="divide-y divide-gray-200 dark:divide-gray-800">

@@ -11,7 +11,7 @@ import { useRapidaStore } from '@/stores/app';
 import { useAllProviderCredentials } from '@/hooks/use-model';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
-import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   AssistantApiDeployment,
@@ -31,7 +31,6 @@ import {
   ValidateTextToSpeechIfInvalid,
 } from '@/app/components/domain/providers/text-to-speech/provider';
 import { useConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-confirmation';
-import { Tabs } from '@/app/components/ui/primitives';
 import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
 import { InputCheckbox } from '@/app/components/ui/primitives';
 import { ButtonSet, CheckboxGroup } from '@carbon/react';
@@ -40,6 +39,8 @@ import {
   createAssistantDeploymentByType,
   getAssistantDeploymentByType,
 } from '@/clients/assistant.client';
+import { DeploymentEditTabs } from '@/app/pages/assistant/actions/create-deployment/commons/deployment-edit-tabs';
+import { DeploymentEditHeader } from '@/app/pages/assistant/actions/create-deployment/commons/deployment-edit-header';
 
 const EDIT_TABS = [
   { code: 'experience', name: 'General Experience' },
@@ -67,7 +68,8 @@ const EditAssistantApiDeployment: FC<{ assistantId: string }> = ({
   const { authId, projectId, token } = useCurrentCredential();
   const { showDialog, ConfirmDialogComponent } = useConfirmDialog({});
 
-  const [activeTab, setActiveTab] = useState('experience');
+  const [activeTab, setActiveTab] =
+    useState<(typeof EDIT_TABS)[number]['code']>('experience');
   const [errorMessage, setErrorMessage] = useState('');
   const [isDeploying, setIsDeploying] = useState(false);
   const [voiceInputEnable, setVoiceInputEnable] = useState(false);
@@ -181,15 +183,6 @@ const EditAssistantApiDeployment: FC<{ assistantId: string }> = ({
 
   const getProviderCredentials = (provider: string) =>
     providerCredentials.filter(c => c.getProvider() === provider);
-
-  const activeIndex = useMemo(
-    () =>
-      Math.max(
-        EDIT_TABS.findIndex(tab => tab.code === activeTab),
-        0,
-      ),
-    [activeTab],
-  );
 
   const handleDeployApi = () => {
     setIsDeploying(true);
@@ -312,98 +305,84 @@ const EditAssistantApiDeployment: FC<{ assistantId: string }> = ({
     <>
       <ConfirmDialogComponent />
       <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-900">
-        <header className="px-8 pt-8 pb-6 border-b border-gray-200 dark:border-gray-800">
-          <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400 mb-1.5">
-            SDK / API Deployment
-          </p>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 leading-tight">
-            Edit SDK / API deployment
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-500 mt-1.5 leading-relaxed">
-            Update general experience, voice input, and voice output.
-          </p>
-        </header>
+        <DeploymentEditHeader
+          eyebrow="SDK / API deployment"
+          title="Edit SDK / API deployment"
+          description="Update general experience, voice input, and voice output."
+        />
 
-        <div className="border-b border-gray-200 dark:border-gray-800 shrink-0">
-          <Tabs
-            contained
-            aria-label="API deployment edit tabs"
-            tabs={EDIT_TABS.map(tab => tab.name)}
-            selectedIndex={activeIndex}
-            onChange={index => setActiveTab(EDIT_TABS[index].code)}
-            className="w-full [&_.cds--tab--list]:w-full [&_.cds--tabs__nav]:w-full [&_.cds--tabs__nav-item]:flex-1 [&_.cds--tabs__nav-link]:w-full [&_.cds--tabs__nav-link]:justify-center [&_.cds--tabs__nav-item]:mx-0 [&_.cds--tabs__nav-link]:ml-0"
-            panelClassName="!px-0"
-          />
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-auto">
-          {activeTab === 'experience' && (
-            <div className="w-full">
+        <DeploymentEditTabs
+          aria-label="API deployment edit tabs"
+          tabs={EDIT_TABS}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          panels={{
+            experience: (
               <ConfigureExperience
                 experienceConfig={experienceConfig}
                 setExperienceConfig={setExperienceConfig}
               />
-            </div>
-          )}
-          {activeTab === 'voice-input' && (
-            <div>
-              <div className="px-6 pt-6">
-                <CheckboxGroup
-                  legendText=""
-                  warn
-                  warnText={
-                    voiceInputEnable
-                      ? 'Assistant can now receive user input via audio and text.'
-                      : 'Assistant will now receive user input via text only.'
-                  }
-                >
-                  <InputCheckbox
-                    checked={voiceInputEnable}
-                    onChange={e => setVoiceInputEnable(e.target.checked)}
-                    id="voice-input-toggle-edit"
+            ),
+            'voice-input': (
+              <div>
+                <div className="px-6 pt-6">
+                  <CheckboxGroup
+                    legendText=""
+                    warn
+                    warnText={
+                      voiceInputEnable
+                        ? 'Assistant can now receive user input via audio and text.'
+                        : 'Assistant will now receive user input via text only.'
+                    }
                   >
-                    Enable Voice Input (Speech-to-Text)
-                  </InputCheckbox>
-                </CheckboxGroup>
+                    <InputCheckbox
+                      checked={voiceInputEnable}
+                      onChange={e => setVoiceInputEnable(e.target.checked)}
+                      id="voice-input-toggle-edit"
+                    >
+                      Enable Voice Input (Speech-to-Text)
+                    </InputCheckbox>
+                  </CheckboxGroup>
+                </div>
+                {voiceInputEnable && (
+                  <ConfigureAudioInputProvider
+                    audioInputConfig={audioInputConfig}
+                    setAudioInputConfig={setAudioInputConfig}
+                  />
+                )}
               </div>
-              {voiceInputEnable && (
-                <ConfigureAudioInputProvider
-                  audioInputConfig={audioInputConfig}
-                  setAudioInputConfig={setAudioInputConfig}
-                />
-              )}
-            </div>
-          )}
-          {activeTab === 'voice-output' && (
-            <div>
-              <div className="px-6 pt-6">
-                <CheckboxGroup
-                  legendText=""
-                  warn
-                  warnText={
-                    voiceOutputEnable
-                      ? 'Assistant responses will now be delivered via audio and text.'
-                      : 'Assistant responses will now be delivered via text.'
-                  }
-                >
-                  <InputCheckbox
-                    checked={voiceOutputEnable}
-                    onChange={e => setVoiceOutputEnable(e.target.checked)}
-                    id="voice-output-toggle-edit"
+            ),
+            'voice-output': (
+              <div>
+                <div className="px-6 pt-6">
+                  <CheckboxGroup
+                    legendText=""
+                    warn
+                    warnText={
+                      voiceOutputEnable
+                        ? 'Assistant responses will now be delivered via audio and text.'
+                        : 'Assistant responses will now be delivered via text.'
+                    }
                   >
-                    Enable Voice Output (Text-to-Speech)
-                  </InputCheckbox>
-                </CheckboxGroup>
+                    <InputCheckbox
+                      checked={voiceOutputEnable}
+                      onChange={e => setVoiceOutputEnable(e.target.checked)}
+                      id="voice-output-toggle-edit"
+                    >
+                      Enable Voice Output (Text-to-Speech)
+                    </InputCheckbox>
+                  </CheckboxGroup>
+                </div>
+                {voiceOutputEnable && (
+                  <ConfigureAudioOutputProvider
+                    audioOutputConfig={audioOutputConfig}
+                    setAudioOutputConfig={setAudioOutputConfig}
+                  />
+                )}
               </div>
-              {voiceOutputEnable && (
-                <ConfigureAudioOutputProvider
-                  audioOutputConfig={audioOutputConfig}
-                  setAudioOutputConfig={setAudioOutputConfig}
-                />
-              )}
-            </div>
-          )}
-        </div>
+            ),
+          }}
+        />
 
         <div className="shrink-0">
           {errorMessage && (

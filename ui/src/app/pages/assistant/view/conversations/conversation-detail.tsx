@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import {
   AssistantChatContext,
   useAssistantChat,
@@ -8,7 +8,7 @@ import { useParams } from 'react-router-dom';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import type { AssistantConversation } from '@rapidaai/react';
 import { useRapidaStore } from '@/stores/app';
-import { PageLoader } from '@/app/components/ui/feedback';
+import { ErrorContainer, PageLoader } from '@/app/components/ui/feedback';
 import {
   ArrowLeft,
   Renew,
@@ -19,17 +19,20 @@ import {
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { GhostButton } from '@/app/components/ui/primitives';
 import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
-import { Table } from '@/app/components/ui/table';
-import { TableHead } from '@/app/components/ui/table';
-import { TableBody } from '@/app/components/ui/table';
-import { TableRow } from '@/app/components/ui/table';
-import { TableCell } from '@/app/components/ui/table';
-import { EmptyState } from '@/app/components/ui/feedback';
 import { cn } from '@/utils';
 import { CarbonStatusIndicator } from '@/app/components/ui/feedback';
 import { getStatusMetric } from '@/utils/metadata';
 import { Tabs } from '@/app/components/ui/primitives';
 import { getAssistantConversationDetail } from '@/clients/assistant.client';
+import { SessionEmptyState } from './session-empty-state';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@carbon/react';
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
 
@@ -53,6 +56,7 @@ export function ConversationDetailPage() {
   const navigator = useGlobalNavigation();
   const [currentConversation, setCurrentConversation] =
     useState<AssistantConversation | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('messages');
   const selectedTabIndex = Math.max(
     TABS.findIndex(({ key }) => key === activeTab),
@@ -60,8 +64,12 @@ export function ConversationDetailPage() {
   );
 
   const get = useCallback(() => {
-    if (!assistantId || !sessionId) return;
+    if (!assistantId || !sessionId) {
+      setLoadError(true);
+      return;
+    }
 
+    setLoadError(false);
     showLoader();
     getAssistantConversationDetail({
       assistantId,
@@ -73,10 +81,13 @@ export function ConversationDetailPage() {
         hideLoader();
         if (response?.getSuccess() && response.getData()) {
           setCurrentConversation(response.getData()!);
+          return;
         }
+        setLoadError(true);
       })
       .catch(() => {
         hideLoader();
+        setLoadError(true);
       });
   }, [
     assistantId,
@@ -92,8 +103,22 @@ export function ConversationDetailPage() {
     get();
   }, [get]);
 
-  if (loading || currentConversation == null) {
+  if (loading || (!loadError && currentConversation == null)) {
     return <PageLoader />;
+  }
+
+  if (loadError || currentConversation == null) {
+    return (
+      <ErrorContainer
+        className="h-full"
+        code="503"
+        title="Session unavailable"
+        description="We couldn't load this session. Try again in a moment."
+        actionLabel="Try again"
+        actionIcon={Renew}
+        onAction={get}
+      />
+    );
   }
 
   const renderContent = () => {
@@ -103,13 +128,12 @@ export function ConversationDetailPage() {
           .getMetadataList()
           .filter(x => x.getKey().startsWith('analysis.'));
         return items.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center py-12">
-            <EmptyState
-              icon={ChartLine}
-              title="No Analysis"
-              subtitle="There is no analysis data for this session yet."
-            />
-          </div>
+          <SessionEmptyState
+            icon={ChartLine}
+            title="No analysis available"
+            description="This session does not contain analysis data."
+            className="h-full"
+          />
         ) : (
           <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
             {items.map((x, idx) => (
@@ -130,13 +154,12 @@ export function ConversationDetailPage() {
       case 'context': {
         const contexts = currentConversation.getContextsList();
         return contexts.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center py-12">
-            <EmptyState
-              icon={DataBase}
-              title="No Context"
-              subtitle="No knowledge context was retrieved for this session."
-            />
-          </div>
+          <SessionEmptyState
+            icon={DataBase}
+            title="No context available"
+            description="No knowledge context was retrieved for this session."
+            className="h-full"
+          />
         ) : (
           <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
             {contexts.map((x, idx) => (
@@ -204,36 +227,44 @@ export function ConversationDetailPage() {
 
       case 'metrics':
         return currentConversation.getMetricsList().length > 0 ? (
-          <Table className="w-full bg-white dark:bg-gray-900">
-            <TableHead
-              columns={[
-                { name: 'Name', key: 'Name' },
-                { name: 'Value', key: 'Value' },
-                { name: 'Description', key: 'Description' },
-              ]}
-            />
-            <TableBody>
-              {currentConversation.getMetricsList().map((m, i) => (
-                <TableRow key={i}>
-                  <TableCell>{m.getName()}</TableCell>
-                  <TableCell className="break-words break-all">
-                    {m.getValue()}
-                  </TableCell>
-                  <TableCell className="break-words break-all">
-                    {m.getDescription()}
-                  </TableCell>
+          <div className="w-full">
+            <Table
+              aria-label="Session metrics"
+              className="w-full table-fixed"
+              size="lg"
+              useZebraStyles={false}
+            >
+              <TableHead>
+                <TableRow>
+                  <TableHeader className="w-[30%]">Name</TableHeader>
+                  <TableHeader className="w-1/5">Value</TableHeader>
+                  <TableHeader className="w-1/2">Description</TableHeader>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <div className="flex flex-1 items-center justify-center py-12">
-            <EmptyState
-              icon={ChartLine}
-              title="No Metrics"
-              subtitle="No metrics have been captured for this session yet."
-            />
+              </TableHead>
+              <TableBody>
+                {currentConversation.getMetricsList().map((m, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="align-top whitespace-normal break-words">
+                      {m.getName()}
+                    </TableCell>
+                    <TableCell className="align-top whitespace-normal break-words">
+                      {m.getValue()}
+                    </TableCell>
+                    <TableCell className="align-top whitespace-normal break-words">
+                      {m.getDescription()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
+        ) : (
+          <SessionEmptyState
+            icon={ChartLine}
+            title="No metrics available"
+            description="This session does not contain metrics."
+            className="h-full"
+          />
         );
 
       case 'arguments': {
@@ -243,50 +274,72 @@ export function ConversationDetailPage() {
           currentConversation.getMetadataList().length > 0;
         if (!hasArguments) {
           return (
-            <div className="flex flex-1 items-center justify-center py-12">
-              <EmptyState
-                icon={DataCheck}
-                title="No Arguments"
-                subtitle="No arguments, options, or metadata were captured for this session."
-              />
-            </div>
+            <SessionEmptyState
+              icon={DataCheck}
+              title="No arguments available"
+              description="This session does not contain arguments, options, or metadata."
+              className="h-full"
+            />
           );
         }
         return (
-          <Table className="w-full bg-white dark:bg-gray-900">
-            <TableHead
-              columns={[
-                { name: 'Type', key: 'Type' },
-                { name: 'Name', key: 'Name' },
-                { name: 'Value', key: 'Value' },
-              ]}
-            />
-            <TableBody>
-              {currentConversation.getArgumentsList().map((m, i) => (
-                <TableRow key={`arg-${i}`}>
-                  <TableCell>Argument</TableCell>
-                  <TableCell>{m.getName()}</TableCell>
-                  <TableCell>{m.getValue()}</TableCell>
+          <div className="w-full">
+            <Table
+              aria-label="Session arguments"
+              className="w-full table-fixed"
+              size="lg"
+              useZebraStyles={false}
+            >
+              <TableHead>
+                <TableRow>
+                  <TableHeader className="w-1/5">Type</TableHeader>
+                  <TableHeader className="w-[30%]">Name</TableHeader>
+                  <TableHeader className="w-1/2">Value</TableHeader>
                 </TableRow>
-              ))}
-              {currentConversation.getOptionsList().map((m, i) => (
-                <TableRow key={`opt-${i}`}>
-                  <TableCell>Option</TableCell>
-                  <TableCell>{m.getKey()}</TableCell>
-                  <TableCell>{m.getValue()}</TableCell>
-                </TableRow>
-              ))}
-              {currentConversation.getMetadataList().map((m, i) => (
-                <TableRow key={`meta-${i}`}>
-                  <TableCell>Metadata</TableCell>
-                  <TableCell>{m.getKey()}</TableCell>
-                  <TableCell className="break-words break-all">
-                    {m.getValue()}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {currentConversation.getArgumentsList().map((m, i) => (
+                  <TableRow key={`arg-${i}`}>
+                    <TableCell className="align-top whitespace-normal">
+                      Argument
+                    </TableCell>
+                    <TableCell className="align-top whitespace-normal break-words">
+                      {m.getName()}
+                    </TableCell>
+                    <TableCell className="align-top whitespace-normal break-words">
+                      {m.getValue()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {currentConversation.getOptionsList().map((m, i) => (
+                  <TableRow key={`opt-${i}`}>
+                    <TableCell className="align-top whitespace-normal">
+                      Option
+                    </TableCell>
+                    <TableCell className="align-top whitespace-normal break-words">
+                      {m.getKey()}
+                    </TableCell>
+                    <TableCell className="align-top whitespace-normal break-words">
+                      {m.getValue()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {currentConversation.getMetadataList().map((m, i) => (
+                  <TableRow key={`meta-${i}`}>
+                    <TableCell className="align-top whitespace-normal">
+                      Metadata
+                    </TableCell>
+                    <TableCell className="align-top whitespace-normal break-words">
+                      {m.getKey()}
+                    </TableCell>
+                    <TableCell className="align-top whitespace-normal break-words">
+                      {m.getValue()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         );
       }
     }
@@ -327,21 +380,24 @@ export function ConversationDetailPage() {
         </div>
       </PageHeaderBlock>
 
-      {/* ── Horizontal tab bar ── */}
-      <div className="border-b border-gray-200 dark:border-gray-800 shrink-0">
-        <Tabs
-          tabs={TABS.map(({ label }) => label)}
-          selectedIndex={selectedTabIndex}
-          onChange={idx => setActiveTab(TABS[idx]?.key ?? 'messages')}
-          contained
-          aria-label="Session detail tabs"
-        />
-      </div>
-
-      {/* ── Content area ── */}
-      <div className="flex-1 overflow-auto min-h-0 flex flex-col">
-        {renderContent()}
-      </div>
+      <Tabs
+        tabs={TABS.map(({ label }) => label)}
+        selectedIndex={selectedTabIndex}
+        onChange={idx => setActiveTab(TABS[idx]?.key ?? 'messages')}
+        contained
+        fill
+        aria-label="Session detail tabs"
+        className="w-full"
+        tabListClassName="w-full border-y border-border-subtle"
+        panelsClassName="h-full w-full"
+        panelClassName="!block !h-full !min-h-0 !w-full !overflow-auto !p-0"
+      >
+        {TABS.map(({ key }) => (
+          <Fragment key={key}>
+            {key === activeTab ? renderContent() : null}
+          </Fragment>
+        ))}
+      </Tabs>
     </>
   );
 }

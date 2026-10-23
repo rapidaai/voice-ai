@@ -11,6 +11,7 @@ import { Slider } from '@carbon/react';
 import { ChevronDown } from '@carbon/icons-react';
 import { cn } from '@/utils';
 import { FC, useState } from 'react';
+import { Text } from '@/app/components/ui/primitives/text';
 
 export interface WebWidgetExperienceConfig extends ExperienceConfig {
   suggestions: string[];
@@ -38,7 +39,9 @@ export const ConfigureExperience: FC<{
         />
 
         <div>
-          <p className="text-xs font-medium mb-2">Quick-start questions</p>
+          <Text as="p" variant="label-01" className="mb-2">
+            Quick-start questions
+          </Text>
           <ConfigSelect
             options={experienceConfig.suggestions || []}
             label="Add question"
@@ -51,7 +54,7 @@ export const ConfigureExperience: FC<{
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+          className="flex items-center gap-1.5 text-[var(--cds-text-secondary)] transition-colors hover:text-[var(--cds-text-primary)]"
         >
           <ChevronDown
             size={16}
@@ -60,7 +63,9 @@ export const ConfigureExperience: FC<{
               showAdvanced && 'rotate-180',
             )}
           />
-          {showAdvanced ? 'Hide' : 'Show'} advanced settings
+          <Text as="span" variant="body-compact-01">
+            {showAdvanced ? 'Hide' : 'Show'} advanced settings
+          </Text>
         </button>
 
         {showAdvanced && (

@@ -1,6 +1,7 @@
 import { InputCheckbox } from '@/app/components/ui/primitives';
 import { FormLabel } from '@/app/components/ui/primitives';
 import { InputHelper } from '@/app/components/ui/primitives';
+import { Text } from '@/app/components/ui/primitives/text';
 
 export interface FeatureConfig {
   qAListing: boolean;
@@ -51,9 +52,9 @@ export const ConfigureFeature: React.FC<ConfigureFeatureProps> = ({
                 checked={config.qAListing}
                 onChange={handleCheckboxChange}
               />
-              <span className="text-sm text-gray-900 dark:text-gray-100">
+              <Text as="span" variant="body-compact-01">
                 Help center / Q&A Listing
-              </span>
+              </Text>
             </label>
             <label
               htmlFor="product_catalog"
@@ -65,9 +66,9 @@ export const ConfigureFeature: React.FC<ConfigureFeatureProps> = ({
                 checked={config.productCatalog}
                 onChange={handleCheckboxChange}
               />
-              <span className="text-sm text-gray-900 dark:text-gray-100">
+              <Text as="span" variant="body-compact-01">
                 Product Catalog
-              </span>
+              </Text>
             </label>
             <label
               htmlFor="blog_post"
@@ -79,9 +80,9 @@ export const ConfigureFeature: React.FC<ConfigureFeatureProps> = ({
                 checked={config.blogPost}
                 onChange={handleCheckboxChange}
               />
-              <span className="text-sm text-gray-900 dark:text-gray-100">
+              <Text as="span" variant="body-compact-01">
                 Blog Post / Articles
-              </span>
+              </Text>
             </label>
           </div>
         </fieldset>

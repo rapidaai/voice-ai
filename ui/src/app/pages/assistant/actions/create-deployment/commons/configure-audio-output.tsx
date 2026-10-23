@@ -12,6 +12,7 @@ import {
 import { ChevronDown } from '@carbon/icons-react';
 import { cn } from '@/utils';
 import { TextInput } from '@/app/components/ui/primitives';
+import { Text } from '@/app/components/ui/primitives/text';
 import { Dropdown, MultiSelect, Slider } from '@carbon/react';
 
 const AMBIENT_OPTIONS = [
@@ -126,7 +127,7 @@ export const ConfigureAudioOutputProvider: React.FC<
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            className="flex items-center gap-1.5 text-[var(--cds-text-secondary)] transition-colors hover:text-[var(--cds-text-primary)]"
           >
             <ChevronDown
               size={16}
@@ -135,14 +136,20 @@ export const ConfigureAudioOutputProvider: React.FC<
                 showAdvanced && 'rotate-180',
               )}
             />
-            {showAdvanced ? 'Hide' : 'Show'} advanced settings
+            <Text as="span" variant="body-compact-01">
+              {showAdvanced ? 'Hide' : 'Show'} advanced settings
+            </Text>
           </button>
 
           {showAdvanced && (
             <div className="flex flex-col gap-6 pt-6 border-t border-gray-200 dark:border-gray-800">
-              <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">
+              <Text
+                as="p"
+                variant="label-01"
+                className="uppercase text-[var(--cds-text-secondary)]"
+              >
                 Ambient
-              </p>
+              </Text>
               <Dropdown
                 id="ambient-sound"
                 titleText="Ambient"
@@ -171,9 +178,13 @@ export const ConfigureAudioOutputProvider: React.FC<
                 }
               />
 
-              <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">
+              <Text
+                as="p"
+                variant="label-01"
+                className="uppercase text-[var(--cds-text-secondary)]"
+              >
                 Experience
-              </p>
+              </Text>
               <MultiSelect
                 id="pronunciation-dictionaries"
                 titleText="Pronunciation Dictionaries"
