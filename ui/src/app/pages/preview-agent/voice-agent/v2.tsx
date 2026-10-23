@@ -80,6 +80,7 @@ import { useTheme } from '@/theme/theme-provider';
 import { InputVarType } from '@/models/common';
 import { cn } from '@/utils';
 import { PreviewAgentHeader } from './preview-agent-header';
+import { isVisibleConfigurationKey } from './configuration-visibility';
 
 const Toggletip =
   (CarbonToggletip as unknown as { default?: typeof CarbonToggletip })
@@ -155,14 +156,6 @@ function formatConfigurationLabel(key: string) {
 
   const name = key.split('.').at(-1)?.replaceAll('_', ' ') || key;
   return name.charAt(0).toUpperCase() + name.slice(1);
-}
-
-function isVisibleConfigurationKey(key: string) {
-  const configurationKey = key.toLowerCase();
-  return (
-    configurationKey !== 'credential' &&
-    !configurationKey.endsWith('credential_id')
-  );
 }
 
 function isCopyableConfigurationKey(key: string) {
@@ -1247,7 +1240,7 @@ function PreviewVoiceAgentV2Workspace({
 
     const focusableElements = Array.from(
       event.currentTarget.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+        'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
       ),
     ).filter(element => {
       if (element.closest('[hidden], [aria-hidden="true"]')) return false;
@@ -1347,7 +1340,7 @@ function PreviewVoiceAgentV2Workspace({
               type="button"
               tabIndex={-1}
               aria-label="Close details panel"
-              className="absolute inset-0 z-10 bg-black/40 lg:hidden"
+              className="absolute inset-0 z-10 bg-black/40 min-[1056px]:hidden"
               onClick={closePanel}
             />
           ) : null}
@@ -1360,7 +1353,7 @@ function PreviewVoiceAgentV2Workspace({
               aria-modal={isOverlayPanel ? true : undefined}
               aria-labelledby="debugger-details-title"
               aria-label="Session configuration"
-              className="absolute inset-y-0 right-0 z-20 flex w-full shrink-0 flex-col border-l border-[var(--cds-border-subtle-01)] bg-[var(--cds-background)] shadow-2xl sm:w-96 lg:static lg:z-auto lg:shadow-none"
+              className="absolute inset-y-0 right-0 z-20 flex w-full shrink-0 flex-col border-l border-[var(--cds-border-subtle-01)] bg-[var(--cds-background)] shadow-2xl sm:w-96 min-[1056px]:static min-[1056px]:z-auto min-[1056px]:shadow-none"
               onKeyDown={handlePanelKeyDown}
             >
               <Layer level={1} className="flex min-h-0 flex-1 flex-col">

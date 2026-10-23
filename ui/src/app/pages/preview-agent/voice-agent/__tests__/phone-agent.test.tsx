@@ -24,7 +24,20 @@ jest.mock('@/hooks/use-credential', () => ({
 }));
 
 jest.mock('@/app/pages/preview-agent/voice-agent/voice-agent', () => ({
-  ArgumentList: () => <div>Argument fields</div>,
+  ArgumentList: ({ variables, values, onChangeArgument }: any) => (
+    <div>
+      {variables.map((variable: any) => (
+        <textarea
+          key={variable.getName()}
+          aria-label={`{{${variable.getName()}}}`}
+          value={values?.get(variable.getName()) ?? variable.getDefaultvalue()}
+          onChange={event =>
+            onChangeArgument(variable.getName(), event.target.value)
+          }
+        />
+      ))}
+    </div>
+  ),
   ConfigEmpty: ({ label }: { label: string }) => <div>{label}</div>,
   ConfigBlock: ({
     title,
@@ -50,13 +63,33 @@ jest.mock('@/app/pages/preview-agent/voice-agent/voice-agent', () => ({
 
 const audioProvider = {
   getAudioprovider: () => 'Deepgram',
-  getAudiooptionsList: () => [],
+  getAudiooptionsList: () => [
+    {
+      getKey: () => 'rapida.credential_id',
+      getValue: () => 'credential-secret-123',
+    },
+    { getKey: () => 'listen.model', getValue: () => 'nova-3' },
+  ],
 };
 
 const model = {
   getModelprovidername: () => 'OpenAI',
-  getAssistantmodeloptionsList: () => [],
-  getTemplate: () => undefined,
+  getAssistantmodeloptionsList: () => [
+    {
+      getKey: () => 'rapida.credential_id',
+      getValue: () => 'credential-secret-123',
+    },
+    { getKey: () => 'model.name', getValue: () => 'gpt-4.1-mini' },
+  ],
+  getTemplate: () => ({
+    getPromptvariablesList: () => [
+      {
+        getName: () => 'delivery_instructions',
+        getDefaultvalue: () => 'Leave at reception',
+        getType: () => 'paragraph',
+      },
+    ],
+  }),
 };
 
 const assistant = {
@@ -119,6 +152,17 @@ describe('PreviewPhoneAgent', () => {
     expect(screen.getByLabelText('Session configuration')).toBeVisible();
     expect(screen.getByText(/telephony: Twilio/)).toBeVisible();
     expect(screen.getByText('Arguments')).toBeVisible();
+    expect(screen.queryByText(/rapida\.credential_id/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/credential-secret-123/)).not.toBeInTheDocument();
+    expect(screen.getByText(/model.name: gpt-4.1-mini/)).toBeVisible();
+
+    const argument = screen.getByRole('textbox', {
+      name: '{{delivery_instructions}}',
+    });
+    expect(argument).toHaveValue('Leave at reception');
+    await user.clear(argument);
+    await user.type(argument, 'Call on arrival');
+    expect(argument).toHaveValue('Call on arrival');
 
     await user.click(
       screen.getByRole('button', { name: 'Close configuration' }),
@@ -126,5 +170,9 @@ describe('PreviewPhoneAgent', () => {
     await waitFor(() =>
       expect(screen.queryByLabelText('Session configuration')).toBeNull(),
     );
+    await user.click(screen.getByRole('button', { name: 'Configuration' }));
+    expect(
+      screen.getByRole('textbox', { name: '{{delivery_instructions}}' }),
+    ).toHaveValue('Call on arrival');
   });
 });

@@ -43,6 +43,34 @@ for (const legacyRoute of [
   });
 }
 
+test('chat configuration remains an overlay below 1056px', async ({ page }) => {
+  await page.setViewportSize({ width: 1040, height: 900 });
+  await authenticatePage(page);
+  await mockDebuggerAssistant(page);
+
+  await page.goto(`/deployment/assistant/${ASSISTANT_ID}/playground/chat`);
+  await page.getByRole('button', { name: 'Configuration' }).click();
+
+  await expect(
+    page.getByRole('dialog', { name: 'Session configuration' }),
+  ).toBeVisible();
+  const backdrop = page.getByRole('button', { name: 'Close details panel' });
+  await expect(backdrop).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Conversation' })).toHaveAttribute(
+    'inert',
+    '',
+  );
+
+  await backdrop.click({ position: { x: 8, y: 8 } });
+  await expect(
+    page.getByRole('dialog', { name: 'Session configuration' }),
+  ).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Conversation' })).not.toHaveAttribute(
+    'inert',
+    '',
+  );
+});
+
 for (const viewport of SCREENSHOT_VIEWPORTS) {
   for (const colorMode of COLOR_MODES) {
     test(`debugger v2 success screenshot at ${viewport.name} in ${colorMode} mode`, async ({

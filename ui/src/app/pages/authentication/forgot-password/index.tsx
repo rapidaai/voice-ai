@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { ForgotPasswordResponse, ServiceError } from '@rapidaai/react';
 import { useForm } from 'react-hook-form';
@@ -48,10 +48,13 @@ export function ForgotPasswordPage() {
       if (!message) console.error(err);
       setSuccessMessage('');
       setError(message || "We couldn't send a reset link. Try again.");
-      setFocus('email');
     },
-    [hideLoader, setFocus, supportContact],
+    [hideLoader, supportContact],
   );
+
+  useEffect(() => {
+    if (!loading && error) setFocus('email');
+  }, [error, loading, setFocus]);
 
   const onForgotPassword = (data: ForgotPasswordFormValues) => {
     setError('');

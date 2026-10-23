@@ -277,7 +277,7 @@ function DashboardNoActivity() {
           Getting started
         </Text>
         <Text
-          as="h2"
+          as="h1"
           id="dashboard-getting-started-title"
           variant="heading-05"
           className="mt-2 text-[var(--cds-text-primary)]"

@@ -40,6 +40,7 @@ import {
 } from '@/clients/runtime.client';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Navigate, useParams, useSearchParams } from 'react-router-dom';
+import { isVisibleConfigurationKey } from './configuration-visibility';
 
 /**
  *
@@ -135,9 +136,7 @@ export const PreviewPhoneAgent = ({
             setVariables(pmtVars);
             const defaults = new Map<string, string>();
             pmtVars.forEach(v => {
-              if (v.getDefaultvalue()) {
-                defaults.set(v.getName(), v.getDefaultvalue());
-              }
+              defaults.set(v.getName(), v.getDefaultvalue() || '');
             });
             setArgumentMap(defaults);
           }
@@ -409,6 +408,7 @@ export const PreviewPhoneAgent = ({
                 tts={tts}
                 model={model}
                 variables={variables}
+                argumentValues={argumentMap}
                 onChangeArgument={onChangeArgument}
               />
             </aside>
@@ -430,6 +430,7 @@ const PhoneAgentDebugger: React.FC<{
   tts: any;
   model: any;
   variables: Variable[];
+  argumentValues: ReadonlyMap<string, string>;
   onChangeArgument: (k: string, v: string) => void;
 }> = ({
   assistant,
@@ -438,6 +439,7 @@ const PhoneAgentDebugger: React.FC<{
   tts,
   model,
   variables,
+  argumentValues,
   onChangeArgument,
 }) => {
   const loading = !assistant;
@@ -483,13 +485,16 @@ const PhoneAgentDebugger: React.FC<{
           {stt ? (
             <>
               <InfoRow label="provider" value={stt.getAudioprovider()} />
-              {stt.getAudiooptionsList().map((d: any) => (
-                <InfoRow
-                  key={d.getKey()}
-                  label={d.getKey()}
-                  value={d.getValue()}
-                />
-              ))}
+              {stt
+                .getAudiooptionsList()
+                .filter((d: any) => isVisibleConfigurationKey(d.getKey()))
+                .map((d: any) => (
+                  <InfoRow
+                    key={d.getKey()}
+                    label={d.getKey()}
+                    value={d.getValue()}
+                  />
+                ))}
             </>
           ) : (
             <ConfigEmpty label="Audio input is not configured." />
@@ -500,13 +505,16 @@ const PhoneAgentDebugger: React.FC<{
           {tts ? (
             <>
               <InfoRow label="provider" value={tts.getAudioprovider()} />
-              {tts.getAudiooptionsList().map((d: any) => (
-                <InfoRow
-                  key={d.getKey()}
-                  label={d.getKey()}
-                  value={d.getValue()}
-                />
-              ))}
+              {tts
+                .getAudiooptionsList()
+                .filter((d: any) => isVisibleConfigurationKey(d.getKey()))
+                .map((d: any) => (
+                  <InfoRow
+                    key={d.getKey()}
+                    label={d.getKey()}
+                    value={d.getValue()}
+                  />
+                ))}
             </>
           ) : (
             <ConfigEmpty label="Audio output is not configured." />
@@ -517,13 +525,16 @@ const PhoneAgentDebugger: React.FC<{
           {model ? (
             <>
               <InfoRow label="provider" value={model.getModelprovidername()} />
-              {model.getAssistantmodeloptionsList().map((m: any) => (
-                <InfoRow
-                  key={m.getKey()}
-                  label={m.getKey()}
-                  value={m.getValue()}
-                />
-              ))}
+              {model
+                .getAssistantmodeloptionsList()
+                .filter((m: any) => isVisibleConfigurationKey(m.getKey()))
+                .map((m: any) => (
+                  <InfoRow
+                    key={m.getKey()}
+                    label={m.getKey()}
+                    value={m.getValue()}
+                  />
+                ))}
             </>
           ) : (
             <ConfigEmpty label="Model configuration is not available." />
@@ -535,6 +546,7 @@ const PhoneAgentDebugger: React.FC<{
         />
         <ArgumentList
           variables={variables}
+          values={argumentValues}
           onChangeArgument={onChangeArgument}
         />
       </div>

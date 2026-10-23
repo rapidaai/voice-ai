@@ -394,6 +394,7 @@ describe('Dashboard HomePage', () => {
     expect(
       await screen.findByRole('heading', {
         name: 'Your dashboard is not ready yet',
+        level: 1,
       }),
     ).toBeInTheDocument();
     expect(

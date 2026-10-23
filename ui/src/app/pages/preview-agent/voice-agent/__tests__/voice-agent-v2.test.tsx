@@ -1831,6 +1831,45 @@ describe('PreviewVoiceAgentV2', () => {
     expect(closeButton).toHaveFocus();
   });
 
+  it('wraps overlay focus from the final multiline argument', async () => {
+    mockIsOverlayPanel = true;
+    const user = userEvent.setup({
+      pointerEventsCheck: PointerEventsCheckLevel.Never,
+      skipHover: true,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/preview/v2/chat/assistant-123']}>
+        <Routes>
+          <Route
+            path="/preview/v2/chat/:assistantId"
+            element={<PreviewVoiceAgentV2 />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
+    await user.click(screen.getByRole('button', { name: 'Configuration' }));
+    const dialog = screen.getByRole('dialog', {
+      name: 'Session configuration',
+    });
+    const closeButton = within(dialog).getByRole('button', {
+      name: 'Close session configuration',
+    });
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Arguments, 2 variables' }),
+    );
+    const multilineArgument = within(dialog).getByRole('textbox', {
+      name: '{{delivery_instructions}}',
+    });
+    multilineArgument.focus();
+
+    await user.tab();
+
+    expect(closeButton).toHaveFocus();
+  });
+
   it('uses the Carbon dark theme when the application is dark', async () => {
     mockResolvedMode = 'dark';
 

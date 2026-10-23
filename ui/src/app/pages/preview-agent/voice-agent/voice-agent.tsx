@@ -833,8 +833,9 @@ export const DebuggerTabHeader: FC<{
 
 export const ArgumentList: FC<{
   variables: Variable[];
+  values?: ReadonlyMap<string, string>;
   onChangeArgument: (k: string, v: string) => void;
-}> = ({ variables, onChangeArgument }) => {
+}> = ({ variables, values, onChangeArgument }) => {
   if (variables.length === 0) {
     return (
       <EmptyState
@@ -851,6 +852,8 @@ export const ArgumentList: FC<{
         <ArgumentRow
           key={variable.getName()}
           variable={variable}
+          value={values?.get(variable.getName())}
+          isControlled={Boolean(values)}
           onChangeArgument={onChangeArgument}
         />
       ))}
@@ -860,8 +863,10 @@ export const ArgumentList: FC<{
 
 const ArgumentRow: FC<{
   variable: Variable;
+  value?: string;
+  isControlled: boolean;
   onChangeArgument: (k: string, v: string) => void;
-}> = ({ variable, onChangeArgument }) => {
+}> = ({ variable, value, isControlled, onChangeArgument }) => {
   const type = variable.getType() as InputVarType;
   const editable = EDITABLE_ARGUMENT_TYPES.includes(type);
   const rows =
@@ -892,7 +897,9 @@ const ArgumentRow: FC<{
           labelText={`{{${variable.getName()}}}`}
           hideLabel
           rows={rows}
-          defaultValue={variable.getDefaultvalue()}
+          {...(isControlled
+            ? { value: value ?? '' }
+            : { defaultValue: variable.getDefaultvalue() })}
           placeholder="Enter variable value"
           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
             onChangeArgument(variable.getName(), e.target.value)
