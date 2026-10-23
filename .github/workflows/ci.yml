@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.26.9"
+  GO_VERSION: "1.26.10"
   NODE_VERSION: "22"
 
 jobs:
@@ -104,7 +104,7 @@ jobs:
     uses: ./.github/workflows/reusable-go-ci.yml
     secrets: inherit
     with:
-      go-version: "1.26.9"
+      go-version: "1.26.10"
 
   basics-ui:
     name: 01 Validate - UI
@@ -120,7 +120,7 @@ jobs:
     needs: changes
     uses: ./.github/workflows/reusable-repository-ci.yml
     with:
-      go-version: "1.26.9"
+      go-version: "1.26.10"
 
   docker:
     name: 02 Build - Docker Images
