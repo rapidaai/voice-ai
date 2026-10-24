@@ -114,6 +114,22 @@ describe('loadProviderData', () => {
     expect(data.length).toBeGreaterThan(0);
     expect(data[0]).toHaveProperty('code');
   });
+
+  it('loads the current Anthropic Claude model catalog', () => {
+    const data = loadProviderData('anthropic', 'text-models.json');
+    expect(data.slice(0, 4).map(model => model.id)).toEqual([
+      'anthropic/claude-fable-5-1',
+      'anthropic/claude-opus-5-5',
+      'anthropic/claude-sonnet-5-5',
+      'anthropic/claude-haiku-5-5',
+    ]);
+    expect(data.slice(0, 4).map(model => model.name)).toEqual([
+      'claude-fable-5-1',
+      'claude-opus-5-5',
+      'claude-sonnet-5-5',
+      'claude-haiku-5-5',
+    ]);
+  });
 });
 
 describe('resolveCategoryParameters', () => {
