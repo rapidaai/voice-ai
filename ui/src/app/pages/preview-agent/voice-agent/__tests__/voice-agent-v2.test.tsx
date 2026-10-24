@@ -1376,6 +1376,73 @@ describe('PreviewVoiceAgentV2', () => {
     expect(screen.queryByText('Listening')).not.toBeInTheDocument();
   });
 
+  it('shows the latest partial user transcript before the assistant reply', async () => {
+    const user = userEvent.setup({
+      pointerEventsCheck: PointerEventsCheckLevel.Never,
+      skipHover: true,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/preview/v2/chat/assistant-123']}>
+        <Routes>
+          <Route
+            path="/preview/v2/chat/:assistantId"
+            element={<PreviewVoiceAgentV2 />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole('heading', { name: 'Delivery concierge' });
+    await user.click(
+      screen.getByRole('button', { name: 'Start voice conversation' }),
+    );
+    await act(async () => resolveVoiceConnection?.());
+
+    await mockCarbonChatProps.messaging.customLoadHistory({
+      messaging: { addMessage: mockAddMessage },
+      send: mockSend,
+    });
+    await act(async () => {
+      mockAgentCallback.onUserMessage?.({
+        id: 'partial-voice-user',
+        messageText: 'My wife is calling',
+        completed: false,
+      });
+    });
+    expect(mockSend).not.toHaveBeenCalled();
+
+    await act(async () => {
+      mockAgentCallback.onAssistantMessage?.({
+        id: 'voice-response-after-partial',
+        messageText: 'Do you want to answer the call?',
+        completed: true,
+      });
+    });
+
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'partial-voice-user',
+        input: expect.objectContaining({ text: 'My wife is calling' }),
+      }),
+    );
+    expect(mockAddMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ request_id: 'partial-voice-user' }),
+    );
+    expect(mockSend.mock.invocationCallOrder[0]).toBeLessThan(
+      mockAddMessage.mock.invocationCallOrder[0],
+    );
+
+    await act(async () => {
+      mockAgentCallback.onUserMessage?.({
+        id: 'partial-voice-user',
+        messageText: 'My wife is calling',
+        completed: true,
+      });
+    });
+    expect(mockSend).toHaveBeenCalledTimes(1);
+  });
+
   it('shows listening after adding voice to an existing text session', async () => {
     const user = userEvent.setup({
       pointerEventsCheck: PointerEventsCheckLevel.Never,
