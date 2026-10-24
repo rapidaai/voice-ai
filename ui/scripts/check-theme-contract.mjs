@@ -87,15 +87,6 @@ export const BRAND_LITERAL_ALLOWLIST = Object.freeze({
       reason:
         'legacy conversation role value is mapped to a tenant-neutral display label',
     },
-  'ui/src/app/components/dialogs/assistant/assistant-instruction-modal.tsx': {
-    literals: ['cdn-01.rapida.ai'],
-    reason: 'web widget script URL is a deployment snippet asset source',
-  },
-  'ui/src/app/components/dialogs/assistant/assistant-web-widget-deployment-modal.tsx':
-    {
-      literals: ['cdn-01.rapida.ai'],
-      reason: 'web widget script URL is a deployment snippet asset source',
-    },
 });
 const HARD_CODED_PALETTES = Object.freeze([
   'white',

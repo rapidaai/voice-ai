@@ -7,6 +7,9 @@
         "socket": "socket.rapida.DOMAIN_PLACEHOLDER:4573",
         "sip": "sip.rapida.DOMAIN_PLACEHOLDER:5060"
     },
+    "deployment": {
+        "webWidgetScriptUrl": "https://cdn.DOMAIN_PLACEHOLDER/public/scripts/app.min.js"
+    },
     "workspace": {
         "domain": "DOMAIN_PLACEHOLDER",
         "authentication": {

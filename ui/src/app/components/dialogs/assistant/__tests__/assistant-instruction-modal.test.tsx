@@ -48,6 +48,14 @@ jest.mock('@/theme/documentation-url', () => ({
   useDocumentationUrl: () => 'https://docs.example.test',
 }));
 
+jest.mock('@/configs', () => ({
+  CONFIG: {
+    deployment: {
+      webWidgetScriptUrl: 'https://assets.client.example/widget/app.min.js',
+    },
+  },
+}));
+
 describe('AssistantWebwidgetDeploymentDialog', () => {
   const originalOpen = window.open;
 
@@ -73,6 +81,25 @@ describe('AssistantWebwidgetDeploymentDialog', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/app.min.js/)).toBeInTheDocument();
     expect(screen.getByText(/assistant-123/)).toBeInTheDocument();
+  });
+
+  it('keeps web widget snippets tenant neutral', () => {
+    render(
+      <AssistantWebwidgetDeploymentDialog
+        modalOpen
+        setModalOpen={jest.fn()}
+        assistantId="assistant-123"
+      />,
+    );
+
+    const snippets = screen.getAllByText((_, node) => node?.tagName === 'PRE');
+    const snippetText = snippets.map(snippet => snippet.textContent).join('\n');
+
+    expect(snippetText).toContain(
+      'https://assets.client.example/widget/app.min.js',
+    );
+    expect(snippetText).toContain('token: "{PROJECT_KEY}"');
+    expect(snippetText).not.toMatch(/rapida/i);
   });
 
   it('opens documentation with the standard action icon', async () => {

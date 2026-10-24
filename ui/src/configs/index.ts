@@ -44,22 +44,58 @@ export interface RapidaConfig {
     sip?: string;
     socket?: string;
   };
+  deployment: {
+    webWidgetScriptUrl: string;
+  };
   analytics?: SentryAnalyticsConfig;
   workspace: WorkspaceConfig;
   theme: ThemeManifest;
 }
-const developmentConfig: RapidaConfig = {
-  ...devConfig,
-  theme: devConfig.theme as ThemeManifest,
-};
-const productionConfig: RapidaConfig = {
-  ...prodConfig,
-  theme: prodConfig.theme as ThemeManifest,
+
+type ConfigSource = Omit<RapidaConfig, 'deployment' | 'theme'> & {
+  deployment?: Partial<RapidaConfig['deployment']>;
+  theme: unknown;
 };
 
-export const getConfig = (
-  environment = getRuntimeEnv().mode,
-): RapidaConfig =>
+const WEB_WIDGET_SCRIPT_PATH = '/public/scripts/app.min.js';
+
+const readConfigString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : undefined;
+
+const withoutTrailingSlash = (value: string): string =>
+  value.endsWith('/') ? value.slice(0, -1) : value;
+
+const isLocalWorkspaceDomain = (domain: string): boolean =>
+  domain === 'localhost' ||
+  domain === '127.0.0.1' ||
+  domain === '::1' ||
+  domain.endsWith('.localhost');
+
+export const withConfigDefaults = (config: ConfigSource): RapidaConfig => {
+  const domain = readConfigString(config.workspace?.domain);
+  const webOrigin = readConfigString(config.connection.web);
+  const webWidgetScriptUrl =
+    readConfigString(config.deployment?.webWidgetScriptUrl) ??
+    (domain && isLocalWorkspaceDomain(domain) && webOrigin
+      ? `${withoutTrailingSlash(webOrigin)}${WEB_WIDGET_SCRIPT_PATH}`
+      : domain
+        ? `https://cdn.${domain}${WEB_WIDGET_SCRIPT_PATH}`
+        : WEB_WIDGET_SCRIPT_PATH);
+
+  return {
+    ...config,
+    deployment: {
+      webWidgetScriptUrl,
+    },
+    theme: config.theme as ThemeManifest,
+  };
+};
+const developmentConfig = withConfigDefaults(devConfig as ConfigSource);
+const productionConfig = withConfigDefaults(prodConfig as ConfigSource);
+
+export const getConfig = (environment = getRuntimeEnv().mode): RapidaConfig =>
   environment === 'production' ? productionConfig : developmentConfig;
 
 export const CONFIG = getConfig();

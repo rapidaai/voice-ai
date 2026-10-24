@@ -15,6 +15,7 @@ import {
   DeploymentSectionHeader,
 } from '@/app/components/dialogs/shared';
 import { Tabs } from '@/app/components/ui/primitives';
+import { CONFIG } from '@/configs';
 
 interface AssistantWebWidgetlDeploymentDialogProps extends ModalProps {
   deployment: AssistantWebpluginDeployment;
@@ -48,7 +49,7 @@ export function AssistantWebWidgetlDeploymentDialog(
               <div className="px-4 py-3">
                 <CodeHighlighting
                   className="min-h-[20px]"
-                  code='<script src="https://cdn-01.rapida.ai/public/scripts/app.min.js" defer></script>'
+                  code={`<script src="${CONFIG.deployment.webWidgetScriptUrl}" defer></script>`}
                 />
               </div>
             </div>
@@ -63,7 +64,7 @@ theme: {
     color: "black",
 },
 assistant_id: "${props.deployment.getAssistantid() || 'YOUR_ASSISTANT_ID'}",
-token: "{RAPIDA_PROJECT_KEY}",
+token: "{PROJECT_KEY}",
 user: {
     id: "{UNIQUE_IDENTIFIER}",
     name: "{NAME}",

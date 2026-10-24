@@ -13,6 +13,7 @@ import { Launch } from '@carbon/icons-react';
 import { CodeHighlighting } from '@/app/components/ui/editor/code-highlighting';
 import { DeploymentSectionHeader } from '@/app/components/dialogs/shared/deployment-modal-primitives';
 import { useDocumentationUrl } from '@/theme/documentation-url';
+import { CONFIG } from '@/configs';
 
 interface AssistantInstructionDialogProps
   extends ModalProps,
@@ -44,7 +45,7 @@ function AssistantWebwidgetDeploymentDialogComponent({
         <div className="px-4 py-3">
           <CodeHighlighting
             className="min-h-[20px]"
-            code='<script src="https://cdn-01.rapida.ai/public/scripts/app.min.js" defer></script>'
+            code={`<script src="${CONFIG.deployment.webWidgetScriptUrl}" defer></script>`}
           />
         </div>
 
@@ -55,7 +56,7 @@ function AssistantWebwidgetDeploymentDialogComponent({
             code={`<script>
 window.chatbotConfig = {
   assistant_id: "${assistantId}",
-  token: "{RAPIDA_PROJECT_KEY}",
+  token: "{PROJECT_KEY}",
   user: {
     id: "{UNIQUE_IDENTIFIER}",
     name: "{NAME}",
