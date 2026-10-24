@@ -169,11 +169,11 @@ export const EditAssistant: FC<{ assistantId: string }> = ({ assistantId }) => {
   });
 
   return (
-    <div className="w-full flex flex-col flex-1 overflow-auto bg-white dark:bg-gray-900">
+    <div className="flex w-full flex-1 flex-col overflow-auto bg-surface">
       <Deletion.ConfirmDeleteDialogComponent />
 
       <AssistantSettingsShellHeader
-        title="General settings"
+        title="General Settings"
         href={`/deployment/assistant/${assistantId}/edit-assistant`}
       />
 

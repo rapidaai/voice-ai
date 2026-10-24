@@ -84,18 +84,18 @@ describe('EditAssistant layout', () => {
     window.scrollTo = jest.fn();
   });
 
-  it('uses light/dark background tokens on general settings page root', async () => {
+  it('uses the shared surface token and exact General Settings heading', async () => {
     const { container } = render(<EditAssistant assistantId="assistant-1" />);
 
     await waitFor(() => {
       expect(
-        screen.getByRole('heading', { name: 'General settings', level: 1 }),
+        screen.getByRole('heading', { name: 'General Settings', level: 1 }),
       ).toBeInTheDocument();
     });
 
     const pageRoot = container.firstElementChild as HTMLElement;
-    expect(pageRoot).toHaveClass('bg-white');
-    expect(pageRoot).toHaveClass('dark:bg-gray-900');
+    expect(pageRoot).toHaveClass('bg-surface');
+    expect(pageRoot).not.toHaveClass('bg-white', 'dark:bg-gray-900');
   });
 
   it('uses label toggletips instead of helper text for edit fields', async () => {

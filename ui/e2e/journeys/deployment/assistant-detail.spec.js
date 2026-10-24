@@ -30,8 +30,65 @@ test('populated assistant journeys expose overview, sessions, versions, and sett
 
   await page.getByRole('link', { name: 'General', exact: true }).click();
   await expect(
-    page.getByRole('heading', { name: 'General settings' }),
+    page.getByRole('heading', { name: 'General Settings' }),
   ).toBeVisible();
+});
+
+test('assistant internal pages share the shell header styling and requested headings', async ({
+  page,
+}) => {
+  const pages = [
+    ['deployment.assistantSettings', 'General Settings'],
+    ['deployment.assistantAuthentication', 'Authentication'],
+    ['deployment.assistantDeployments', 'Deployments'],
+    ['deployment.assistantTools', 'Tool & MCP'],
+    ['deployment.assistantWebhooks', 'Webhooks'],
+    ['deployment.assistantTelemetry', 'Telemetry'],
+    ['deployment.assistantStorage', 'Storage'],
+    ['deployment.assistantAnalysis', 'Analysis'],
+    ['deployment.assistantPlaygroundChat', 'Chat'],
+  ];
+
+  for (const [journeyId, heading] of pages) {
+    await gotoJourney(page, journey(journeyId));
+
+    const globalHeader = page.locator('header').filter({
+      has: page.getByRole('navigation', { name: 'Breadcrumb' }),
+    });
+    const pageHeading = page.getByRole('heading', {
+      name: heading,
+      exact: true,
+      level: 1,
+    });
+    const pageHeader = pageHeading.locator(
+      'xpath=ancestor::*[@aria-label][contains(@aria-label, "header") or @role="toolbar"][1]',
+    );
+
+    await expect(pageHeading).toBeVisible();
+    await expect(pageHeader).toBeVisible();
+
+    const [globalStyles, pageStyles] = await Promise.all(
+      [globalHeader, pageHeader].map(locator =>
+        locator.evaluate(element => {
+          const styles = getComputedStyle(element);
+          return {
+            backgroundColor: styles.backgroundColor,
+            borderBottomColor: styles.borderBottomColor,
+            borderBottomWidth: styles.borderBottomWidth,
+            boxShadow: styles.boxShadow,
+            height: styles.height,
+          };
+        }),
+      ),
+    );
+
+    expect(pageStyles).toEqual(globalStyles);
+    await expect(
+      pageHeading.locator(
+        'xpath=ancestor::*[contains(@class, "bg-surface")][1]',
+      ),
+    ).toBeVisible();
+  }
 });
 
 test('assistant session opens its populated message detail', async ({

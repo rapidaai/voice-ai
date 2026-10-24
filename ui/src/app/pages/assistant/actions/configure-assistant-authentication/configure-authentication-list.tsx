@@ -212,7 +212,7 @@ export const ConfigureAuthenticationList: FC<
   }
 
   return (
-    <div className="h-full flex flex-col flex-1">
+    <div className="flex h-full flex-1 flex-col bg-surface">
       <ComposedModal
         open={Boolean(pendingAction)}
         onClose={closeActionModal}

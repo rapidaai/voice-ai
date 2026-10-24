@@ -123,11 +123,11 @@ const ConfigureAssistantTool: FC<{ assistantId: string }> = ({
   }
 
   return (
-    <div className="relative flex flex-col flex-1">
+    <div className="relative flex flex-1 flex-col bg-surface">
       <ConfirmDialogComponent />
 
       <AssistantSettingsShellHeader
-        title="Tools & MCP"
+        title="Tool & MCP"
         href={`/deployment/assistant/${assistantId}/configure-tool`}
         onReload={refreshTools}
         reloadLabel="Reload tools"
