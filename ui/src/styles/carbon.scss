@@ -2,6 +2,7 @@
 @use '@carbon/react/scss/theme' as carbon-theme with (
   $theme: themes.$white
 );
+@use '@carbon/styles/scss/grid';
 @use '@carbon/react/scss/components/button';
 @use '@carbon/react/scss/components/tooltip';
 @use '@carbon/react/scss/components/toggletip';
@@ -12,16 +13,20 @@
 @use '@carbon/react/scss/components/stack';
 @use '@carbon/react/scss/components/checkbox';
 @use '@carbon/react/scss/components/text-input';
+@use '@carbon/react/scss/components/fluid-text-input';
 @use '@carbon/react/scss/components/text-area';
+@use '@carbon/react/scss/components/fluid-text-area';
 @use '@carbon/react/scss/components/list-box';
 @use '@carbon/react/scss/components/dropdown';
 @use '@carbon/react/scss/components/multiselect';
 @use '@carbon/react/scss/components/search';
 @use '@carbon/react/scss/components/combo-box';
 @use '@carbon/react/scss/components/select';
+@use '@carbon/react/scss/components/fluid-select';
 @use '@carbon/react/scss/components/pagination';
 @use '@carbon/react/scss/components/radio-button';
 @use '@carbon/react/scss/components/number-input';
+@use '@carbon/react/scss/components/fluid-number-input';
 @use '@carbon/react/scss/components/slider';
 @use '@carbon/react/scss/components/skeleton-styles';
 @use '@carbon/react/scss/components/data-table';
@@ -34,8 +39,10 @@
 @use '@carbon/react/scss/components/tile';
 @use '@carbon/react/scss/components/tag';
 @use '@carbon/react/scss/components/loading';
+@use '@carbon/react/scss/components/inline-loading';
 @use '@carbon/react/scss/components/code-snippet';
 @use '@carbon/react/scss/components/content-switcher';
+@use '@carbon/react/scss/components/progress-bar';
 @use '@carbon/react/scss/components/progress-indicator';
 @use '@carbon/react/scss/components/copy-button';
 @use '@carbon/react/scss/components/menu';
@@ -46,6 +53,22 @@
 @use '@carbon/react/scss/components/date-picker';
 @use '@carbon/react/scss/components/tabs';
 @use '@carbon/react/scss/components/structured-list';
+@use '@carbon/react/scss/components/accordion';
+
+.debugger-configuration-accordion > .cds--accordion__item:first-child {
+  border-block-start: 0;
+}
+
+.debugger-configuration-accordion .cds--accordion__content {
+  margin-inline-start: 0;
+  padding-inline: 0;
+}
+
+.debugger-configuration-accordion
+  .cds--accordion__item--active
+  > .cds--accordion__wrapper {
+  padding-block: 0;
+}
 
 // ─── DatePicker calendar background ─────────────────────────────────────────
 .flatpickr-calendar,
@@ -171,17 +194,29 @@
   --cds-interactive: var(--brand-primary);
   --cds-link-primary: var(--brand-primary);
   --cds-link-primary-hover: var(--brand-primary-hover);
-  --cds-button-primary: var(--brand-primary);
-  --cds-button-primary-hover: var(--brand-primary-hover);
-  --cds-button-primary-active: var(--brand-primary-active);
   --cds-text-on-color: #ffffff;
   --cds-button-tertiary: var(--brand-primary);
   --cds-button-tertiary-hover: var(--brand-primary-hover);
   --cds-button-tertiary-active: var(--brand-primary-active);
 }
 
-.cds--btn--primary {
-  color: var(--brand-on-primary);
+.app-primary-button.cds--btn--primary:not(:disabled) {
+  background-color: var(--cds-button-primary);
+  color: #ffffff;
+
+  &:hover {
+    background-color: var(--cds-button-primary-hover);
+    color: #ffffff;
+  }
+
+  &:active {
+    background-color: var(--cds-button-primary-active);
+    color: #ffffff;
+  }
+
+  svg {
+    fill: currentColor;
+  }
 }
 
 .assistant-settings-save {

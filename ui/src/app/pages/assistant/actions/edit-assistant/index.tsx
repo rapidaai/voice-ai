@@ -17,8 +17,6 @@ import {
 import { PrimaryButton, DangerButton } from '@/app/components/ui/primitives';
 import { CopyButton } from '@/app/components/ui/primitives';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
   Toggletip as CarbonToggletip,
   ToggletipButton,
   ToggletipContent,
@@ -30,6 +28,7 @@ import {
   getAssistantById,
   updateAssistantDescription,
 } from '@/clients/assistant.client';
+import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
 
 const Toggletip = (CarbonToggletip as any).default || CarbonToggletip;
 
@@ -173,17 +172,10 @@ export const EditAssistant: FC<{ assistantId: string }> = ({ assistantId }) => {
     <div className="w-full flex flex-col flex-1 overflow-auto bg-white dark:bg-gray-900">
       <Deletion.ConfirmDeleteDialogComponent />
 
-      {/* Page header */}
-      <div className="px-4 pt-4 pb-6 border-b border-gray-200 dark:border-gray-800">
-        <Breadcrumb noTrailingSlash className="mb-2">
-          <BreadcrumbItem
-            href={`/deployment/assistant/${assistantId}/overview`}
-          >
-            Assistant
-          </BreadcrumbItem>
-        </Breadcrumb>
-        <h1 className="text-2xl font-light tracking-tight">General Settings</h1>
-      </div>
+      <AssistantSettingsShellHeader
+        title="General settings"
+        href={`/deployment/assistant/${assistantId}/edit-assistant`}
+      />
 
       <InputGroup title="Identity">
         <div className="flex max-w-full flex-col items-start gap-2">

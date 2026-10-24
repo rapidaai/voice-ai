@@ -21,6 +21,7 @@ let mockParams: Record<string, string | undefined> = {};
 const mockNavigate = jest.fn();
 const mockShowLoader = jest.fn();
 const mockHideLoader = jest.fn();
+let mockLoading = false;
 const mockConfigPrompt = jest.fn();
 const mockTextProvider = jest.fn();
 const mockValidateTextProviderDefaultOptions = jest.fn();
@@ -137,7 +138,7 @@ jest.mock('@carbon/react', () => {
 
 jest.mock('@/stores/app', () => ({
   useRapidaStore: () => ({
-    loading: false,
+    loading: mockLoading,
     showLoader: mockShowLoader,
     hideLoader: mockHideLoader,
   }),
@@ -363,6 +364,13 @@ describe('Requested create/update flow pages', () => {
       }),
     });
     jest.clearAllMocks();
+    mockLoading = false;
+    mockShowLoader.mockImplementation(() => {
+      mockLoading = true;
+    });
+    mockHideLoader.mockImplementation(() => {
+      mockLoading = false;
+    });
     mockParams = {};
     mockConfigPrompt.mockClear();
     mockTextProvider.mockClear();
@@ -403,9 +411,9 @@ describe('Requested create/update flow pages', () => {
       screen.getByText('Enter your email and we will send you a reset link.'),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Back to sign in' }),
+      screen.getByRole('link', { name: 'Back to log in' }),
     ).toHaveAttribute('href', '/auth/signin');
-    await user.click(screen.getByPlaceholderText('eg: john@example.com'));
+    await user.click(screen.getByLabelText('Email address'));
     await user.keyboard('{Control>}a{/Control}');
     await user.paste(String('user@x.com'));
     await user.click(screen.getByRole('button', { name: 'Send reset link' }));
@@ -413,6 +421,61 @@ describe('Requested create/update flow pages', () => {
     expect(
       await screen.findByText(/Thanks! An email was sent/i),
     ).toBeInTheDocument();
+  });
+
+  it('forgot password shows a field error before calling the client', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    renderWithTheme(<ForgotPasswordPage />);
+
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
+
+    expect(await screen.findByText('Enter your email address.')).toBeVisible();
+    expect(ForgotPassword).not.toHaveBeenCalled();
+  });
+
+  it('forgot password rejects a malformed email before calling the client', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    renderWithTheme(<ForgotPasswordPage />);
+
+    await user.type(screen.getByLabelText('Email address'), 'not-an-email');
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
+
+    expect(
+      await screen.findByText('Enter a valid email address.'),
+    ).toBeVisible();
+    expect(ForgotPassword).not.toHaveBeenCalled();
+  });
+
+  it('returns focus to the email field after a failed reset request', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    let completeRequest:
+      | ((error: unknown, response: unknown) => void)
+      | undefined;
+    (ForgotPassword as jest.Mock).mockImplementation((_cfg, _email, cb) => {
+      completeRequest = cb;
+    });
+    const { rerender } = renderWithTheme(<ForgotPasswordPage />);
+
+    await user.type(screen.getByLabelText('Email address'), 'user@x.com');
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
+    rerender(
+      <ThemeProvider theme={theme}>
+        <ForgotPasswordPage />
+      </ThemeProvider>,
+    );
+    expect(screen.getByLabelText('Email address')).toBeDisabled();
+
+    act(() => {
+      completeRequest?.(new Error('request failed'), {
+        getSuccess: () => false,
+        getError: () => ({ getHumanmessage: () => 'Try again.' }),
+      });
+    });
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Email address')).not.toBeDisabled(),
+    );
+    expect(screen.getByLabelText('Email address')).toHaveFocus();
   });
 
   it('create endpoint blocks continue when prompt template variables are missing', async () => {

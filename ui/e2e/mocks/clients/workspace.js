@@ -10,8 +10,11 @@ const WORKSPACE_LIST_PATHS = [
   '**/web_api.AuthenticationService/GetAllUser',
   '**/web_api.ProjectService/GetAllProject',
 ];
-const ORGANIZATION_PATH =
-  '**/web_api.OrganizationService/GetOrganization';
+const ORGANIZATION_PATH = '**/web_api.OrganizationService/GetOrganization';
+const WORKSPACE_CREATION_PATHS = Object.freeze({
+  organization: '/web_api.OrganizationService/CreateOrganization',
+  project: '/web_api.ProjectService/CreateProject',
+});
 
 const EMPTY_WORKSPACE_LIST_RESPONSE = Buffer.concat([
   protobufBoolean(2, true),
@@ -32,6 +35,19 @@ const ORGANIZATION_RESPONSE = Buffer.concat([
   protobufBytes(3, ORGANIZATION),
 ]);
 
+const WORKSPACE_CREATION_RESPONSE = protobufBoolean(2, true);
+
+async function mockWorkspaceCreation(page, resource, onCreate) {
+  const path = WORKSPACE_CREATION_PATHS[resource];
+  if (!path) throw new Error(`Unknown workspace resource: ${resource}`);
+
+  await page.route(`**${path}`, route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    onCreate?.();
+    return fulfillGrpcWeb(route, WORKSPACE_CREATION_RESPONSE);
+  });
+}
+
 async function installWorkspaceClientMock(page) {
   for (const path of WORKSPACE_LIST_PATHS) {
     await page.route(path, route => {
@@ -48,6 +64,8 @@ async function installWorkspaceClientMock(page) {
 
 module.exports = {
   ORGANIZATION_PATH,
+  WORKSPACE_CREATION_PATHS,
   WORKSPACE_LIST_PATHS,
   installWorkspaceClientMock,
+  mockWorkspaceCreation,
 };

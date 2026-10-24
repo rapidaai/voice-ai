@@ -41,6 +41,26 @@ const journeySubjourneys = [
     'journeys/auth/authentication.spec.js',
   ),
   covered(
+    'onboarding.organization.responsiveLayout',
+    'onboarding.organization',
+    'journeys/onboarding/onboarding.spec.js',
+  ),
+  covered(
+    'onboarding.project.completedOrganizationGuard',
+    'onboarding.project',
+    'journeys/onboarding/onboarding.spec.js',
+  ),
+  covered(
+    'onboarding.signup.completeFlow',
+    'auth.signup',
+    'journeys/onboarding/onboarding.spec.js',
+  ),
+  covered(
+    'onboarding.project.resumeIncompleteAccount',
+    'onboarding.project',
+    'journeys/onboarding/onboarding.spec.js',
+  ),
+  covered(
     'dashboard.loading',
     'dashboard.home',
     'journeys/dashboard/state-screenshots.spec.js',
@@ -155,6 +175,16 @@ const journeySubjourneys = [
     'deployment.assistant.overviewError',
     'deployment.assistantOverview',
     'journeys/deployment/assistant-state-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.playgroundChat',
+    'deployment.assistantPlaygroundChat',
+    'journeys/preview/debugger-v2.spec.js',
+  ),
+  covered(
+    'deployment.assistant.playgroundPhone',
+    'deployment.assistantPlaygroundPhone',
+    'journeys/preview/debugger-v2.spec.js',
   ),
   covered(
     'deployment.assistant.sessions',

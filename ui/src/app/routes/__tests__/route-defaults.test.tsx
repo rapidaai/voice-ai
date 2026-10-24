@@ -66,6 +66,15 @@ jest.mock('@/app/pages/assistant/view/assistant-view.layout', () => {
   return { AssistantViewLayout: () => <Outlet /> };
 });
 
+jest.mock('@/app/pages/preview-agent', () => ({
+  PreviewVoiceAgentV2Page: ({ embedded }: { embedded?: boolean }) => (
+    <div>{embedded ? 'Embedded chat debugger' : 'Chat debugger'}</div>
+  ),
+  PreviewPhoneAgentPage: ({ embedded }: { embedded?: boolean }) => (
+    <div>{embedded ? 'Embedded phone debugger' : 'Phone debugger'}</div>
+  ),
+}));
+
 jest.mock('@/app/pages/endpoint', () => {
   const EmptyPage = () => null;
   return {
@@ -87,7 +96,17 @@ jest.mock('@/app/pages/user-onboarding', () => ({
 }));
 
 jest.mock('@/theme/theme-provider', () => ({
-  useTheme: () => ({ theme: { brand: { name: 'Rapida AI' } } }),
+  useTheme: () => ({
+    theme: {
+      brand: { name: 'Rapida AI' },
+      links: {
+        documentation: '/docs',
+        privacy: '/privacy',
+        support: '/support',
+        terms: '/terms',
+      },
+    },
+  }),
 }));
 
 jest.mock('@/app/components/layout/brand/branded-logo', () => ({
@@ -120,6 +139,27 @@ describe('route defaults', () => {
     await waitFor(() =>
       expect(screen.getByText('/deployment/assistant')).toBeInTheDocument(),
     );
+  });
+
+  it.each([
+    [
+      '/deployment/assistant/assistant-1/playground/chat',
+      'Embedded chat debugger',
+    ],
+    [
+      '/deployment/assistant/assistant-1/playground/phone',
+      'Embedded phone debugger',
+    ],
+  ])('renders the native assistant playground at %s', (path, expectedText) => {
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/deployment/*" element={<DeploymentRoute />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(expectedText)).toBeInTheDocument();
   });
 
   it('redirects the onboarding root to organization setup', async () => {

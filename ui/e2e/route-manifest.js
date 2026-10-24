@@ -15,7 +15,7 @@ const routeRoots = [
   {
     root: '/preview',
     deferredReason:
-      'Preview pages need assistant-specific realtime fixtures before browser coverage is stable.',
+      'Public assistant preview needs realtime SDK fixtures before browser coverage is stable.',
   },
   {
     root: '/connect-common',
@@ -45,24 +45,24 @@ const routeJourneys = [
     id: 'navigation.root',
     path: '/',
     auth: false,
-    expectText: 'Sign in',
-    readyText: 'Sign in with GitHub',
+    expectText: 'Log in',
+    readyText: 'Log in with GitHub',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
     id: 'auth.root',
     path: '/auth',
     auth: false,
-    expectText: 'Sign in',
-    readyText: 'Sign in with GitHub',
+    expectText: 'Log in',
+    readyText: 'Log in with GitHub',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
     id: 'auth.signin',
     path: '/auth/signin',
     auth: false,
-    expectText: 'Sign in',
-    readyText: 'Sign in with GitHub',
+    expectText: 'Log in',
+    readyText: 'Log in with GitHub',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
@@ -104,7 +104,7 @@ const routeJourneys = [
     id: 'dashboard.home',
     path: '/dashboard',
     auth: true,
-    expectText: 'Project overview',
+    expectText: 'Top assistants',
     readyText: 'Top assistants',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
@@ -114,6 +114,7 @@ const routeJourneys = [
     auth: true,
     expectText: 'Assistants',
     checks: ['smoke', 'a11y', 'screenshot'],
+    screenshotOwner: 'focused',
   },
   {
     id: 'deployment.root',
@@ -171,6 +172,25 @@ const routeJourneys = [
     expectText: 'Assistant activity',
     readyText: '1,284',
     checks: ['smoke', 'a11y', 'screenshot'],
+    screenshotOwner: 'focused',
+  },
+  {
+    id: 'deployment.assistantPlaygroundChat',
+    path: '/deployment/assistant/2301664620831571968/playground/chat',
+    auth: true,
+    expectText: 'Support bot',
+    readyText: 'Hello! How can I help you today?',
+    checks: ['smoke', 'a11y', 'screenshot'],
+    screenshotOwner: 'focused',
+  },
+  {
+    id: 'deployment.assistantPlaygroundPhone',
+    path: '/deployment/assistant/2301664620831571968/playground/phone',
+    auth: true,
+    expectText: 'Debug Phone Call',
+    readyText: 'Start Call',
+    checks: ['smoke', 'a11y', 'screenshot'],
+    screenshotOwner: 'focused',
   },
   {
     id: 'deployment.assistantSessions',
@@ -179,6 +199,7 @@ const routeJourneys = [
     expectText: 'customer@example.test',
     readyText: '2301664620831572101',
     checks: ['smoke', 'a11y', 'screenshot'],
+    screenshotOwner: 'focused',
   },
   {
     id: 'deployment.assistantSessionDetail',
@@ -200,7 +221,7 @@ const routeJourneys = [
     id: 'deployment.assistantSettings',
     path: '/deployment/assistant/2301664620831571968/edit-assistant',
     auth: true,
-    expectText: 'General Settings',
+    expectText: 'General settings',
     readyText: 'Support bot',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
@@ -209,8 +230,9 @@ const routeJourneys = [
     path: '/deployment/assistant/2301664620831571968/deployment',
     auth: true,
     expectText: 'Deployments',
-    readyText: 'No deployments found',
+    readyText: 'Choose how you want to test or deliver your assistant.',
     checks: ['smoke', 'a11y', 'screenshot'],
+    screenshotOwner: 'focused',
   },
   {
     id: 'deployment.assistantTools',
@@ -457,14 +479,14 @@ const routeJourneys = [
     id: 'onboarding.organization',
     path: '/onboarding/organization',
     auth: true,
-    expectText: 'Set up your organization',
+    expectText: 'Create your organization',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
     id: 'onboarding.root',
     path: '/onboarding',
     auth: true,
-    expectText: 'Set up your organization',
+    expectText: 'Create your organization',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
@@ -586,6 +608,14 @@ const sourceRouteInventory = {
     {
       path: 'assistant/:assistantId',
       journey: 'deployment.assistantOverview',
+    },
+    {
+      path: 'playground/chat',
+      journey: 'deployment.assistantPlaygroundChat',
+    },
+    {
+      path: 'playground/phone',
+      journey: 'deployment.assistantPlaygroundPhone',
     },
     {
       path: 'sessions/:sessionId',
@@ -798,19 +828,19 @@ const sourceRouteInventory = {
   ],
   'preview.tsx': [
     {
-      path: '/',
-      deferredReason:
-        'Preview layout needs assistant-specific realtime fixtures.',
-    },
-    {
       path: 'call/:assistantId/',
       deferredReason:
-        'Phone preview needs assistant-specific realtime fixtures.',
+        'Legacy phone preview redirects to the assistant playground.',
     },
     {
       path: 'chat/:assistantId',
       deferredReason:
-        'Chat preview needs assistant-specific realtime fixtures.',
+        'Legacy chat preview redirects to the assistant playground.',
+    },
+    {
+      path: 'v2/chat/:assistantId',
+      deferredReason:
+        'Legacy debugger v2 redirects to the assistant playground.',
     },
     {
       path: 'public/assistant/:assistantId',
@@ -827,7 +857,14 @@ const sourceRouteInventory = {
 const journeysWithCheck = check =>
   routeJourneys.filter(journey => journey.checks.includes(check));
 
+const genericScreenshotJourneys = routeJourneys.filter(
+  journey =>
+    journey.checks.includes('screenshot') &&
+    journey.screenshotOwner !== 'focused',
+);
+
 module.exports = {
+  genericScreenshotJourneys,
   routeRoots,
   routeJourneys,
   sourceRouteInventory,

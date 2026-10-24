@@ -23,10 +23,14 @@ export interface CarbonTabsProps {
   contained?: boolean;
   /** Stretch tabs and panels to fill the parent flex layout. */
   fill?: boolean;
+  /** Distribute contained tabs across the available width. */
+  fullWidth?: boolean;
   /** Accessible label for the tab list. */
   'aria-label'?: string;
   /** Class applied to the Carbon Tabs root container. */
   className?: string;
+  /** Class applied to the Carbon TabList. */
+  tabListClassName?: string;
   /** Class applied to each Carbon TabPanel. */
   panelClassName?: string;
   /** Class applied to the Carbon TabPanels wrapper. */
@@ -43,8 +47,10 @@ export function Tabs({
   onChange,
   contained = false,
   fill = false,
+  fullWidth = false,
   'aria-label': ariaLabel = 'Tabs',
   className,
+  tabListClassName,
   panelClassName,
   panelsClassName,
   isLoading = false,
@@ -67,7 +73,12 @@ export function Tabs({
           onChange?.(idx)
         }
       >
-        <CarbonTabList contained={contained} aria-label={ariaLabel}>
+        <CarbonTabList
+          contained={contained}
+          fullWidth={fullWidth}
+          aria-label={ariaLabel}
+          className={tabListClassName}
+        >
           {tabs.map(label => (
             <CarbonTab key={label}>{label}</CarbonTab>
           ))}

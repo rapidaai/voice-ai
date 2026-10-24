@@ -1,59 +1,88 @@
-import React, { useCallback, useContext, useState } from 'react';
-import { Helmet } from '@/app/components/app-shell/helmet';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useContext, useState } from 'react';
+import type { CreateOrganizationResponse, ServiceError } from '@rapidaai/react';
+import { SelectItem } from '@carbon/react';
+import { ArrowRight } from '@carbon/icons-react';
 import { useForm } from 'react-hook-form';
-import { CreateOrganizationResponse } from '@rapidaai/react';
+import { useNavigate } from 'react-router-dom';
+import { Helmet } from '@/app/components/app-shell/helmet';
+import { Notification } from '@/app/components/ui/feedback';
+import {
+  FluidForm,
+  FluidSelect,
+  FluidTextInput,
+  PrimaryButton,
+  Text,
+} from '@/app/components/ui/primitives';
+import { createWorkspaceOrganization } from '@/clients';
+import { AuthContext } from '@/context/auth-context';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useRapidaStore } from '@/stores/app';
-import { ServiceError } from '@rapidaai/react';
-import { AuthContext } from '@/context/auth-context';
-import { Stack, TextInput } from '@/app/components/ui/primitives';
-import { PrimaryButton } from '@/app/components/ui/primitives';
-import { Notification } from '@/app/components/ui/feedback';
-import { ArrowRight } from '@carbon/icons-react';
-import { Select, SelectItem } from '@carbon/react';
-import { createWorkspaceOrganization } from '@/clients';
+
+type OrganizationFormValues = {
+  organizationName: string;
+  organizationSize: string;
+  organizationIndustry: string;
+};
+
+const ORGANIZATION_ERROR = "We couldn't create your organization. Try again.";
 
 export function CreateOrganizationPage() {
   const navigate = useNavigate();
   const { loading, showLoader, hideLoader } = useRapidaStore();
   const { authorize } = useContext(AuthContext);
   const { user, authId, token } = useCurrentCredential();
+  const profileName = user?.name?.trim();
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm();
+  } = useForm<OrganizationFormValues>({
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
+    defaultValues: {
+      organizationName: profileName ? `${profileName}'s organization` : '',
+      organizationSize: '',
+      organizationIndustry: '',
+    },
+  });
   const [error, setError] = useState('');
 
   const afterCreateOrganization = useCallback(
     (err: ServiceError | null, org: CreateOrganizationResponse | null) => {
       if (err) {
         hideLoader();
-        setError('Unable to process your request. Please try again later.');
+        setError(ORGANIZATION_ERROR);
         return;
       }
-      if (org?.getSuccess()) {
-        authorize &&
-          authorize(
-            () => {
-              hideLoader();
-              return navigate('/onboarding/project');
-            },
-            () => {
-              hideLoader();
-              setError('Please provide valid credentials to sign in.');
-            },
-          );
-      } else {
+
+      if (!org?.getSuccess()) {
         hideLoader();
-        setError('Please provide valid credentials to sign in.');
+        setError(org?.getError()?.getHumanmessage() || ORGANIZATION_ERROR);
+        return;
       }
+
+      if (!authorize) {
+        hideLoader();
+        setError("We couldn't refresh your workspace. Log in again.");
+        return;
+      }
+
+      authorize(
+        () => {
+          hideLoader();
+          navigate('/onboarding/project');
+        },
+        () => {
+          hideLoader();
+          setError("We couldn't refresh your workspace. Log in again.");
+        },
+      );
     },
-    [],
+    [authorize, hideLoader, navigate],
   );
 
-  const onCreateOrganization = data => {
+  const onCreateOrganization = (data: OrganizationFormValues) => {
+    setError('');
     showLoader('overlay');
     createWorkspaceOrganization({
       name: data.organizationName,
@@ -64,64 +93,80 @@ export function CreateOrganizationPage() {
     });
   };
 
-  const formError =
-    (errors.organizationName?.message as string) ||
-    (errors.organizationSize?.message as string) ||
-    (errors.organizationIndustry?.message as string) ||
-    error;
-
   return (
     <>
       <Helmet title="Onboarding: Create an organization" />
-      <div className="mb-4">
-        <h1 className="text-xl font-light tracking-tight">
-          Set up your organization
-        </h1>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Create the top-level workspace that owns assistants, credentials,
-          client programs, and governance settings.
-        </p>
+      <div className="mb-10">
+        <Text as="h1" variant="heading-05" className="m-0">
+          Create your organization
+        </Text>
+        <Text as="p" variant="body-02" className="mt-2 text-muted">
+          Tell us about your organization to set up your workspace.
+        </Text>
       </div>
 
-      <form onSubmit={handleSubmit(onCreateOrganization)}>
-        <Stack gap={5}>
-          <TextInput
+      <FluidForm
+        noValidate
+        data-testid="organization-form"
+        onChange={() => {
+          if (error) setError('');
+        }}
+        onSubmit={handleSubmit(onCreateOrganization)}
+      >
+        <div className="flex flex-col" data-testid="organization-fields">
+          <FluidTextInput
             id="org-name"
-            labelText="Organization Name"
+            labelText="Organization name"
             type="text"
             required
-            defaultValue={`${user?.name}'s Organization`}
-            placeholder="eg: Acme Voice Studio"
-            helperText="Use your agency, brand, or operating company name."
+            invalid={Boolean(errors.organizationName)}
+            invalidText={errors.organizationName?.message}
             {...register('organizationName', {
-              required: 'Please enter the organization name.',
+              required: 'Enter an organization name.',
+              setValueAs: value => value.trim(),
             })}
           />
-          <Select
+          <FluidSelect
             id="org-size"
-            labelText="Operating Model"
-            helperText="Helps tailor onboarding for agency delivery, internal platform teams, and enterprise programs."
-            {...register('organizationSize')}
+            labelText="Organization type"
+            required
+            invalid={Boolean(errors.organizationSize)}
+            invalidText={errors.organizationSize?.message}
+            {...register('organizationSize', {
+              required: 'Select an organization type.',
+            })}
           >
-            <SelectItem value="" text="Select your operating model" />
-            <SelectItem value="agency" text="Agency / system integrator" />
+            <SelectItem value="" text="Select an organization type" />
+            <SelectItem value="agency" text="Agency or system integrator" />
             <SelectItem value="in-house" text="In-house product team" />
-            <SelectItem value="enterprise" text="Enterprise / multi-team org" />
-          </Select>
-          <TextInput
+            <SelectItem
+              value="enterprise"
+              text="Enterprise with multiple teams"
+            />
+          </FluidSelect>
+          <FluidTextInput
             id="org-industry"
             labelText="Industry"
             type="text"
             required
-            placeholder="eg: Agency services, healthcare, finance"
-            helperText="Used to suggest integrations and assistant templates for your market."
+            invalid={Boolean(errors.organizationIndustry)}
+            invalidText={errors.organizationIndustry?.message}
             {...register('organizationIndustry', {
-              required: 'Please provide an industry.',
+              required: 'Enter an industry.',
+              setValueAs: value => value.trim(),
             })}
           />
-          {formError && (
-            <Notification kind="error" title="Error" subtitle={formError} />
-          )}
+        </div>
+        {error && (
+          <div className="mt-6">
+            <Notification
+              kind="error"
+              title="Organization not created"
+              subtitle={error}
+            />
+          </div>
+        )}
+        <div className="mt-12" data-testid="organization-actions">
           <PrimaryButton
             size="lg"
             renderIcon={ArrowRight}
@@ -129,10 +174,10 @@ export function CreateOrganizationPage() {
             isLoading={loading}
             className="!w-full !max-w-none !justify-between"
           >
-            Continue
+            Create organization
           </PrimaryButton>
-        </Stack>
-      </form>
+        </div>
+      </FluidForm>
     </>
   );
 }

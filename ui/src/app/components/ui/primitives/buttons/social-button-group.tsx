@@ -35,9 +35,9 @@ export function SocialButtonGroup(props: {
   linkedin: boolean;
   github: boolean;
   password: boolean;
-  actionLabel?: 'Sign in' | 'Sign up';
+  actionLabel?: 'Log in' | 'Sign up';
 }) {
-  const actionLabel = props.actionLabel || 'Sign in';
+  const actionLabel = props.actionLabel || 'Log in';
   const linkedinClick = () => {
     window.location.assign(CONFIG.connection.web + '/oauth/linkedin');
   };

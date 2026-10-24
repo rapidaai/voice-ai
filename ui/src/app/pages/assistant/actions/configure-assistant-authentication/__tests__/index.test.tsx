@@ -254,6 +254,18 @@ jest.mock('@/app/components/ui/primitives/button', () => ({
 }));
 
 jest.mock('@carbon/react', () => ({
+  Header: ({ children, ...props }: any) => <header {...props}>{children}</header>,
+  HeaderName: ({ children, href, prefix: _prefix, ...props }: any) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+  HeaderGlobalBar: ({ children, ...props }: any) => (
+    <div {...props}>{children}</div>
+  ),
+  HeaderGlobalAction: ({ children, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
   Breadcrumb: ({ children }: any) => <div>{children}</div>,
   BreadcrumbItem: ({ children }: any) => <span>{children}</span>,
   ButtonSet: ({ children }: any) => <div>{children}</div>,

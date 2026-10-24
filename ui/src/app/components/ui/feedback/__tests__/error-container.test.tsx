@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { ErrorContainer } from '../error-container';
+import { typographyClassNames } from '@/app/components/ui/primitives/text';
 
 jest.mock('@/app/components/ui/primitives/button', () => ({
   PrimaryButton: ({ children, renderIcon: Icon, ...props }: any) => (
@@ -19,7 +20,7 @@ jest.mock('@carbon/icons-react', () => ({
 }));
 
 describe('ErrorContainer', () => {
-  it('renders error content with the standard action icon', () => {
+  it('renders the page error content', () => {
     render(
       <ErrorContainer
         code="404"
@@ -53,5 +54,38 @@ describe('ErrorContainer', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(onAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('centers the page state and uses shared Carbon typography', () => {
+    render(
+      <ErrorContainer
+        code="403"
+        title="Assistant not available"
+        description="This assistant may be archived or unavailable."
+        actionLabel="Go to listing"
+        onAction={jest.fn()}
+      />,
+    );
+
+    const container = screen.getByLabelText('Assistant not available');
+    const code = screen.getByText('403');
+    const title = screen.getByRole('heading', {
+      name: 'Assistant not available',
+    });
+    const description = screen.getByText(
+      'This assistant may be archived or unavailable.',
+    );
+
+    expect(container).toHaveClass('w-full', 'flex-1', 'items-center');
+    expect(code).toHaveClass(...typographyClassNames['heading-06'].split(' '));
+    expect(title).toHaveClass(
+      ...typographyClassNames['heading-04'].split(' '),
+    );
+    expect(description).toHaveClass(
+      ...typographyClassNames['body-01'].split(' '),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Go to listing' }).parentElement,
+    ).toHaveClass('mt-8');
   });
 });

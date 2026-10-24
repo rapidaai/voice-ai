@@ -11,17 +11,13 @@ jest.mock('@/app/pages/authentication', () => ({
   AuthChangePasswordPage: () => <div>Change password route</div>,
 }));
 
-jest.mock('@/app/components/layout/container/center-box', () => ({
-  CenterBox: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-}));
-
-jest.mock('@/app/components/layout/container/flex-box', () => ({
-  FlexBox: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-}));
+jest.mock(
+  '@/app/components/layout/authentication/authentication-layout',
+  () => {
+    const { Outlet } = jest.requireActual('react-router-dom');
+    return { AuthenticationLayout: () => <Outlet /> };
+  },
+);
 
 jest.mock('@/app/components/layout/container/protected-box', () => ({
   IgnoreBox: ({ children }: { children: React.ReactNode }) => (

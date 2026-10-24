@@ -125,20 +125,20 @@ describe('useGlobalNavigation', () => {
     );
   });
 
-  it('opens preview windows for chat and call routes', () => {
-    const openSpy = jest
-      .spyOn(window, 'open')
-      .mockImplementation(() => null as unknown as Window);
-
+  it('navigates to first-class assistant playground routes', () => {
     const { result } = renderHook(() => useGlobalNavigation());
 
     result.current.goToAssistantPreview('assistant-1');
     result.current.goToAssistantPreviewCall('assistant-1');
 
-    expect(openSpy).toHaveBeenNthCalledWith(1, '/preview/chat/assistant-1');
-    expect(openSpy).toHaveBeenNthCalledWith(2, '/preview/call/assistant-1');
-
-    openSpy.mockRestore();
+    expect(mockNavigate).toHaveBeenNthCalledWith(
+      1,
+      '/deployment/assistant/assistant-1/playground/chat',
+    );
+    expect(mockNavigate).toHaveBeenNthCalledWith(
+      2,
+      '/deployment/assistant/assistant-1/playground/phone',
+    );
   });
 
   it('builds telemetry routes with visible query filters', () => {

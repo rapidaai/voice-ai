@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
@@ -445,7 +445,8 @@ jest.mock('@/app/components/ui/primitives/button', () => ({
   }: any) => <button aria-label={iconDescription} {...props} />,
 }));
 jest.mock('@/app/components/ui/primitives/modal', () => ({
-  Modal: ({ children, open }: any) => (open ? <div>{children}</div> : null),
+  Modal: ({ children, open }: any) =>
+    open ? <div role="dialog">{children}</div> : null,
   ModalHeader: ({ title }: any) => <div>{title}</div>,
   ModalBody: ({ children }: any) => <div>{children}</div>,
   ModalFooter: ({ children }: any) => <div>{children}</div>,
@@ -546,6 +547,14 @@ describe('Deployment and tool flows', () => {
       getData: () => ({
         getApideployment: () => ({
           getId: () => 'api-dep-1',
+          getAssistantid: () => 'assistant-1',
+          getUpdateddate: () => undefined,
+          getMaxsessionduration: () => '300',
+          getIdealtimeout: () => '30',
+          hasGreetinginterruptible: () => false,
+          getGreetinginterruptible: () => false,
+          hasUnclearinputtimeout: () => false,
+          getUnclearinputtimeout: () => 0,
           getInputaudio: () => null,
           getOutputaudio: () => null,
           getCreateddate: () => '2026-01-01',
@@ -620,7 +629,9 @@ describe('Deployment and tool flows', () => {
     await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    await user.click(screen.getByRole('menuitem', { name: /Web Widget/i }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByText('Web Widget'),
+    );
 
     expect(mockGlobalNavigation.goToConfigureWeb).toHaveBeenCalledWith(
       'assistant-1',
@@ -647,17 +658,34 @@ describe('Deployment and tool flows', () => {
     render(<ConfigureAssistantDeploymentPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('No deployments found')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Deployment' }),
+      ).toBeInTheDocument();
     });
 
     await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    await user.click(screen.getByRole('menuitem', { name: /Debugger/i }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByText('Debugger'),
+    );
     expect(mockGlobalNavigation.goToConfigureDebugger).toHaveBeenCalledWith(
       'assistant-1',
     );
     await act(async () => {});
+  });
+
+  it('presents configured deployments as a contained list without table controls', async () => {
+    render(<ConfigureAssistantDeploymentPage />);
+
+    expect(
+      await screen.findByLabelText('Deployment channels'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('SDK / API')).toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText('Search deployments'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
   });
 
   it('create deployment routes to API, phone and debugger channels from add deployment menu', async () => {
@@ -667,7 +695,9 @@ describe('Deployment and tool flows', () => {
     await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    await user.click(screen.getByRole('menuitem', { name: /SDK \/ API/i }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByText('SDK / API'),
+    );
     expect(mockGlobalNavigation.goToConfigureApi).toHaveBeenCalledWith(
       'assistant-1',
     );
@@ -675,7 +705,9 @@ describe('Deployment and tool flows', () => {
     await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    await user.click(screen.getByRole('menuitem', { name: /Phone Call/i }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByText('Phone Call'),
+    );
     expect(mockGlobalNavigation.goToConfigureCall).toHaveBeenCalledWith(
       'assistant-1',
     );
@@ -683,7 +715,9 @@ describe('Deployment and tool flows', () => {
     await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    await user.click(screen.getByRole('menuitem', { name: /Debugger/i }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByText('Debugger'),
+    );
     expect(mockGlobalNavigation.goToConfigureDebugger).toHaveBeenCalledWith(
       'assistant-1',
     );
@@ -732,6 +766,14 @@ describe('Deployment and tool flows', () => {
         hasWebplugindeployment: () => false,
         getDebuggerdeployment: () => ({
           getId: () => 'debugger-dep-1',
+          getAssistantid: () => 'assistant-1',
+          getUpdateddate: () => undefined,
+          getMaxsessionduration: () => '300',
+          getIdealtimeout: () => '30',
+          hasGreetinginterruptible: () => false,
+          getGreetinginterruptible: () => false,
+          hasUnclearinputtimeout: () => false,
+          getUnclearinputtimeout: () => 0,
           getInputaudio: () => ({
             getAudioprovider: () => 'deepgram',
           }),

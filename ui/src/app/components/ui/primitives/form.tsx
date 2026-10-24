@@ -1,17 +1,24 @@
 import type {
   ReactNode,
   ChangeEvent,
+  ComponentPropsWithoutRef,
   FormEvent,
+  ForwardRefExoticComponent,
   KeyboardEventHandler,
   MouseEvent,
+  RefAttributes,
 } from 'react';
 import { forwardRef } from 'react';
 import {
   Form as CarbonForm,
+  FluidForm as CarbonFluidForm,
   Stack as CarbonStack,
   Checkbox as CarbonCheckbox,
   CheckboxSkeleton as CarbonCheckboxSkeleton,
   FormGroup as CarbonFormGroup,
+  FluidSelect as CarbonFluidSelect,
+  FluidTextArea as CarbonFluidTextArea,
+  FluidTextInput as CarbonFluidTextInput,
   TextInput as CarbonTextInput,
   TextInputSkeleton as CarbonTextInputSkeleton,
   TextArea as CarbonTextArea,
@@ -35,6 +42,13 @@ export function Form({ children, className, onSubmit }: CarbonFormProps) {
       {children}
     </CarbonForm>
   );
+}
+
+export type CarbonFluidFormProps = ComponentPropsWithoutRef<'form'>;
+
+/** Carbon FluidForm: applies the fluid field treatment to its form controls. */
+export function FluidForm({ className, ...rest }: CarbonFluidFormProps) {
+  return <CarbonFluidForm className={cn(className)} {...rest} />;
 }
 
 export interface CarbonStackProps {
@@ -136,6 +150,76 @@ export const TextInput = forwardRef<HTMLInputElement, CarbonTextInputProps>(
     );
   },
 );
+
+export type CarbonFluidTextInputProps = Omit<
+  CarbonTextInputProps,
+  'helperText' | 'hideLabel' | 'inline' | 'size'
+>;
+
+type FluidTextInputComponent = ForwardRefExoticComponent<
+  CarbonFluidTextInputProps & {
+    isPassword?: boolean;
+  } & RefAttributes<HTMLInputElement>
+>;
+
+const TypedCarbonFluidTextInput =
+  CarbonFluidTextInput as FluidTextInputComponent;
+
+/** Carbon FluidTextInput: full-width field row for fluid forms and panels. */
+export const FluidTextInput = forwardRef<
+  HTMLInputElement,
+  CarbonFluidTextInputProps
+>(({ className, ...rest }, ref) => (
+  <TypedCarbonFluidTextInput ref={ref} className={cn(className)} {...rest} />
+));
+
+/** Carbon FluidPasswordInput: fluid field row with password visibility control. */
+export const FluidPasswordInput = forwardRef<
+  HTMLInputElement,
+  CarbonFluidTextInputProps
+>(({ className, ...rest }, ref) => (
+  <TypedCarbonFluidTextInput
+    ref={ref}
+    className={cn(className)}
+    isPassword
+    {...rest}
+  />
+));
+
+export type CarbonFluidSelectProps = ComponentPropsWithoutRef<
+  typeof CarbonFluidSelect
+> &
+  Pick<
+    ComponentPropsWithoutRef<'select'>,
+    'name' | 'onBlur' | 'required' | 'value'
+  >;
+
+type FluidSelectComponent = ForwardRefExoticComponent<
+  CarbonFluidSelectProps & RefAttributes<HTMLSelectElement>
+>;
+
+const TypedCarbonFluidSelect = CarbonFluidSelect as FluidSelectComponent;
+
+/** Carbon FluidSelect: full-width select row for fluid forms and panels. */
+export const FluidSelect = forwardRef<
+  HTMLSelectElement,
+  CarbonFluidSelectProps
+>(({ className, ...rest }, ref) => (
+  <TypedCarbonFluidSelect ref={ref} className={cn(className)} {...rest} />
+));
+
+export type CarbonFluidTextAreaProps = ComponentPropsWithoutRef<
+  typeof CarbonFluidTextArea
+> &
+  Pick<ComponentPropsWithoutRef<'textarea'>, 'name' | 'onBlur' | 'required'>;
+
+/** Carbon FluidTextArea: full-width multiline row for fluid forms and panels. */
+export function FluidTextArea({
+  className,
+  ...rest
+}: CarbonFluidTextAreaProps) {
+  return <CarbonFluidTextArea className={cn(className)} {...rest} />;
+}
 
 /** Carbon TextInputSkeleton: loading placeholder for TextInput. */
 export function TextInputSkeleton({

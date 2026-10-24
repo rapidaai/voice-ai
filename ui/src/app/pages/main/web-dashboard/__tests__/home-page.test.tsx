@@ -22,10 +22,16 @@ jest.mock('@/clients/dashboard.client', () => ({
   getProjectDashboardRange: jest.fn(),
 }));
 
-let mockCurrentCredential = {
+let mockCurrentCredential: {
+  authId: string;
+  projectId: string;
+  token: string;
+  user?: { name?: string };
+} = {
   authId: 'user-1',
   projectId: 'project-1',
   token: 'token-1',
+  user: { name: 'Jordan Lee' },
 };
 
 jest.mock('@/hooks/use-credential', () => ({
@@ -183,6 +189,7 @@ describe('Dashboard HomePage', () => {
       authId: 'user-1',
       projectId: 'project-1',
       token: 'token-1',
+      user: { name: 'Jordan Lee' },
     };
     mockGetProjectDashboardRange.mockResolvedValue(dashboardResponse());
   });
@@ -190,10 +197,12 @@ describe('Dashboard HomePage', () => {
   it('renders the project dashboard from the public dashboard API', async () => {
     const { container } = render(<HomePage />);
 
-    expect(
-      screen.getByRole('heading', { name: 'Project overview' }),
-    ).toBeInTheDocument();
+    expect(screen.queryByText('Welcome, Jordan!')).not.toBeInTheDocument();
+    expect(screen.queryByText('Project overview')).not.toBeInTheDocument();
     expect(await screen.findByText('12,486')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Dashboard', level: 1 }),
+    ).toBeInTheDocument();
     expect(screen.getByText('94.8%')).toBeInTheDocument();
     expect(screen.getByText('Component usage')).toBeInTheDocument();
     expect(screen.getByText('Recent failures')).toBeInTheDocument();
@@ -249,6 +258,60 @@ describe('Dashboard HomePage', () => {
     });
   });
 
+  it('uses canonical Carbon typography across dashboard content', async () => {
+    render(<HomePage />);
+
+    expect(await screen.findByText('12,486')).toHaveClass(
+      'text-[2rem]',
+      'font-normal',
+      'leading-[2.5rem]',
+      'tracking-[0]',
+      'tabular-nums',
+    );
+    expect(screen.queryByText('Project overview')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Monitor sessions, reliability, latency, and assistant health.',
+      ),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Conversation activity' }),
+    ).toHaveClass(
+      'text-[1rem]',
+      'font-[600]',
+      'leading-[1.5rem]',
+      'tracking-[0]',
+    );
+    expect(
+      screen.getByText('Sessions and failures from the last 30 days'),
+    ).toHaveClass(
+      'text-[0.875rem]',
+      'font-normal',
+      'leading-[1.125rem]',
+      'tracking-[0.16px]',
+    );
+    expect(screen.getByText('Based on success rate and latency')).toHaveClass(
+      'text-[0.75rem]',
+      'font-normal',
+      'leading-[1rem]',
+      'tracking-[0.32px]',
+    );
+    expect(screen.getByText('Speech to text')).toHaveClass(
+      'text-[0.875rem]',
+      'font-normal',
+      'leading-[1.125rem]',
+      'tracking-[0.16px]',
+    );
+    screen.getAllByRole('link', { name: 'Support bot' }).forEach(link => {
+      expect(link.firstElementChild).toHaveClass(
+        'text-[0.875rem]',
+        'font-[600]',
+        'leading-[1.125rem]',
+        'tracking-[0.16px]',
+      );
+    });
+  });
+
   it('shows a layout skeleton while the first request is pending', () => {
     mockGetProjectDashboardRange.mockReturnValue(new Promise(() => {}));
 
@@ -279,9 +342,6 @@ describe('Dashboard HomePage', () => {
     expect(
       screen.getByText('Check your connection and try again.'),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: 'Project overview' }),
-    ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Try again' }));
 
     expect(await screen.findByText('12,486')).toBeInTheDocument();
@@ -321,7 +381,7 @@ describe('Dashboard HomePage', () => {
     expect(screen.getByText('Top assistants')).toBeInTheDocument();
   });
 
-  it('renders explicit empty states for an inactive project', async () => {
+  it('renders a simple assistant CTA when the dashboard has no activity', async () => {
     mockGetProjectDashboardRange.mockResolvedValue(
       dashboardResponse({
         analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
@@ -331,13 +391,94 @@ describe('Dashboard HomePage', () => {
 
     render(<HomePage />);
 
-    expect(await screen.findByText('No analytics yet')).toBeInTheDocument();
-    expect(screen.getByText('No component usage yet')).toBeInTheDocument();
-    expect(screen.getByText('No recent failures yet')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Your dashboard is not ready yet',
+        level: 1,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Dashboard', level: 1 }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Getting started')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Create an assistant and run a test conversation. Sessions, latency, and health will appear here after the first session.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Create assistant' }),
+    ).toHaveAttribute('href', '/deployment/assistant/create-assistant');
+    expect(
+      screen.queryByRole('link', { name: 'View assistants' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add credential' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: 'Date range' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: 'Auto-refresh' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Recommended setup')).not.toBeInTheDocument();
+    expect(screen.queryByText('No analytics yet')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('No component usage yet'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('No recent failures yet'),
+    ).not.toBeInTheDocument();
   });
 
-  it('ignores a stale response after the date range changes', async () => {
-    const user = userEvent.setup({ writeToClipboard: false });
+  it('replaces the empty dashboard when the project changes', async () => {
+    mockGetProjectDashboardRange
+      .mockResolvedValueOnce(
+        dashboardResponse({
+          analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+          usageState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+        }),
+      )
+      .mockResolvedValueOnce(dashboardResponse({ sessions: 212 }));
+
+    const { rerender } = render(<HomePage />);
+
+    await screen.findByRole('heading', {
+      name: 'Your dashboard is not ready yet',
+    });
+    mockCurrentCredential = {
+      ...mockCurrentCredential,
+      projectId: 'project-2',
+    };
+    rerender(<HomePage />);
+
+    expect(await screen.findByText('212')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Your dashboard is not ready yet',
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('preserves section fallbacks when only analytics are empty', async () => {
+    mockGetProjectDashboardRange.mockResolvedValue(
+      dashboardResponse({
+        analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+      }),
+    );
+
+    render(<HomePage />);
+
+    expect(await screen.findByText('No analytics yet')).toBeInTheDocument();
+    expect(screen.getByText('Component usage')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Your dashboard is not ready yet',
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('ignores a stale response after the project changes', async () => {
     let resolveFirst: (value: never) => void = () => undefined;
     const firstRequest = new Promise<never>(resolve => {
       resolveFirst = resolve;
@@ -346,9 +487,12 @@ describe('Dashboard HomePage', () => {
       .mockReturnValueOnce(firstRequest)
       .mockResolvedValueOnce(dashboardResponse({ sessions: 3248 }));
 
-    render(<HomePage />);
-    await user.click(screen.getByRole('combobox', { name: 'Date range' }));
-    await user.click(screen.getByRole('option', { name: 'Last 7 days' }));
+    const { rerender } = render(<HomePage />);
+    mockCurrentCredential = {
+      ...mockCurrentCredential,
+      projectId: 'project-2',
+    };
+    rerender(<HomePage />);
 
     expect(await screen.findByText('3,248')).toBeInTheDocument();
     await act(async () => {
@@ -372,6 +516,7 @@ describe('Dashboard HomePage', () => {
       authId: 'user-1',
       projectId: 'project-2',
       token: 'token-2',
+      user: { name: 'Jordan Lee' },
     };
 
     rerender(<HomePage />);
@@ -406,34 +551,6 @@ describe('Dashboard HomePage', () => {
     expect(dashboardActivityLabel(firstBucket, '7d')).not.toBe(
       dashboardActivityLabel(timestamp('2026-10-17T12:00:00Z') as never, '7d'),
     );
-  });
-
-  it('keeps the last dashboard when an automatic refresh fails', async () => {
-    const user = userEvent.setup({ writeToClipboard: false });
-    let refresh: TimerHandler = () => undefined;
-    const interval = jest
-      .spyOn(window, 'setInterval')
-      .mockImplementation(handler => {
-        refresh = handler;
-        return 1 as unknown as ReturnType<typeof window.setInterval>;
-      });
-
-    render(<HomePage />);
-    expect(await screen.findByText('12,486')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('combobox', { name: 'Auto-refresh' }));
-    await user.click(screen.getByRole('option', { name: 'Every 5 min' }));
-    mockGetProjectDashboardRange.mockRejectedValueOnce(
-      new Error('refresh unavailable'),
-    );
-
-    await act(async () => {
-      if (typeof refresh === 'function') await refresh();
-    });
-
-    expect(await screen.findByText('Refresh failed')).toBeInTheDocument();
-    expect(screen.getByText('12,486')).toBeInTheDocument();
-    interval.mockRestore();
   });
 
   it('provides accessible chart and table descriptions', async () => {

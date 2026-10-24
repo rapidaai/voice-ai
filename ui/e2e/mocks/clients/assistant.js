@@ -15,7 +15,12 @@ const {
   AssistantDashboardLatency,
   AssistantDashboardSummary,
   AssistantDashboardUsage,
+  AssistantApiDeployment,
+  AssistantDebuggerDeployment,
+  AssistantPhoneDeployment,
   AssistantProviderModel,
+  AssistantWebpluginDeployment,
+  DeploymentAudioProvider,
   GetAllAssistantConversationResponse,
   GetAllAssistantProviderResponse,
   GetAllAssistantResponse,
@@ -26,6 +31,8 @@ const {
   Metadata,
   Metric,
   Paginated,
+  TextChatCompletePrompt,
+  Variable,
 } = require('@rapidaai/react');
 if (previousWindow === undefined) delete global.window;
 else global.window = previousWindow;
@@ -77,6 +84,16 @@ function metadata(key, value) {
   return result;
 }
 
+function audioProvider(name, type, options) {
+  const audio = new DeploymentAudioProvider();
+  audio.setAudioprovider(name);
+  audio.setAudiotype(type);
+  audio.setAudiooptionsList(
+    options.map(([key, value]) => metadata(key, value)),
+  );
+  return audio;
+}
+
 function buildAssistant() {
   const provider = new AssistantProviderModel();
   provider.setId(ASSISTANT_VERSION_ID);
@@ -121,6 +138,159 @@ function buildAssistantDetailResponse() {
   response.setSuccess(true);
   response.setData(buildAssistant());
   return Buffer.from(response.serializeBinary());
+}
+
+function buildPopulatedDeploymentAssistantDetailResponse() {
+  const assistant = buildAssistant();
+  const inputAudio = () =>
+    audioProvider('Deepgram', 'speech-to-text', [
+      ['listen.model', 'nova-3'],
+      ['listen.language', 'en'],
+    ]);
+  const outputAudio = () =>
+    audioProvider('Cartesia', 'text-to-speech', [
+      ['speak.model', 'sonic-2'],
+      ['speak.voice.id', 'Professional English'],
+    ]);
+
+  const debuggerDeployment = new AssistantDebuggerDeployment();
+  debuggerDeployment.setId('2301664620831573001');
+  debuggerDeployment.setAssistantid(ASSISTANT_ID);
+  debuggerDeployment.setName('Browser debugger');
+  debuggerDeployment.setStatus('ACTIVE');
+  debuggerDeployment.setInputaudio(inputAudio());
+  debuggerDeployment.setOutputaudio(outputAudio());
+  debuggerDeployment.setCreateddate(timestamp('2026-10-14T09:00:00Z'));
+  debuggerDeployment.setUpdateddate(timestamp('2026-10-17T08:28:00Z'));
+  assistant.setDebuggerdeployment(debuggerDeployment);
+
+  const apiDeployment = new AssistantApiDeployment();
+  apiDeployment.setId('2301664620831573002');
+  apiDeployment.setAssistantid(ASSISTANT_ID);
+  apiDeployment.setStatus('ACTIVE');
+  apiDeployment.setInputaudio(inputAudio());
+  apiDeployment.setOutputaudio(outputAudio());
+  apiDeployment.setCreateddate(timestamp('2026-10-15T10:30:00Z'));
+  apiDeployment.setUpdateddate(timestamp('2026-10-17T08:28:00Z'));
+  assistant.setApideployment(apiDeployment);
+
+  const phoneDeployment = new AssistantPhoneDeployment();
+  phoneDeployment.setId('2301664620831573003');
+  phoneDeployment.setAssistantid(ASSISTANT_ID);
+  phoneDeployment.setPhoneprovidername('Twilio');
+  phoneDeployment.setStatus('ACTIVE');
+  phoneDeployment.setInputaudio(inputAudio());
+  phoneDeployment.setOutputaudio(outputAudio());
+  phoneDeployment.setCreateddate(timestamp('2026-10-16T11:45:00Z'));
+  phoneDeployment.setUpdateddate(timestamp('2026-10-17T08:28:00Z'));
+  assistant.setPhonedeployment(phoneDeployment);
+
+  const webDeployment = new AssistantWebpluginDeployment();
+  webDeployment.setId('2301664620831573004');
+  webDeployment.setAssistantid(ASSISTANT_ID);
+  webDeployment.setName('Support widget');
+  webDeployment.setStatus('ACTIVE');
+  webDeployment.setInputaudio(inputAudio());
+  webDeployment.setOutputaudio(outputAudio());
+  webDeployment.setCreateddate(timestamp('2026-10-17T08:20:00Z'));
+  webDeployment.setUpdateddate(timestamp('2026-10-17T08:28:00Z'));
+  assistant.setWebplugindeployment(webDeployment);
+
+  const response = new GetAssistantResponse();
+  response.setCode(200);
+  response.setSuccess(true);
+  response.setData(assistant);
+  return Buffer.from(response.serializeBinary());
+}
+
+function buildDebuggerAssistantDetailResponse({
+  withSpeechToText = true,
+} = {}) {
+  const assistant = buildAssistant();
+  assistant.setName('Delivery concierge');
+
+  const provider = assistant.getAssistantprovidermodel();
+  const prompt = new TextChatCompletePrompt();
+  prompt.setPromptvariablesList(
+    [
+      ['customer_name', 'string', 'Prashant'],
+      [
+        'delivery_instructions',
+        'paragraph',
+        'Leave the package with reception if no one answers.',
+      ],
+      ['order_context', 'json', '{ "priority": "express" }'],
+    ].map(([name, type, defaultValue]) => {
+      const item = new Variable();
+      item.setName(name);
+      item.setType(type);
+      item.setDefaultvalue(defaultValue);
+      return item;
+    }),
+  );
+  provider.setTemplate(prompt);
+  provider.setAssistantmodeloptionsList([
+    metadata('model.name', 'gpt-4.1-mini'),
+    metadata('model.temperature', '0.7'),
+    metadata('model.top_p', '1'),
+    metadata('rapida.credential_id', 'credential-secret-123'),
+  ]);
+
+  const deployment = new AssistantDebuggerDeployment();
+  if (withSpeechToText) {
+    deployment.setInputaudio(
+      audioProvider('Deepgram', 'speech-to-text', [
+        ['listen.model', 'nova-3'],
+        ['listen.language', 'en'],
+      ]),
+    );
+  }
+  deployment.setOutputaudio(
+    audioProvider('Cartesia', 'text-to-speech', [
+      ['speak.model', 'sonic-2'],
+      ['speak.voice.id', 'Professional English'],
+    ]),
+  );
+  assistant.setDebuggerdeployment(deployment);
+
+  const phoneDeployment = new AssistantPhoneDeployment();
+  phoneDeployment.setPhoneprovidername('Twilio');
+  phoneDeployment.setInputaudio(
+    audioProvider('Deepgram', 'speech-to-text', [
+      ['listen.model', 'nova-3'],
+      ['listen.language', 'en'],
+    ]),
+  );
+  phoneDeployment.setOutputaudio(
+    audioProvider('Cartesia', 'text-to-speech', [
+      ['speak.model', 'sonic-2'],
+      ['speak.voice.id', 'Professional English'],
+    ]),
+  );
+  assistant.setPhonedeployment(phoneDeployment);
+
+  const response = new GetAssistantResponse();
+  response.setCode(200);
+  response.setSuccess(true);
+  response.setData(assistant);
+  return Buffer.from(response.serializeBinary());
+}
+
+async function mockDebuggerAssistant(page, options) {
+  await page.route(ASSISTANT_DETAIL_PATH, route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    return fulfillGrpcWeb(route, buildDebuggerAssistantDetailResponse(options));
+  });
+}
+
+async function mockPopulatedAssistantDeployments(page) {
+  await page.route(ASSISTANT_DETAIL_PATH, route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    return fulfillGrpcWeb(
+      route,
+      buildPopulatedDeploymentAssistantDetailResponse(),
+    );
+  });
 }
 
 function buildAssistantDashboardResponse() {
@@ -345,9 +515,13 @@ module.exports = {
   POPULATED_ASSISTANT_LIST_RESPONSE,
   buildAssistantDashboardResponse,
   buildAssistantDetailResponse,
+  buildPopulatedDeploymentAssistantDetailResponse,
+  buildDebuggerAssistantDetailResponse,
   buildConversationDetailResponse,
   buildConversationListResponse,
   buildMessageListResponse,
   fulfillGrpcWeb,
   installAssistantClientMock,
+  mockDebuggerAssistant,
+  mockPopulatedAssistantDeployments,
 };

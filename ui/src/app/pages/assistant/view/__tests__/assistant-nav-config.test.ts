@@ -9,4 +9,26 @@ describe('assistantNavSections', () => {
 
     expect(versionsItem?.icon).toBe(SourceControl);
   });
+
+  it('exposes chat and phone as native playground links', () => {
+    const playground = assistantNavSections.find(
+      section => section.label === 'Playground',
+    );
+
+    expect(playground?.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: 'debugging',
+          label: 'Chat',
+          path: 'playground/chat',
+        }),
+        expect.objectContaining({
+          key: 'phone-preview',
+          label: 'Phone call',
+          path: 'playground/phone',
+        }),
+      ]),
+    );
+    expect(playground?.items.every(item => !item.action)).toBe(true);
+  });
 });

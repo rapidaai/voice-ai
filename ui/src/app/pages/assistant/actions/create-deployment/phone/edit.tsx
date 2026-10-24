@@ -38,7 +38,6 @@ import {
   ValidateTelephonyOptions,
 } from '@/app/components/domain/providers/telephony';
 import { useConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-confirmation';
-import { Tabs } from '@/app/components/ui/primitives';
 import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
 import { Notification } from '@/app/components/ui/feedback';
 import { ButtonSet } from '@carbon/react';
@@ -46,6 +45,8 @@ import {
   createAssistantDeploymentByType,
   getAssistantDeploymentByType,
 } from '@/clients/assistant.client';
+import { DeploymentEditTabs } from '@/app/pages/assistant/actions/create-deployment/commons/deployment-edit-tabs';
+import { DeploymentEditHeader } from '@/app/pages/assistant/actions/create-deployment/commons/deployment-edit-header';
 
 const EDIT_TABS = [
   {
@@ -91,7 +92,8 @@ const EditAssistantCallDeployment: FC<{ assistantId: string }> = ({
   const { providerCredentials } = useAllProviderCredentials();
   const { authId, projectId, token } = useCurrentCredential();
 
-  const [activeTab, setActiveTab] = useState('telephony');
+  const [activeTab, setActiveTab] =
+    useState<(typeof EDIT_TABS)[number]['code']>('telephony');
   const [errorMessage, setErrorMessage] = useState('');
   const [isDeploying, setIsDeploying] = useState(false);
   const { showDialog, ConfirmDialogComponent } = useConfirmDialog({});
@@ -221,11 +223,8 @@ const EditAssistantCallDeployment: FC<{ assistantId: string }> = ({
   const getProviderCredentials = (provider: string) =>
     providerCredentials.filter(c => c.getProvider() === provider);
 
-  const activeIndex = EDIT_TABS.findIndex(tab => tab.code === activeTab);
-
-  const handleTabChange = (index: number) => {
-    if (index < 0 || index >= EDIT_TABS.length) return;
-    setActiveTab(EDIT_TABS[index].code);
+  const handleTabChange = (tab: (typeof EDIT_TABS)[number]['code']) => {
+    setActiveTab(tab);
     setErrorMessage('');
   };
 
@@ -358,72 +357,64 @@ const EditAssistantCallDeployment: FC<{ assistantId: string }> = ({
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-900">
       <ConfirmDialogComponent />
-      <header className="px-8 pt-8 pb-6 border-b border-gray-200 dark:border-gray-800">
-        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400 mb-1.5">
-          Phone Deployment
-        </p>
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 leading-tight">
-          Edit phone deployment
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-500 mt-1.5 leading-relaxed">
-          Update telephony, voice input, general experience, and voice output.
-        </p>
-      </header>
+      <DeploymentEditHeader
+        eyebrow="Phone deployment"
+        title="Edit phone deployment"
+        description="Update telephony, voice input, general experience, and voice output."
+      />
 
-      <div className="border-b border-gray-200 dark:border-gray-800 shrink-0">
-        <Tabs
-          contained
-          aria-label="Phone deployment edit tabs"
-          tabs={EDIT_TABS.map(tab => tab.name)}
-          selectedIndex={Math.max(activeIndex, 0)}
-          onChange={handleTabChange}
-          className="w-full [&_.cds--tab--list]:w-full [&_.cds--tabs__nav]:w-full [&_.cds--tabs__nav-item]:flex-1 [&_.cds--tabs__nav-link]:w-full [&_.cds--tabs__nav-link]:justify-center [&_.cds--tabs__nav-item]:mx-0 [&_.cds--tabs__nav-link]:ml-0"
-          panelClassName="!px-0"
-        />
-      </div>
-      <div className="flex-1 min-h-0 overflow-auto">
-        {activeTab === 'telephony' && (
-          <div className="flex flex-col gap-6 max-w-4xl p-6">
-            <TelephonyProvider
-              provider={telephonyConfig.provider}
-              parameters={telephonyConfig.parameters}
-              onChangeProvider={provider =>
-                setTelephonyConfig({
-                  provider,
-                  parameters: GetDefaultTelephonyConfigIfInvalid(provider, []),
-                })
-              }
-              onChangeParameter={parameters =>
-                setTelephonyConfig(c => ({
-                  ...c,
-                  parameters: GetDefaultTelephonyConfigIfInvalid(
-                    c.provider,
-                    parameters,
-                  ),
-                }))
-              }
+      <DeploymentEditTabs
+        aria-label="Phone deployment edit tabs"
+        tabs={EDIT_TABS}
+        activeTab={activeTab}
+        onChange={handleTabChange}
+        panels={{
+          telephony: (
+            <div className="flex max-w-4xl flex-col gap-6 p-6">
+              <TelephonyProvider
+                provider={telephonyConfig.provider}
+                parameters={telephonyConfig.parameters}
+                onChangeProvider={provider =>
+                  setTelephonyConfig({
+                    provider,
+                    parameters: GetDefaultTelephonyConfigIfInvalid(
+                      provider,
+                      [],
+                    ),
+                  })
+                }
+                onChangeParameter={parameters =>
+                  setTelephonyConfig(c => ({
+                    ...c,
+                    parameters: GetDefaultTelephonyConfigIfInvalid(
+                      c.provider,
+                      parameters,
+                    ),
+                  }))
+                }
+              />
+            </div>
+          ),
+          'voice-input': (
+            <ConfigureAudioInputProvider
+              audioInputConfig={audioInputConfig}
+              setAudioInputConfig={setAudioInputConfig}
             />
-          </div>
-        )}
-        {activeTab === 'voice-input' && (
-          <ConfigureAudioInputProvider
-            audioInputConfig={audioInputConfig}
-            setAudioInputConfig={setAudioInputConfig}
-          />
-        )}
-        {activeTab === 'experience' && (
-          <ConfigureExperience
-            experienceConfig={experienceConfig}
-            setExperienceConfig={setExperienceConfig}
-          />
-        )}
-        {activeTab === 'voice-output' && (
-          <ConfigureAudioOutputProvider
-            audioOutputConfig={audioOutputConfig}
-            setAudioOutputConfig={setAudioOutputConfig}
-          />
-        )}
-      </div>
+          ),
+          experience: (
+            <ConfigureExperience
+              experienceConfig={experienceConfig}
+              setExperienceConfig={setExperienceConfig}
+            />
+          ),
+          'voice-output': (
+            <ConfigureAudioOutputProvider
+              audioOutputConfig={audioOutputConfig}
+              setAudioOutputConfig={setAudioOutputConfig}
+            />
+          ),
+        }}
+      />
 
       <div className="shrink-0">
         {errorMessage && (

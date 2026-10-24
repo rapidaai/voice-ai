@@ -2,6 +2,7 @@ import { forwardRef } from 'react';
 import type { HTMLAttributes, Ref } from 'react';
 import { useTheme } from '@/theme/theme-provider';
 import { ResolvedThemeMode } from '@/theme/types';
+import { typographyClassNames } from '@/app/components/ui/primitives/text';
 import { cn } from '@/utils';
 
 type BrandedLogoVariant = 'full' | 'compact';
@@ -26,7 +27,10 @@ export const BrandedLogo = forwardRef<HTMLElement, BrandedLogoProps>(
     const label = environmentLabel ? (
       <span
         aria-label={`Environment: ${environmentLabel}`}
-        className="ml-2 rounded-[3px] border border-[var(--cds-support-warning)] px-1 py-0.5 text-[10px] font-semibold leading-none text-[var(--cds-support-warning)]"
+        className={cn(
+          typographyClassNames['label-01'],
+          'ml-2 shrink-0 whitespace-nowrap rounded-[3px] border border-[var(--cds-support-warning)] px-1 py-0.5 text-[var(--cds-support-warning)]',
+        )}
       >
         {environmentLabel}
       </span>
@@ -53,7 +57,8 @@ export const BrandedLogo = forwardRef<HTMLElement, BrandedLogoProps>(
           {...attributes}
           ref={ref as Ref<HTMLSpanElement>}
           className={cn(
-            'block min-w-0 truncate font-semibold text-primary',
+            typographyClassNames['heading-compact-02'],
+            'block min-w-0 truncate text-primary',
             className,
             textClassName,
           )}

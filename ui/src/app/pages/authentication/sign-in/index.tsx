@@ -1,18 +1,21 @@
-import { useState, useContext, useEffect, useCallback } from 'react';
+import { useCallback, useContext, useEffect, useState } from 'react';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { SocialButtonGroup } from '@/app/components/ui/primitives/buttons/social-button-group';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { AuthenticateResponse } from '@rapidaai/react';
+import { AuthenticateResponse, ServiceError } from '@rapidaai/react';
 import { useRapidaStore } from '@/stores/app';
-import { ServiceError } from '@rapidaai/react';
 import { AuthContext } from '@/context/auth-context';
 import { useWorkspace } from '@/workspace';
-import { Stack, TextInput } from '@/app/components/ui/primitives';
+import {
+  FluidPasswordInput,
+  FluidTextInput,
+  Text,
+} from '@/app/components/ui/primitives';
 import { PrimaryButton } from '@/app/components/ui/primitives';
 import { Notification } from '@/app/components/ui/feedback';
 import { ArrowRight } from '@carbon/icons-react';
-import { Link, PasswordInput } from '@carbon/react';
+import { Link } from '@carbon/react';
 import {
   authenticateUser,
   githubAuth,
@@ -20,44 +23,67 @@ import {
   linkedinAuth,
 } from '@/clients';
 
+interface SignInFormValues {
+  email: string;
+  password: string;
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function SignInPage() {
-  let navigate = useNavigate();
+  const navigate = useNavigate();
   const { setAuthentication } = useContext(AuthContext);
   const { loading, showLoader, hideLoader } = useRapidaStore();
-  const { register, handleSubmit } = useForm();
+  const {
+    register,
+    handleSubmit,
+    resetField,
+    setFocus,
+    formState: { errors },
+  } = useForm<SignInFormValues>({ mode: 'onBlur' });
   const [error, setError] = useState('');
   const workspace = useWorkspace();
   const [searchParams] = useSearchParams();
   const { next, externalValidation, code, state } = Object.fromEntries(
     searchParams.entries(),
   );
+  const providers = workspace.authentication.signIn.providers;
+  const hasAlternateLogin =
+    providers.google || providers.linkedin || providers.github;
 
   const afterAuthenticate = useCallback(
     (err: ServiceError | null, auth: AuthenticateResponse | null) => {
       hideLoader();
       if (auth?.getSuccess()) {
-        if (setAuthentication)
-          setAuthentication(auth.getData(), () => {
-            if (next && externalValidation) {
-              window.location.replace(next);
-              return;
-            }
-            return navigate('/dashboard');
-          });
-      } else {
-        let errorMessage = auth?.getError();
-        if (errorMessage) setError(errorMessage.getHumanmessage());
-        else {
-          console.error(err);
-          setError('Unable to process your request. please try again later.');
-        }
+        setAuthentication?.(auth.getData(), () => {
+          if (next && externalValidation) {
+            window.location.replace(next);
+            return;
+          }
+          navigate('/dashboard');
+        });
         return;
       }
+
+      const message = auth?.getError()?.getHumanmessage();
+      if (!message) console.error(err);
+      setError(message || "We couldn't log you in. Try again.");
+      resetField('password');
+      setFocus('email');
     },
-    [],
+    [
+      externalValidation,
+      hideLoader,
+      navigate,
+      next,
+      resetField,
+      setAuthentication,
+      setFocus,
+    ],
   );
 
-  const onAuthenticate = data => {
+  const onAuthenticate = (data: SignInFormValues) => {
+    setError('');
     showLoader();
     authenticateUser(data.email, data.password, afterAuthenticate);
   };
@@ -69,74 +95,112 @@ export function SignInPage() {
       if (state === 'linkedin') linkedinAuth(afterAuthenticate, state, code);
       if (state === 'github') githubAuth(afterAuthenticate, state, code);
     }
-  }, [afterAuthenticate, code, state]);
+  }, [afterAuthenticate, code, showLoader, state]);
 
   return (
-    <Stack gap={6}>
-      <Helmet title="Sign in to your account" />
-      <Stack gap={2}>
-        <h1 className="m-0 text-[1.8rem] leading-tight">Sign in</h1>
+    <div
+      className="flex w-full max-w-[37rem] flex-col bg-surface"
+      data-testid="signin-panel"
+    >
+      <Helmet title="Log in to your account" />
+      <header className="p-6 sm:p-8" data-testid="signin-header">
+        <Text as="h1" variant="heading-05" className="m-0">
+          Log in
+        </Text>
         {workspace.authentication.signUp.enable && (
-          <p className="mt-1.5 text-sm leading-[1.4286] text-(--cds-text-secondary)">
-            Don't have an account? &nbsp;
-            <Link href="/auth/signup" className="text-sm !underline">
-              Sign up
+          <Text as="p" variant="body-02" className="mt-2 text-muted">
+            Don’t have an account?{' '}
+            <Link href="/auth/signup" inline>
+              Create an account
             </Link>
-          </p>
+          </Text>
         )}
+      </header>
 
+      <form
+        noValidate
+        className="p-0"
+        data-testid="signin-form"
+        onSubmit={handleSubmit(onAuthenticate)}
+      >
         <div
-          aria-hidden="true"
-          className={`h-px bg-gray-300 dark:bg-gray-900 mt-3`}
-        />
-      </Stack>
-
-      <form className="mt-6" onSubmit={handleSubmit(onAuthenticate)}>
-        <Stack gap={5}>
-          <TextInput
+          className="mx-6 flex flex-col sm:mx-8"
+          data-testid="signin-input-stack"
+        >
+          <FluidTextInput
             id="signin-email"
-            labelText="Email Address"
+            labelText="Email address"
             type="email"
             required
             autoComplete="email"
-            placeholder="eg: john@example.com"
-            {...register('email')}
+            placeholder="name@example.com"
+            invalid={Boolean(errors.email)}
+            invalidText={errors.email?.message}
+            {...register('email', {
+              required: 'Enter your email address.',
+              pattern: {
+                value: EMAIL_PATTERN,
+                message: 'Enter a valid email address.',
+              },
+            })}
           />
-          <PasswordInput
+          <FluidPasswordInput
             id="signin-password"
             labelText="Password"
             required
             autoComplete="current-password"
-            placeholder="******"
-            {...register('password')}
+            invalid={Boolean(errors.password)}
+            invalidText={errors.password?.message}
+            {...register('password', { required: 'Enter your password.' })}
           />
+        </div>
+
+        <div className="p-6 sm:p-8" data-testid="signin-actions">
+          <div className="flex justify-end">
+            <Link href="/auth/forgot-password" inline>
+              <Text variant="body-compact-01">Forgot password?</Text>
+            </Link>
+          </div>
+
           {error && (
-            <Notification kind="error" title="Error" subtitle={error} />
+            <div className="mt-4">
+              <Notification
+                kind="error"
+                title="Unable to log in"
+                subtitle={error}
+              />
+            </div>
           )}
+
           <PrimaryButton
             size="lg"
             renderIcon={ArrowRight}
             isLoading={loading}
             type="submit"
-            className="!w-full !max-w-none !justify-between"
+            className="mt-6! w-full! max-w-none! justify-between!"
           >
-            Continue
+            Log in
           </PrimaryButton>
-        </Stack>
-        <div
-          aria-hidden="true"
-          className={`h-px bg-gray-300 dark:bg-gray-900 mt-3`}
-        />
+        </div>
       </form>
 
-      <Stack gap={2}>
-        <p className="text-center">
-          <Link href="/auth/forgot-password" className="text-sm !underline">
-            Can't sign in?
-          </Link>
-        </p>
-      </Stack>
-      <SocialButtonGroup {...workspace.authentication.signIn.providers} />
-    </Stack>
+      {hasAlternateLogin && (
+        <section
+          aria-labelledby="alternate-login-heading"
+          className="p-6 sm:p-8"
+          data-testid="signin-alternates"
+        >
+          <Text
+            as="p"
+            variant="body-02"
+            id="alternate-login-heading"
+            className="mb-4 text-muted"
+          >
+            Other ways to log in
+          </Text>
+          <SocialButtonGroup {...providers} actionLabel="Log in" />
+        </section>
+      )}
+    </div>
   );
 }

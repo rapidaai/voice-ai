@@ -54,6 +54,12 @@ describe('BrandedLogo', () => {
       'src',
       baseTheme.brand.logos?.full.light,
     );
+    expect(screen.getByLabelText('Environment: (dev)')).toHaveClass(
+      'text-[0.75rem]',
+      'font-normal',
+      'leading-[1rem]',
+      'tracking-[0.32px]',
+    );
   });
 
   it('falls back to brand text when no logo assets are configured', () => {

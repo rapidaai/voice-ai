@@ -2,7 +2,7 @@ import React, { FC, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { toHumanReadableDateTime } from '@/utils/date';
-import { Add, Renew, ChartLine } from '@carbon/icons-react';
+import { ChartLine } from '@carbon/icons-react';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useRapidaStore } from '@/stores/app';
 import { SectionLoader } from '@/app/components/ui/feedback';
@@ -11,12 +11,9 @@ import { EmptyState } from '@/app/components/ui/feedback';
 import { CreateAssistantAnalysis } from '@/app/pages/assistant/actions/configure-assistant-analysis/create-assistant-analysis';
 import { useAssistantAnalysisPageStore } from '@/stores/assistant/actions';
 import { UpdateAssistantAnalysis } from '@/app/pages/assistant/actions/configure-assistant-analysis/update-assistant-analysis';
-import { IconOnlyButton, PrimaryButton } from '@/app/components/ui/primitives';
 import { RecordStatusIndicator } from '@/app/components/ui/feedback';
 import { Pagination } from '@/app/components/ui/primitives';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
   Button,
   Table,
   TableHead,
@@ -24,9 +21,6 @@ import {
   TableHeader,
   TableBody,
   TableCell,
-  TableToolbar,
-  TableToolbarContent,
-  TableToolbarSearch,
   ComposedModal,
   ModalBody,
   ModalFooter,
@@ -35,6 +29,7 @@ import {
   OverflowMenuItem,
 } from '@carbon/react';
 import { TableSection } from '@/app/components/layout/sections/table-section';
+import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
 
 const getAnalysisOptionMap = (row: any): Map<string, string> => {
   const map = new Map<string, string>();
@@ -98,7 +93,6 @@ const ConfigureAssistantAnalysis: FC<{ assistantId: string }> = ({
   const axtion = useAssistantAnalysisPageStore();
   const { authId, token, projectId } = useCurrentCredential();
   const { loading, showLoader, hideLoader } = useRapidaStore();
-  const [searchTerm, setSearchTerm] = useState('');
   const [pendingAnalysisAction, setPendingAnalysisAction] =
     useState<AnalysisAction | null>(null);
 
@@ -165,22 +159,6 @@ const ConfigureAssistantAnalysis: FC<{ assistantId: string }> = ({
       },
     );
   };
-
-  const filteredAnalyses = searchTerm.trim()
-    ? axtion.analysises.filter(row =>
-        [
-          getAnalysisName(row),
-          getAnalysisEndpointId(row),
-          getAnalysisEndpointVersion(row),
-          getAnalysisPriority(row),
-          row.getEnabled() ? 'enabled' : 'disabled',
-          row.getStatus(),
-        ]
-          .join(' ')
-          .toLowerCase()
-          .includes(searchTerm.trim().toLowerCase()),
-      )
-    : axtion.analysises;
 
   const modalTitle =
     pendingAnalysisAction?.kind === 'enable'
@@ -253,42 +231,18 @@ const ConfigureAssistantAnalysis: FC<{ assistantId: string }> = ({
           </Button>
         </ModalFooter>
       </ComposedModal>
-      <div className="px-4 pt-4 pb-6 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <div>
-          <Breadcrumb noTrailingSlash className="mb-2">
-            <BreadcrumbItem
-              href={`/deployment/assistant/${assistantId}/overview`}
-            >
-              Assistant
-            </BreadcrumbItem>
-          </Breadcrumb>
-          <h1 className="text-2xl font-light tracking-tight">Analysis</h1>
-        </div>
-      </div>
-      <TableToolbar>
-        <TableToolbarContent>
-          <TableToolbarSearch
-            placeholder="Search analysis..."
-            onChange={(e: any) => setSearchTerm(e.target?.value || '')}
-          />
-          <IconOnlyButton
-            kind="ghost"
-            size="lg"
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            onClick={get}
-          />
-          <PrimaryButton
-            size="md"
-            renderIcon={Add}
-            onClick={() => navigation.goToCreateAssistantAnalysis(assistantId)}
-          >
-            Create analysis
-          </PrimaryButton>
-        </TableToolbarContent>
-      </TableToolbar>
+      <AssistantSettingsShellHeader
+        title="Analysis"
+        href={`/deployment/assistant/${assistantId}/configure-analysis`}
+        onReload={get}
+        reloadLabel="Reload analysis"
+        primaryAction={{
+          label: 'Create analysis',
+          onClick: () => navigation.goToCreateAssistantAnalysis(assistantId),
+        }}
+      />
       <TableSection>
-        {axtion.analysises.length > 0 && filteredAnalyses.length > 0 ? (
+        {axtion.analysises.length > 0 ? (
           <>
             <Table>
               <TableHead>
@@ -303,7 +257,7 @@ const ConfigureAssistantAnalysis: FC<{ assistantId: string }> = ({
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredAnalyses.map(row => {
+                {axtion.analysises.map(row => {
                   return (
                     <TableRow key={row.getId()}>
                       <TableCell className="text-sm">
@@ -389,12 +343,6 @@ const ConfigureAssistantAnalysis: FC<{ assistantId: string }> = ({
               }}
             />
           </>
-        ) : axtion.analysises.length > 0 ? (
-          <EmptyState
-            icon={ChartLine}
-            title="No analysis found"
-            subtitle="No analysis matched your search."
-          />
         ) : (
           <EmptyState
             icon={ChartLine}

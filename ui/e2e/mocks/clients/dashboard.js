@@ -244,6 +244,37 @@ function buildDashboardResponse() {
   return Buffer.from(response.serializeBinary());
 }
 
+function buildEmptyDashboardResponse() {
+  const analyticsSection = new DashboardAnalyticsSection();
+  analyticsSection.setState(
+    DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+  );
+
+  const usageSection = new DashboardUsageSection();
+  usageSection.setState(DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY);
+
+  const dashboard = new ProjectDashboard();
+  dashboard.setGeneratedat(timestamp('2026-10-17T08:30:00Z'));
+  dashboard.setAnalytics(analyticsSection);
+  dashboard.setUsage(usageSection);
+
+  const response = new GetProjectDashboardResponse();
+  response.setCode(200);
+  response.setSuccess(true);
+  response.setData(dashboard);
+  return Buffer.from(response.serializeBinary());
+}
+
+async function installEmptyDashboardClientMock(page) {
+  const response = buildEmptyDashboardResponse();
+  const handler = route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    return fulfillGrpcWeb(route, response);
+  };
+  await page.route(DASHBOARD_PATH, handler);
+  return () => page.unroute(DASHBOARD_PATH, handler);
+}
+
 async function installDashboardClientMock(page) {
   const response = buildDashboardResponse();
   dashboardRequests.set(page, []);
@@ -300,4 +331,5 @@ module.exports = {
   DASHBOARD_PATH,
   getDashboardRequests,
   installDashboardClientMock,
+  installEmptyDashboardClientMock,
 };

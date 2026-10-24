@@ -5,6 +5,7 @@ import {
 } from '@carbon/react';
 import type { ButtonSize } from '@carbon/react/es/components/Button/Button';
 import { Spinner } from '@/app/components/ui/feedback/loaders/spinner';
+import { Text } from '@/app/components/ui/primitives/text';
 import { cn } from '@/utils';
 import type {
   ComponentProps,
@@ -102,8 +103,22 @@ function CarbonBtn({
 // Default / Primary
 
 /** Carbon Primary button: the main CTA on a page. */
-export function PrimaryButton(props: CarbonButtonProps) {
-  return <CarbonBtn kind="primary" {...props} />;
+export function PrimaryButton({
+  children,
+  className,
+  ...props
+}: CarbonButtonProps) {
+  return (
+    <CarbonBtn
+      kind="primary"
+      className={cn('app-primary-button', className)}
+      {...props}
+    >
+      <Text variant="body-compact-01" className="text-inherit">
+        {children}
+      </Text>
+    </CarbonBtn>
+  );
 }
 
 // Secondary

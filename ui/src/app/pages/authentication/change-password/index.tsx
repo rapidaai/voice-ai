@@ -1,103 +1,149 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { useNavigate, useParams } from 'react-router-dom';
-import { CreatePasswordResponse } from '@rapidaai/react';
+import { CreatePasswordResponse, ServiceError } from '@rapidaai/react';
 import { useForm } from 'react-hook-form';
-import { ServiceError } from '@rapidaai/react';
 import { useRapidaStore } from '@/stores/app';
-import { Stack } from '@/app/components/ui/primitives';
-import { PrimaryButton } from '@/app/components/ui/primitives';
+import {
+  FluidPasswordInput,
+  PrimaryButton,
+  Text,
+} from '@/app/components/ui/primitives';
 import { Notification } from '@/app/components/ui/feedback';
 import { ArrowRight } from '@carbon/icons-react';
-import { PasswordInput } from '@carbon/react';
+import { Link } from '@carbon/react';
 import { createPassword } from '@/clients';
 
+interface ChangePasswordFormValues {
+  password: string;
+  confirmPassword: string;
+}
+
 export function ChangePasswordPage() {
-  const { register, handleSubmit } = useForm();
+  const {
+    register,
+    handleSubmit,
+    clearErrors,
+    setError: setFieldError,
+    setFocus,
+    formState: { errors },
+  } = useForm<ChangePasswordFormValues>({ mode: 'onBlur' });
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { token } = useParams();
   const { loading, showLoader, hideLoader } = useRapidaStore();
 
   const afterCreatePassword = useCallback(
-    (err: ServiceError | null, cpr: CreatePasswordResponse | null) => {
+    (err: ServiceError | null, response: CreatePasswordResponse | null) => {
       hideLoader();
-      if (err) {
-        setError('Unable to process your request. Please try again later.');
+      if (response?.getSuccess()) {
+        navigate('/auth/signin');
         return;
       }
-      if (cpr?.getSuccess()) {
-        return navigate('/auth/signin');
-      } else {
-        let errorMessage = cpr?.getError();
-        if (errorMessage) setError(errorMessage.getHumanmessage());
-        else
-          setError('Unable to process your request. Please try again later.');
-        return;
-      }
+
+      const message = response?.getError()?.getHumanmessage();
+      if (!message) console.error(err);
+      setError(message || "We couldn't reset your password. Try again.");
+      setFocus('password');
     },
-    [],
+    [hideLoader, navigate, setFocus],
   );
 
-  const onCreatePassword = data => {
+  const onCreatePassword = (data: ChangePasswordFormValues) => {
+    setError('');
+    clearErrors('confirmPassword');
     if (!token) {
-      setError(
-        'The password token is expired, please request again for reset password token.',
-      );
+      setError('This reset link has expired. Request a new reset link.');
       return;
     }
     if (data.password !== data.confirmPassword) {
-      setError('Passwords entered do not match, please check and try again.');
+      setFieldError('confirmPassword', {
+        type: 'validate',
+        message: 'Passwords do not match.',
+      });
+      setFocus('confirmPassword');
       return;
     }
+
     showLoader();
     createPassword(token, data.password, afterCreatePassword);
   };
 
   return (
-    <Stack gap={6}>
+    <div
+      className="flex w-full max-w-[37rem] flex-col bg-surface"
+      data-testid="change-password-panel"
+    >
       <Helmet title="Set a new password" />
-      <Stack gap={2}>
-        <h1 className="m-0 text-[1.8rem] leading-tight">Set a new password</h1>
-        <p className="mt-1.5 text-sm leading-[1.4286] text-(--cds-text-secondary)">
-          You've requested to change your password. Please enter your new
-          password below to secure your account.
-        </p>
+      <header className="p-6 sm:p-8" data-testid="change-password-header">
+        <Text as="h1" variant="heading-05" className="m-0">
+          Set a new password
+        </Text>
+        <Text as="p" variant="body-02" className="mt-2 text-muted">
+          Choose a new password for your account.
+        </Text>
+      </header>
+
+      <form
+        noValidate
+        className="p-0"
+        data-testid="change-password-form"
+        onSubmit={handleSubmit(onCreatePassword)}
+      >
         <div
-          aria-hidden="true"
-          className={`h-px bg-gray-300 dark:bg-gray-900 mt-3`}
-        />
-      </Stack>
-      <form className="mt-6" onSubmit={handleSubmit(onCreatePassword)}>
-        <Stack gap={5}>
-          <PasswordInput
+          className="mx-6 flex flex-col sm:mx-8"
+          data-testid="change-password-input-stack"
+        >
+          <FluidPasswordInput
             id="new-password"
-            labelText="Password"
+            labelText="New password"
             required
-            placeholder="********"
-            {...register('password')}
+            autoComplete="new-password"
+            invalid={Boolean(errors.password)}
+            invalidText={errors.password?.message}
+            {...register('password', { required: 'Enter a new password.' })}
           />
-          <PasswordInput
+          <FluidPasswordInput
             id="confirm-password"
-            labelText="Confirm Password"
+            labelText="Confirm password"
             required
-            placeholder="********"
-            {...register('confirmPassword')}
+            autoComplete="new-password"
+            invalid={Boolean(errors.confirmPassword)}
+            invalidText={errors.confirmPassword?.message}
+            {...register('confirmPassword', {
+              required: 'Confirm your new password.',
+            })}
           />
+        </div>
+
+        <div className="p-6 sm:p-8" data-testid="change-password-actions">
           {error && (
-            <Notification kind="error" title="Error" subtitle={error} />
+            <div className="mb-6">
+              <Notification
+                kind="error"
+                title="Unable to reset password"
+                subtitle={error}
+              />
+            </div>
           )}
+
           <PrimaryButton
             size="lg"
             renderIcon={ArrowRight}
             type="submit"
             isLoading={loading}
-            className="!w-full !max-w-none !justify-between"
+            className="w-full! max-w-none! justify-between!"
           >
             Save new password
           </PrimaryButton>
-        </Stack>
+
+          <div className="mt-6">
+            <Link href="/auth/forgot-password" inline>
+              <Text variant="body-compact-01">Request another reset link</Text>
+            </Link>
+          </div>
+        </div>
       </form>
-    </Stack>
+    </div>
   );
 }

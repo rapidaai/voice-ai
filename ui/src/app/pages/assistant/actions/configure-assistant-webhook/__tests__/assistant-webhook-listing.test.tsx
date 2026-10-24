@@ -82,6 +82,14 @@ jest.mock('@carbon/react', () => {
   const React = require('react');
   const Div = ({ children }: any) => React.createElement('div', null, children);
   return {
+    Header: ({ children, ...props }: any) =>
+      React.createElement('header', props, children),
+    HeaderName: ({ children, prefix: _prefix, ...props }: any) =>
+      React.createElement('a', props, children),
+    HeaderGlobalBar: ({ children, ...props }: any) =>
+      React.createElement('div', props, children),
+    HeaderGlobalAction: ({ children, ...props }: any) =>
+      React.createElement('button', props, children),
     Table: Div,
     TableHead: Div,
     TableRow: Div,

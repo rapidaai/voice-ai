@@ -38,6 +38,15 @@ jest.mock('@/app/components/app-shell/helmet', () => ({
 jest.mock('@/app/components/ui/primitives/form', () => ({
   Stack: ({ children }: any) => <div>{children}</div>,
   TextInput: (props: any) => <input {...props} />,
+  FluidPasswordInput: require('react').forwardRef(
+    ({ id, invalid, invalidText, labelText, ...props }: any, ref: any) => (
+      <div data-fluid-input>
+        <label htmlFor={id}>{labelText}</label>
+        <input id={id} ref={ref} aria-invalid={invalid} {...props} />
+        {invalid && <span>{invalidText}</span>}
+      </div>
+    ),
+  ),
 }));
 
 jest.mock('@/app/components/ui/primitives/button', () => ({
@@ -51,8 +60,18 @@ jest.mock('@/app/components/ui/feedback/notification', () => ({
 }));
 
 jest.mock('@carbon/react', () => ({
+  FluidForm: ({ children, ...props }: any) => (
+    <form {...props}>{children}</form>
+  ),
+  Link: ({ children, href }: any) => <a href={href}>{children}</a>,
   PasswordInput: require('react').forwardRef(
-    ({ labelText, ...props }: any, ref: any) => <input ref={ref} {...props} />,
+    ({ id, invalid, invalidText, labelText, ...props }: any, ref: any) => (
+      <div>
+        <label htmlFor={id}>{labelText}</label>
+        <input id={id} ref={ref} aria-invalid={invalid} {...props} />
+        {invalid && <span>{invalidText}</span>}
+      </div>
+    ),
   ),
 }));
 
@@ -68,19 +87,39 @@ describe('ChangePasswordPage', () => {
 
     expect(
       screen.getByRole('heading', { level: 1, name: 'Set a new password' }),
-    ).toBeInTheDocument();
+    ).toHaveClass('text-[2rem]', 'leading-[2.5rem]', 'font-normal');
+    expect(screen.getByTestId('change-password-panel')).toHaveClass(
+      'max-w-[37rem]',
+      'bg-surface',
+    );
+    expect(screen.getByTestId('change-password-header')).toHaveClass(
+      'p-6',
+      'sm:p-8',
+    );
+    expect(screen.getByTestId('change-password-form')).toHaveClass('p-0');
+    expect(screen.getByTestId('change-password-input-stack')).toHaveClass(
+      'mx-6',
+      'sm:mx-8',
+      'flex-col',
+    );
+    expect(screen.getByTestId('change-password-actions')).toHaveClass(
+      'p-6',
+      'sm:p-8',
+    );
+    expect(screen.getByLabelText('New password').parentElement).toHaveAttribute(
+      'data-fluid-input',
+    );
+    expect(
+      screen.getByLabelText('Confirm password').parentElement,
+    ).toHaveAttribute('data-fluid-input');
 
-    await user.click(screen.getAllByPlaceholderText('********')[0]);
-    await user.keyboard('{Control>}a{/Control}');
-    await user.paste(String('secret'));
-    await user.click(screen.getAllByPlaceholderText('********')[1]);
-    await user.keyboard('{Control>}a{/Control}');
-    await user.paste(String('secret'));
+    await user.type(screen.getByLabelText('New password'), 'secret');
+    await user.type(screen.getByLabelText('Confirm password'), 'secret');
     await user.click(screen.getByRole('button', { name: 'Save new password' }));
 
     expect(
       await screen.findByText(
-        'The password token is expired, please request again for reset password token.',
+        'This reset link has expired. Request a new reset link.',
       ),
     ).toBeInTheDocument();
     expect(CreatePassword).not.toHaveBeenCalled();
@@ -92,18 +131,12 @@ describe('ChangePasswordPage', () => {
     mockParams = { token: 'token-1' };
     render(<ChangePasswordPage />);
 
-    await user.click(screen.getAllByPlaceholderText('********')[0]);
-    await user.keyboard('{Control>}a{/Control}');
-    await user.paste(String('secret-1'));
-    await user.click(screen.getAllByPlaceholderText('********')[1]);
-    await user.keyboard('{Control>}a{/Control}');
-    await user.paste(String('secret-2'));
+    await user.type(screen.getByLabelText('New password'), 'secret-1');
+    await user.type(screen.getByLabelText('Confirm password'), 'secret-2');
     await user.click(screen.getByRole('button', { name: 'Save new password' }));
 
     expect(
-      await screen.findByText(
-        'Passwords entered do not match, please check and try again.',
-      ),
+      await screen.findByText('Passwords do not match.'),
     ).toBeInTheDocument();
     expect(CreatePassword).not.toHaveBeenCalled();
   });
@@ -119,12 +152,8 @@ describe('ChangePasswordPage', () => {
 
     render(<ChangePasswordPage />);
 
-    await user.click(screen.getAllByPlaceholderText('********')[0]);
-    await user.keyboard('{Control>}a{/Control}');
-    await user.paste(String('secret'));
-    await user.click(screen.getAllByPlaceholderText('********')[1]);
-    await user.keyboard('{Control>}a{/Control}');
-    await user.paste(String('secret'));
+    await user.type(screen.getByLabelText('New password'), 'secret');
+    await user.type(screen.getByLabelText('Confirm password'), 'secret');
     await user.click(screen.getByRole('button', { name: 'Save new password' }));
 
     await waitFor(() => {
@@ -146,18 +175,12 @@ describe('ChangePasswordPage', () => {
 
     render(<ChangePasswordPage />);
 
-    await user.click(screen.getAllByPlaceholderText('********')[0]);
-    await user.keyboard('{Control>}a{/Control}');
-    await user.paste(String('secret'));
-    await user.click(screen.getAllByPlaceholderText('********')[1]);
-    await user.keyboard('{Control>}a{/Control}');
-    await user.paste(String('secret'));
+    await user.type(screen.getByLabelText('New password'), 'secret');
+    await user.type(screen.getByLabelText('Confirm password'), 'secret');
     await user.click(screen.getByRole('button', { name: 'Save new password' }));
 
     expect(
-      await screen.findByText(
-        'Unable to process your request. Please try again later.',
-      ),
+      await screen.findByText("We couldn't reset your password. Try again."),
     ).toBeInTheDocument();
     expect(mockHideLoader).toHaveBeenCalled();
   });
@@ -176,12 +199,8 @@ describe('ChangePasswordPage', () => {
 
     render(<ChangePasswordPage />);
 
-    await user.click(screen.getAllByPlaceholderText('********')[0]);
-    await user.keyboard('{Control>}a{/Control}');
-    await user.paste(String('secret'));
-    await user.click(screen.getAllByPlaceholderText('********')[1]);
-    await user.keyboard('{Control>}a{/Control}');
-    await user.paste(String('secret'));
+    await user.type(screen.getByLabelText('New password'), 'secret');
+    await user.type(screen.getByLabelText('Confirm password'), 'secret');
     await user.click(screen.getByRole('button', { name: 'Save new password' }));
 
     expect(await screen.findByText('Token invalid')).toBeInTheDocument();
@@ -201,18 +220,24 @@ describe('ChangePasswordPage', () => {
 
     render(<ChangePasswordPage />);
 
-    await user.click(screen.getAllByPlaceholderText('********')[0]);
-    await user.keyboard('{Control>}a{/Control}');
-    await user.paste(String('secret'));
-    await user.click(screen.getAllByPlaceholderText('********')[1]);
-    await user.keyboard('{Control>}a{/Control}');
-    await user.paste(String('secret'));
+    await user.type(screen.getByLabelText('New password'), 'secret');
+    await user.type(screen.getByLabelText('Confirm password'), 'secret');
     await user.click(screen.getByRole('button', { name: 'Save new password' }));
 
     expect(
-      await screen.findByText(
-        'Unable to process your request. Please try again later.',
-      ),
+      await screen.findByText("We couldn't reset your password. Try again."),
     ).toBeInTheDocument();
+  });
+
+  it('shows required field errors before checking the token', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    mockParams = { token: 'token-1' };
+    render(<ChangePasswordPage />);
+
+    await user.click(screen.getByRole('button', { name: 'Save new password' }));
+
+    expect(await screen.findByText('Enter a new password.')).toBeVisible();
+    expect(screen.getByText('Confirm your new password.')).toBeVisible();
+    expect(CreatePassword).not.toHaveBeenCalled();
   });
 });

@@ -20,6 +20,7 @@ import {
   BargeInTriggerControl,
   MICROPHONE_BARGE_IN_TRIGGER_KEY,
 } from '@/app/components/domain/providers/microphone/barge-in-trigger-control';
+import { Text } from '@/app/components/ui/primitives/text';
 
 interface ConfigureAudioInputProviderProps {
   audioInputConfig: { provider: string; parameters: Metadata[] };
@@ -84,7 +85,7 @@ export const ConfigureAudioInputProvider: React.FC<
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            className="flex items-center gap-1.5 text-[var(--cds-text-secondary)] transition-colors hover:text-[var(--cds-text-primary)]"
           >
             <ChevronDown
               size={16}
@@ -93,21 +94,31 @@ export const ConfigureAudioInputProvider: React.FC<
                 showAdvanced && 'rotate-180',
               )}
             />
-            {showAdvanced ? 'Hide' : 'Show'} advanced settings
+            <Text as="span" variant="body-compact-01">
+              {showAdvanced ? 'Hide' : 'Show'} advanced settings
+            </Text>
           </button>
 
           {showAdvanced && (
             <div className="flex flex-col gap-6 pt-6 border-t border-gray-200 dark:border-gray-800">
-              <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">
+              <Text
+                as="p"
+                variant="label-01"
+                className="uppercase text-[var(--cds-text-secondary)]"
+              >
                 Barge-in Control
-              </p>
+              </Text>
               <BargeInTriggerControl
                 parameters={audioInputConfig.parameters}
                 onChangeParameter={onChangeAudioInputParameter}
               />
-              <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">
+              <Text
+                as="p"
+                variant="label-01"
+                className="uppercase text-[var(--cds-text-secondary)]"
+              >
                 Voice Activity Detection
-              </p>
+              </Text>
               <VADProvider
                 provider={getParamValue(
                   'microphone.vad.provider',
@@ -121,9 +132,13 @@ export const ConfigureAudioInputProvider: React.FC<
                 parameters={audioInputConfig.parameters}
                 onChangeParameter={onChangeAudioInputParameter}
               />
-              <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">
+              <Text
+                as="p"
+                variant="label-01"
+                className="uppercase text-[var(--cds-text-secondary)]"
+              >
                 Background Noise
-              </p>
+              </Text>
               <NoiseCancellationProvider
                 noiseCancellationProvider={getParamValue(
                   'microphone.denoising.provider',
@@ -140,9 +155,13 @@ export const ConfigureAudioInputProvider: React.FC<
                   )
                 }
               />
-              <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">
+              <Text
+                as="p"
+                variant="label-01"
+                className="uppercase text-[var(--cds-text-secondary)]"
+              >
                 End of Speech
-              </p>
+              </Text>
               <EndOfSpeechProvider
                 provider={getParamValue(
                   'microphone.eos.provider',

@@ -1,6 +1,8 @@
 import { PrimaryButton } from '@/app/components/ui/primitives/button';
+import { Text } from '@/app/components/ui/primitives/text';
 import { ArrowLeft } from '@carbon/icons-react';
 import { useId } from 'react';
+import type { ComponentProps } from 'react';
 import { cn } from '@/utils';
 
 interface ErrorContainerProps {
@@ -9,6 +11,7 @@ interface ErrorContainerProps {
   description: string;
   actionLabel: string;
   onAction: () => void;
+  actionIcon?: ComponentProps<typeof PrimaryButton>['renderIcon'] | null;
   className?: string;
 }
 
@@ -18,6 +21,7 @@ export function ErrorContainer({
   description,
   actionLabel,
   onAction,
+  actionIcon = ArrowLeft,
   className,
 }: ErrorContainerProps) {
   const titleId = useId();
@@ -26,23 +30,42 @@ export function ErrorContainer({
     <section
       aria-labelledby={titleId}
       className={cn(
-        'flex min-h-[24rem] items-center justify-center px-6 py-16 text-[var(--cds-text-primary)]',
+        'flex min-h-0 w-full flex-1 items-center justify-center px-4 py-12 text-[var(--cds-text-primary)] sm:px-6 lg:px-8',
         className,
       )}
     >
-      <div className="max-w-xl text-center">
-        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--cds-text-secondary)]">
+      <div className="flex w-full max-w-xl flex-col items-center text-center">
+        <Text
+          as="span"
+          variant="heading-06"
+          className="[color:var(--cds-text-secondary)]"
+        >
           {code}
-        </p>
-        <h1 id={titleId} className="text-3xl font-semibold leading-tight">
+        </Text>
+        <Text
+          as="h1"
+          id={titleId}
+          variant="heading-04"
+          className="mt-4"
+        >
           {title}
-        </h1>
-        <p className="mx-auto mb-8 mt-3 max-w-lg text-base leading-6 text-[var(--cds-text-secondary)]">
+        </Text>
+        <Text
+          as="p"
+          variant="body-01"
+          className="mt-3 max-w-lg [color:var(--cds-text-secondary)]"
+        >
           {description}
-        </p>
-        <PrimaryButton size="md" onClick={onAction} renderIcon={ArrowLeft}>
-          {actionLabel}
-        </PrimaryButton>
+        </Text>
+        <div className="mt-8">
+          <PrimaryButton
+            size="md"
+            onClick={onAction}
+            renderIcon={actionIcon ?? undefined}
+          >
+            {actionLabel}
+          </PrimaryButton>
+        </div>
       </div>
     </section>
   );

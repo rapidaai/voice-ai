@@ -74,7 +74,7 @@ describe('DebuggerDeploymentSuccessDialog', () => {
     await user.click(previewButton);
 
     expect(window.open).toHaveBeenCalledWith(
-      '/preview/chat/assistant-1',
+      '/deployment/assistant/assistant-1/playground/chat',
       '_blank',
     );
   });

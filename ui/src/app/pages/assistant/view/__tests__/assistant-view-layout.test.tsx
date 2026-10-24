@@ -118,7 +118,9 @@ describe('AssistantViewLayout', () => {
     expect(
       await screen.findByRole('heading', { name: 'Assistant not available' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Go to listing' })).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Back to assistants' }),
+    ).toBeVisible();
     expect(mockHideLoader).toHaveBeenCalled();
   });
 

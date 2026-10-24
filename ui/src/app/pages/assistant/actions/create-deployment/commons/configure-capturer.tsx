@@ -1,5 +1,6 @@
 import { Metadata } from '@rapidaai/react';
 import { CloudStorageProvider } from '@/app/components/domain/providers/storage';
+import { Text } from '@/app/components/ui/primitives/text';
 
 export interface StorageConfig {
   providerId: string;
@@ -25,10 +26,16 @@ export const ConfigureCapturer: React.FC<{
       {allowed.includes('text') && (
         <div className="border-b dark:border-gray-800">
           <div className="px-5 py-4 border-b dark:border-gray-800">
-            <h2 className="text-sm font-semibold">Text Messages</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            <Text as="h2" variant="heading-compact-01">
+              Text Messages
+            </Text>
+            <Text
+              as="p"
+              variant="helper-text-01"
+              className="mt-0.5 text-[var(--cds-text-secondary)]"
+            >
               Store conversation transcripts to a cloud storage provider.
-            </p>
+            </Text>
           </div>
           <div className="px-5 py-5">
             <CloudStorageProvider
@@ -42,10 +49,16 @@ export const ConfigureCapturer: React.FC<{
       {allowed.includes('audio') && (
         <div className="border-b dark:border-gray-800">
           <div className="px-5 py-4 border-b dark:border-gray-800">
-            <h2 className="text-sm font-semibold">Audio Recording</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            <Text as="h2" variant="heading-compact-01">
+              Audio Recording
+            </Text>
+            <Text
+              as="p"
+              variant="helper-text-01"
+              className="mt-0.5 text-[var(--cds-text-secondary)]"
+            >
               Save call audio recordings to a cloud storage provider.
-            </p>
+            </Text>
           </div>
           <div className="px-5 py-5">
             <CloudStorageProvider

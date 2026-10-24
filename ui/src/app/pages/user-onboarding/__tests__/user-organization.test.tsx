@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
 
@@ -44,10 +44,35 @@ jest.mock('@/app/components/app-shell/helmet', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives/form', () => ({
-  Stack: ({ children }: any) => <div>{children}</div>,
-  TextInput: require('react').forwardRef(
-    ({ labelText, helperText, ...props }: any, ref: any) => (
-      <input ref={ref} {...props} />
+  FluidForm: ({ children, ...props }: any) => (
+    <form data-fluid-form="true" {...props}>
+      {children}
+    </form>
+  ),
+  FluidTextInput: require('react').forwardRef(
+    (
+      { labelText, helperText, invalid, invalidText, ...props }: any,
+      ref: any,
+    ) => (
+      <label>
+        {labelText}
+        <input ref={ref} aria-invalid={invalid} {...props} />
+        {invalid ? <span>{invalidText}</span> : null}
+      </label>
+    ),
+  ),
+  FluidSelect: require('react').forwardRef(
+    (
+      { labelText, helperText, children, invalid, invalidText, ...props }: any,
+      ref: any,
+    ) => (
+      <label>
+        {labelText}
+        <select ref={ref} aria-invalid={invalid} {...props}>
+          {children}
+        </select>
+        {invalid ? <span>{invalidText}</span> : null}
+      </label>
     ),
   ),
 }));
@@ -63,13 +88,6 @@ jest.mock('@/app/components/ui/feedback/notification', () => ({
 }));
 
 jest.mock('@carbon/react', () => ({
-  Select: require('react').forwardRef(
-    ({ labelText, helperText, children, ...props }: any, ref: any) => (
-      <select ref={ref} {...props}>
-        {children}
-      </select>
-    ),
-  ),
   SelectItem: ({ value, text }: any) => <option value={value}>{text}</option>,
 }));
 
@@ -94,18 +112,102 @@ describe('CreateOrganizationPage', () => {
     const user = userEvent.setup({ writeToClipboard: false });
     renderWithAuth();
 
-    const industry = screen.getByPlaceholderText(
-      'eg: Agency services, healthcare, finance',
+    const industry = screen.getByLabelText('Industry');
+    await user.clear(screen.getByLabelText('Organization name'));
+    await user.type(screen.getByLabelText('Organization name'), '   ');
+    await user.type(industry, '   ');
+    await user.click(
+      screen.getByRole('button', { name: 'Create organization' }),
     );
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
+    expect(
+      await screen.findByText('Enter an organization name.'),
+    ).toBeInTheDocument();
     expect(industry).toBeInvalid();
+    expect(
+      await screen.findByText('Enter an industry.'),
+    ).toBeInTheDocument();
     expect(CreateOrganization).not.toHaveBeenCalled();
+  });
+
+  it('requires an organization type before submission', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    renderWithAuth();
+
+    await user.type(screen.getByLabelText('Industry'), 'Software');
+    await user.click(
+      screen.getByRole('button', { name: 'Create organization' }),
+    );
+
+    expect(
+      await screen.findByText('Select an organization type.'),
+    ).toBeInTheDocument();
+    expect(CreateOrganization).not.toHaveBeenCalled();
+  });
+
+  it('leaves the organization name empty when the profile has no name', () => {
+    mockCredential = {
+      user: {} as any,
+      authId: 'auth-1',
+      token: 'token-1',
+    };
+
+    renderWithAuth();
+
+    expect(screen.getByLabelText('Organization name')).toHaveValue('');
+  });
+
+  it('uses sign-in typography and a hint-free Carbon fluid form', () => {
+    renderWithAuth();
+
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Create your organization',
+      }),
+    ).toHaveClass(
+      'text-[2rem]',
+      'leading-[2.5rem]',
+      'font-normal',
+      'tracking-[0]',
+      'm-0',
+    );
+    expect(
+      screen.getByText(
+        'Tell us about your organization to set up your workspace.',
+      ),
+    ).toHaveClass('text-[1rem]', 'leading-[1.5rem]', 'tracking-[0]');
+    expect(screen.getByTestId('organization-form')).toHaveAttribute(
+      'data-fluid-form',
+      'true',
+    );
+    expect(screen.getByTestId('organization-fields')).not.toHaveClass('gap-8');
+    expect(screen.getByLabelText('Organization name')).not.toHaveAttribute(
+      'placeholder',
+    );
+    expect(screen.getByLabelText('Industry')).not.toHaveAttribute(
+      'placeholder',
+    );
+    expect(
+      screen.queryByText('Use your agency, brand, or operating company name.'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('This helps tailor setup guidance for your team.'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Used to suggest relevant integrations and templates.',
+      ),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('organization-actions')).toHaveClass('mt-12');
   });
 
   it('submits and navigates to onboarding project on success', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
-    const authorize = jest.fn(success => success());
+    let finishAuthorization: (() => void) | undefined;
+    const authorize = jest.fn(success => {
+      finishAuthorization = success;
+    });
     (CreateOrganization as jest.Mock).mockImplementation(
       (_cfg, _name, _size, _industry, _headers, callback) => {
         callback(null, { getSuccess: () => true });
@@ -114,18 +216,15 @@ describe('CreateOrganizationPage', () => {
 
     renderWithAuth(authorize);
 
-    const organizationName = screen.getByPlaceholderText(
-      'eg: Acme Voice Studio',
-    );
+    const organizationName = screen.getByLabelText('Organization name');
     await user.click(organizationName);
     await user.keyboard('{Control>}a{/Control}');
     await user.paste('My Org');
-    await user.type(
-      screen.getByPlaceholderText('eg: Agency services, healthcare, finance'),
-      'Software',
-    );
+    await user.type(screen.getByLabelText('Industry'), 'Software');
     await user.selectOptions(screen.getByRole('combobox'), 'agency');
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Create organization' }),
+    );
 
     await waitFor(() => {
       expect(CreateOrganization).toHaveBeenCalled();
@@ -133,6 +232,10 @@ describe('CreateOrganizationPage', () => {
 
     expect(mockShowLoader).toHaveBeenCalledWith('overlay');
     expect(authorize).toHaveBeenCalled();
+    expect(mockHideLoader).not.toHaveBeenCalled();
+
+    act(() => finishAuthorization?.());
+
     expect(mockHideLoader).toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith('/onboarding/project');
   });
@@ -147,37 +250,47 @@ describe('CreateOrganizationPage', () => {
 
     renderWithAuth();
 
-    await user.type(
-      screen.getByPlaceholderText('eg: Agency services, healthcare, finance'),
-      'Software',
+    await user.type(screen.getByLabelText('Industry'), 'Software');
+    await user.selectOptions(screen.getByRole('combobox'), 'agency');
+    await user.click(
+      screen.getByRole('button', { name: 'Create organization' }),
     );
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(
       await screen.findByText(
-        'Unable to process your request. Please try again later.',
+        "We couldn't create your organization. Try again.",
       ),
     ).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Organization name'), ' updated');
+    expect(
+      screen.queryByText("We couldn't create your organization. Try again."),
+    ).not.toBeInTheDocument();
   });
 
-  it('shows credential error when API returns unsuccessful response', async () => {
+  it('shows the actionable API error when creation is unsuccessful', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     (CreateOrganization as jest.Mock).mockImplementation(
       (_cfg, _name, _size, _industry, _headers, callback) => {
-        callback(null, { getSuccess: () => false });
+        callback(null, {
+          getSuccess: () => false,
+          getError: () => ({
+            getHumanmessage: () => 'An organization with this name exists.',
+          }),
+        });
       },
     );
 
     renderWithAuth();
 
-    await user.type(
-      screen.getByPlaceholderText('eg: Agency services, healthcare, finance'),
-      'Software',
+    await user.type(screen.getByLabelText('Industry'), 'Software');
+    await user.selectOptions(screen.getByRole('combobox'), 'agency');
+    await user.click(
+      screen.getByRole('button', { name: 'Create organization' }),
     );
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(
-      await screen.findByText('Please provide valid credentials to sign in.'),
+      await screen.findByText('An organization with this name exists.'),
     ).toBeInTheDocument();
   });
 });

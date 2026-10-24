@@ -52,6 +52,10 @@ import {
 import { AssistantViewLayout } from '@/app/pages/assistant/view/assistant-view.layout';
 import { EndpointViewLayout } from '@/app/pages/endpoint/view/endpoint-view.layout';
 import { StaticPageNotFoundPage } from '@/app/pages/static-pages';
+import {
+  PreviewPhoneAgentPage,
+  PreviewVoiceAgentV2Page,
+} from '@/app/pages/preview-agent';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 
 export function DeploymentRoute() {
@@ -116,6 +120,14 @@ export function DeploymentRoute() {
         >
           <Route index element={<Navigate to="overview" replace />} />
           <Route path={':tab'} element={<DeploymentViewAssistantPage />} />
+          <Route
+            path={'playground/chat'}
+            element={<PreviewVoiceAgentV2Page embedded />}
+          />
+          <Route
+            path={'playground/phone'}
+            element={<PreviewPhoneAgentPage embedded />}
+          />
 
           {/* Session detail */}
           <Route

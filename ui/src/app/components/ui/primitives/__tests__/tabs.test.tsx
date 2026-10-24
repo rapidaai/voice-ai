@@ -18,8 +18,12 @@ jest.mock('@carbon/react', () => {
         <div data-design-system-tabs>{children}</div>
       </TabsContext.Provider>
     ),
-    TabList: ({ children }: any) => (
-      <div role="tablist">
+    TabList: ({ children, className, fullWidth }: any) => (
+      <div
+        role="tablist"
+        className={className}
+        data-full-width={fullWidth || undefined}
+      >
         {React.Children.map(
           children,
           (child: React.ReactElement, index: number) =>
@@ -68,6 +72,26 @@ describe('Tab', () => {
     render(<Tabs tabs={['Messages', 'Details']} />);
 
     expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(2);
+  });
+
+  it('forwards opt-in full-width and divider styling to Carbon TabList', () => {
+    render(
+      <Tabs
+        tabs={['Messages', 'Details']}
+        contained
+        fullWidth
+        tabListClassName="border-y border-border-subtle"
+      />,
+    );
+
+    expect(screen.getByRole('tablist')).toHaveAttribute(
+      'data-full-width',
+      'true',
+    );
+    expect(screen.getByRole('tablist')).toHaveClass(
+      'border-y',
+      'border-border-subtle',
+    );
   });
 
   it('selects the tab matching the active label', () => {

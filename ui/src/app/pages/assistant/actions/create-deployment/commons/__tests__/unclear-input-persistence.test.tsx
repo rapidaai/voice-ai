@@ -123,13 +123,14 @@ jest.mock('@/app/components/ui/composites', () => ({
   },
 }));
 jest.mock('@/app/components/ui/primitives', () => ({
-  Tabs: ({ tabs, onChange }: any) => (
+  Tabs: ({ tabs, onChange, selectedIndex = 0, children }: any) => (
     <>
       {tabs.map((label: string, index: number) => (
         <button key={label} onClick={() => onChange(index)}>
           {label}
         </button>
       ))}
+      {(Array.isArray(children) ? children : [children])[selectedIndex]}
     </>
   ),
   PrimaryButton: ({ children, isLoading, ...props }: any) => (

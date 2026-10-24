@@ -58,7 +58,7 @@
     "test:e2e:update": "yarn e2e:screenshots --update-snapshots",
     "e2e:smoke": "playwright test e2e/route-coverage.spec.js e2e/route-smoke.spec.js --config=playwright.config.js",
     "e2e:a11y": "playwright test e2e/a11y.spec.js --config=playwright.config.js",
-    "e2e:screenshots": "playwright test e2e/screenshot-journey.spec.js e2e/journey-viewport-screenshots.spec.js e2e/subjourney-screenshots.spec.js e2e/journeys/dashboard/state-screenshots.spec.js e2e/journeys/deployment/assistant-state-screenshots.spec.js --config=playwright.config.js",
+    "e2e:screenshots": "playwright test e2e/screenshot-journey.spec.js e2e/journey-viewport-screenshots.spec.js e2e/subjourney-screenshots.spec.js e2e/journeys/dashboard/state-screenshots.spec.js e2e/journeys/deployment/assistant-state-screenshots.spec.js e2e/journeys/preview/debugger-v2.spec.js --config=playwright.config.js",
     "check:dependencies": "depcruise --config .dependency-cruiser.cjs --output-type err src",
     "depcruise:graph": "depcruise --config .dependency-cruiser.cjs --output-type dot --output-to dependency-graph.dot src",
     "checkTs": "node scripts/check-typescript.mjs",
@@ -76,8 +76,10 @@
     "verify:ui:e2e": "node scripts/verify-ui.mjs --e2e"
   },
   "dependencies": {
+    "@carbon/ai-chat": "1.22.0",
     "@carbon/react": "1.104.0",
     "@carbon/styles": "1.103.0",
+    "@carbon/web-components": "2.65.0",
     "@floating-ui/react": "0.26.9",
     "@formatjs/intl-localematcher": "0.5.4",
     "@grpc/proto-loader": "0.7.13",

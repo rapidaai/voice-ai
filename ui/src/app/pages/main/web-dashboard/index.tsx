@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  Bot,
   CheckmarkFilled,
   Renew,
   WarningAltFilled,
@@ -53,11 +54,17 @@ import {
 } from 'recharts';
 
 import { EmptyState } from '@/app/components/ui/feedback';
-import { Dropdown } from '@/app/components/ui/primitives';
+import {
+  PrimaryButton,
+  Text,
+  typographyClassNames,
+} from '@/app/components/ui/primitives';
 import { getProjectDashboardRange } from '@/clients/dashboard.client';
 import { useCurrentCredential } from '@/hooks/use-credential';
 
 type DashboardRange = '30d' | '7d' | '24h';
+const dashboardRange: DashboardRange = '30d';
+const dashboardRangeLabel = 'Last 30 days';
 
 type DashboardMetric = {
   label: string;
@@ -72,29 +79,6 @@ type DashboardBreakdown = {
   value: string;
   width: number;
 };
-
-type DashboardRangeOption = {
-  id: DashboardRange;
-  text: string;
-};
-
-type AutoRefreshOption = {
-  id: string;
-  text: string;
-};
-
-const dashboardRangeOptions: DashboardRangeOption[] = [
-  { id: '30d', text: 'Last 30 days' },
-  { id: '7d', text: 'Last 7 days' },
-  { id: '24h', text: 'Last 24 hours' },
-];
-
-const autoRefreshOptions: AutoRefreshOption[] = [
-  { id: '0', text: 'Off' },
-  { id: '5', text: 'Every 5 min' },
-  { id: '10', text: 'Every 10 min' },
-  { id: '30', text: 'Every 30 min' },
-];
 
 const assistantTableHeaders = [
   { key: 'assistant', header: 'Assistant' },
@@ -253,15 +237,74 @@ function PanelHeader({
   return (
     <header className="flex min-h-[76px] items-start justify-between gap-4 border-b border-gray-200 px-6 py-4 dark:border-gray-800">
       <div>
-        <h2 className="text-lg font-semibold text-[var(--cds-text-primary)]">
+        <Text
+          as="h2"
+          variant="heading-02"
+          className="text-[var(--cds-text-primary)]"
+        >
           {title}
-        </h2>
-        <p className="mt-1 text-xs text-[var(--cds-text-secondary)]">
+        </Text>
+        <Text
+          as="p"
+          variant="body-compact-01"
+          className="mt-1 text-[var(--cds-text-secondary)]"
+        >
           {subtitle}
-        </p>
+        </Text>
       </div>
       {action}
     </header>
+  );
+}
+
+function DashboardNoActivity() {
+  return (
+    <section
+      data-dashboard-empty
+      aria-labelledby="dashboard-getting-started-title"
+      className="flex min-h-[420px] items-center bg-[var(--cds-layer-01)]"
+    >
+      <div className="mx-auto w-full max-w-[640px] px-6 py-12 md:px-12 md:py-16">
+        <div className="flex h-12 w-12 items-center justify-center bg-[var(--cds-background-brand)] text-white">
+          <Bot aria-hidden="true" size={24} />
+        </div>
+
+        <Text
+          as="p"
+          variant="label-01"
+          className="mt-8 text-[var(--cds-text-secondary)]"
+        >
+          Getting started
+        </Text>
+        <Text
+          as="h1"
+          id="dashboard-getting-started-title"
+          variant="heading-05"
+          className="mt-2 text-[var(--cds-text-primary)]"
+        >
+          Your dashboard is not ready yet
+        </Text>
+        <Text
+          as="p"
+          variant="body-02"
+          className="mt-4 max-w-[520px] text-[var(--cds-text-secondary)]"
+        >
+          Create an assistant and run a test conversation. Sessions, latency,
+          and health will appear here after the first session.
+        </Text>
+
+        <div className="mt-6">
+          <PrimaryButton
+            size="lg"
+            href="/deployment/assistant/create-assistant"
+            renderIcon={ArrowRight}
+            className="w-full max-w-[320px] justify-between"
+          >
+            Create assistant
+          </PrimaryButton>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -272,28 +315,41 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
       className="flex h-[156px] flex-col border border-gray-200 bg-white dark:border-gray-800 dark:bg-[#262626]"
     >
       <div className="flex h-10 shrink-0 items-center border-b border-gray-200 px-4 dark:border-gray-800">
-        <h2 className="truncate text-sm font-semibold text-[var(--cds-text-primary)]">
+        <Text
+          as="h2"
+          variant="heading-compact-01"
+          className="truncate text-[var(--cds-text-primary)]"
+        >
           {metric.label}
-        </h2>
+        </Text>
       </div>
       <div className="flex min-h-0 flex-1 flex-col justify-between p-4">
-        <p className="text-4xl font-light leading-none tracking-tight tabular-nums text-[var(--cds-text-primary)]">
+        <Text
+          as="p"
+          variant="heading-05"
+          className="tabular-nums text-[var(--cds-text-primary)]"
+        >
           {metric.value}
           {metric.unit && (
-            <span className="ml-1 text-base font-normal tracking-normal text-[var(--cds-text-secondary)]">
+            <Text
+              variant="body-compact-02"
+              className="ml-1 text-[var(--cds-text-secondary)]"
+            >
               {metric.unit}
-            </span>
+            </Text>
           )}
-        </p>
-        <p
-          className={`text-xs font-semibold ${
+        </Text>
+        <Text
+          as="p"
+          variant="label-01"
+          className={
             metric.comparisonTone === 'danger'
               ? 'text-[var(--cds-support-error)]'
               : 'text-[var(--cds-text-secondary)]'
-          }`}
+          }
         >
           {metric.comparison}
-        </p>
+        </Text>
       </div>
     </article>
   );
@@ -324,17 +380,23 @@ function ActivityPanel({
     >
       <PanelHeader
         title="Conversation activity"
-        subtitle="Sessions and failures during the selected period"
+        subtitle="Sessions and failures from the last 30 days"
         action={
-          <div className="flex shrink-0 flex-col gap-1 text-xs text-[var(--cds-text-secondary)] sm:flex-row sm:gap-4">
-            <span className="flex items-center gap-1.5">
+          <div className="flex shrink-0 flex-col gap-1 sm:flex-row sm:gap-4">
+            <Text
+              variant="label-01"
+              className="flex items-center gap-1.5 text-[var(--cds-text-secondary)]"
+            >
               <span className="h-2.5 w-2.5 bg-[var(--cds-interactive)]" />
               Sessions
-            </span>
-            <span className="flex items-center gap-1.5">
+            </Text>
+            <Text
+              variant="label-01"
+              className="flex items-center gap-1.5 text-[var(--cds-text-secondary)]"
+            >
               <span className="h-2.5 w-2.5 bg-[var(--cds-support-error)]" />
               Failed
-            </span>
+            </Text>
           </div>
         }
       />
@@ -379,22 +441,28 @@ function ActivityPanel({
               />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, fill: 'var(--cds-text-secondary)' }}
+                tick={{
+                  className: typographyClassNames['label-01'],
+                  fill: 'var(--cds-text-secondary)',
+                }}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
                 width={42}
-                tick={{ fontSize: 11, fill: 'var(--cds-text-secondary)' }}
+                tick={{
+                  className: typographyClassNames['label-01'],
+                  fill: 'var(--cds-text-secondary)',
+                }}
                 tickLine={false}
                 axisLine={false}
               />
               <Tooltip
+                wrapperClassName={typographyClassNames['label-01']}
                 contentStyle={{
                   border: '1px solid var(--cds-border-subtle-01)',
                   background: 'var(--cds-layer-01)',
                   color: 'var(--cds-text-primary)',
-                  fontSize: 12,
                 }}
               />
               <Area
@@ -455,15 +523,21 @@ function HealthPanel({ analytics }: { analytics: ProjectDashboardAnalytics }) {
             className="mt-0.5 shrink-0 text-[var(--cds-support-error)]"
           />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Failed sessions</p>
-            <p className="mt-2 text-xs text-[var(--cds-text-secondary)]">
+            <Text as="p" variant="heading-compact-01">
+              Failed sessions
+            </Text>
+            <Text
+              as="p"
+              variant="label-01"
+              className="mt-2 text-[var(--cds-text-secondary)]"
+            >
               {numberFormatter.format(recentFailures)} recent{' '}
               {recentFailures === 1 ? 'failure' : 'failures'}
-            </p>
+            </Text>
           </div>
-          <span className="text-2xl font-light tabular-nums">
+          <Text variant="heading-04" className="tabular-nums">
             {numberFormatter.format(health?.getFailedsessions() || 0)}
-          </span>
+          </Text>
         </li>
         <li className="flex min-h-[106px] items-start gap-4 py-5">
           <WarningAltFilled
@@ -472,14 +546,20 @@ function HealthPanel({ analytics }: { analytics: ProjectDashboardAnalytics }) {
             className="mt-0.5 shrink-0 text-[var(--cds-support-warning)]"
           />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Slow sessions</p>
-            <p className="mt-2 text-xs text-[var(--cds-text-secondary)]">
+            <Text as="p" variant="heading-compact-01">
+              Slow sessions
+            </Text>
+            <Text
+              as="p"
+              variant="label-01"
+              className="mt-2 text-[var(--cds-text-secondary)]"
+            >
               Response latency above {numberFormatter.format(threshold)} ms
-            </p>
+            </Text>
           </div>
-          <span className="text-2xl font-light tabular-nums">
+          <Text variant="heading-04" className="tabular-nums">
             {numberFormatter.format(health?.getSlowsessions() || 0)}
-          </span>
+          </Text>
         </li>
         <li className="flex min-h-[106px] items-start gap-4 py-5">
           <CheckmarkFilled
@@ -488,14 +568,20 @@ function HealthPanel({ analytics }: { analytics: ProjectDashboardAnalytics }) {
             className="mt-0.5 shrink-0 text-[var(--cds-support-success)]"
           />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Healthy assistants</p>
-            <p className="mt-2 text-xs text-[var(--cds-text-secondary)]">
+            <Text as="p" variant="heading-compact-01">
+              Healthy assistants
+            </Text>
+            <Text
+              as="p"
+              variant="label-01"
+              className="mt-2 text-[var(--cds-text-secondary)]"
+            >
               Based on success rate and latency
-            </p>
+            </Text>
           </div>
-          <span className="text-2xl font-light tabular-nums">
+          <Text variant="heading-04" className="tabular-nums">
             {healthyAssistants} of {assistantCount}
-          </span>
+          </Text>
         </li>
       </ul>
     </section>
@@ -518,12 +604,20 @@ function EmptyContent({
         aria-hidden="true"
         className="text-[var(--cds-text-disabled)]"
       />
-      <h3 className="mt-4 text-base font-semibold text-[var(--cds-text-primary)]">
+      <Text
+        as="h3"
+        variant="heading-02"
+        className="mt-4 text-[var(--cds-text-primary)]"
+      >
         {title}
-      </h3>
-      <p className="mt-1 max-w-sm text-sm text-[var(--cds-text-secondary)]">
+      </Text>
+      <Text
+        as="p"
+        variant="body-compact-01"
+        className="mt-1 max-w-sm text-[var(--cds-text-secondary)]"
+      >
         {description}
-      </p>
+      </Text>
       {action}
     </div>
   );
@@ -574,11 +668,11 @@ function BreakdownPanel({
         <div className="grid gap-6 p-6 sm:grid-cols-2">
           {values.map(value => (
             <div key={value.label}>
-              <div className="mb-2 flex items-center justify-between gap-4 text-sm">
-                <span>{value.label}</span>
-                <span className="font-semibold tabular-nums">
+              <div className="mb-2 flex items-center justify-between gap-4">
+                <Text variant="body-compact-01">{value.label}</Text>
+                <Text variant="heading-compact-01" className="tabular-nums">
                   {value.value}
-                </span>
+                </Text>
               </div>
               <div className="h-1 bg-gray-200 dark:bg-gray-800">
                 <div
@@ -643,8 +737,10 @@ function RecentFailuresTable({
                   size="md"
                   tabIndex={0}
                 >
-                  <caption className="sr-only">
-                    Recent failed sessions for the selected period
+                  <caption
+                    className={`${typographyClassNames['label-01']} sr-only`}
+                  >
+                    Recent failed sessions from the last 30 days
                   </caption>
                   <TableHead>
                     <TableRow>
@@ -667,13 +763,15 @@ function RecentFailuresTable({
                             failureRoutes.get(row.id) ? (
                               <a
                                 href={failureRoutes.get(row.id)}
-                                className="font-semibold text-[var(--cds-link-primary)] hover:underline focus:underline"
+                                className="text-[var(--cds-link-primary)] hover:underline focus:underline"
                               >
-                                {cell.value}
+                                <Text variant="heading-compact-01">
+                                  {cell.value}
+                                </Text>
                               </a>
                             ) : cell.info.header === 'reason' ? (
                               <Tag size="sm" type="red">
-                                {cell.value}
+                                <Text variant="label-01">{cell.value}</Text>
                               </Tag>
                             ) : (
                               cell.value
@@ -691,7 +789,7 @@ function RecentFailuresTable({
       ) : (
         <EmptyContent
           title="No recent failures"
-          description="No failed sessions were returned for this period."
+          description="No failed sessions were returned in the last 30 days."
         />
       )}
     </Tile>
@@ -737,7 +835,7 @@ function AssistantsTable({
             renderIcon={ArrowRight}
             href="/deployment/assistant"
           >
-            View all assistants
+            <Text variant="body-compact-01">View all assistants</Text>
           </Button>
         }
       />
@@ -753,9 +851,11 @@ function AssistantsTable({
                   size="md"
                   tabIndex={0}
                 >
-                  <caption className="sr-only">
-                    Top assistants ranked by conversation volume for the
-                    selected period
+                  <caption
+                    className={`${typographyClassNames['label-01']} sr-only`}
+                  >
+                    Top assistants ranked by conversation volume in the last 30
+                    days
                   </caption>
                   <TableHead>
                     <TableRow>
@@ -784,16 +884,18 @@ function AssistantsTable({
                                     : undefined
                                 }
                               >
-                                {cell.value}
+                                <Text variant="label-01">{cell.value}</Text>
                               </Tag>
                             ) : cell.info.header === 'assistant' ? (
                               <a
                                 href={`/deployment/assistant/${encodeURIComponent(
                                   row.id,
                                 )}`}
-                                className="font-semibold text-[var(--cds-link-primary)] hover:underline focus:underline"
+                                className="text-[var(--cds-link-primary)] hover:underline focus:underline"
                               >
-                                {cell.value}
+                                <Text variant="heading-compact-01">
+                                  {cell.value}
+                                </Text>
                               </a>
                             ) : (
                               cell.value
@@ -825,7 +927,9 @@ function DashboardLoading() {
       role="status"
       aria-label="Loading project dashboard"
     >
-      <span className="sr-only">Loading project dashboard</span>
+      <Text variant="label-01" className="sr-only">
+        Loading project dashboard
+      </Text>
       <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map(item => (
           <div
@@ -840,10 +944,10 @@ function DashboardLoading() {
           </div>
         ))}
       </div>
-      <div className="mb-4 grid gap-4 lg:grid-cols-16">
+      <div className="mb-4 grid gap-4 xl:grid-cols-16">
         <div
           data-dashboard-loading-card
-          className="h-[396px] border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-[#262626] lg:col-span-11"
+          className="h-[396px] border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-[#262626] xl:col-span-11"
         >
           <SkeletonText width="30%" heading />
           <SkeletonText width="45%" />
@@ -851,7 +955,7 @@ function DashboardLoading() {
         </div>
         <div
           data-dashboard-loading-card
-          className="h-[396px] border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-[#262626] lg:col-span-5"
+          className="h-[396px] border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-[#262626] xl:col-span-5"
         >
           <SkeletonText width="55%" heading />
           <SkeletonText width="75%" />
@@ -951,9 +1055,6 @@ function buildUsage(usage: DashboardUsageSection) {
 }
 
 export const HomePage = () => {
-  const [selectedRange, setSelectedRange] = useState<DashboardRange>('30d');
-  const [selectedAutoRefresh, setSelectedAutoRefresh] =
-    useState<AutoRefreshOption>(autoRefreshOptions[0]);
   const [dashboardState, setDashboardState] = useState<{
     contextKey: string;
     data: ProjectDashboard;
@@ -968,7 +1069,7 @@ export const HomePage = () => {
     data: ProjectDashboard;
   } | null>(null);
   const { authId, projectId, token } = useCurrentCredential();
-  const currentContextKey = `${projectId}:${selectedRange}`;
+  const currentContextKey = `${projectId}:${dashboardRange}`;
   const isContextPending = dashboardContextKey.current !== currentContextKey;
   const dashboard =
     dashboardState?.contextKey === currentContextKey
@@ -978,7 +1079,7 @@ export const HomePage = () => {
   const fetchDashboard = useCallback(() => {
     requestId.current += 1;
     const currentRequestId = requestId.current;
-    const contextKey = `${projectId}:${selectedRange}`;
+    const contextKey = `${projectId}:${dashboardRange}`;
     const isNewContext = dashboardContextKey.current !== contextKey;
 
     if (isNewContext) {
@@ -998,7 +1099,7 @@ export const HomePage = () => {
 
     const toDate = new Date();
     getProjectDashboardRange({
-      fromDate: toTimestamp(getDashboardStartDate(selectedRange, toDate)),
+      fromDate: toTimestamp(getDashboardStartDate(dashboardRange, toDate)),
       toDate: toTimestamp(toDate),
       assistantLimit: 3,
       recentFailureLimit: 5,
@@ -1022,7 +1123,7 @@ export const HomePage = () => {
       .finally(() => {
         if (currentRequestId === requestId.current) setLoading(false);
       });
-  }, [authId, projectId, selectedRange, token]);
+  }, [authId, projectId, token]);
 
   useEffect(() => {
     fetchDashboard();
@@ -1035,16 +1136,6 @@ export const HomePage = () => {
     [],
   );
 
-  useEffect(() => {
-    const minutes = Number(selectedAutoRefresh.id);
-    if (!minutes) return undefined;
-    const interval = window.setInterval(fetchDashboard, minutes * 60 * 1000);
-    return () => window.clearInterval(interval);
-  }, [fetchDashboard, selectedAutoRefresh]);
-
-  const selectedRangeOption = dashboardRangeOptions.find(
-    option => option.id === selectedRange,
-  );
   const analyticsSection = dashboard?.getAnalytics();
   const analytics =
     analyticsSection?.getState() ===
@@ -1054,6 +1145,10 @@ export const HomePage = () => {
   const usage = dashboard?.getUsage();
   const isUsageReady =
     usage?.getState() === DashboardSectionState.DASHBOARD_SECTION_STATE_READY;
+  const isDashboardActivityEmpty =
+    analyticsSection?.getState() ===
+      DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY &&
+    usage?.getState() === DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY;
   const metrics = useMemo(
     () => (analytics ? buildMetrics(analytics) : []),
     [analytics],
@@ -1092,61 +1187,24 @@ export const HomePage = () => {
         data-dashboard-content
         className="mx-auto grid max-w-[1584px] grid-cols-4 gap-x-4 p-4 md:grid-cols-8 lg:grid-cols-16"
       >
-        <div className="col-span-full mb-4">
-          <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-[var(--cds-text-secondary)]">
-                  Dashboard
-                </p>
-                {dashboard?.getPartial() && (
-                  <Tag size="sm" type="warm-gray">
-                    Partial data
-                  </Tag>
-                )}
-              </div>
-              <h1 className="text-2xl font-semibold text-[var(--cds-text-primary)]">
-                Project overview
-              </h1>
-              <p className="mt-1 text-sm text-[var(--cds-text-secondary)]">
-                Monitor sessions, reliability, latency, and assistant health.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Dropdown<DashboardRangeOption>
-                id="dashboard-range"
-                aria-label="Date range"
-                titleText=""
-                hideLabel
-                label="Date range"
-                items={dashboardRangeOptions}
-                selectedItem={selectedRangeOption}
-                itemToString={item => item?.text || ''}
-                onChange={({ selectedItem }) => {
-                  if (selectedItem) setSelectedRange(selectedItem.id);
-                }}
-                size="sm"
-                className="min-w-[160px]"
-              />
-              <Dropdown<AutoRefreshOption>
-                id="dashboard-auto-refresh"
-                aria-label="Auto-refresh"
-                titleText=""
-                hideLabel
-                label="Auto-refresh"
-                items={autoRefreshOptions}
-                selectedItem={selectedAutoRefresh}
-                itemToString={item => item?.text || ''}
-                onChange={({ selectedItem }) => {
-                  if (selectedItem) setSelectedAutoRefresh(selectedItem);
-                }}
-                size="sm"
-                className="min-w-[140px]"
-              />
-            </div>
-          </section>
-        </div>
+        {dashboard && !isDashboardActivityEmpty && (
+          <div className="col-span-full mb-4">
+            <section className="flex items-center gap-2">
+              <Text
+                as="h1"
+                variant="heading-03"
+                className="text-[var(--cds-text-primary)]"
+              >
+                Dashboard
+              </Text>
+              {dashboard.getPartial() && (
+                <Tag size="sm" type="warm-gray">
+                  <Text variant="label-01">Partial data</Text>
+                </Tag>
+              )}
+            </section>
+          </div>
+        )}
 
         {refreshError && !isContextPending && (
           <div className="col-span-full mb-4">
@@ -1162,6 +1220,10 @@ export const HomePage = () => {
 
         {(loading || isContextPending) && !dashboard ? (
           <DashboardLoading />
+        ) : dashboard && isDashboardActivityEmpty ? (
+          <div className="col-span-full mb-4">
+            <DashboardNoActivity />
+          </div>
         ) : dashboard ? (
           <>
             {analytics ? (
@@ -1175,17 +1237,15 @@ export const HomePage = () => {
                   ))}
                 </div>
 
-                <div className="col-span-full mb-4 grid gap-4 lg:grid-cols-16">
-                  <div className="min-w-0 lg:col-span-11">
+                <div className="col-span-full mb-4 grid gap-4 xl:grid-cols-16">
+                  <div className="min-w-0 xl:col-span-11">
                     <ActivityPanel
                       analytics={analytics}
-                      range={selectedRange}
-                      rangeLabel={
-                        selectedRangeOption?.text || 'the selected period'
-                      }
+                      range={dashboardRange}
+                      rangeLabel={dashboardRangeLabel}
                     />
                   </div>
-                  <div className="lg:col-span-5">
+                  <div className="xl:col-span-5">
                     <HealthPanel analytics={analytics} />
                   </div>
                 </div>

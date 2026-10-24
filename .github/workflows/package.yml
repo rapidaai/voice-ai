@@ -47,7 +47,7 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: "1.26.9"
+  GO_VERSION: "1.26.10"
   NODE_VERSION: "22"
   PACKAGE_REF: ${{ inputs.ref || github.ref }}
   PACKAGE_TAG: ${{ inputs.release-tag || github.ref_name || github.sha }}

@@ -10,11 +10,10 @@ import toast from 'react-hot-toast/headless';
 import { EmptyState } from '@/app/components/ui/feedback';
 import { UpdateAssistantWebhook } from '@/app/pages/assistant/actions/configure-assistant-webhook/update-assistant-webhook';
 import { useAssistantWebhookPageStore } from '@/stores/assistant/actions';
-import { IconOnlyButton, PrimaryButton } from '@/app/components/ui/primitives';
 import { RecordStatusIndicator } from '@/app/components/ui/feedback';
 import { UrlTableCell } from '@/app/components/ui/table';
 import { Pagination } from '@/app/components/ui/primitives';
-import { Add, Renew, Webhook } from '@carbon/icons-react';
+import { Webhook } from '@carbon/icons-react';
 import { Tag } from '@carbon/react';
 import {
   Table,
@@ -23,12 +22,7 @@ import {
   TableHeader,
   TableBody,
   TableCell,
-  TableToolbar,
-  TableToolbarContent,
-  TableToolbarSearch,
   Button,
-  Breadcrumb,
-  BreadcrumbItem,
   ComposedModal,
   ModalBody,
   ModalFooter,
@@ -36,6 +30,7 @@ import {
   OverflowMenu,
   OverflowMenuItem,
 } from '@carbon/react';
+import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
 import {
   ScrollableTableSection,
   TableSection,
@@ -124,7 +119,6 @@ const ConfigureAssistantWebhook: FC<{ assistantId: string }> = ({
   const axtion = useAssistantWebhookPageStore();
   const { authId, token, projectId } = useCurrentCredential();
   const { loading, showLoader, hideLoader } = useRapidaStore();
-  const [searchTerm, setSearchTerm] = useState('');
   const [pendingWebhookAction, setPendingWebhookAction] =
     useState<WebhookAction | null>(null);
 
@@ -191,22 +185,6 @@ const ConfigureAssistantWebhook: FC<{ assistantId: string }> = ({
       },
     );
   };
-
-  const filteredWebhooks = searchTerm.trim()
-    ? axtion.webhooks.filter(row =>
-        [
-          getWebhookMethod(row),
-          getWebhookUrl(row),
-          getWebhookPriority(row),
-          row.getEnabled() ? 'enabled' : 'disabled',
-          row.getStatus(),
-          ...getWebhookEvents(row),
-        ]
-          .join(' ')
-          .toLowerCase()
-          .includes(searchTerm.trim().toLowerCase()),
-      )
-    : axtion.webhooks;
 
   const modalTitle =
     pendingWebhookAction?.kind === 'enable'
@@ -279,42 +257,18 @@ const ConfigureAssistantWebhook: FC<{ assistantId: string }> = ({
           </Button>
         </ModalFooter>
       </ComposedModal>
-      <div className="px-4 pt-4 pb-6 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <div>
-          <Breadcrumb noTrailingSlash className="mb-2">
-            <BreadcrumbItem
-              href={`/deployment/assistant/${assistantId}/overview`}
-            >
-              Assistant
-            </BreadcrumbItem>
-          </Breadcrumb>
-          <h1 className="text-2xl font-light tracking-tight">Webhooks</h1>
-        </div>
-      </div>
-      <TableToolbar>
-        <TableToolbarContent>
-          <TableToolbarSearch
-            placeholder="Search webhooks..."
-            onChange={(e: any) => setSearchTerm(e.target?.value || '')}
-          />
-          <IconOnlyButton
-            kind="ghost"
-            size="lg"
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            onClick={get}
-          />
-          <PrimaryButton
-            size="md"
-            renderIcon={Add}
-            onClick={() => navigation.goToCreateAssistantWebhook(assistantId)}
-          >
-            Create new webhook
-          </PrimaryButton>
-        </TableToolbarContent>
-      </TableToolbar>
+      <AssistantSettingsShellHeader
+        title="Webhooks"
+        href={`/deployment/assistant/${assistantId}/configure-webhook`}
+        onReload={get}
+        reloadLabel="Reload webhooks"
+        primaryAction={{
+          label: 'Create new webhook',
+          onClick: () => navigation.goToCreateAssistantWebhook(assistantId),
+        }}
+      />
       <TableSection>
-        {axtion.webhooks.length > 0 && filteredWebhooks.length > 0 ? (
+        {axtion.webhooks.length > 0 ? (
           <>
             <ScrollableTableSection>
               <Table className="min-w-max">
@@ -331,7 +285,7 @@ const ConfigureAssistantWebhook: FC<{ assistantId: string }> = ({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filteredWebhooks.map(row => {
+                  {axtion.webhooks.map(row => {
                     return (
                       <TableRow key={row.getId()}>
                         <UrlTableCell
@@ -431,13 +385,6 @@ const ConfigureAssistantWebhook: FC<{ assistantId: string }> = ({
               }}
             />
           </>
-        ) : axtion.webhooks.length > 0 ? (
-          <EmptyState
-            className="w-full"
-            icon={Webhook}
-            title="No webhooks found"
-            subtitle="No webhook matched your search."
-          />
         ) : (
           <EmptyState
             className="w-full"

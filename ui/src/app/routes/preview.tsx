@@ -1,10 +1,24 @@
-import { ProtectedBox } from '@/app/components/layout/container/protected-box';
-import { Outlet, Route, Routes } from 'react-router-dom';
-import {
-  PreviewPhoneAgentPage,
-  PreviewVoiceAgentPage,
-  PublicPreviewVoiceAgentPage,
-} from '@/app/pages/preview-agent';
+import { PublicPreviewVoiceAgentPage } from '@/app/pages/preview-agent';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+
+function AssistantPlaygroundRedirect({
+  channel,
+}: {
+  channel: 'chat' | 'phone';
+}) {
+  const { assistantId } = useParams();
+
+  if (!assistantId) {
+    return <Navigate to="/404" replace />;
+  }
+
+  return (
+    <Navigate
+      to={`/deployment/assistant/${assistantId}/playground/${channel}`}
+      replace
+    />
+  );
+}
 
 /**
  *
@@ -14,24 +28,17 @@ export function PreviewRoute() {
   return (
     <Routes>
       <Route
-        path="/"
-        element={
-          <ProtectedBox>
-            <Outlet />
-          </ProtectedBox>
-        }
-      >
-        <Route
-          key="/assistant/call"
-          path="call/:assistantId/"
-          element={<PreviewPhoneAgentPage />}
-        />
-        <Route
-          key="/assistant/chat"
-          path="chat/:assistantId"
-          element={<PreviewVoiceAgentPage />}
-        />
-      </Route>
+        path="call/:assistantId/"
+        element={<AssistantPlaygroundRedirect channel="phone" />}
+      />
+      <Route
+        path="chat/:assistantId"
+        element={<AssistantPlaygroundRedirect channel="chat" />}
+      />
+      <Route
+        path="v2/chat/:assistantId"
+        element={<AssistantPlaygroundRedirect channel="chat" />}
+      />
       <Route
         path="public/assistant/:assistantId"
         element={<PublicPreviewVoiceAgentPage />}
