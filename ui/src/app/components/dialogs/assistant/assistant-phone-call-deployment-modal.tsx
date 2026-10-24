@@ -22,6 +22,10 @@ interface AssistantPhoneCallDeploymentDialogProps extends ModalProps {
   deployment: AssistantPhoneDeployment;
 }
 
+const INTERNAL_PHONE_OPTION_KEYS = new Set(['rapida.sip_inbound']);
+const PHONE_HOST_PLACEHOLDER = '<your-phone-host>';
+const AUDIO_SOCKET_HOST_PLACEHOLDER = '<your-audiosocket-host>';
+
 export function AssistantPhoneCallDeploymentDialog(
   props: AssistantPhoneCallDeploymentDialogProps,
 ) {
@@ -40,8 +44,8 @@ export function AssistantPhoneCallDeploymentDialog(
       .find(option => option.getKey() === 'rapida.sip_inbound')
       ?.getValue() === 'true';
 
-  const webhookUrl = `${mediaHost}/v1/talk/${providerName || '<provider>'}/call/${assistantId}?x-api-key={{PROJECT_CRDENTIAL_KEY}}`;
-  const eventUrl = `${mediaHost}/v1/talk/${providerName || '<provider>'}/event/${assistantId}?x-api-key={{PROJECT_CRDENTIAL_KEY}}`;
+  const webhookUrl = `${mediaHost}/v1/talk/${providerName || '<provider>'}/call/${assistantId}?x-api-key={{PROJECT_CREDENTIAL_KEY}}`;
+  const eventUrl = `${mediaHost}/v1/talk/${providerName || '<provider>'}/event/${assistantId}?x-api-key={{PROJECT_CREDENTIAL_KEY}}`;
 
   const modalContent = (
     <RightSideModal
@@ -120,7 +124,10 @@ function TelephonyConfig({
   deployment: AssistantPhoneDeployment;
 }) {
   const options = (deployment.getPhoneoptionsList() || []).filter(
-    detail => detail.getKey() && detail.getValue(),
+    detail =>
+      detail.getKey() &&
+      detail.getValue() &&
+      !INTERNAL_PHONE_OPTION_KEYS.has(detail.getKey()),
   );
 
   return (
@@ -249,7 +256,7 @@ function SipIntegrationInstructions({
   did?: string;
   inboundRegistrationEnabled?: boolean;
 }) {
-  const routeHost = sipHost || 'rapida.example.com:5090';
+  const routeHost = sipHost || `${PHONE_HOST_PLACEHOLDER}:5060`;
   const sipEndpoint = `sip:${routeHost}`;
   const sipPort = routeHost.includes(':')
     ? routeHost.split(':').pop() || '5060'
@@ -319,7 +326,7 @@ function SipIntegrationInstructions({
 
       <CodeBlock
         label="PBX Dial Plan — FreeSWITCH"
-        code={`<extension name="rapida-ai">
+        code={`<extension name="voice-ai">
   <condition field="destination_number" expression="^(\\d+)$">
     <action application="bridge"
             data="sofia/external/sip:did-+\${destination_number}@${routeHost}"/>
@@ -330,19 +337,19 @@ function SipIntegrationInstructions({
       <CodeBlock
         label="PBX Dial Plan — Asterisk (pjsip.conf + extensions.conf)"
         code={`; pjsip.conf
-[rapida-trunk]
+[voice-ai-trunk]
 type = endpoint
 transport = transport-udp
-context = from-rapida
-aors = rapida-trunk-aor
+context = from-voice-ai
+aors = voice-ai-trunk-aor
 
-[rapida-trunk-aor]
+[voice-ai-trunk-aor]
 type = aor
 contact = ${sipEndpoint}
 
 ; extensions.conf
-[rapida-outbound]
-exten => _X.,1,Dial(PJSIP/did-+\${EXTEN}@rapida-trunk)`}
+[voice-ai-outbound]
+exten => _X.,1,Dial(PJSIP/did-+\${EXTEN}@voice-ai-trunk)`}
       />
     </>
   );
@@ -361,17 +368,17 @@ function AsteriskIntegrationInstructions({
   audioSocketHost?: string;
   assistantId: string;
 }) {
-  const rapidaHostname = useMemo(() => {
+  const mediaHostname = useMemo(() => {
     try {
       return new URL(mediaHost).hostname;
     } catch {
-      return '<your-rapida-host>';
+      return PHONE_HOST_PLACEHOLDER;
     }
   }, [mediaHost]);
 
   const audioSocketHostPart = useMemo(() => {
-    if (!audioSocketHost) return '<your-rapida-host>';
-    return audioSocketHost.split(':')[0] || '<your-rapida-host>';
+    if (!audioSocketHost) return AUDIO_SOCKET_HOST_PLACEHOLDER;
+    return audioSocketHost.split(':')[0] || AUDIO_SOCKET_HOST_PLACEHOLDER;
   }, [audioSocketHost]);
 
   const audioSocketPort = useMemo(() => {
@@ -380,22 +387,22 @@ function AsteriskIntegrationInstructions({
     return parts.length > 1 ? parts[1] : '4573';
   }, [audioSocketHost]);
 
-  const webhookUrl = `https://${rapidaHostname}/v1/talk/asterisk/call/${assistantId || '{ASSISTANT_ID}'}?from=\${CALLERID(num)}&x-api-key={{PROJECT_CREDENTIAL_KEY}}`;
+  const webhookUrl = `https://${mediaHostname}/v1/talk/asterisk/call/${assistantId || '{ASSISTANT_ID}'}?from=\${CALLERID(num)}&x-api-key={{PROJECT_CREDENTIAL_KEY}}`;
 
   return (
     <>
       <CodeRow
         label="WebSocket — Endpoint"
-        value={`wss://${rapidaHostname}/v1/talk/asterisk/ctx/{contextId}`}
+        value={`wss://${mediaHostname}/v1/talk/asterisk/ctx/{contextId}`}
       />
 
       <CodeBlock
         label="WebSocket — Dialplan (extensions.conf)"
-        code={`[rapida-inbound-ws]
+        code={`[voice-ai-inbound-ws]
 exten => _X.,1,Answer()
  same => n,Set(CTX=\${CURL(${webhookUrl})})
  same => n,GotoIf($["\${CTX}" = ""]?error)
- same => n,WebSocket(wss://${rapidaHostname}/v1/talk/asterisk/ctx/\${CTX})
+ same => n,WebSocket(wss://${mediaHostname}/v1/talk/asterisk/ctx/\${CTX})
  same => n,Hangup()
  same => n(error),Playback(an-error-has-occurred)
  same => n,Hangup()`}
@@ -411,7 +418,7 @@ exten => _X.,1,Answer()
 
       <CodeBlock
         label="AudioSocket — Dialplan (extensions.conf)"
-        code={`[rapida-inbound]
+        code={`[voice-ai-inbound]
 exten => _X.,1,Answer()
  same => n,Set(CHANNEL(audioreadformat)=slin)
  same => n,Set(CHANNEL(audiowriteformat)=slin)

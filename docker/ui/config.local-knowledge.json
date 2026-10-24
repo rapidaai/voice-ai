@@ -7,6 +7,9 @@
         "socket": "localhost:4573",
         "sip": "localhost:5060"
     },
+    "deployment": {
+        "webWidgetScriptUrl": "http://localhost:8080/public/scripts/app.min.js"
+    },
     "workspace": {
         "domain": "localhost",
         "authentication": {
