@@ -294,7 +294,7 @@ export const ConfigureAssistantDeploymentPage = () => {
   };
 
   return (
-    <div className="flex flex-col w-full flex-1 overflow-auto">
+    <div className="flex w-full flex-1 flex-col overflow-auto bg-surface">
       {/* Modals */}
       {assistant?.getPhonedeployment() && (
         <AssistantPhoneCallDeploymentDialog
@@ -353,7 +353,7 @@ export const ConfigureAssistantDeploymentPage = () => {
         }}
       />
 
-      <div className="flex flex-1 flex-col bg-[var(--cds-background)]">
+      <div className="flex flex-1 flex-col bg-surface">
         <div className="flex w-full flex-1 flex-col">
           {hasAnyDeployment ? (
             <div

@@ -318,7 +318,10 @@ describe('PreviewVoiceAgentV2', () => {
     expect(screen.getByLabelText('Carbon AI chat')).toBeInTheDocument();
     expect(mockCarbonChatProps.openChatByDefault).toBe(true);
     expect(mockCarbonChatProps.injectCarbonTheme).toBe('white');
-    expect(mockCarbonChatProps.header).toEqual({ isOn: true });
+    expect(mockCarbonChatProps.header).toEqual({ isOn: false });
+    expect(
+      mockCarbonChatProps.renderWriteableElements.customHeader,
+    ).toBeUndefined();
     expect(mockCarbonChatProps.homescreen).toEqual({ isOn: false });
     expect(mockCarbonChatProps.messaging.skipWelcome).toBe(false);
     expect(mockCarbonChatProps.layout).toMatchObject({
@@ -336,7 +339,16 @@ describe('PreviewVoiceAgentV2', () => {
       name: 'Conversation toolbar',
     });
     expect(toolbar).toBeInTheDocument();
-    expect(toolbar).toHaveClass('h-12!');
+    expect(toolbar).toHaveClass(
+      'h-12',
+      'flex',
+      'items-center',
+      'bg-shell',
+      'border-b',
+      'border-border-subtle',
+      'shrink-0',
+    );
+    expect(toolbar).not.toHaveClass('cds--header');
     expect(within(toolbar).getAllByRole('button')[0]).toHaveAccessibleName(
       'Back to assistant',
     );
@@ -644,8 +656,11 @@ describe('PreviewVoiceAgentV2', () => {
     );
 
     expect(
-      await screen.findByRole('heading', { name: 'Delivery concierge' }),
+      await screen.findByRole('heading', { name: 'Chat' }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Delivery concierge' }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Product header')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Back to assistant' }),

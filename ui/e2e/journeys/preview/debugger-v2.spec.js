@@ -15,12 +15,12 @@ for (const legacyRoute of [
   {
     path: `/preview/chat/${ASSISTANT_ID}`,
     destination: `/deployment/assistant/${ASSISTANT_ID}/playground/chat`,
-    heading: 'Delivery concierge',
+    heading: 'Chat',
   },
   {
     path: `/preview/v2/chat/${ASSISTANT_ID}`,
     destination: `/deployment/assistant/${ASSISTANT_ID}/playground/chat`,
-    heading: 'Delivery concierge',
+    heading: 'Chat',
   },
   {
     path: `/preview/call/${ASSISTANT_ID}`,
@@ -84,7 +84,7 @@ for (const viewport of SCREENSHOT_VIEWPORTS) {
       await page.goto(`/deployment/assistant/${ASSISTANT_ID}/playground/chat`);
       await expect(
         page.getByRole('heading', {
-          name: 'Delivery concierge',
+          name: 'Chat',
           exact: true,
         }),
       ).toBeVisible();
@@ -96,6 +96,33 @@ for (const viewport of SCREENSHOT_VIEWPORTS) {
       ).toBeEnabled();
       await expect(
         page.getByRole('button', { name: 'Back to assistant' }),
+      ).toHaveCount(0);
+
+      const getDecoration = locator =>
+        locator.evaluate(element => {
+          const styles = getComputedStyle(element);
+          return {
+            borderBottomWidth: styles.borderBottomWidth,
+            boxShadow: styles.boxShadow,
+          };
+        });
+      const [globalHeader, debuggerToolbar] = await Promise.all([
+        getDecoration(
+          page.locator('header').filter({
+            has: page.getByRole('navigation', { name: 'Breadcrumb' }),
+          }),
+        ),
+        getDecoration(
+          page.getByRole('toolbar', { name: 'Conversation toolbar' }),
+        ),
+      ]);
+      expect(globalHeader).toEqual({
+        borderBottomWidth: '1px',
+        boxShadow: 'none',
+      });
+      expect(debuggerToolbar).toEqual(globalHeader);
+      await expect(
+        page.locator('cds-aichat-shell .header.has-content'),
       ).toHaveCount(0);
 
       if (viewport.width >= 1280) {

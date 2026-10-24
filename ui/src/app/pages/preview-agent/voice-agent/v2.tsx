@@ -1,5 +1,4 @@
 import {
-  type ComponentType,
   type ComponentProps,
   type ChangeEvent as ReactChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -51,7 +50,6 @@ import {
   FluidNumberInput,
   FluidTextArea,
   FluidTextInput,
-  Header,
   HeaderGlobalAction,
   HeaderGlobalBar,
   HeaderName,
@@ -73,6 +71,7 @@ import {
   PrimaryButton,
   Text,
 } from '@/app/components/ui/primitives';
+import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
 import { ConfirmDialog } from '@/app/components/dialogs/shared';
 import { createVoiceAgentDebuggerConnection } from '@/clients/runtime.client';
 import { useCurrentCredential } from '@/hooks/use-credential';
@@ -85,9 +84,6 @@ import { isVisibleConfigurationKey } from './configuration-visibility';
 const Toggletip =
   (CarbonToggletip as unknown as { default?: typeof CarbonToggletip })
     .default ?? CarbonToggletip;
-const ConversationHeader = Header as ComponentType<
-  ComponentProps<typeof Header> & { role?: string }
->;
 
 type VoicePhase = 'idle' | 'connecting' | 'listening';
 
@@ -1010,67 +1006,64 @@ function PreviewVoiceAgentV2Workspace({
       .catch(handleRuntimeError);
   };
 
+  const conversationToolbar = (
+    <PageHeaderBlock
+      role="toolbar"
+      aria-label="Conversation toolbar"
+      className="w-full"
+    >
+      {!embedded ? (
+        <HeaderGlobalAction
+          aria-label="Back to assistant"
+          tooltipAlignment="start"
+          onClick={() =>
+            navigate(`/deployment/assistant/${assistantId}/overview`)
+          }
+        >
+          <ArrowLeft size={16} />
+        </HeaderGlobalAction>
+      ) : null}
+      <HeaderName
+        href={
+          embedded
+            ? `/deployment/assistant/${assistantId}/playground/chat`
+            : `/preview/v2/chat/${assistantId}`
+        }
+        prefix=""
+        className="h-full min-w-0 px-0!"
+      >
+        <span role="heading" aria-level={1} className="block min-w-0 truncate">
+          <Text as="span" variant="heading-compact-01">
+            {embedded ? 'Chat' : assistantName}
+          </Text>
+        </span>
+      </HeaderName>
+      <HeaderGlobalBar
+        aria-label="Chat debugger header actions"
+        className="h-full items-center"
+      >
+        <HeaderGlobalAction
+          ref={panelTriggerRef}
+          aria-label="Configuration"
+          tooltipAlignment="end"
+          aria-controls="debugger-details-panel"
+          aria-expanded={isConfigurationOpen}
+          aria-pressed={isConfigurationOpen}
+          className={cn(
+            'h-12! w-12! shrink-0 border-b-2! border-b-transparent!',
+            isConfigurationOpen &&
+              'border-b-[var(--cds-border-interactive)]! bg-[var(--cds-layer-selected-01)]!',
+          )}
+          onClick={toggleConfiguration}
+        >
+          <Model size={16} />
+        </HeaderGlobalAction>
+      </HeaderGlobalBar>
+    </PageHeaderBlock>
+  );
+
   const chatSlots = useMemo(
     () => ({
-      [WriteableElementName.CUSTOM_HEADER]: (
-        <ConversationHeader
-          role="toolbar"
-          aria-label="Conversation toolbar"
-          className="relative! inset-auto! z-auto! h-12! min-h-12! w-full! shrink-0 border-b! border-border-subtle! bg-[var(--cds-background)]! p-0!"
-        >
-          {!embedded ? (
-            <HeaderGlobalAction
-              aria-label="Back to assistant"
-              tooltipAlignment="start"
-              onClick={() =>
-                navigate(`/deployment/assistant/${assistantId}/overview`)
-              }
-            >
-              <ArrowLeft size={16} />
-            </HeaderGlobalAction>
-          ) : null}
-          <HeaderName
-            href={
-              embedded
-                ? `/deployment/assistant/${assistantId}/playground/chat`
-                : `/preview/v2/chat/${assistantId}`
-            }
-            prefix=""
-            className="h-full min-w-0"
-          >
-            <span
-              role="heading"
-              aria-level={1}
-              className="block min-w-0 truncate"
-            >
-              <Text as="span" variant="heading-compact-01">
-                {assistantName}
-              </Text>
-            </span>
-          </HeaderName>
-          <HeaderGlobalBar
-            aria-label="Chat debugger header actions"
-            className="h-full items-center"
-          >
-            <HeaderGlobalAction
-              ref={panelTriggerRef}
-              aria-label="Configuration"
-              tooltipAlignment="end"
-              aria-controls="debugger-details-panel"
-              aria-expanded={isConfigurationOpen}
-              aria-pressed={isConfigurationOpen}
-              className={cn(
-                'h-12! w-12! shrink-0 border-b-2! border-b-transparent!',
-                isConfigurationOpen &&
-                  'border-b-[var(--cds-border-interactive)]! bg-[var(--cds-layer-selected-01)]!',
-              )}
-              onClick={toggleConfiguration}
-            >
-              <Model size={16} />
-            </HeaderGlobalAction>
-          </HeaderGlobalBar>
-        </ConversationHeader>
-      ),
       [WriteableElementName.BEFORE_INPUT_ELEMENT]:
         voicePhase === 'idle' ? null : (
           <div
@@ -1211,22 +1204,18 @@ function PreviewVoiceAgentV2Workspace({
     }),
     [
       assistantId,
-      assistantName,
       disconnectChatSession,
       endVoiceSession,
       handleRuntimeError,
-      isConfigurationOpen,
       isSessionConnected,
       isVoiceMuted,
       isVoiceAvailable,
       navigate,
       startVoiceSession,
       switchToText,
-      toggleConfiguration,
       toggleMute,
       voiceAgent,
       voicePhase,
-      embedded,
     ],
   );
 
@@ -1269,18 +1258,18 @@ function PreviewVoiceAgentV2Workspace({
   return (
     <div
       className={cn(
-        'flex min-h-0 flex-col bg-white text-sm dark:bg-gray-950',
+        'flex min-h-0 flex-col bg-surface text-sm',
         embedded ? 'h-full' : 'h-dvh',
       )}
     >
       {!embedded ? <PreviewAgentHeader /> : null}
 
       <div className="flex min-h-0 flex-1">
-        <main className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-white dark:bg-gray-950">
+        <main className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-surface">
           <section
             ref={conversationRef}
             aria-label="Conversation"
-            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-gray-950"
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface"
           >
             {runtimeError ? (
               <InlineNotification
@@ -1292,6 +1281,7 @@ function PreviewVoiceAgentV2Workspace({
                 className="!m-0 !max-w-none shrink-0"
               />
             ) : null}
+            {conversationToolbar}
             <div ref={chatContainerRef} className="min-h-0 flex-1">
               <ChatCustomElement
                 className="block h-full min-h-0 w-full"
@@ -1304,7 +1294,7 @@ function PreviewVoiceAgentV2Workspace({
                 }
                 assistantName={assistantName}
                 aiEnabled
-                header={{ isOn: true }}
+                header={{ isOn: false }}
                 history={{ isOn: false }}
                 homescreen={{ isOn: false }}
                 input={{
