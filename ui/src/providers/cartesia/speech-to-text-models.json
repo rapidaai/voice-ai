@@ -1,10 +1,10 @@
 [
   {
-    "name": "ink-whisper",
+    "name": "ink-whisper (Sunsetted)",
     "id": "ink-whisper",
-    "releaseDate": "Legacy",
+    "releaseDate": "Sunsetted",
     "languages": ["en"],
-    "status": "Legacy",
+    "status": "Sunsetted",
     "config": {
       "parameters": [
         {
@@ -13,7 +13,7 @@
           "type": "dropdown",
           "required": true,
           "default": "en",
-          "data": "languages-ink-2.json",
+          "data": "languages-ink-whisper.json",
           "valueField": "code",
           "errorMessage": "Please provide valid cartesia language options for speech to text."
         }
@@ -24,7 +24,7 @@
     "name": "ink-2",
     "id": "ink-2",
     "releaseDate": "May 22, 2026",
-    "languages": ["en"],
+    "languages": ["en", "fr", "hi", "ja", "es"],
     "status": "Stable",
     "config": {
       "parameters": [
@@ -34,7 +34,7 @@
           "type": "dropdown",
           "required": true,
           "default": "en",
-          "data": "languages-ink-2.json",
+          "data": "languages-ink-preview.json",
           "valueField": "code",
           "errorMessage": "Please provide valid cartesia language options for speech to text."
         }

@@ -8,6 +8,7 @@
 import { Metadata } from '@rapidaai/react';
 import {
   loadProviderConfig,
+  loadProviderData,
   resolveCategoryParameters,
 } from '../config-loader';
 import { getDefaultsFromConfig, validateFromConfig } from '../config-defaults';
@@ -456,15 +457,22 @@ describe('Cartesia STT — config vs original', () => {
     expect(validateFromConfig(config, 'stt', 'cartesia', opts)).toBeUndefined();
   });
 
-  it('validates: stable model rejects preview-only languages', () => {
+  it('validates: stable ink-2 supports the expanded language set', () => {
     const opts = [
       cred(),
       createMetadata('listen.model', 'ink-2'),
       createMetadata('listen.language', 'hi'),
     ];
-    expect(validateFromConfig(config, 'stt', 'cartesia', opts)).toBe(
-      'Please provide valid cartesia language options for speech to text.',
-    );
+    expect(validateFromConfig(config, 'stt', 'cartesia', opts)).toBeUndefined();
+  });
+
+  it('marks ink-whisper as sunsetted while preserving its model id', () => {
+    const models = loadProviderData('cartesia', 'speech-to-text-models.json');
+    const inkWhisper = models.find(model => model.id === 'ink-whisper');
+
+    expect(inkWhisper?.id).toBe('ink-whisper');
+    expect(inkWhisper?.name).toContain('Sunsetted');
+    expect(inkWhisper?.status).toBe('Sunsetted');
   });
 });
 

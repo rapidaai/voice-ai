@@ -1,18 +1,450 @@
 [
-    {
-        "name": "Sonic-2",
-        "id": "sonic-2"
-    },
-    {
-        "name": "Sonic Turbo",
-        "id": "sonic-turbo"
-    },
-    {
-        "name": "Sonic",
-        "id": "sonic"
-    },
-    {
-        "name": "sonic-3",
-        "id": "sonic-3"
+  {
+    "name": "Sonic 3.6",
+    "id": "sonic-3.6",
+    "releaseDate": "Continuous updates",
+    "languages": ["en", "de", "es", "fr", "ja", "pt", "zh", "hi", "ko", "it", "nl", "pl", "ru", "sv", "tr", "tl", "bg", "ro", "ar", "cs", "el", "fi", "hr", "ms", "sk", "da", "ta", "uk", "hu", "no", "vi", "bn", "th", "he", "ka", "id", "te", "gu", "kn", "ml", "mr", "pa", "or", "ur"],
+    "status": "Stable",
+    "config": {
+      "parameters": [
+        {
+          "key": "speak.voice.id",
+          "label": "Voice",
+          "type": "dropdown",
+          "required": true,
+          "data": "voices.json",
+          "valueField": "id",
+          "searchable": true,
+          "strict": false,
+          "customValue": true,
+          "errorMessage": "Please select a valid voice for text to speech."
+        },
+        {
+          "key": "speak.language",
+          "label": "Language",
+          "type": "dropdown",
+          "required": true,
+          "default": "en",
+          "data": "languages-sonic-3-6.json",
+          "valueField": "code",
+          "errorMessage": "Please select a valid language for text to speech."
+        },
+        {
+          "key": "speak.__experimental_controls.speed",
+          "label": "Speed (Experimental)",
+          "type": "select",
+          "required": false,
+          "advanced": true,
+          "choices": [
+            { "label": "Provider Default", "value": "" },
+            { "label": "Slowest", "value": "slowest" },
+            { "label": "Slow", "value": "slow" },
+            { "label": "Normal", "value": "normal" },
+            { "label": "Fast", "value": "fast" },
+            { "label": "Fastest", "value": "fastest" }
+          ]
+        },
+        {
+          "key": "speak.__experimental_controls.emotion",
+          "label": "Emotion (Experimental)",
+          "type": "input",
+          "required": false,
+          "advanced": true,
+          "placeholder": "e.g. curiosity:high<|||>positivity:low"
+        }
+      ]
     }
+  },
+  {
+    "name": "Sonic 3.6 Snapshot",
+    "id": "sonic-3.6-2026-08-27",
+    "releaseDate": "August 27, 2026",
+    "languages": ["en", "de", "es", "fr", "ja", "pt", "zh", "hi", "ko", "it", "nl", "pl", "ru", "sv", "tr", "tl", "bg", "ro", "ar", "cs", "el", "fi", "hr", "ms", "sk", "da", "ta", "uk", "hu", "no", "vi", "bn", "th", "he", "ka", "id", "te", "gu", "kn", "ml", "mr", "pa", "or", "ur"],
+    "status": "Stable",
+    "config": {
+      "parameters": [
+        {
+          "key": "speak.voice.id",
+          "label": "Voice",
+          "type": "dropdown",
+          "required": true,
+          "data": "voices.json",
+          "valueField": "id",
+          "searchable": true,
+          "strict": false,
+          "customValue": true,
+          "errorMessage": "Please select a valid voice for text to speech."
+        },
+        {
+          "key": "speak.language",
+          "label": "Language",
+          "type": "dropdown",
+          "required": true,
+          "default": "en",
+          "data": "languages-sonic-3-6.json",
+          "valueField": "code",
+          "errorMessage": "Please select a valid language for text to speech."
+        },
+        {
+          "key": "speak.__experimental_controls.speed",
+          "label": "Speed (Experimental)",
+          "type": "select",
+          "required": false,
+          "advanced": true,
+          "choices": [
+            { "label": "Provider Default", "value": "" },
+            { "label": "Slowest", "value": "slowest" },
+            { "label": "Slow", "value": "slow" },
+            { "label": "Normal", "value": "normal" },
+            { "label": "Fast", "value": "fast" },
+            { "label": "Fastest", "value": "fastest" }
+          ]
+        },
+        {
+          "key": "speak.__experimental_controls.emotion",
+          "label": "Emotion (Experimental)",
+          "type": "input",
+          "required": false,
+          "advanced": true,
+          "placeholder": "e.g. curiosity:high<|||>positivity:low"
+        }
+      ]
+    }
+  },
+  {
+    "name": "Sonic Preview",
+    "id": "sonic-preview",
+    "releaseDate": "Preview",
+    "languages": ["en", "de", "es", "fr", "ja", "pt", "zh", "hi", "ko", "it", "nl", "pl", "ru", "sv", "tr", "tl", "bg", "ro", "ar", "cs", "el", "fi", "hr", "ms", "sk", "da", "ta", "uk", "hu", "no", "vi", "bn", "th", "he", "ka", "id", "te", "gu", "kn", "ml", "mr", "pa", "or", "ur"],
+    "status": "Preview",
+    "config": {
+      "parameters": [
+        {
+          "key": "speak.voice.id",
+          "label": "Voice",
+          "type": "dropdown",
+          "required": true,
+          "data": "voices.json",
+          "valueField": "id",
+          "searchable": true,
+          "strict": false,
+          "customValue": true,
+          "errorMessage": "Please select a valid voice for text to speech."
+        },
+        {
+          "key": "speak.language",
+          "label": "Language",
+          "type": "dropdown",
+          "required": true,
+          "default": "en",
+          "data": "languages-sonic-3-6.json",
+          "valueField": "code",
+          "errorMessage": "Please select a valid language for text to speech."
+        },
+        {
+          "key": "speak.__experimental_controls.speed",
+          "label": "Speed (Experimental)",
+          "type": "select",
+          "required": false,
+          "advanced": true,
+          "choices": [
+            { "label": "Provider Default", "value": "" },
+            { "label": "Slowest", "value": "slowest" },
+            { "label": "Slow", "value": "slow" },
+            { "label": "Normal", "value": "normal" },
+            { "label": "Fast", "value": "fast" },
+            { "label": "Fastest", "value": "fastest" }
+          ]
+        },
+        {
+          "key": "speak.__experimental_controls.emotion",
+          "label": "Emotion (Experimental)",
+          "type": "input",
+          "required": false,
+          "advanced": true,
+          "placeholder": "e.g. curiosity:high<|||>positivity:low"
+        }
+      ]
+    }
+  },
+  {
+    "name": "Sonic 3.5 Snapshot",
+    "id": "sonic-3.5-2026-05-04",
+    "releaseDate": "May 4, 2026",
+    "languages": ["en", "de", "es", "fr", "ja", "pt", "zh", "hi", "ko", "it", "nl", "pl", "ru", "sv", "tr", "tl", "bg", "ro", "ar", "cs", "el", "fi", "hr", "ms", "sk", "da", "ta", "uk", "hu", "no", "vi", "bn", "th", "he", "ka", "id", "te", "gu", "kn", "ml", "mr", "pa"],
+    "status": "Stable",
+    "config": {
+      "parameters": [
+        {
+          "key": "speak.voice.id",
+          "label": "Voice",
+          "type": "dropdown",
+          "required": true,
+          "data": "voices.json",
+          "valueField": "id",
+          "searchable": true,
+          "strict": false,
+          "customValue": true,
+          "errorMessage": "Please select a valid voice for text to speech."
+        },
+        {
+          "key": "speak.language",
+          "label": "Language",
+          "type": "dropdown",
+          "required": true,
+          "default": "en",
+          "data": "languages-sonic-3-5.json",
+          "valueField": "code",
+          "errorMessage": "Please select a valid language for text to speech."
+        },
+        {
+          "key": "speak.__experimental_controls.speed",
+          "label": "Speed (Experimental)",
+          "type": "select",
+          "required": false,
+          "advanced": true,
+          "choices": [
+            { "label": "Provider Default", "value": "" },
+            { "label": "Slowest", "value": "slowest" },
+            { "label": "Slow", "value": "slow" },
+            { "label": "Normal", "value": "normal" },
+            { "label": "Fast", "value": "fast" },
+            { "label": "Fastest", "value": "fastest" }
+          ]
+        },
+        {
+          "key": "speak.__experimental_controls.emotion",
+          "label": "Emotion (Experimental)",
+          "type": "input",
+          "required": false,
+          "advanced": true,
+          "placeholder": "e.g. curiosity:high<|||>positivity:low"
+        }
+      ]
+    }
+  },
+  {
+    "name": "Sonic 3 (Older)",
+    "id": "sonic-3",
+    "releaseDate": "Older model",
+    "languages": ["en", "de", "es", "fr", "ja", "pt", "zh", "hi", "ko", "it", "nl", "pl", "ru", "sv", "tr", "tl", "bg", "ro", "ar", "cs", "el", "fi", "hr", "ms", "sk", "da", "ta", "uk", "hu", "no", "vi", "bn", "th", "he", "ka", "id", "te", "gu", "kn", "ml", "mr", "pa"],
+    "status": "Older",
+    "config": {
+      "parameters": [
+        {
+          "key": "speak.voice.id",
+          "label": "Voice",
+          "type": "dropdown",
+          "required": true,
+          "data": "voices.json",
+          "valueField": "id",
+          "searchable": true,
+          "strict": false,
+          "customValue": true,
+          "errorMessage": "Please select a valid voice for text to speech."
+        },
+        {
+          "key": "speak.language",
+          "label": "Language",
+          "type": "dropdown",
+          "required": true,
+          "default": "en",
+          "data": "languages-sonic-3-5.json",
+          "valueField": "code",
+          "errorMessage": "Please select a valid language for text to speech."
+        },
+        {
+          "key": "speak.__experimental_controls.speed",
+          "label": "Speed (Experimental)",
+          "type": "select",
+          "required": false,
+          "advanced": true,
+          "choices": [
+            { "label": "Provider Default", "value": "" },
+            { "label": "Slowest", "value": "slowest" },
+            { "label": "Slow", "value": "slow" },
+            { "label": "Normal", "value": "normal" },
+            { "label": "Fast", "value": "fast" },
+            { "label": "Fastest", "value": "fastest" }
+          ]
+        },
+        {
+          "key": "speak.__experimental_controls.emotion",
+          "label": "Emotion (Experimental)",
+          "type": "input",
+          "required": false,
+          "advanced": true,
+          "placeholder": "e.g. curiosity:high<|||>positivity:low"
+        }
+      ]
+    }
+  },
+  {
+    "name": "Sonic 2 (Sunsetted)",
+    "id": "sonic-2",
+    "releaseDate": "Sunsetted",
+    "languages": ["en", "fr", "de", "es", "pt", "zh", "ja", "ko"],
+    "status": "Sunsetted",
+    "config": {
+      "parameters": [
+        {
+          "key": "speak.voice.id",
+          "label": "Voice",
+          "type": "dropdown",
+          "required": true,
+          "data": "voices.json",
+          "valueField": "id",
+          "searchable": true,
+          "strict": false,
+          "customValue": true,
+          "errorMessage": "Please select a valid voice for text to speech."
+        },
+        {
+          "key": "speak.language",
+          "label": "Language",
+          "type": "dropdown",
+          "required": true,
+          "default": "en",
+          "data": "languages-sonic-2.json",
+          "valueField": "code",
+          "errorMessage": "Please select a valid language for text to speech."
+        },
+        {
+          "key": "speak.__experimental_controls.speed",
+          "label": "Speed (Experimental)",
+          "type": "select",
+          "required": false,
+          "advanced": true,
+          "choices": [
+            { "label": "Provider Default", "value": "" },
+            { "label": "Slowest", "value": "slowest" },
+            { "label": "Slow", "value": "slow" },
+            { "label": "Normal", "value": "normal" },
+            { "label": "Fast", "value": "fast" },
+            { "label": "Fastest", "value": "fastest" }
+          ]
+        },
+        {
+          "key": "speak.__experimental_controls.emotion",
+          "label": "Emotion (Experimental)",
+          "type": "input",
+          "required": false,
+          "advanced": true,
+          "placeholder": "e.g. curiosity:high<|||>positivity:low"
+        }
+      ]
+    }
+  },
+  {
+    "name": "Sonic Turbo (Sunsetted)",
+    "id": "sonic-turbo",
+    "releaseDate": "Sunsetted",
+    "languages": ["en", "fr", "de", "es", "pt", "zh", "ja", "hi", "ko"],
+    "status": "Sunsetted",
+    "config": {
+      "parameters": [
+        {
+          "key": "speak.voice.id",
+          "label": "Voice",
+          "type": "dropdown",
+          "required": true,
+          "data": "voices.json",
+          "valueField": "id",
+          "searchable": true,
+          "strict": false,
+          "customValue": true,
+          "errorMessage": "Please select a valid voice for text to speech."
+        },
+        {
+          "key": "speak.language",
+          "label": "Language",
+          "type": "dropdown",
+          "required": true,
+          "default": "en",
+          "data": "languages-sonic-turbo.json",
+          "valueField": "code",
+          "errorMessage": "Please select a valid language for text to speech."
+        },
+        {
+          "key": "speak.__experimental_controls.speed",
+          "label": "Speed (Experimental)",
+          "type": "select",
+          "required": false,
+          "advanced": true,
+          "choices": [
+            { "label": "Provider Default", "value": "" },
+            { "label": "Slowest", "value": "slowest" },
+            { "label": "Slow", "value": "slow" },
+            { "label": "Normal", "value": "normal" },
+            { "label": "Fast", "value": "fast" },
+            { "label": "Fastest", "value": "fastest" }
+          ]
+        },
+        {
+          "key": "speak.__experimental_controls.emotion",
+          "label": "Emotion (Experimental)",
+          "type": "input",
+          "required": false,
+          "advanced": true,
+          "placeholder": "e.g. curiosity:high<|||>positivity:low"
+        }
+      ]
+    }
+  },
+  {
+    "name": "Sonic (Sunsetted)",
+    "id": "sonic",
+    "releaseDate": "Sunsetted",
+    "languages": ["en", "fr", "de", "es", "pt", "zh", "ja", "hi", "it", "ko", "nl", "pl", "ru", "sv", "tr"],
+    "status": "Sunsetted",
+    "config": {
+      "parameters": [
+        {
+          "key": "speak.voice.id",
+          "label": "Voice",
+          "type": "dropdown",
+          "required": true,
+          "data": "voices.json",
+          "valueField": "id",
+          "searchable": true,
+          "strict": false,
+          "customValue": true,
+          "errorMessage": "Please select a valid voice for text to speech."
+        },
+        {
+          "key": "speak.language",
+          "label": "Language",
+          "type": "dropdown",
+          "required": true,
+          "default": "en",
+          "data": "languages-sonic.json",
+          "valueField": "code",
+          "errorMessage": "Please select a valid language for text to speech."
+        },
+        {
+          "key": "speak.__experimental_controls.speed",
+          "label": "Speed (Experimental)",
+          "type": "select",
+          "required": false,
+          "advanced": true,
+          "choices": [
+            { "label": "Provider Default", "value": "" },
+            { "label": "Slowest", "value": "slowest" },
+            { "label": "Slow", "value": "slow" },
+            { "label": "Normal", "value": "normal" },
+            { "label": "Fast", "value": "fast" },
+            { "label": "Fastest", "value": "fastest" }
+          ]
+        },
+        {
+          "key": "speak.__experimental_controls.emotion",
+          "label": "Emotion (Experimental)",
+          "type": "input",
+          "required": false,
+          "advanced": true,
+          "placeholder": "e.g. curiosity:high<|||>positivity:low"
+        }
+      ]
+    }
+  }
 ]
