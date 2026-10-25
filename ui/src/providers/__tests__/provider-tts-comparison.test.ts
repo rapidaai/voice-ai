@@ -405,3 +405,93 @@ describe('Smallest TTS — config resolution', () => {
     expect([...standardIds].some(id => proIds.has(id))).toBe(false);
   });
 });
+
+describe('Cartesia TTS — config resolution', () => {
+  const config = loadProviderConfig('cartesia')!;
+
+  const resolveModelLanguageCodes = (modelId: string): string[] => {
+    const params = resolveCategoryParameters('cartesia', 'tts', config.tts!, [
+      createMetadata('speak.model', modelId),
+    ]);
+    const languageParam = params.find(param => param.key === 'speak.language');
+    expect(languageParam?.data).toBeDefined();
+
+    return loadProviderData('cartesia', languageParam!.data!).map(
+      language => language.code,
+    );
+  };
+
+  it('defaults to Sonic 3.6 with shared voices and model-specific language options', () => {
+    const result = getDefaultsFromConfig(config, 'tts', [], 'cartesia');
+
+    expect(findMeta(result, 'speak.model')).toBe('sonic-3.6');
+    expect(findMeta(result, 'speak.language')).toBe('en');
+
+    const params = resolveCategoryParameters('cartesia', 'tts', config.tts!, [
+      createMetadata('speak.model', 'sonic-3.6'),
+    ]);
+    const voiceParam = params.find(param => param.key === 'speak.voice.id');
+    const languageParam = params.find(param => param.key === 'speak.language');
+
+    expect(voiceParam?.data).toBe('voices.json');
+    expect(languageParam?.data).toBe('languages-sonic-3-6.json');
+  });
+
+  it('scopes Cartesia TTS languages to the selected model', () => {
+    const sonic36 = resolveModelLanguageCodes('sonic-3.6');
+    expect(sonic36).toEqual(expect.arrayContaining(['or', 'ur']));
+
+    const sonic35 = resolveModelLanguageCodes('sonic-3.5-2026-05-04');
+    expect(sonic35).toEqual(expect.arrayContaining(['pa', 'mr']));
+    expect(sonic35).not.toContain('or');
+    expect(sonic35).not.toContain('ur');
+
+    const sonic2 = resolveModelLanguageCodes('sonic-2');
+    expect(sonic2).toEqual(['en', 'fr', 'de', 'es', 'pt', 'zh', 'ja', 'ko']);
+  });
+
+  it('validates Cartesia TTS languages against the selected model catalog', () => {
+    expect(
+      validateFromConfig(config, 'tts', 'cartesia', [
+        cred(),
+        createMetadata('speak.model', 'sonic-3.6'),
+        createMetadata('speak.voice.id', 'custom-voice'),
+        createMetadata('speak.language', 'ur'),
+      ]),
+    ).toBeUndefined();
+
+    expect(
+      validateFromConfig(config, 'tts', 'cartesia', [
+        cred(),
+        createMetadata('speak.model', 'sonic-2'),
+        createMetadata('speak.voice.id', 'custom-voice'),
+        createMetadata('speak.language', 'ur'),
+      ]),
+    ).toBe('Please select a valid language for text to speech.');
+  });
+
+  it('keeps only existing old aliases and labels sunsetted Cartesia TTS models', () => {
+    const models = loadProviderData('cartesia', 'text-to-speech-models.json');
+    const modelIds = models.map(model => model.id);
+
+    expect(modelIds).toEqual([
+      'sonic-3.6',
+      'sonic-3.6-2026-08-27',
+      'sonic-preview',
+      'sonic-3.5-2026-05-04',
+      'sonic-3',
+      'sonic-2',
+      'sonic-turbo',
+      'sonic',
+    ]);
+    expect(models.find(model => model.id === 'sonic-2')?.status).toBe(
+      'Sunsetted',
+    );
+    expect(models.find(model => model.id === 'sonic-turbo')?.status).toBe(
+      'Sunsetted',
+    );
+    expect(models.find(model => model.id === 'sonic')?.status).toBe(
+      'Sunsetted',
+    );
+  });
+});
