@@ -77,6 +77,22 @@ const getMetadataValue = (
   key: string,
 ): string | undefined => source.find(m => m.getKey() === key)?.getValue();
 
+const getDeepgramModelLanguageData = (modelId: string): string[] => {
+  const modelCatalog = loadProviderData(
+    'deepgram',
+    'speech-to-text-models.json',
+  );
+  const model = modelCatalog.find(item => item?.id === modelId);
+  expect(model).toBeDefined();
+  const languageParam = model?.config?.parameters?.find(
+    (param: any) => param.key === 'listen.language',
+  );
+  expect(languageParam?.data).toBeDefined();
+  return loadProviderData('deepgram', languageParam.data).map(
+    item => item.code,
+  );
+};
+
 const withValidCustomSttResponseRules = (source: Metadata[]): Metadata[] =>
   withMetadataValue(
     source,
@@ -314,6 +330,58 @@ describe('Speech-to-text provider runtime standard', () => {
       'cred-deepgram',
     ]);
     expect(err).toBeUndefined();
+  });
+
+  it('scopes deepgram language options by selected model', () => {
+    const nova3GeneralLanguages =
+      getDeepgramModelLanguageData('nova-3-general');
+    expect(nova3GeneralLanguages).toEqual(
+      expect.arrayContaining(['multi', 'as', 'mn', 'ps-AF', 'zh-Hant']),
+    );
+
+    const nova3MedicalLanguages =
+      getDeepgramModelLanguageData('nova-3-medical');
+    expect(nova3MedicalLanguages).toEqual(
+      expect.arrayContaining(['multi', 'en-IE', 'en-IN', 'en-NZ']),
+    );
+    expect(nova3MedicalLanguages).not.toContain('as');
+    expect(nova3MedicalLanguages).not.toContain('ja');
+
+    const nova3PharmaLanguages =
+      getDeepgramModelLanguageData('nova-3-pharma');
+    expect(nova3PharmaLanguages).toEqual([
+      'en',
+      'en-US',
+      'en-AU',
+      'en-CA',
+      'en-GB',
+      'en-IE',
+      'en-IN',
+      'en-NZ',
+    ]);
+
+    const nova2PhonecallLanguages =
+      getDeepgramModelLanguageData('nova-2-phonecall');
+    expect(nova2PhonecallLanguages).toEqual(['en', 'en-US']);
+  });
+
+  it('rejects deepgram languages outside the selected model catalog', () => {
+    const pharmaDefaults = GetDefaultSpeechToTextIfInvalid('deepgram', [
+      createMetadata('rapida.credential_id', 'cred-deepgram'),
+      createMetadata('listen.model', 'nova-3-pharma'),
+    ]);
+
+    expect(getMetadataValue(pharmaDefaults, 'listen.language')).toBe('en');
+
+    const err = ValidateSpeechToTextIfInvalid(
+      'deepgram',
+      withMetadataValue(pharmaDefaults, 'listen.language', 'as'),
+      ['cred-deepgram'],
+    );
+
+    expect(err).toBe(
+      'Please provide a valid deepgram language for speech to text.',
+    );
   });
 
   it('unknown provider remains no-op when no config exists', () => {
