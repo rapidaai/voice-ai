@@ -140,6 +140,45 @@ describe('resolveCategoryParameters', () => {
     return m;
   };
 
+  it('omits deprecated sampling controls for new Anthropic Claude models', () => {
+    const config = loadProviderConfig('anthropic');
+    expect(config?.text).toBeDefined();
+
+    const resolved = resolveCategoryParameters(
+      'anthropic',
+      'text',
+      config!.text!,
+      [
+        createMetadata('model.id', 'anthropic/claude-sonnet-5-5'),
+        createMetadata('model.name', 'claude-sonnet-5-5'),
+      ],
+    );
+
+    expect(resolved.find(p => p.key === 'model.max_tokens')).toBeDefined();
+    expect(resolved.find(p => p.key === 'model.temperature')).toBeUndefined();
+    expect(resolved.find(p => p.key === 'model.top_k')).toBeUndefined();
+    expect(resolved.find(p => p.key === 'model.top_p')).toBeUndefined();
+  });
+
+  it('keeps sampling controls for older Anthropic Claude models', () => {
+    const config = loadProviderConfig('anthropic');
+    expect(config?.text).toBeDefined();
+
+    const resolved = resolveCategoryParameters(
+      'anthropic',
+      'text',
+      config!.text!,
+      [
+        createMetadata('model.id', 'anthropic/claude-3-5-haiku-20241022'),
+        createMetadata('model.name', 'claude-3-5-haiku-20241022'),
+      ],
+    );
+
+    expect(resolved.find(p => p.key === 'model.temperature')).toBeDefined();
+    expect(resolved.find(p => p.key === 'model.top_k')).toBeDefined();
+    expect(resolved.find(p => p.key === 'model.top_p')).toBeDefined();
+  });
+
   it('includes model selector + model-defined parameters', () => {
     const config = loadProviderConfig('openai');
     expect(config?.text).toBeDefined();
