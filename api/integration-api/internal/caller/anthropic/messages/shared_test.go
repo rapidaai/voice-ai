@@ -249,6 +249,22 @@ func TestBuildMessageParamsMapsRetiredClaudeSonnetFour(t *testing.T) {
 	require.True(t, params.TopP.Valid())
 }
 
+func TestBuildMessageParamsMapsRetiredClaudeSonnetThreeSeven(t *testing.T) {
+	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
+		"model.name":        "claude-3-7-sonnet-20250219",
+		"model.temperature": 0.3,
+		"model.top_k":       int64(5),
+		"model.top_p":       0.8,
+	})
+
+	params := buildMessageParams(modelParams, nil)
+
+	assert.Equal(t, "claude-sonnet-4-6", string(params.Model))
+	require.True(t, params.Temperature.Valid())
+	require.True(t, params.TopK.Valid())
+	require.True(t, params.TopP.Valid())
+}
+
 func TestBuildMessageParamsMapsRetiredClaudeOpusFour(t *testing.T) {
 	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
 		"model.name":        "claude-opus-4-20250514",

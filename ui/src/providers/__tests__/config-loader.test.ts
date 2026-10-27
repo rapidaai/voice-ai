@@ -140,6 +140,7 @@ describe('loadProviderData', () => {
     expect(modelIds).toContain('anthropic/claude-sonnet-4-6');
     expect(modelNames).not.toContain('claude-opus-4-20250514');
     expect(modelNames).not.toContain('claude-sonnet-4-20250514');
+    expect(modelNames).not.toContain('claude-3-7-sonnet-20250219');
   });
 });
 
