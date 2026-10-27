@@ -233,7 +233,7 @@ func TestBuildMessageParamsKeepsSamplingForOlderClaude(t *testing.T) {
 	assert.Equal(t, 0.8, params.TopP.Value)
 }
 
-func TestBuildMessageParamsKeepsSamplingForDatedClaudeFour(t *testing.T) {
+func TestBuildMessageParamsMapsRetiredClaudeSonnetFour(t *testing.T) {
 	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
 		"model.name":        "claude-sonnet-4-20250514",
 		"model.temperature": 0.3,
@@ -243,8 +243,24 @@ func TestBuildMessageParamsKeepsSamplingForDatedClaudeFour(t *testing.T) {
 
 	params := buildMessageParams(modelParams, nil)
 
-	assert.Equal(t, "claude-sonnet-4-20250514", string(params.Model))
+	assert.Equal(t, "claude-sonnet-4-6", string(params.Model))
 	require.True(t, params.Temperature.Valid())
 	require.True(t, params.TopK.Valid())
 	require.True(t, params.TopP.Valid())
+}
+
+func TestBuildMessageParamsMapsRetiredClaudeOpusFour(t *testing.T) {
+	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
+		"model.name":        "claude-opus-4-20250514",
+		"model.temperature": 0.3,
+		"model.top_k":       int64(5),
+		"model.top_p":       0.8,
+	})
+
+	params := buildMessageParams(modelParams, nil)
+
+	assert.Equal(t, "claude-opus-4-8", string(params.Model))
+	assert.False(t, params.Temperature.Valid())
+	assert.False(t, params.TopK.Valid())
+	assert.False(t, params.TopP.Valid())
 }

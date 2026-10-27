@@ -280,8 +280,8 @@
     }
   },
   {
-    "id": "anthropic/claude-opus-4-20250514",
-    "name": "claude-opus-4-20250514",
+    "id": "anthropic/claude-opus-4-8",
+    "name": "claude-opus-4-8",
     "config": {
       "parameters": [
         {
@@ -293,36 +293,6 @@
           "default": "1028",
           "min": 1,
           "errorMessage": "Please check and provide a correct value for max_tokens."
-        },
-        {
-          "key": "model.temperature",
-          "label": "Temperature",
-          "type": "slider",
-          "advanced": true,
-          "required": true,
-          "default": "1.0",
-          "min": 0,
-          "max": 1,
-          "step": 0.1,
-          "errorMessage": "Please check and provide a correct value for temperature any decimal value between 0 to 1"
-        },
-        {
-          "key": "model.top_k",
-          "label": "Top K",
-          "type": "number",
-          "advanced": true,
-          "required": false
-        },
-        {
-          "key": "model.top_p",
-          "label": "Top P",
-          "type": "slider",
-          "advanced": true,
-          "required": false,
-          "min": 0,
-          "max": 1,
-          "step": 0.05,
-          "errorMessage": "Please check and provide a correct value for top_p any decimal value between 0 to 1"
         },
         {
           "key": "model.stop_sequences",
@@ -378,8 +348,8 @@
     }
   },
   {
-    "id": "anthropic/claude-sonnet-4-20250514",
-    "name": "claude-sonnet-4-20250514",
+    "id": "anthropic/claude-sonnet-4-6",
+    "name": "claude-sonnet-4-6",
     "config": {
       "parameters": [
         {

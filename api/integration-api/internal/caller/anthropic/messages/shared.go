@@ -114,7 +114,7 @@ func buildMessageParams(
 	toolDefinitions []*internal_callers.ToolDefinition,
 ) anthropic.MessageNewParams {
 	options := anthropic.MessageNewParams{}
-	modelName := anthropicModelName(modelParameter)
+	modelName := canonicalAnthropicModelName(anthropicModelName(modelParameter))
 	allowSamplingControls := !anthropicModelDisallowsSamplingControls(modelName)
 
 	if len(toolDefinitions) > 0 {
@@ -145,7 +145,7 @@ func buildMessageParams(
 		switch key {
 		case "model.name":
 			if mn, err := utils.AnyToString(value); err == nil {
-				options.Model = anthropic.Model(mn)
+				options.Model = anthropic.Model(canonicalAnthropicModelName(mn))
 			}
 		case "model.max_tokens":
 			if mct, err := utils.AnyToInt64(value); err == nil {
@@ -205,6 +205,17 @@ func anthropicModelName(modelParameter map[string]*anypb.Any) string {
 		}
 	}
 	return ""
+}
+
+func canonicalAnthropicModelName(modelName string) string {
+	switch strings.TrimPrefix(strings.ToLower(strings.TrimSpace(modelName)), "anthropic/") {
+	case "claude-sonnet-4-20250514":
+		return "claude-sonnet-4-6"
+	case "claude-opus-4-20250514":
+		return "claude-opus-4-8"
+	default:
+		return modelName
+	}
 }
 
 func anthropicModelDisallowsSamplingControls(modelName string) bool {
