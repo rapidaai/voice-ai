@@ -141,6 +141,8 @@ describe('loadProviderData', () => {
     expect(modelNames).not.toContain('claude-opus-4-20250514');
     expect(modelNames).not.toContain('claude-sonnet-4-20250514');
     expect(modelNames).not.toContain('claude-3-7-sonnet-20250219');
+    expect(modelNames).not.toContain('claude-3-5-haiku-20241022');
+    expect(modelNames).not.toContain('claude-3-5-sonnet-20241022');
   });
 });
 
@@ -172,7 +174,7 @@ describe('resolveCategoryParameters', () => {
     expect(resolved.find(p => p.key === 'model.top_p')).toBeUndefined();
   });
 
-  it('keeps sampling controls for older Anthropic Claude models', () => {
+  it('keeps sampling controls for Anthropic Claude Sonnet 4.6', () => {
     const config = loadProviderConfig('anthropic');
     expect(config?.text).toBeDefined();
 
@@ -181,8 +183,8 @@ describe('resolveCategoryParameters', () => {
       'text',
       config!.text!,
       [
-        createMetadata('model.id', 'anthropic/claude-3-5-haiku-20241022'),
-        createMetadata('model.name', 'claude-3-5-haiku-20241022'),
+        createMetadata('model.id', 'anthropic/claude-sonnet-4-6'),
+        createMetadata('model.name', 'claude-sonnet-4-6'),
       ],
     );
 

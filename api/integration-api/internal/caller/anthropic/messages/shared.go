@@ -213,6 +213,10 @@ func canonicalAnthropicModelName(modelName string) string {
 		return "claude-sonnet-4-6"
 	case "claude-3-7-sonnet-20250219":
 		return "claude-sonnet-4-6"
+	case "claude-3-5-sonnet-20241022":
+		return "claude-sonnet-4-6"
+	case "claude-3-5-haiku-20241022":
+		return "claude-haiku-5-5"
 	case "claude-opus-4-20250514":
 		return "claude-opus-4-8"
 	default:

@@ -214,9 +214,9 @@ func TestBuildMessageParamsDropsSamplingForClaudeFive(t *testing.T) {
 	assert.False(t, params.TopP.Valid())
 }
 
-func TestBuildMessageParamsKeepsSamplingForOlderClaude(t *testing.T) {
+func TestBuildMessageParamsKeepsSamplingForClaudeSonnetFourSix(t *testing.T) {
 	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
-		"model.name":        "claude-3-5-haiku-20241022",
+		"model.name":        "claude-sonnet-4-6",
 		"model.temperature": 0.3,
 		"model.top_k":       int64(5),
 		"model.top_p":       0.8,
@@ -224,7 +224,7 @@ func TestBuildMessageParamsKeepsSamplingForOlderClaude(t *testing.T) {
 
 	params := buildMessageParams(modelParams, nil)
 
-	assert.Equal(t, "claude-3-5-haiku-20241022", string(params.Model))
+	assert.Equal(t, "claude-sonnet-4-6", string(params.Model))
 	require.True(t, params.Temperature.Valid())
 	require.True(t, params.TopK.Valid())
 	require.True(t, params.TopP.Valid())
@@ -263,6 +263,38 @@ func TestBuildMessageParamsMapsRetiredClaudeSonnetThreeSeven(t *testing.T) {
 	require.True(t, params.Temperature.Valid())
 	require.True(t, params.TopK.Valid())
 	require.True(t, params.TopP.Valid())
+}
+
+func TestBuildMessageParamsMapsRetiredClaudeSonnetThreeFive(t *testing.T) {
+	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
+		"model.name":        "claude-3-5-sonnet-20241022",
+		"model.temperature": 0.3,
+		"model.top_k":       int64(5),
+		"model.top_p":       0.8,
+	})
+
+	params := buildMessageParams(modelParams, nil)
+
+	assert.Equal(t, "claude-sonnet-4-6", string(params.Model))
+	require.True(t, params.Temperature.Valid())
+	require.True(t, params.TopK.Valid())
+	require.True(t, params.TopP.Valid())
+}
+
+func TestBuildMessageParamsMapsRetiredClaudeHaikuThreeFive(t *testing.T) {
+	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
+		"model.name":        "claude-3-5-haiku-20241022",
+		"model.temperature": 0.3,
+		"model.top_k":       int64(5),
+		"model.top_p":       0.8,
+	})
+
+	params := buildMessageParams(modelParams, nil)
+
+	assert.Equal(t, "claude-haiku-5-5", string(params.Model))
+	assert.False(t, params.Temperature.Valid())
+	assert.False(t, params.TopK.Valid())
+	assert.False(t, params.TopP.Valid())
 }
 
 func TestBuildMessageParamsMapsRetiredClaudeOpusFour(t *testing.T) {
