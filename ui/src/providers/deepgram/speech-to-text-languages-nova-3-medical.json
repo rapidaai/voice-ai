@@ -1,0 +1,38 @@
+[
+  {
+    "code": "multi",
+    "name": "Multilingual"
+  },
+  {
+    "code": "en",
+    "name": "English"
+  },
+  {
+    "code": "en-US",
+    "name": "English (US)"
+  },
+  {
+    "code": "en-AU",
+    "name": "English (Australia)"
+  },
+  {
+    "code": "en-CA",
+    "name": "English (Canada)"
+  },
+  {
+    "code": "en-GB",
+    "name": "English (UK)"
+  },
+  {
+    "code": "en-IE",
+    "name": "English (Ireland)"
+  },
+  {
+    "code": "en-IN",
+    "name": "English (India)"
+  },
+  {
+    "code": "en-NZ",
+    "name": "English (New Zealand)"
+  }
+]

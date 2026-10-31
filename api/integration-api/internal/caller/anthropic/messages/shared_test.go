@@ -6,6 +6,7 @@ package internal_anthropic_messages
 import (
 	"testing"
 
+	caller_testutil "github.com/rapidaai/api/integration-api/internal/caller/internal/testutil"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -193,4 +194,121 @@ func TestBuildHistory_InvalidToolCallJSON(t *testing.T) {
 	require.Len(t, history, 1)
 	require.Len(t, history[0].Content, 1)
 	assert.Equal(t, "text", history[0].Content[0].OfText.Text)
+}
+
+func TestBuildMessageParamsDropsSamplingForClaudeFive(t *testing.T) {
+	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
+		"model.name":        "claude-sonnet-5-5",
+		"model.max_tokens":  int64(1028),
+		"model.temperature": 0.3,
+		"model.top_k":       int64(5),
+		"model.top_p":       0.8,
+	})
+
+	params := buildMessageParams(modelParams, nil)
+
+	assert.Equal(t, "claude-sonnet-5-5", string(params.Model))
+	assert.Equal(t, int64(1028), params.MaxTokens)
+	assert.False(t, params.Temperature.Valid())
+	assert.False(t, params.TopK.Valid())
+	assert.False(t, params.TopP.Valid())
+}
+
+func TestBuildMessageParamsKeepsSamplingForClaudeSonnetFourSix(t *testing.T) {
+	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
+		"model.name":        "claude-sonnet-4-6",
+		"model.temperature": 0.3,
+		"model.top_k":       int64(5),
+		"model.top_p":       0.8,
+	})
+
+	params := buildMessageParams(modelParams, nil)
+
+	assert.Equal(t, "claude-sonnet-4-6", string(params.Model))
+	require.True(t, params.Temperature.Valid())
+	require.True(t, params.TopK.Valid())
+	require.True(t, params.TopP.Valid())
+	assert.Equal(t, 0.3, params.Temperature.Value)
+	assert.Equal(t, int64(5), params.TopK.Value)
+	assert.Equal(t, 0.8, params.TopP.Value)
+}
+
+func TestBuildMessageParamsMapsRetiredClaudeSonnetFour(t *testing.T) {
+	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
+		"model.name":        "claude-sonnet-4-20250514",
+		"model.temperature": 0.3,
+		"model.top_k":       int64(5),
+		"model.top_p":       0.8,
+	})
+
+	params := buildMessageParams(modelParams, nil)
+
+	assert.Equal(t, "claude-sonnet-4-6", string(params.Model))
+	require.True(t, params.Temperature.Valid())
+	require.True(t, params.TopK.Valid())
+	require.True(t, params.TopP.Valid())
+}
+
+func TestBuildMessageParamsMapsRetiredClaudeSonnetThreeSeven(t *testing.T) {
+	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
+		"model.name":        "claude-3-7-sonnet-20250219",
+		"model.temperature": 0.3,
+		"model.top_k":       int64(5),
+		"model.top_p":       0.8,
+	})
+
+	params := buildMessageParams(modelParams, nil)
+
+	assert.Equal(t, "claude-sonnet-4-6", string(params.Model))
+	require.True(t, params.Temperature.Valid())
+	require.True(t, params.TopK.Valid())
+	require.True(t, params.TopP.Valid())
+}
+
+func TestBuildMessageParamsMapsRetiredClaudeSonnetThreeFive(t *testing.T) {
+	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
+		"model.name":        "claude-3-5-sonnet-20241022",
+		"model.temperature": 0.3,
+		"model.top_k":       int64(5),
+		"model.top_p":       0.8,
+	})
+
+	params := buildMessageParams(modelParams, nil)
+
+	assert.Equal(t, "claude-sonnet-4-6", string(params.Model))
+	require.True(t, params.Temperature.Valid())
+	require.True(t, params.TopK.Valid())
+	require.True(t, params.TopP.Valid())
+}
+
+func TestBuildMessageParamsMapsRetiredClaudeHaikuThreeFive(t *testing.T) {
+	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
+		"model.name":        "claude-3-5-haiku-20241022",
+		"model.temperature": 0.3,
+		"model.top_k":       int64(5),
+		"model.top_p":       0.8,
+	})
+
+	params := buildMessageParams(modelParams, nil)
+
+	assert.Equal(t, "claude-haiku-5-5", string(params.Model))
+	assert.False(t, params.Temperature.Valid())
+	assert.False(t, params.TopK.Valid())
+	assert.False(t, params.TopP.Valid())
+}
+
+func TestBuildMessageParamsMapsRetiredClaudeOpusFour(t *testing.T) {
+	modelParams := caller_testutil.BuildModelParameters(map[string]interface{}{
+		"model.name":        "claude-opus-4-20250514",
+		"model.temperature": 0.3,
+		"model.top_k":       int64(5),
+		"model.top_p":       0.8,
+	})
+
+	params := buildMessageParams(modelParams, nil)
+
+	assert.Equal(t, "claude-opus-4-8", string(params.Model))
+	assert.False(t, params.Temperature.Valid())
+	assert.False(t, params.TopK.Valid())
+	assert.False(t, params.TopP.Valid())
 }

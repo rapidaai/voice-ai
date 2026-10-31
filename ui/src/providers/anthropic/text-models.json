@@ -1,7 +1,9 @@
 [
   {
-    "id": "anthropic/claude-opus-4-20250514",
-    "name": "claude-opus-4-20250514",
+    "id": "anthropic/claude-fable-5-1",
+    "name": "claude-fable-5-1",
+    "human_name": "Claude Fable 5.1",
+    "description": "For demanding reasoning and long-horizon agentic work.",
     "config": {
       "parameters": [
         {
@@ -13,36 +15,6 @@
           "default": "1028",
           "min": 1,
           "errorMessage": "Please check and provide a correct value for max_tokens."
-        },
-        {
-          "key": "model.temperature",
-          "label": "Temperature",
-          "type": "slider",
-          "advanced": true,
-          "required": true,
-          "default": "1.0",
-          "min": 0,
-          "max": 1,
-          "step": 0.1,
-          "errorMessage": "Please check and provide a correct value for temperature any decimal value between 0 to 1"
-        },
-        {
-          "key": "model.top_k",
-          "label": "Top K",
-          "type": "number",
-          "advanced": true,
-          "required": false
-        },
-        {
-          "key": "model.top_p",
-          "label": "Top P",
-          "type": "slider",
-          "advanced": true,
-          "required": false,
-          "min": 0,
-          "max": 1,
-          "step": 0.05,
-          "errorMessage": "Please check and provide a correct value for top_p any decimal value between 0 to 1"
         },
         {
           "key": "model.stop_sequences",
@@ -98,8 +70,10 @@
     }
   },
   {
-    "id": "anthropic/claude-sonnet-4-20250514",
-    "name": "claude-sonnet-4-20250514",
+    "id": "anthropic/claude-opus-5-5",
+    "name": "claude-opus-5-5",
+    "human_name": "Claude Opus 5.5",
+    "description": "For long-running agentic coding and knowledge work.",
     "config": {
       "parameters": [
         {
@@ -111,36 +85,6 @@
           "default": "1028",
           "min": 1,
           "errorMessage": "Please check and provide a correct value for max_tokens."
-        },
-        {
-          "key": "model.temperature",
-          "label": "Temperature",
-          "type": "slider",
-          "advanced": true,
-          "required": true,
-          "default": "1.0",
-          "min": 0,
-          "max": 1,
-          "step": 0.1,
-          "errorMessage": "Please check and provide a correct value for temperature any decimal value between 0 to 1"
-        },
-        {
-          "key": "model.top_k",
-          "label": "Top K",
-          "type": "number",
-          "advanced": true,
-          "required": false
-        },
-        {
-          "key": "model.top_p",
-          "label": "Top P",
-          "type": "slider",
-          "advanced": true,
-          "required": false,
-          "min": 0,
-          "max": 1,
-          "step": 0.05,
-          "errorMessage": "Please check and provide a correct value for top_p any decimal value between 0 to 1"
         },
         {
           "key": "model.stop_sequences",
@@ -196,8 +140,10 @@
     }
   },
   {
-    "id": "anthropic/claude-3-7-sonnet-20250219",
-    "name": "claude-3-7-sonnet-20250219",
+    "id": "anthropic/claude-sonnet-5-5",
+    "name": "claude-sonnet-5-5",
+    "human_name": "Claude Sonnet 5.5",
+    "description": "The best combination of speed and intelligence.",
     "config": {
       "parameters": [
         {
@@ -209,36 +155,6 @@
           "default": "1028",
           "min": 1,
           "errorMessage": "Please check and provide a correct value for max_tokens."
-        },
-        {
-          "key": "model.temperature",
-          "label": "Temperature",
-          "type": "slider",
-          "advanced": true,
-          "required": true,
-          "default": "1.0",
-          "min": 0,
-          "max": 1,
-          "step": 0.1,
-          "errorMessage": "Please check and provide a correct value for temperature any decimal value between 0 to 1"
-        },
-        {
-          "key": "model.top_k",
-          "label": "Top K",
-          "type": "number",
-          "advanced": true,
-          "required": false
-        },
-        {
-          "key": "model.top_p",
-          "label": "Top P",
-          "type": "slider",
-          "advanced": true,
-          "required": false,
-          "min": 0,
-          "max": 1,
-          "step": 0.05,
-          "errorMessage": "Please check and provide a correct value for top_p any decimal value between 0 to 1"
         },
         {
           "key": "model.stop_sequences",
@@ -294,8 +210,10 @@
     }
   },
   {
-    "id": "anthropic/claude-3-5-haiku-20241022",
-    "name": "claude-3-5-haiku-20241022",
+    "id": "anthropic/claude-haiku-5-5",
+    "name": "claude-haiku-5-5",
+    "human_name": "Claude Haiku 5.5",
+    "description": "For high-volume, latency-sensitive tasks such as classification.",
     "config": {
       "parameters": [
         {
@@ -307,36 +225,6 @@
           "default": "1028",
           "min": 1,
           "errorMessage": "Please check and provide a correct value for max_tokens."
-        },
-        {
-          "key": "model.temperature",
-          "label": "Temperature",
-          "type": "slider",
-          "advanced": true,
-          "required": true,
-          "default": "1.0",
-          "min": 0,
-          "max": 1,
-          "step": 0.1,
-          "errorMessage": "Please check and provide a correct value for temperature any decimal value between 0 to 1"
-        },
-        {
-          "key": "model.top_k",
-          "label": "Top K",
-          "type": "number",
-          "advanced": true,
-          "required": false
-        },
-        {
-          "key": "model.top_p",
-          "label": "Top P",
-          "type": "slider",
-          "advanced": true,
-          "required": false,
-          "min": 0,
-          "max": 1,
-          "step": 0.05,
-          "errorMessage": "Please check and provide a correct value for top_p any decimal value between 0 to 1"
         },
         {
           "key": "model.stop_sequences",
@@ -392,8 +280,76 @@
     }
   },
   {
-    "id": "anthropic/claude-3-5-sonnet-20241022",
-    "name": "claude-3-5-sonnet-20241022",
+    "id": "anthropic/claude-opus-4-8",
+    "name": "claude-opus-4-8",
+    "config": {
+      "parameters": [
+        {
+          "key": "model.max_tokens",
+          "label": "Max Tokens",
+          "type": "number",
+          "advanced": true,
+          "required": true,
+          "default": "1028",
+          "min": 1,
+          "errorMessage": "Please check and provide a correct value for max_tokens."
+        },
+        {
+          "key": "model.stop_sequences",
+          "label": "Stop Sequences",
+          "type": "input",
+          "advanced": true,
+          "required": false
+        },
+        {
+          "key": "model.metadata",
+          "label": "Metadata",
+          "type": "json",
+          "advanced": true,
+          "required": false,
+          "colSpan": 2,
+          "helpText": "Optional metadata about the request. Enter as JSON object."
+        },
+        {
+          "key": "model.container",
+          "label": "Container",
+          "type": "input",
+          "advanced": true,
+          "required": false
+        },
+        {
+          "key": "model.service_tier",
+          "label": "Service Tier",
+          "type": "select",
+          "advanced": true,
+          "required": false,
+          "default": "auto",
+          "choices": [
+            {
+              "label": "Auto",
+              "value": "auto"
+            },
+            {
+              "label": "Standard Only",
+              "value": "standard_only"
+            }
+          ]
+        },
+        {
+          "key": "model.thinking",
+          "label": "Thinking",
+          "type": "json",
+          "advanced": true,
+          "required": false,
+          "colSpan": 2,
+          "helpText": "Enables Claude to show internal reasoning (thinking)."
+        }
+      ]
+    }
+  },
+  {
+    "id": "anthropic/claude-sonnet-4-6",
+    "name": "claude-sonnet-4-6",
     "config": {
       "parameters": [
         {

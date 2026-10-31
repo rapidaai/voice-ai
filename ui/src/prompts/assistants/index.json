@@ -196,7 +196,7 @@
     "description": "A mysterious old antique shop owner NPC who specializes in occult items. Wise and guarded with secrets, seeking a traveler to retrieve a special medicinal herb.",
     "category": "Entertainment",
     "provider": "anthropic",
-    "model": "claude-sonnet-4-20250514",
+    "model": "claude-sonnet-4-6",
     "parameters": {
       "temperature": 0.8
     },
@@ -244,7 +244,7 @@
     "description": "An advanced AI operating system for a futuristic smart home with precise control over lighting, temperature, air quality, sound, appliances, and devices.",
     "category": "IT",
     "provider": "anthropic",
-    "model": "claude-sonnet-4-20250514",
+    "model": "claude-sonnet-4-6",
     "parameters": {
       "temperature": 0.6
     },

@@ -6,6 +6,7 @@
       "label": "Model",
       "type": "dropdown",
       "required": true,
+      "default": "sonic-3.6",
       "data": "text-to-speech-models.json",
       "valueField": "id",
       "errorMessage": "Please select a valid model for text to speech."
