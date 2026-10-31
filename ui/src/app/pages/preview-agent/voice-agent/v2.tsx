@@ -269,7 +269,8 @@ function PreviewVoiceAgentV2Workspace({
   const activeAssistantStreamsRef = useRef<Map<string, ActiveAssistantStream>>(
     new Map(),
   );
-  const voiceTranscriptIdRef = useRef<string>();
+  const pendingVoiceTranscriptsRef = useRef<Map<string, string>>(new Map());
+  const displayedVoiceTranscriptIdsRef = useRef<Set<string>>(new Set());
   const pendingVoiceConnectionRef = useRef<Promise<void> | null>(null);
   const runtimeResetRef = useRef<Promise<void> | null>(null);
   const isRuntimeResettingRef = useRef(false);
@@ -511,6 +512,8 @@ function PreviewVoiceAgentV2Workspace({
     setRuntimeError('');
     pendingRequestIdsRef.current = [];
     assistantRequestIdsRef.current.clear();
+    pendingVoiceTranscriptsRef.current.clear();
+    displayedVoiceTranscriptIdsRef.current.clear();
     try {
       await stopAssistantStreams();
       await resetRuntime();
@@ -610,6 +613,8 @@ function PreviewVoiceAgentV2Workspace({
         }
         pendingRequestIdsRef.current = [];
         assistantRequestIdsRef.current.clear();
+        pendingVoiceTranscriptsRef.current.clear();
+        displayedVoiceTranscriptIdsRef.current.clear();
         setIsSessionConnected(false);
         setVoicePhase('idle');
         setIsVoiceMuted(false);
@@ -621,6 +626,8 @@ function PreviewVoiceAgentV2Workspace({
       isVoiceRequestedRef.current = false;
       pendingRequestIdsRef.current = [];
       assistantRequestIdsRef.current.clear();
+      pendingVoiceTranscriptsRef.current.clear();
+      displayedVoiceTranscriptIdsRef.current.clear();
       setIsSessionConnected(false);
       voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
       voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
@@ -632,11 +639,42 @@ function PreviewVoiceAgentV2Workspace({
 
     voiceAgent.on('onConnectionStateEvent', handleConnectionState);
     voiceAgent.on('onErrorEvent', handleAgentError);
+
+    const displayVoiceTranscript = (
+      instance: ChatInstance,
+      transcriptId: string,
+      text: string,
+    ) => {
+      pendingVoiceTranscriptsRef.current.delete(transcriptId);
+      if (displayedVoiceTranscriptIdsRef.current.has(transcriptId)) return;
+
+      displayedVoiceTranscriptIdsRef.current.add(transcriptId);
+      pendingRequestIdsRef.current.push(transcriptId);
+      void instance
+        .send({
+          id: transcriptId,
+          input: {
+            message_type: MessageInputType.TEXT,
+            text,
+          },
+        })
+        .catch(error => {
+          pendingRequestIdsRef.current = pendingRequestIdsRef.current.filter(
+            requestId => requestId !== transcriptId,
+          );
+          handleRuntimeError(error);
+        });
+    };
+
     voiceAgent.registerCallback({
       onAssistantMessage: message => {
         if (!isActive || !message) return;
         const instance = chatInstanceRef.current;
         if (!instance) return;
+
+        pendingVoiceTranscriptsRef.current.forEach((text, transcriptId) => {
+          displayVoiceTranscript(instance, transcriptId, text);
+        });
 
         const runtimeResponseId =
           message.id || `runtime-response-${++responseSequence.current}`;
@@ -741,7 +779,6 @@ function PreviewVoiceAgentV2Workspace({
         if (
           !isActive ||
           !message ||
-          message.completed === false ||
           !message.messageText?.trim() ||
           voiceAgent.agentConfiguration.inputOptions.channel !== Channel.Audio
         ) {
@@ -750,31 +787,22 @@ function PreviewVoiceAgentV2Workspace({
         const instance = chatInstanceRef.current;
         if (!instance) return;
 
-        voiceTranscriptIdRef.current = message.id;
-        if (message.id) pendingRequestIdsRef.current.push(message.id);
-        void instance
-          .send({
-            id: message.id,
-            input: {
-              message_type: MessageInputType.TEXT,
-              text: message.messageText,
-            },
-          })
-          .catch(error => {
-            pendingRequestIdsRef.current = pendingRequestIdsRef.current.filter(
-              requestId => requestId !== message.id,
-            );
-            if (voiceTranscriptIdRef.current === message.id) {
-              voiceTranscriptIdRef.current = undefined;
-            }
-            handleRuntimeError(error);
-          });
+        const transcriptId = message.id;
+        if (displayedVoiceTranscriptIdsRef.current.has(transcriptId)) return;
+
+        const text = message.messageText.trim();
+        pendingVoiceTranscriptsRef.current.set(transcriptId, text);
+        if (message.completed === false) return;
+
+        displayVoiceTranscript(instance, transcriptId, text);
       },
       onConversationError: error => {
         if (isActive) {
           isVoiceRequestedRef.current = false;
           pendingRequestIdsRef.current = [];
           assistantRequestIdsRef.current.clear();
+          pendingVoiceTranscriptsRef.current.clear();
+          displayedVoiceTranscriptIdsRef.current.clear();
           setIsSessionConnected(false);
           voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
           voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
@@ -798,6 +826,8 @@ function PreviewVoiceAgentV2Workspace({
       chatInstanceRef.current = null;
       isVoiceRequestedRef.current = false;
       assistantRequestIdsRef.current.clear();
+      pendingVoiceTranscriptsRef.current.clear();
+      displayedVoiceTranscriptIdsRef.current.clear();
       voiceAgent.agentConfiguration.inputOptions.channel = Channel.Text;
       voiceAgent.agentConfiguration.outputOptions.channel = Channel.Text;
       void resetRuntime();
@@ -848,10 +878,8 @@ function PreviewVoiceAgentV2Workspace({
       const message = request.input.text?.trim();
       if (!message) return;
 
-      if (voiceTranscriptIdRef.current === request.id) {
-        voiceTranscriptIdRef.current = undefined;
+      if (request.id && displayedVoiceTranscriptIdsRef.current.has(request.id))
         return;
-      }
 
       setRuntimeError('');
       try {
