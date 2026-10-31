@@ -18,7 +18,7 @@ chat:
     credential:
       key: "sk-ant-..."
     options:
-      model.name: "claude-sonnet-4-20250514"
+      model.name: "claude-sonnet-4-6"
       model.max_tokens: 1024
 
   gemini:

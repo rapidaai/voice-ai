@@ -5,6 +5,7 @@ package internal_anthropic_messages
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -113,6 +114,8 @@ func buildMessageParams(
 	toolDefinitions []*internal_callers.ToolDefinition,
 ) anthropic.MessageNewParams {
 	options := anthropic.MessageNewParams{}
+	modelName := canonicalAnthropicModelName(anthropicModelName(modelParameter))
+	allowSamplingControls := !anthropicModelDisallowsSamplingControls(modelName)
 
 	if len(toolDefinitions) > 0 {
 		fns := make([]anthropic.ToolUnionParam, len(toolDefinitions))
@@ -142,7 +145,7 @@ func buildMessageParams(
 		switch key {
 		case "model.name":
 			if mn, err := utils.AnyToString(value); err == nil {
-				options.Model = anthropic.Model(mn)
+				options.Model = anthropic.Model(canonicalAnthropicModelName(mn))
 			}
 		case "model.max_tokens":
 			if mct, err := utils.AnyToInt64(value); err == nil {
@@ -161,14 +164,23 @@ func buildMessageParams(
 				options.StopSequences = strings.Split(stopStr, ",")
 			}
 		case "model.temperature":
+			if !allowSamplingControls {
+				continue
+			}
 			if temp, err := utils.AnyToFloat64(value); err == nil {
 				options.Temperature = anthropic.Float(temp)
 			}
 		case "model.top_k":
+			if !allowSamplingControls {
+				continue
+			}
 			if topk, err := utils.AnyToInt64(value); err == nil {
 				options.TopK = anthropic.Int(topk)
 			}
 		case "model.top_p":
+			if !allowSamplingControls {
+				continue
+			}
 			if topP, err := utils.AnyToFloat64(value); err == nil {
 				options.TopP = anthropic.Float(topP)
 			}
@@ -184,6 +196,63 @@ func buildMessageParams(
 		}
 	}
 	return options
+}
+
+func anthropicModelName(modelParameter map[string]*anypb.Any) string {
+	if value, ok := modelParameter["model.name"]; ok {
+		if name, err := utils.AnyToString(value); err == nil {
+			return name
+		}
+	}
+	return ""
+}
+
+func canonicalAnthropicModelName(modelName string) string {
+	switch strings.TrimPrefix(strings.ToLower(strings.TrimSpace(modelName)), "anthropic/") {
+	case "claude-sonnet-4-20250514":
+		return "claude-sonnet-4-6"
+	case "claude-3-7-sonnet-20250219":
+		return "claude-sonnet-4-6"
+	case "claude-3-5-sonnet-20241022":
+		return "claude-sonnet-4-6"
+	case "claude-3-5-haiku-20241022":
+		return "claude-haiku-5-5"
+	case "claude-opus-4-20250514":
+		return "claude-opus-4-8"
+	default:
+		return modelName
+	}
+}
+
+func anthropicModelDisallowsSamplingControls(modelName string) bool {
+	modelName = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(modelName)), "anthropic/")
+	if modelName == "" {
+		return false
+	}
+
+	parts := strings.Split(modelName, "-")
+	major := -1
+	minor := 0
+	foundMajor := false
+
+	for _, part := range parts {
+		n, err := strconv.Atoi(part)
+		if err != nil {
+			continue
+		}
+		if !foundMajor {
+			major = n
+			foundMajor = true
+			continue
+		}
+		if len(part) > 2 {
+			break
+		}
+		minor = n
+		break
+	}
+
+	return major > 4 || major == 4 && minor >= 7
 }
 
 func convertAnthropicMessageToProto(message anthropic.Message) *protos.Message {

@@ -130,6 +130,20 @@ describe('loadProviderData', () => {
       'claude-haiku-5-5',
     ]);
   });
+
+  it('uses active Anthropic Claude 4 replacements instead of retired snapshots', () => {
+    const data = loadProviderData('anthropic', 'text-models.json');
+    const modelIds = data.map(model => model.id);
+    const modelNames = data.map(model => model.name);
+
+    expect(modelIds).toContain('anthropic/claude-opus-4-8');
+    expect(modelIds).toContain('anthropic/claude-sonnet-4-6');
+    expect(modelNames).not.toContain('claude-opus-4-20250514');
+    expect(modelNames).not.toContain('claude-sonnet-4-20250514');
+    expect(modelNames).not.toContain('claude-3-7-sonnet-20250219');
+    expect(modelNames).not.toContain('claude-3-5-haiku-20241022');
+    expect(modelNames).not.toContain('claude-3-5-sonnet-20241022');
+  });
 });
 
 describe('resolveCategoryParameters', () => {
@@ -139,6 +153,84 @@ describe('resolveCategoryParameters', () => {
     m.setValue(value);
     return m;
   };
+
+  it('omits deprecated sampling controls for new Anthropic Claude models', () => {
+    const config = loadProviderConfig('anthropic');
+    expect(config?.text).toBeDefined();
+
+    const resolved = resolveCategoryParameters(
+      'anthropic',
+      'text',
+      config!.text!,
+      [
+        createMetadata('model.id', 'anthropic/claude-sonnet-5-5'),
+        createMetadata('model.name', 'claude-sonnet-5-5'),
+      ],
+    );
+
+    expect(resolved.find(p => p.key === 'model.max_tokens')).toBeDefined();
+    expect(resolved.find(p => p.key === 'model.temperature')).toBeUndefined();
+    expect(resolved.find(p => p.key === 'model.top_k')).toBeUndefined();
+    expect(resolved.find(p => p.key === 'model.top_p')).toBeUndefined();
+  });
+
+  it('keeps sampling controls for Anthropic Claude Sonnet 4.6', () => {
+    const config = loadProviderConfig('anthropic');
+    expect(config?.text).toBeDefined();
+
+    const resolved = resolveCategoryParameters(
+      'anthropic',
+      'text',
+      config!.text!,
+      [
+        createMetadata('model.id', 'anthropic/claude-sonnet-4-6'),
+        createMetadata('model.name', 'claude-sonnet-4-6'),
+      ],
+    );
+
+    expect(resolved.find(p => p.key === 'model.temperature')).toBeDefined();
+    expect(resolved.find(p => p.key === 'model.top_k')).toBeDefined();
+    expect(resolved.find(p => p.key === 'model.top_p')).toBeDefined();
+  });
+
+  it('omits sampling controls for Anthropic Claude Opus 4.8', () => {
+    const config = loadProviderConfig('anthropic');
+    expect(config?.text).toBeDefined();
+
+    const resolved = resolveCategoryParameters(
+      'anthropic',
+      'text',
+      config!.text!,
+      [
+        createMetadata('model.id', 'anthropic/claude-opus-4-8'),
+        createMetadata('model.name', 'claude-opus-4-8'),
+      ],
+    );
+
+    expect(resolved.find(p => p.key === 'model.max_tokens')).toBeDefined();
+    expect(resolved.find(p => p.key === 'model.temperature')).toBeUndefined();
+    expect(resolved.find(p => p.key === 'model.top_k')).toBeUndefined();
+    expect(resolved.find(p => p.key === 'model.top_p')).toBeUndefined();
+  });
+
+  it('keeps sampling controls for Anthropic Claude Sonnet 4.6', () => {
+    const config = loadProviderConfig('anthropic');
+    expect(config?.text).toBeDefined();
+
+    const resolved = resolveCategoryParameters(
+      'anthropic',
+      'text',
+      config!.text!,
+      [
+        createMetadata('model.id', 'anthropic/claude-sonnet-4-6'),
+        createMetadata('model.name', 'claude-sonnet-4-6'),
+      ],
+    );
+
+    expect(resolved.find(p => p.key === 'model.temperature')).toBeDefined();
+    expect(resolved.find(p => p.key === 'model.top_k')).toBeDefined();
+    expect(resolved.find(p => p.key === 'model.top_p')).toBeDefined();
+  });
 
   it('includes model selector + model-defined parameters', () => {
     const config = loadProviderConfig('openai');
