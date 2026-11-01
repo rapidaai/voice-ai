@@ -6,6 +6,7 @@
 package parsers
 
 import (
+	"encoding/json"
 	"sort"
 	"strings"
 
@@ -39,12 +40,48 @@ func (stp *pongo2StringTemplateParser) Parse(template string, argument map[strin
 		stp.logger.Errorf("error while parsing the template with pongo2: %v", err)
 		return template
 	}
-	formattedTemplate, err := tpl.Execute(pongo2.Context(CanonicalizePromptArguments(utils.NormalizeInterface(argument))))
+	context := CanonicalizePromptArguments(utils.NormalizeInterface(argument))
+	for key, value := range context {
+		context[key] = promptArrayValue(value)
+	}
+	formattedTemplate, err := tpl.Execute(pongo2.Context(context))
 	if err != nil {
 		stp.logger.Errorf("error while executing the template with pongo2: %v", err)
 		return template
 	}
 	return formattedTemplate
+}
+
+// promptArray keeps transcript indexing and iteration while giving direct output a JSON form.
+type promptArray []interface{}
+
+func (values promptArray) String() string {
+	var output strings.Builder
+	encoder := json.NewEncoder(&output)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode([]interface{}(values)); err != nil {
+		return pongo2.AsValue([]interface{}(values)).String()
+	}
+	return strings.TrimSuffix(output.String(), "\n")
+}
+
+func promptArrayValue(value interface{}) interface{} {
+	switch value := value.(type) {
+	case []interface{}:
+		out := make(promptArray, len(value))
+		for i, item := range value {
+			out[i] = promptArrayValue(item)
+		}
+		return out
+	case map[string]interface{}:
+		out := make(map[string]interface{}, len(value))
+		for key, item := range value {
+			out[key] = promptArrayValue(item)
+		}
+		return out
+	default:
+		return value
+	}
 }
 
 // canonicalizePromptArguments expands dotted top-level keys (for example
