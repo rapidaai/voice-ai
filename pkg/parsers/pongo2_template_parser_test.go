@@ -196,3 +196,89 @@ Take care of yourself, and remember that recognizing your worth is the first ste
 		})
 	}
 }
+
+func TestPongo2StringTemplateParser_Parse_ConversationJSON(t *testing.T) {
+	logger, _ := commons.NewApplicationLogger()
+	parser := NewPongo2StringTemplateParser(logger)
+	tests := []struct {
+		name     string
+		template string
+		argument map[string]interface{}
+		expected string
+	}{
+		{
+			name:     "direct transcript",
+			template: "Analyse: {{ messages }}",
+			argument: map[string]interface{}{"messages": `[{"role":"user","content":"book a cab"}]`},
+			expected: `Analyse: [{"content":"book a cab","role":"user"}]`,
+		},
+		{
+			name:     "direct transcript with loop and index",
+			template: `{{ messages }}|{% for m in messages %}{{ m.role }}: {{ m.content }}{% endfor %}|{{ messages.0.role }}`,
+			argument: map[string]interface{}{"messages": `[{"role":"user","content":"book a cab"}]`},
+			expected: `[{"content":"book a cab","role":"user"}]|user: book a cab|user`,
+		},
+		{
+			name:     "nested transcript with dotted key",
+			template: `{{ conversation.messages }}|{{ conversation.messages.0.content }}|{{ conversation.language }}`,
+			argument: map[string]interface{}{"conversation.messages": `[{"content":"book a cab"}]`, "conversation.language": "en"},
+			expected: `[{"content":"book a cab"}]|book a cab|en`,
+		},
+		{
+			name:     "native transcript preserves map keys",
+			template: `{{ messages }}|{{ messages.0.String }}`,
+			argument: map[string]interface{}{"messages": []interface{}{map[string]interface{}{"String": "value"}}},
+			expected: `[{"String":"value"}]|value`,
+		},
+		{
+			name:     "transcript text remains readable",
+			template: `{{ messages }}`,
+			argument: map[string]interface{}{"messages": `[{"content":"AT&T <3 你好"}]`},
+			expected: `[{"content":"AT&T <3 你好"}]`,
+		},
+		{
+			name:     "empty transcript",
+			template: `{{ messages }}|{% for m in messages %}unexpected{% empty %}empty{% endfor %}`,
+			argument: map[string]interface{}{"messages": `[]`},
+			expected: `[]|empty`,
+		},
+		{
+			name:     "scalar escaping remains enabled",
+			template: `{{ text }}`,
+			argument: map[string]interface{}{"text": `<b>"cab"</b>`},
+			expected: `&lt;b&gt;&quot;cab&quot;&lt;/b&gt;`,
+		},
+		{
+			name:     "unencodable transcript preserves fallback",
+			template: `{{ messages }}`,
+			argument: map[string]interface{}{"messages": []interface{}{make(chan int)}},
+			expected: `<[]interface {} Value>`,
+		},
+		{
+			name:     "invalid template fallback",
+			template: `{{ messages`,
+			argument: map[string]interface{}{"messages": `[]`},
+			expected: `{{ messages`,
+		},
+		{
+			name:     "execution error fallback",
+			template: `{{ messages.invalid }}`,
+			argument: map[string]interface{}{"messages": `[]`},
+			expected: `{{ messages.invalid }}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, parser.Parse(tt.template, tt.argument))
+		})
+	}
+}
+
+func TestPongo2StringTemplateParser_Parse_PreexpandedArguments(t *testing.T) {
+	logger, _ := commons.NewApplicationLogger()
+	parser := NewPongo2StringTemplateParser(logger)
+	argument := CanonicalizePromptArguments(map[string]interface{}{
+		"messages": []interface{}{`{"role":"user"}`},
+	})
+	assert.Equal(t, "user", parser.Parse(`{{ messages.0.role }}`, argument))
+}
