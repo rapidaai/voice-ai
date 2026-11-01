@@ -68,7 +68,7 @@
         "just agent-drift-check",
         "just agent-style-check"
       ],
-      "limitation": "Style checks apply to added lines and intentionally do not rewrite historical content."
+      "limitation": "Style checks apply to added lines and do not rewrite historical content. Existing Go identifiers may move within the same file without increasing their count. Comments, strings and prose receive no credit."
     },
     {
       "id": "hook-regression-tests",

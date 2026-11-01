@@ -7,7 +7,8 @@ import argparse
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 
@@ -17,7 +18,12 @@ BANNED_STEM = re.compile("normali" + "z", re.IGNORECASE)
 TOOL_ATTRIBUTION = re.compile(r"co-authored-by|generated with|noreply@anthropic", re.IGNORECASE)
 TODO = re.compile(r"\b(?:TODO|FIXME|HACK)\b")
 TODO_OWNER = re.compile(r"(?:#[0-9]+|https?://|owner\s*:|remove(?:d)?\s+when)", re.IGNORECASE)
-HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+HUNK = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+GO_TOKEN = re.compile(
+    r'//[^\n]*|/\*[\s\S]*?(?:\*/|\Z)|`[^`]*(?:`|\Z)|'
+    r'"(?:\\[\s\S]|[^"\\])*(?:"|\Z)|'
+    r"'(?:\\[\s\S]|[^'\\])*(?:'|\Z)|(?P<identifier>[^\W\d]\w*)"
+)
 
 
 @dataclass(frozen=True)
@@ -25,6 +31,7 @@ class AddedLine:
     path: str
     number: int
     text: str
+    introduced_text: str | None = None
 
 
 def run_git(root: Path, arguments: list[str]) -> str:
@@ -40,27 +47,60 @@ def run_git(root: Path, arguments: list[str]) -> str:
     return result.stdout
 
 
+def go_identifiers(lines: list[str]) -> list[tuple[int, int, str]]:
+    source = "\n".join(lines)
+    identifiers = []
+    for match in GO_TOKEN.finditer(source):
+        name = match.group("identifier")
+        if name and BANNED_STEM.search(name):
+            row = source.count("\n", 0, match.start())
+            column = match.start() - source.rfind("\n", 0, match.start()) - 1
+            identifiers.append((row, column, name))
+    return identifiers
+
+
 def parse_added_lines(diff: str) -> list[AddedLine]:
-    path = ""
-    number = 0
     lines: list[AddedLine] = []
-    for line in diff.splitlines():
-        if line.startswith("+++ "):
-            path = line[4:]
-            if path.startswith("b/"):
-                path = path[2:]
-            continue
-        match = HUNK.match(line)
-        if match:
-            number = int(match.group(1))
-            continue
-        if not path or line.startswith("diff --git "):
-            continue
-        if line.startswith("+") and not line.startswith("+++"):
-            lines.append(AddedLine(path, number, line[1:]))
-            number += 1
-        elif not line.startswith("-"):
-            number += 1
+    for section in re.split(r"(?=^diff --git )", diff, flags=re.MULTILINE):
+        path = old_path = ""
+        number = hunks = 0
+        starts_at_top = False
+        before: list[str] = []
+        after: list[str] = []
+        removed: set[int] = set()
+        added: dict[int, AddedLine] = {}
+        for line in section.splitlines():
+            if not hunks and line.startswith("--- "):
+                old_path = line[4:].removeprefix("a/")
+            elif not hunks and line.startswith("+++ "):
+                path = line[4:].removeprefix("b/")
+            elif match := HUNK.match(line):
+                hunks += 1
+                number = int(match.group(2))
+                starts_at_top = int(match.group(1)) <= 1 and number <= 1
+            elif hunks and line.startswith("+"):
+                added[len(after)] = AddedLine(path, number, line[1:])
+                after.append(line[1:])
+                number += 1
+            elif hunks and line.startswith("-"):
+                removed.add(len(before))
+                before.append(line[1:])
+            elif hunks and line.startswith(" "):
+                before.append(line[1:])
+                after.append(line[1:])
+                number += 1
+        # Full Go context distinguishes identifiers from comments and string literals.
+        if path.endswith(".go") and path == old_path and hunks == 1 and starts_at_top:
+            credits = Counter(name for row, _, name in go_identifiers(before) if row in removed)
+            for row, column, name in go_identifiers(after):
+                if row in added and credits[name]:
+                    entry = added[row]
+                    text = entry.introduced_text if entry.introduced_text is not None else entry.text
+                    added[row] = replace(
+                        entry, introduced_text=text[:column] + " " * len(name) + text[column + len(name):]
+                    )
+                    credits[name] -= 1
+        lines.extend(added.values())
     return lines
 
 
@@ -78,7 +118,7 @@ def untracked_lines(root: Path) -> list[AddedLine]:
 
 
 def changed_lines(root: Path, mode: str, revision_range: str | None) -> list[AddedLine]:
-    arguments = ["diff", "--no-ext-diff", "--no-color", "--unified=0"]
+    arguments = ["diff", "--no-ext-diff", "--no-color", "--unified=2147483647"]
     if mode == "staged":
         arguments.append("--cached")
     elif mode == "range":
@@ -99,7 +139,8 @@ def validate(lines: list[AddedLine]) -> list[str]:
         suffix = Path(line.path).suffix.lower()
         is_prose = suffix in PROSE_SUFFIXES
         is_comment = COMMENT_LINE.match(line.text) is not None
-        if BANNED_STEM.search(line.text):
+        introduced = line.introduced_text if line.introduced_text is not None else line.text
+        if BANNED_STEM.search(introduced):
             failures.append(f"{line.path}:{line.number}: prohibited vague transformation stem")
         if (is_prose or is_comment) and "—" in line.text:
             failures.append(f"{line.path}:{line.number}: em dash is not allowed")
