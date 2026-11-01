@@ -162,6 +162,28 @@ class StyleCheckTest(unittest.TestCase):
         )
         self.assertEqual(style.validate(style.parse_added_lines(diff)), [])
 
+    def test_accepts_moves_in_git_quoted_paths(self) -> None:
+        name = "Normali" + "zeInterface"
+        for header, path in [
+            (r'"{prefix}/pkg/caf\303\251.go"', "pkg/café.go"),
+            (r'"{prefix}/pkg/quote\"slash\\.go"', 'pkg/quote"slash\\.go'),
+            (r'"{prefix}/pkg/tab\tline\n.go"', "pkg/tab\tline\n.go"),
+            ("{prefix}/pkg/my file.go\t", "pkg/my file.go"),
+            (r'"{prefix}/pkg/my caf\303\251.go"' + "\t", "pkg/my café.go"),
+        ]:
+            with self.subTest(path=path):
+                diff = self.source_diff(
+                    f"old := utils.{name}(argument)\n",
+                    f"next := utils.{name}(argument)\n",
+                ).replace("--- a/pkg/example.go", "--- " + header.format(prefix="a")).replace(
+                    "+++ b/pkg/example.go", "+++ " + header.format(prefix="b")
+                )
+                lines = style.parse_added_lines(diff)
+                self.assertEqual(lines[0].path, path)
+                self.assertEqual(style.validate(lines), [])
+                renamed = diff.replace("+++ " + header.format(prefix="b"), '+++ "b/pkg/other.go"')
+                self.assertEqual(len(style.validate(style.parse_added_lines(renamed))), 1)
+
     def test_rejects_new_or_additional_identifier_occurrences(self) -> None:
         name = "Normali" + "zeInterface"
         cases = [
@@ -237,11 +259,15 @@ class StyleCheckTest(unittest.TestCase):
         diff = self.source_diff(f"old := utils.{name}(argument)\n", f"next := utils.{name}(argument)\n")
         extra = style.AddedLine("pkg/new.go", 1, f"next := utils.{name}(argument)")
         for mode, revision in [("working-tree", None), ("staged", None), ("range", "base...head")]:
-            with self.subTest(mode=mode), patch.object(style, "run_git", return_value=diff), patch.object(
+            with self.subTest(mode=mode), patch.object(style, "run_git", return_value=diff) as run_git, patch.object(
                 style, "untracked_lines", return_value=[extra]
             ):
                 failures = style.validate(style.changed_lines(ROOT, mode, revision))
                 self.assertEqual(len(failures), int(mode == "working-tree"))
+                selector = "--cached" if mode == "staged" else revision or "HEAD"
+                run_git.assert_called_once_with(
+                    ROOT, ["diff", "--no-ext-diff", "--no-color", "--unified=2147483647", selector, "--"]
+                )
 
     def test_preserves_other_comment_checks_beside_moved_code(self) -> None:
         name = "Normali" + "zeInterface"

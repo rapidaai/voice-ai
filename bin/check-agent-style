@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import codecs
 import re
 import subprocess
 import sys
@@ -59,6 +60,13 @@ def go_identifiers(lines: list[str]) -> list[tuple[int, int, str]]:
     return identifiers
 
 
+def header_path(value: str) -> str:
+    value = value.removesuffix("\t")
+    if value.startswith('"') and value.endswith('"'):
+        return codecs.escape_decode(value[1:-1].encode("utf-8"))[0].decode("utf-8", "surrogateescape")
+    return value
+
+
 def parse_added_lines(diff: str) -> list[AddedLine]:
     lines: list[AddedLine] = []
     for section in re.split(r"(?=^diff --git )", diff, flags=re.MULTILINE):
@@ -71,9 +79,9 @@ def parse_added_lines(diff: str) -> list[AddedLine]:
         added: dict[int, AddedLine] = {}
         for line in section.splitlines():
             if not hunks and line.startswith("--- "):
-                old_path = line[4:].removeprefix("a/")
+                old_path = header_path(line[4:]).removeprefix("a/")
             elif not hunks and line.startswith("+++ "):
-                path = line[4:].removeprefix("b/")
+                path = header_path(line[4:]).removeprefix("b/")
             elif match := HUNK.match(line):
                 hunks += 1
                 number = int(match.group(2))
