@@ -20,6 +20,7 @@ export type JsonEditorProps = {
   height?: string;
   className?: string;
   placeholder?: string;
+  ariaLabel?: string;
   configureEditor?: (
     editor: monaco.editor.IStandaloneCodeEditor,
     monacoInstance: typeof monaco,
@@ -35,6 +36,7 @@ export function JsonEditor({
   className,
   placeholder = '',
   height = '200px',
+  ariaLabel,
   configureEditor,
 }: JsonEditorProps) {
   const { resolvedMode } = useTheme();
@@ -95,6 +97,7 @@ export function JsonEditor({
         onChange={handleChange}
         theme={resolvedMode === 'dark' ? 'vs-dark' : 'vs'}
         options={{
+          ariaLabel,
           readOnly: !editable,
           minimap: { enabled: false },
           wordWrap: 'on',
