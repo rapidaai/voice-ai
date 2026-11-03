@@ -146,12 +146,13 @@ test('deployment loading does not flash the empty-state tiles', async ({
   await mockPopulatedAssistantDeployments(page, { delayMs: 1000 });
   await page.goto('/deployment/assistant/2301664620831571968/deployment');
 
-  await expect(page.getByLabel('Loading deployments')).toBeVisible();
+  const loadingStatus = page.getByRole('status');
+  await expect(loadingStatus).toHaveText('Loading deployments');
   await expect(
     page.getByText('Choose how you want to test or deliver your assistant.'),
   ).toBeHidden();
   await expect(page.getByRole('row', { name: /SDK \/ API/ })).toBeVisible();
-  await expect(page.getByLabel('Loading deployments')).toBeHidden();
+  await expect(loadingStatus).toBeEmpty();
 });
 
 test('web widget deployment details use the shared integration design', async ({

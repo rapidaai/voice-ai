@@ -100,6 +100,7 @@ export const ConfigureAssistantDeploymentPage = () => {
     (id: typeof assistantId) => {
       const requestId = ++requestSequence.current;
       if (!id) {
+        setAssistant(null);
         hideLoader();
         setIsLoading(false);
         return;
@@ -116,8 +117,9 @@ export const ConfigureAssistantDeploymentPage = () => {
 
           if (epmr?.getSuccess()) {
             const a = epmr.getData();
-            if (a) setAssistant(a);
+            setAssistant(a ?? null);
           } else {
+            setAssistant(null);
             const error = epmr?.getError();
             toast.error(
               error?.getHumanmessage() ??
@@ -125,7 +127,12 @@ export const ConfigureAssistantDeploymentPage = () => {
             );
           }
         })
-        .catch(() => undefined)
+        .catch(() => {
+          if (requestId !== requestSequence.current) return;
+
+          setAssistant(null);
+          toast.error('Unable to get your assistant. please try again later.');
+        })
         .finally(() => {
           if (requestId !== requestSequence.current) return;
 
@@ -138,7 +145,7 @@ export const ConfigureAssistantDeploymentPage = () => {
 
   useEffect(() => {
     get(assistantId);
-  }, [assistantId]);
+  }, [assistantId, get]);
 
   const deploymentCount = [
     assistant?.getApideployment(),
@@ -377,11 +384,11 @@ export const ConfigureAssistantDeploymentPage = () => {
 
       <div className="flex flex-1 flex-col bg-surface">
         <div className="flex w-full flex-1 flex-col">
+          <div role="status" aria-live="polite" className="sr-only">
+            {isLoading ? 'Loading deployments' : ''}
+          </div>
           {isLoading ? (
-            <div
-              aria-label="Loading deployments"
-              className="no-scrollbar w-full overflow-x-auto"
-            >
+            <div className="no-scrollbar w-full overflow-x-auto">
               <DataTableSkeleton
                 headers={deploymentSkeletonHeaders}
                 columnCount={deploymentSkeletonHeaders.length}

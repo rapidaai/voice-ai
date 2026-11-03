@@ -123,7 +123,7 @@ jest.mock('@monaco-editor/react', () => {
 
     return (
       <textarea
-        aria-label={`${language}-editor`}
+        aria-label={options?.ariaLabel ?? `${language}-editor`}
         className={className}
         data-font-family={options?.fontFamily}
         data-line-padding={options?.lineDecorationsWidth}
@@ -166,6 +166,7 @@ describe('editor components', () => {
 
     const { unmount } = render(
       <JsonEditor
+        ariaLabel="Response format"
         className="consumer-class"
         value=""
         placeholder="Enter JSON"
@@ -174,7 +175,7 @@ describe('editor components', () => {
       />,
     );
 
-    const editor = screen.getByLabelText('json-editor');
+    const editor = screen.getByLabelText('Response format');
     expect(editor).toHaveAttribute('data-theme', 'vs-dark');
     expect(editor).toHaveAttribute('data-font-family', 'IBM Plex Mono');
     expect(editor).toHaveAttribute('data-line-padding', '8');

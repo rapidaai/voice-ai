@@ -270,7 +270,14 @@ export function ConfigRenderer({
           ? param.min ?? 0
           : sliderParsedValue;
         return (
-          <div className={cn(colSpanClass, 'relative')} key={param.key}>
+          <div
+            className={cn(
+              colSpanClass,
+              'relative',
+              param.helpText && '[&_.cds--label]:pe-8',
+            )}
+            key={param.key}
+          >
             <Slider
               id={`slider-${param.key}`}
               labelText={param.label}
@@ -298,7 +305,9 @@ export function ConfigRenderer({
             <TextInput
               id={numberInputId}
               labelText={param.label}
-              decorator={<FieldHelp param={param} />}
+              decorator={
+                param.helpText ? <FieldHelp param={param} /> : undefined
+              }
               type="number"
               min={param.min}
               max={param.max}
@@ -317,7 +326,9 @@ export function ConfigRenderer({
             <TextInput
               id={inputId}
               labelText={param.label}
-              decorator={<FieldHelp param={param} />}
+              decorator={
+                param.helpText ? <FieldHelp param={param} /> : undefined
+              }
               value={getParamValue(param.key)}
               placeholder={param.placeholder}
               onChange={e => updateParameter(param.key, e.target.value)}
@@ -332,7 +343,9 @@ export function ConfigRenderer({
             <TextArea
               id={textareaId}
               labelText={param.label}
-              decorator={<FieldHelp param={param} />}
+              decorator={
+                param.helpText ? <FieldHelp param={param} /> : undefined
+              }
               required={param.required !== false}
               value={getParamValue(param.key)}
               rows={param.rows ?? 2}
@@ -349,7 +362,9 @@ export function ConfigRenderer({
             <CarbonSelect
               id={selectId}
               labelText={param.label}
-              decorator={<FieldHelp param={param} />}
+              decorator={
+                param.helpText ? <FieldHelp param={param} /> : undefined
+              }
               value={getParamValue(param.key)}
               onChange={e => updateParameter(param.key, e.target.value)}
             >
@@ -575,7 +590,7 @@ function DropdownField({
           id={`combo-${param.key}`}
           aria-label={param.label}
           titleText={param.label}
-          decorator={<FieldHelp param={param} />}
+          decorator={param.helpText ? <FieldHelp param={param} /> : undefined}
           items={data}
           selectedItem={selectedItem}
           itemToString={getProviderDataItemName}
@@ -611,7 +626,7 @@ function DropdownField({
       <CarbonDropdown
         id={`dropdown-${param.key}`}
         titleText={param.label}
-        decorator={<FieldHelp param={param} />}
+        decorator={param.helpText ? <FieldHelp param={param} /> : undefined}
         label={`Select ${param.label.toLowerCase()}`}
         items={data}
         selectedItem={selectedItem}
