@@ -59,6 +59,10 @@ interface FieldLabelRowProps {
   className?: string;
 }
 
+function FieldHelp({ param }: Pick<FieldLabelRowProps, 'param'>) {
+  return <HelpToggletip label={param.label} helpText={param.helpText} />;
+}
+
 function FieldLabelRow({ param, htmlFor, className }: FieldLabelRowProps) {
   return (
     <span className={cn('inline-flex items-center gap-1', className)}>
@@ -266,11 +270,11 @@ export function ConfigRenderer({
           ? param.min ?? 0
           : sliderParsedValue;
         return (
-          <div className={cn(colSpanClass)} key={param.key}>
-            <FieldLabelRow param={param} htmlFor={`slider-${param.key}`} />
+          <div className={cn(colSpanClass, 'relative')} key={param.key}>
             <Slider
               id={`slider-${param.key}`}
-              labelText=""
+              labelText={param.label}
+              ariaLabelInput={param.label}
               min={param.min ?? 0}
               max={param.max ?? 1}
               step={param.step ?? 0.1}
@@ -279,6 +283,11 @@ export function ConfigRenderer({
                 updateParameter(param.key, v.toString())
               }
             />
+            {param.helpText && (
+              <span className="absolute end-0 top-0">
+                <FieldHelp param={param} />
+              </span>
+            )}
           </div>
         );
 
@@ -286,10 +295,10 @@ export function ConfigRenderer({
         const numberInputId = `num-${param.key}`;
         return (
           <div className={cn(colSpanClass)} key={param.key}>
-            <FieldLabelRow param={param} htmlFor={numberInputId} />
             <TextInput
               id={numberInputId}
-              labelText=""
+              labelText={param.label}
+              decorator={<FieldHelp param={param} />}
               type="number"
               min={param.min}
               max={param.max}
@@ -305,10 +314,10 @@ export function ConfigRenderer({
         const inputId = `input-${param.key}`;
         return (
           <div className={cn(colSpanClass)} key={param.key}>
-            <FieldLabelRow param={param} htmlFor={inputId} />
             <TextInput
               id={inputId}
-              labelText=""
+              labelText={param.label}
+              decorator={<FieldHelp param={param} />}
               value={getParamValue(param.key)}
               placeholder={param.placeholder}
               onChange={e => updateParameter(param.key, e.target.value)}
@@ -320,10 +329,10 @@ export function ConfigRenderer({
         const textareaId = `textarea-${param.key}`;
         return (
           <div className={cn(colSpanClass)} key={param.key}>
-            <FieldLabelRow param={param} htmlFor={textareaId} />
             <TextArea
               id={textareaId}
-              labelText=""
+              labelText={param.label}
+              decorator={<FieldHelp param={param} />}
               required={param.required !== false}
               value={getParamValue(param.key)}
               rows={param.rows ?? 2}
@@ -337,10 +346,10 @@ export function ConfigRenderer({
         const selectId = `select-${param.key}`;
         return (
           <div className={cn(colSpanClass)} key={param.key}>
-            <FieldLabelRow param={param} htmlFor={selectId} />
             <CarbonSelect
               id={selectId}
-              labelText=""
+              labelText={param.label}
+              decorator={<FieldHelp param={param} />}
               value={getParamValue(param.key)}
               onChange={e => updateParameter(param.key, e.target.value)}
             >
@@ -356,10 +365,9 @@ export function ConfigRenderer({
         );
 
       case 'json':
-        const jsonId = `json-${param.key}`;
         return (
           <div className={cn(colSpanClass)} key={param.key}>
-            <FieldLabelRow param={param} htmlFor={jsonId} />
+            <FieldLabelRow param={param} />
             <div className="mt-1 w-full min-w-0">
               {param.editor === 'websocket_dsl_json' ? (
                 <WebsocketDslEditor
@@ -368,6 +376,7 @@ export function ConfigRenderer({
                   }
                   mode={param.editorMode ?? 'query_params'}
                   value={getParamValue(param.key)}
+                  ariaLabel={param.label}
                   placeholder={param.placeholder ?? 'Enter as JSON'}
                   onChange={value => updateParameter(param.key, value)}
                   height="160px"
@@ -376,6 +385,7 @@ export function ConfigRenderer({
               ) : (
                 <JsonEditor
                   value={getParamValue(param.key)}
+                  ariaLabel={param.label}
                   placeholder={param.placeholder ?? 'Enter as JSON'}
                   onChange={value => updateParameter(param.key, value)}
                   height="160px"
@@ -561,10 +571,11 @@ function DropdownField({
   if (param.customValue || param.searchable) {
     return (
       <div className={cn(colSpanClass)} key={param.key}>
-        <FieldLabelRow param={param} />
         <ComboBox
           id={`combo-${param.key}`}
           aria-label={param.label}
+          titleText={param.label}
+          decorator={<FieldHelp param={param} />}
           items={data}
           selectedItem={selectedItem}
           itemToString={getProviderDataItemName}
@@ -597,11 +608,10 @@ function DropdownField({
 
   return (
     <div className={cn(colSpanClass)} key={param.key}>
-      <FieldLabelRow param={param} />
       <CarbonDropdown
         id={`dropdown-${param.key}`}
         titleText={param.label}
-        hideLabel
+        decorator={<FieldHelp param={param} />}
         label={`Select ${param.label.toLowerCase()}`}
         items={data}
         selectedItem={selectedItem}

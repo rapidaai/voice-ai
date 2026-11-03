@@ -111,12 +111,15 @@ export interface CarbonTextInputProps {
   labelText: ReactNode;
   className?: string;
   defaultValue?: string | number;
+  decorator?: ReactNode;
   disabled?: boolean;
   helperText?: ReactNode;
   hideLabel?: boolean;
   inline?: boolean;
   invalid?: boolean;
   invalidText?: ReactNode;
+  max?: number | string;
+  min?: number | string;
   name?: string;
   onChange?: (e: ChangeEvent<HTMLInputElement>) => void;
   onClick?: (e: MouseEvent<HTMLElement>) => void;
@@ -125,6 +128,7 @@ export interface CarbonTextInputProps {
   readOnly?: boolean;
   required?: boolean;
   size?: InputSize;
+  step?: number | string;
   type?: string;
   value?: string | number;
   warn?: boolean;
@@ -239,6 +243,7 @@ export interface CarbonTextAreaProps {
   className?: string;
   cols?: number;
   defaultValue?: string | number;
+  decorator?: ReactNode;
   disabled?: boolean;
   helperText?: ReactNode;
   hideLabel?: boolean;

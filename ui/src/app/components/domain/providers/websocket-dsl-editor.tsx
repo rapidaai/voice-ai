@@ -13,6 +13,7 @@ type WebsocketDslEditorProps = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  ariaLabel?: string;
   className?: string;
   height?: string;
 };
@@ -34,6 +35,7 @@ export function WebsocketDslEditor({
   value,
   onChange,
   placeholder,
+  ariaLabel,
   className,
   height = '160px',
 }: WebsocketDslEditorProps) {
@@ -42,6 +44,7 @@ export function WebsocketDslEditor({
       value={value}
       onChange={onChange}
       placeholder={placeholder}
+      ariaLabel={ariaLabel}
       className={className}
       height={height}
       configureEditor={(editor, monacoInstance) => {

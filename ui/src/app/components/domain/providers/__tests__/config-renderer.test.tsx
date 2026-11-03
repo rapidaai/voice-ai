@@ -5,7 +5,7 @@
  * category JSON parameter types and calls onParameterChange appropriately.
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setRangeValue } from '@/test-utils/set-range-value';
 import '@testing-library/jest-dom';
@@ -20,10 +20,11 @@ jest.mock('@/utils', () => ({
 jest.mock('@/app/components/ui/editor/json-editor', () => {
   const React = require('react');
   return {
-    JsonEditor: ({ value, onChange, placeholder }: any) =>
+    JsonEditor: ({ value, onChange, placeholder, ariaLabel }: any) =>
       React.createElement('textarea', {
         value: value ?? '',
         placeholder,
+        'aria-label': ariaLabel,
         onChange: (e: any) => onChange?.(e.target.value),
       }),
   };
@@ -92,6 +93,7 @@ jest.mock('@/app/components/ui/primitives/form', () => {
     TextInput: ({
       id,
       labelText,
+      decorator,
       value,
       onChange,
       placeholder,
@@ -100,7 +102,7 @@ jest.mock('@/app/components/ui/primitives/form', () => {
     }: any) =>
       React.createElement(
         'div',
-        null,
+        { 'data-testid': `${id}-field` },
         labelText
           ? React.createElement('label', { htmlFor: id }, labelText)
           : null,
@@ -111,11 +113,13 @@ jest.mock('@/app/components/ui/primitives/form', () => {
           placeholder,
           type,
         }),
+        decorator,
         helperText ? React.createElement('p', null, helperText) : null,
       ),
     TextArea: ({
       id,
       labelText,
+      decorator,
       value,
       onChange,
       placeholder,
@@ -123,7 +127,7 @@ jest.mock('@/app/components/ui/primitives/form', () => {
     }: any) =>
       React.createElement(
         'div',
-        null,
+        { 'data-testid': `${id}-field` },
         labelText
           ? React.createElement('label', { htmlFor: id }, labelText)
           : null,
@@ -133,6 +137,7 @@ jest.mock('@/app/components/ui/primitives/form', () => {
           onChange,
           placeholder,
         }),
+        decorator,
         helperText ? React.createElement('p', null, helperText) : null,
       ),
   };
@@ -156,6 +161,7 @@ jest.mock('@carbon/react', () => {
       id,
       hideLabel,
       titleText,
+      decorator,
       label,
       items = [],
       selectedItem,
@@ -163,7 +169,7 @@ jest.mock('@carbon/react', () => {
     }: any) =>
       React.createElement(
         'div',
-        null,
+        { 'data-testid': `${id}-field` },
         titleText && !hideLabel
           ? React.createElement('span', null, titleText)
           : null,
@@ -190,11 +196,13 @@ jest.mock('@carbon/react', () => {
             ),
           ),
         ),
+        decorator,
       ),
     ComboBox: ({
       id,
       hideLabel,
       titleText,
+      decorator,
       items = [],
       selectedItem,
       onChange,
@@ -203,7 +211,7 @@ jest.mock('@carbon/react', () => {
     }: any) =>
       React.createElement(
         'div',
-        null,
+        { 'data-testid': `${id}-field` },
         titleText && !hideLabel
           ? React.createElement('span', null, titleText)
           : null,
@@ -237,11 +245,12 @@ jest.mock('@carbon/react', () => {
             ),
           ),
         ),
+        decorator,
       ),
     Slider: ({ id, value, onChange, labelText }: any) =>
       React.createElement(
         'div',
-        null,
+        { 'data-testid': `${id}-field` },
         labelText
           ? React.createElement('label', { htmlFor: id }, labelText)
           : null,
@@ -253,14 +262,15 @@ jest.mock('@carbon/react', () => {
           onChange: (e: any) => onChange?.({ value: Number(e.target.value) }),
         }),
       ),
-    Select: ({ id, labelText, value, onChange, children }: any) =>
+    Select: ({ id, labelText, decorator, value, onChange, children }: any) =>
       React.createElement(
         'div',
-        null,
+        { 'data-testid': `${id}-field` },
         labelText
           ? React.createElement('label', { htmlFor: id }, labelText)
           : null,
         React.createElement('select', { id, value, onChange }, children),
+        decorator,
       ),
     SelectItem: ({ value, text }: any) =>
       React.createElement('option', { value }, text),
@@ -477,6 +487,74 @@ describe('ConfigRenderer', () => {
 
       expect(screen.getAllByText('Select model').length).toBeGreaterThan(0);
     });
+
+    it('keeps each Carbon field label inside its control wrapper', () => {
+      const fieldConfig: CategoryConfig = {
+        parameters: [
+          {
+            key: 'speak.model',
+            label: 'Model',
+            type: 'dropdown',
+            data: 'models.json',
+            valueField: 'id',
+          },
+          {
+            key: 'speak.voice',
+            label: 'Voice',
+            type: 'dropdown',
+            data: 'models.json',
+            valueField: 'id',
+            searchable: true,
+          },
+          {
+            key: 'speak.language',
+            label: 'Language',
+            type: 'dropdown',
+            data: 'languages.json',
+            valueField: 'code',
+          },
+          {
+            key: 'speak.format',
+            label: 'Format',
+            type: 'select',
+            choices: [{ label: 'PCM', value: 'pcm' }],
+          },
+          {
+            key: 'speak.instructions',
+            label: 'Instructions',
+            type: 'input',
+          },
+          {
+            key: 'speak.speed',
+            label: 'Speed',
+            type: 'number',
+          },
+        ],
+      };
+
+      render(
+        <ConfigRenderer
+          provider="test"
+          category="tts"
+          config={fieldConfig}
+          parameters={[]}
+          onParameterChange={mockOnChange}
+        />,
+      );
+
+      for (const [fieldId, label] of [
+        ['dropdown-speak.model-field', 'Model'],
+        ['combo-speak.voice-field', 'Voice'],
+        ['dropdown-speak.language-field', 'Language'],
+        ['select-speak.format-field', 'Format'],
+        ['input-speak.instructions-field', 'Instructions'],
+        ['num-speak.speed-field', 'Speed'],
+      ]) {
+        expect(
+          within(screen.getByTestId(fieldId)).getByText(label),
+        ).toBeInTheDocument();
+      }
+    });
   });
 
   describe('slider fields', () => {
@@ -530,6 +608,9 @@ describe('ConfigRenderer', () => {
 
       const slider = screen.getByRole('slider') as HTMLInputElement;
       expect(slider).toBeInTheDocument();
+      expect(
+        screen.getByRole('slider', { name: 'Threshold' }),
+      ).toBeInTheDocument();
       expect(slider).toHaveAttribute('type', 'range');
       expect(slider.value).toBe('0.5');
     });
@@ -804,6 +885,9 @@ describe('ConfigRenderer', () => {
       );
 
       expect(screen.getByText('Response Format')).toBeInTheDocument();
+      expect(
+        screen.getByRole('textbox', { name: 'Response Format' }),
+      ).toBeInTheDocument();
       expect(screen.getByPlaceholderText('Enter as JSON')).toBeInTheDocument();
     });
 
@@ -832,6 +916,32 @@ describe('ConfigRenderer', () => {
       ).toBeInTheDocument();
       expect(
         screen.getByText('Runtime variables are validated before save.'),
+      ).toBeInTheDocument();
+    });
+
+    it('names websocket JSON editors from their visible field label', () => {
+      render(
+        <ConfigRenderer
+          provider="custom-stt"
+          category="stt"
+          config={{
+            parameters: [
+              {
+                key: 'listen.query_params',
+                label: 'Query Parameters',
+                type: 'json',
+                editor: 'websocket_dsl_json',
+                editorMode: 'query_params',
+              },
+            ],
+          }}
+          parameters={[]}
+          onParameterChange={mockOnChange}
+        />,
+      );
+
+      expect(
+        screen.getByRole('textbox', { name: 'Query Parameters' }),
       ).toBeInTheDocument();
     });
 
