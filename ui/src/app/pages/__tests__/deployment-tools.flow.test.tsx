@@ -659,6 +659,86 @@ describe('Deployment and tool flows', () => {
     await act(async () => {});
   });
 
+  it('shows a deployment skeleton matching the table columns instead of empty-state tiles while loading', () => {
+    (GetAssistant as jest.Mock).mockReturnValue(new Promise(() => undefined));
+
+    const { container } = render(<ConfigureAssistantDeploymentPage />);
+
+    expect(screen.getByLabelText('Loading deployments')).toBeInTheDocument();
+    expect(container.querySelectorAll('thead th')).toHaveLength(8);
+    expect(
+      screen.queryByRole('heading', { name: 'Deployment' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the deployment skeleton until the newest reload settles', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    let resolveFirst: (value: unknown) => void = () => undefined;
+    let resolveSecond: (value: unknown) => void = () => undefined;
+    const firstRequest = new Promise(resolve => {
+      resolveFirst = resolve;
+    });
+    const secondRequest = new Promise(resolve => {
+      resolveSecond = resolve;
+    });
+    const emptyAssistant = {
+      getApideployment: () => null,
+      hasApideployment: () => false,
+      getWebplugindeployment: () => null,
+      hasWebplugindeployment: () => false,
+      getDebuggerdeployment: () => null,
+      hasDebuggerdeployment: () => false,
+      getPhonedeployment: () => null,
+      hasPhonedeployment: () => false,
+    };
+
+    (GetAssistant as jest.Mock)
+      .mockReturnValueOnce(firstRequest)
+      .mockReturnValueOnce(secondRequest);
+
+    render(<ConfigureAssistantDeploymentPage />);
+    await user.click(
+      screen.getByRole('button', { name: 'Reload deployments' }),
+    );
+
+    await act(async () => {
+      resolveFirst({
+        getSuccess: () => true,
+        getData: () => emptyAssistant,
+      });
+    });
+
+    expect(screen.getByLabelText('Loading deployments')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Deployment' }),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveSecond({
+        getSuccess: () => true,
+        getData: () => emptyAssistant,
+      });
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: 'Deployment' }),
+    ).toBeInTheDocument();
+  });
+
+  it('removes the deployment skeleton when loading fails', async () => {
+    (GetAssistant as jest.Mock).mockRejectedValue(new Error('network error'));
+
+    render(<ConfigureAssistantDeploymentPage />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Deployment' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Loading deployments'),
+    ).not.toBeInTheDocument();
+    expect(mockHideLoader).toHaveBeenCalled();
+  });
+
   it('create deployment empty state shows add deployment action', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     (GetAssistant as jest.Mock).mockResolvedValue({

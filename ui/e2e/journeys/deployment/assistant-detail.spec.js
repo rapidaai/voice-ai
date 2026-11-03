@@ -113,6 +113,47 @@ for (const colorMode of ['light', 'dark']) {
   });
 }
 
+test('deployment rows use the Carbon expanded chevron state', async ({
+  page,
+}) => {
+  await authenticatePage(page);
+  await mockPopulatedAssistantDeployments(page);
+  await page.goto('/deployment/assistant/2301664620831571968/deployment');
+
+  const expandButton = page.getByRole('button', {
+    name: /SDK \/ API deployment details$/,
+  });
+  const chevron = expandButton.locator('.cds--table-expand__svg');
+  const collapsedTransform = await chevron.evaluate(
+    element => getComputedStyle(element).transform,
+  );
+
+  await expect(expandButton).toHaveAttribute('aria-expanded', 'false');
+  await expandButton.click();
+  await expect(expandButton).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByText('Session behavior')).toBeVisible();
+  await expect
+    .poll(() =>
+      chevron.evaluate(element => getComputedStyle(element).transform),
+    )
+    .not.toBe(collapsedTransform);
+});
+
+test('deployment loading does not flash the empty-state tiles', async ({
+  page,
+}) => {
+  await authenticatePage(page);
+  await mockPopulatedAssistantDeployments(page, { delayMs: 1000 });
+  await page.goto('/deployment/assistant/2301664620831571968/deployment');
+
+  await expect(page.getByLabel('Loading deployments')).toBeVisible();
+  await expect(
+    page.getByText('Choose how you want to test or deliver your assistant.'),
+  ).toBeHidden();
+  await expect(page.getByRole('row', { name: /SDK \/ API/ })).toBeVisible();
+  await expect(page.getByLabel('Loading deployments')).toBeHidden();
+});
+
 test('web widget deployment details use the shared integration design', async ({
   page,
 }) => {

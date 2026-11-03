@@ -290,9 +290,12 @@ async function mockDebuggerAssistant(page, options) {
   });
 }
 
-async function mockPopulatedAssistantDeployments(page) {
-  await page.route(ASSISTANT_DETAIL_PATH, route => {
+async function mockPopulatedAssistantDeployments(page, { delayMs = 0 } = {}) {
+  await page.route(ASSISTANT_DETAIL_PATH, async route => {
     if (route.request().method() !== 'POST') return route.fallback();
+    if (delayMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
     return fulfillGrpcWeb(
       route,
       buildPopulatedDeploymentAssistantDetailResponse(),
