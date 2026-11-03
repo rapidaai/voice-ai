@@ -158,6 +158,13 @@ function buildPopulatedDeploymentAssistantDetailResponse() {
   debuggerDeployment.setAssistantid(ASSISTANT_ID);
   debuggerDeployment.setName('Browser debugger');
   debuggerDeployment.setStatus('ACTIVE');
+  debuggerDeployment.setGreeting('Hello, how can I help?');
+  debuggerDeployment.setMistake('Sorry, something went wrong.');
+  debuggerDeployment.setMaxsessionduration('300');
+  debuggerDeployment.setIdealtimeout('30');
+  debuggerDeployment.setIdealtimeoutbackoff('2');
+  debuggerDeployment.setGreetinginterruptible(true);
+  debuggerDeployment.setUnclearinputtimeout(8);
   debuggerDeployment.setInputaudio(inputAudio());
   debuggerDeployment.setOutputaudio(outputAudio());
   debuggerDeployment.setCreateddate(timestamp('2026-10-14T09:00:00Z'));

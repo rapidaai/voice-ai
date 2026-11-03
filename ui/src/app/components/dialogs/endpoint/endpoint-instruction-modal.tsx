@@ -29,7 +29,7 @@ export function EndpointInstructionDialog(
       title={currentEndpoint?.getName() || 'Get started'}
       {...mldAttr}
     >
-      <div className="flex flex-1 flex-col overflow-auto">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         {currentEndpoint && <EndpointIntegration endpoint={currentEndpoint} />}
       </div>
     </RightSideModal>

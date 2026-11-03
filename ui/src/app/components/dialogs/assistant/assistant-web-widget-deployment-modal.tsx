@@ -1,83 +1,55 @@
-import {
-  type AssistantWebpluginDeployment,
-  type DeploymentAudioProvider,
-} from '@rapidaai/react';
+import type { AssistantWebpluginDeployment } from '@rapidaai/react';
 import type { ModalProps } from '@/app/components/ui/primitives';
+import { Tabs } from '@/app/components/ui/primitives';
 import { RightSideModal } from '@/app/components/dialogs/shared';
-import { CopyButton } from '@/app/components/ui/primitives';
-import { YellowNoticeBlock } from '@/app/components/layout/container/message/notice-block';
-import { ProviderPill } from '@/app/components/domain/pills/provider-model-pill';
-import { useState } from 'react';
-import { createPortal } from 'react-dom';
-import { CodeHighlighting } from '@/app/components/ui/editor/code-highlighting';
+import { DeploymentAudioPanel } from '@/app/components/dialogs/shared/deployment-audio-panel';
+import { DeploymentConfigurationPanel } from '@/app/components/dialogs/shared/deployment-configuration-panel';
 import {
   DeploymentRow,
   DeploymentSectionHeader,
 } from '@/app/components/dialogs/shared';
-import { Tabs } from '@/app/components/ui/primitives';
-import { CONFIG } from '@/configs';
+import { WidgetIntegration } from '@/app/components/domain/integration-document/widget-integration';
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface AssistantWebWidgetlDeploymentDialogProps extends ModalProps {
   deployment: AssistantWebpluginDeployment;
 }
 
-export function AssistantWebWidgetlDeploymentDialog(
-  props: AssistantWebWidgetlDeploymentDialogProps,
-) {
+export function AssistantWebWidgetlDeploymentDialog({
+  deployment,
+  modalOpen,
+  setModalOpen,
+}: AssistantWebWidgetlDeploymentDialogProps) {
   const [selectedTab, setSelectedTab] = useState(0);
   const modalContent = (
     <RightSideModal
-      modalOpen={props.modalOpen}
-      setModalOpen={props.setModalOpen}
-      className="w-[580px]"
+      modalOpen={modalOpen}
+      setModalOpen={setModalOpen}
+      className="w-[580px] max-w-[calc(100vw-2rem)]"
       label="Web Widget Deployment"
-      title={props.deployment.getId()}
+      title={deployment.getId()}
     >
-      <div className="relative flex flex-col flex-1 min-h-0">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <Tabs
-          tabs={['Integration', 'Audio']}
+          tabs={['Setup', 'Configuration', 'Audio']}
           selectedIndex={selectedTab}
           onChange={setSelectedTab}
           contained
+          fullWidth
           fill
           aria-label="Web widget deployment tabs"
-          panelClassName="overflow-auto p-0"
+          panelClassName="overflow-auto !p-0"
         >
-          <div className="divide-y divide-gray-200 dark:divide-gray-800 w-full">
-            <div>
-              <SectionHeader label="Add script to your website" />
-              <div className="px-4 py-3">
-                <CodeHighlighting
-                  className="min-h-[20px]"
-                  code={`<script src="${CONFIG.deployment.webWidgetScriptUrl}" defer></script>`}
-                />
-              </div>
-            </div>
-            <div>
-              <SectionHeader label="Initialize assistant" />
-              <div className="px-4 py-3">
-                <CodeHighlighting
-                  className="min-h-[200px]"
-                  code={`
-                        <script>window.chatbotConfig = {
-theme: {
-    color: "black",
-},
-assistant_id: "${props.deployment.getAssistantid() || 'YOUR_ASSISTANT_ID'}",
-token: "{PROJECT_KEY}",
-user: {
-    id: "{UNIQUE_IDENTIFIER}",
-    name: "{NAME}",
-}
-}</script>`.trim()}
-                />
-              </div>
-            </div>
-          </div>
-          <div className="divide-y divide-gray-200 dark:divide-gray-800 w-full">
-            <VoiceInput deployment={props.deployment?.getInputaudio()} />
-            <VoiceOutput deployment={props.deployment?.getOutputaudio()} />
-          </div>
+          <WidgetIntegration assistantId={deployment.getAssistantid()} />
+          <DeploymentConfigurationPanel
+            deployment={deployment}
+            channelDetails={<WidgetConfiguration deployment={deployment} />}
+          />
+          <DeploymentAudioPanel
+            inputAudio={deployment.getInputaudio()}
+            outputAudio={deployment.getOutputaudio()}
+          />
         </Tabs>
       </div>
     </RightSideModal>
@@ -88,79 +60,52 @@ user: {
   return createPortal(modalContent, document.body);
 }
 
-const Row = DeploymentRow;
-const SectionHeader = DeploymentSectionHeader;
+function WidgetConfiguration({
+  deployment,
+}: {
+  deployment: AssistantWebpluginDeployment;
+}) {
+  const suggestions = deployment.getSuggestionList();
 
-interface DeploymentAudioProps {
-  deployment?: DeploymentAudioProvider;
-}
-
-function VoiceInput({ deployment }: DeploymentAudioProps) {
   return (
-    <>
-      <SectionHeader label="Speech to text" />
-      {deployment?.getAudiooptionsList() ? (
-        deployment?.getAudiooptionsList().length > 0 && (
-          <>
-            <Row label="Provider">
-              <ProviderPill provider={deployment?.getAudioprovider()} />
-            </Row>
-            {deployment
-              ?.getAudiooptionsList()
-              .filter(detail => detail.getValue())
-              .filter(detail => detail.getKey().startsWith('listen.'))
-              .map((detail, index) => (
-                <Row key={index} label={detail.getKey()}>
-                  <span className="text-sm font-mono text-gray-900 dark:text-gray-100 truncate max-w-[200px] text-right">
-                    {detail.getValue()}
-                  </span>
-                  <CopyButton className="h-6 w-6 shrink-0">
-                    {detail.getValue()}
-                  </CopyButton>
-                </Row>
-              ))}
-          </>
-        )
-      ) : (
-        <div className="px-4 py-3">
-          <YellowNoticeBlock>Voice input is not enabled</YellowNoticeBlock>
-        </div>
-      )}
-    </>
+    <section>
+      <DeploymentSectionHeader label="Widget settings" />
+      <DeploymentRow label="Name">
+        <span className="text-sm text-gray-900 dark:text-gray-100">
+          {deployment.getName() || 'Not configured'}
+        </span>
+      </DeploymentRow>
+      <DeploymentRow label="Suggested prompts" className="h-auto min-h-12 py-3">
+        <span className="max-w-[320px] break-words text-right text-sm text-gray-900 dark:text-gray-100">
+          {suggestions.length > 0 ? suggestions.join(', ') : 'Not configured'}
+        </span>
+      </DeploymentRow>
+      <FeatureRow
+        label="Help center"
+        enabled={deployment.getHelpcenterenabled()}
+      />
+      <FeatureRow
+        label="Product catalog"
+        enabled={deployment.getProductcatalogenabled()}
+      />
+      <FeatureRow
+        label="Article catalog"
+        enabled={deployment.getArticlecatalogenabled()}
+      />
+      <FeatureRow
+        label="File upload"
+        enabled={deployment.getUploadfileenabled()}
+      />
+    </section>
   );
 }
 
-function VoiceOutput({ deployment }: DeploymentAudioProps) {
+function FeatureRow({ label, enabled }: { label: string; enabled: boolean }) {
   return (
-    <>
-      <SectionHeader label="Text to speech" />
-      {deployment?.getAudiooptionsList() ? (
-        deployment?.getAudiooptionsList().length > 0 && (
-          <>
-            <Row label="Provider">
-              <ProviderPill provider={deployment?.getAudioprovider()} />
-            </Row>
-            {deployment
-              ?.getAudiooptionsList()
-              .filter(detail => detail.getValue())
-              .filter(detail => detail.getKey().startsWith('speak.'))
-              .map((detail, index) => (
-                <Row key={index} label={detail.getKey()}>
-                  <span className="text-sm font-mono text-gray-900 dark:text-gray-100 truncate max-w-[200px] text-right">
-                    {detail.getValue()}
-                  </span>
-                  <CopyButton className="h-6 w-6 shrink-0">
-                    {detail.getValue()}
-                  </CopyButton>
-                </Row>
-              ))}
-          </>
-        )
-      ) : (
-        <div className="px-4 py-3">
-          <YellowNoticeBlock>Voice output is not enabled</YellowNoticeBlock>
-        </div>
-      )}
-    </>
+    <DeploymentRow label={label}>
+      <span className="text-sm text-gray-900 dark:text-gray-100">
+        {enabled ? 'Enabled' : 'Disabled'}
+      </span>
+    </DeploymentRow>
   );
 }

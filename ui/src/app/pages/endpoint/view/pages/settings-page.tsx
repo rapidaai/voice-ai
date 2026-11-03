@@ -51,7 +51,7 @@ export function EndpointSettingsPage(props: { currentEndpoint: Endpoint }) {
   const { currentEndpoint } = props;
   const [userId, token, projectId] = useCredential();
   const { loading, showLoader, hideLoader } = useRapidaStore();
-  const { onShowEditTagVisible, onShowInstruction, onUpdateEndpointDetail } =
+  const { onShowEditTagVisible, onUpdateEndpointDetail } =
     useEndpointPageStore();
   const [name, setName] = useState(currentEndpoint.getName());
   const [description, setDescription] = useState(
@@ -183,17 +183,6 @@ export function EndpointSettingsPage(props: { currentEndpoint: Endpoint }) {
             onClick={() => onShowEditTagVisible(currentEndpoint)}
           >
             Edit tags
-          </TertiaryButton>
-        </div>
-      </InputGroup>
-
-      <InputGroup title="Instructions" childClass="opacity-100!">
-        <div className="flex max-w-2xl flex-col items-start gap-4">
-          <p className="text-sm text-[var(--cds-text-primary)]">
-            View the integration instructions for invoking this endpoint.
-          </p>
-          <TertiaryButton size="md" onClick={onShowInstruction}>
-            View instructions
           </TertiaryButton>
         </div>
       </InputGroup>

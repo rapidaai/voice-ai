@@ -44,6 +44,84 @@ test('endpoint overview summarizes logs and opens the simplified playground', as
     page.getByTestId('endpoint-request-performance-chart'),
   ).toBeVisible();
   await expect(page.getByText('Customer support analysis')).toBeVisible();
+  const integrationAction = page.getByRole('button', {
+    name: 'View integration',
+  });
+  const createVersionAction = page.getByRole('button', {
+    name: 'Create new version',
+  });
+  await expect(integrationAction).toBeVisible();
+  const integrationActionBounds = await integrationAction.boundingBox();
+  const createVersionActionBounds = await createVersionAction.boundingBox();
+  expect(integrationActionBounds).not.toBeNull();
+  expect(createVersionActionBounds).not.toBeNull();
+  expect(
+    Math.abs(
+      integrationActionBounds.x +
+        integrationActionBounds.width -
+        createVersionActionBounds.x,
+    ),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(integrationActionBounds.y - createVersionActionBounds.y),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(integrationActionBounds.height - createVersionActionBounds.height),
+  ).toBeLessThanOrEqual(1);
+
+  await integrationAction.click();
+  const integrationDialog = page.getByRole('dialog', {
+    name: 'Customer support analysis',
+  });
+  await expect(integrationDialog).toBeVisible();
+  const languageTabs = integrationDialog.getByRole('tablist', {
+    name: 'Endpoint integration languages',
+  });
+  await expect(languageTabs).toBeVisible();
+  const pythonTabBounds = await integrationDialog
+    .getByRole('tab', { name: 'Python' })
+    .boundingBox();
+  const typeScriptTabBounds = await integrationDialog
+    .getByRole('tab', { name: 'TypeScript' })
+    .boundingBox();
+  const golangTabBounds = await integrationDialog
+    .getByRole('tab', { name: 'Golang' })
+    .boundingBox();
+  expect(pythonTabBounds).not.toBeNull();
+  expect(typeScriptTabBounds).not.toBeNull();
+  expect(golangTabBounds).not.toBeNull();
+  expect(
+    Math.max(
+      pythonTabBounds.width,
+      typeScriptTabBounds.width,
+      golangTabBounds.width,
+    ) -
+      Math.min(
+        pythonTabBounds.width,
+        typeScriptTabBounds.width,
+        golangTabBounds.width,
+      ),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.max(pythonTabBounds.y, typeScriptTabBounds.y, golangTabBounds.y) -
+      Math.min(pythonTabBounds.y, typeScriptTabBounds.y, golangTabBounds.y),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.max(
+      pythonTabBounds.height,
+      typeScriptTabBounds.height,
+      golangTabBounds.height,
+    ) -
+      Math.min(
+        pythonTabBounds.height,
+        typeScriptTabBounds.height,
+        golangTabBounds.height,
+      ),
+  ).toBeLessThanOrEqual(1);
+  await integrationDialog.getByRole('tab', { name: 'TypeScript' }).click();
+  await expect(integrationDialog.getByText(/npm install/)).toBeVisible();
+  await integrationDialog.getByRole('button', { name: 'Close' }).click();
+  await expect(integrationDialog).toBeHidden();
   const overviewHeaderBounds = await page
     .getByTestId('endpoint-page-header')
     .boundingBox();
@@ -92,6 +170,9 @@ test('endpoint settings follows the assistant general settings pattern', async (
   await expect(
     page.getByRole('button', { name: 'Save changes' }),
   ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'View integration' }),
+  ).toHaveCount(0);
 });
 
 test('endpoint overview aligns the empty graph state with its header', async ({

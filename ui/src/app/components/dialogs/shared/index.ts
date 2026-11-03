@@ -3,6 +3,8 @@ export * from './confirm-delete';
 export { default as ConfirmDialog } from './confirm-ui';
 export * from './create-tag-modal';
 export * from './deployment-modal-primitives';
+export * from './deployment-audio-panel';
+export * from './deployment-configuration-panel';
 export * from './disconnect-details-modal';
 export * from './how-it-works-modal';
 export * from './message-feedback-modal';

@@ -1,52 +1,189 @@
-import {
-  type AssistantDebuggerDeployment,
-  type DeploymentAudioProvider,
+import type {
+  AssistantDebuggerDeployment,
+  DeploymentAudioProvider,
 } from '@rapidaai/react';
-import type { ModalProps } from '@/app/components/ui/primitives';
-import { RightSideModal } from '@/app/components/dialogs/shared';
-import { CopyButton } from '@/app/components/ui/primitives';
-import { YellowNoticeBlock } from '@/app/components/layout/container/message/notice-block';
-import { ProviderPill } from '@/app/components/domain/pills/provider-model-pill';
-import { useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
-  DeploymentRow,
-  DeploymentSectionHeader,
-} from '@/app/components/dialogs/shared';
-import { Tabs } from '@/app/components/ui/primitives';
+  Accordion,
+  AccordionItem,
+  ButtonSet,
+  StructuredListBody,
+  StructuredListCell,
+  StructuredListRow,
+  StructuredListWrapper,
+} from '@carbon/react';
+import {
+  Chat,
+  Edit,
+  Launch,
+  VoiceActivate,
+  VolumeUp,
+  type CarbonIconType,
+} from '@carbon/icons-react';
+import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { RightSideModal } from '@/app/components/dialogs/shared';
+import { RecordStatusIndicator } from '@/app/components/ui/feedback';
+import {
+  PrimaryButton,
+  SecondaryButton,
+  type ModalProps,
+} from '@/app/components/ui/primitives';
+import {
+  DEFAULT_IDEAL_TIMEOUT,
+  DEFAULT_IDLE_PROMPT_COUNT,
+  DEFAULT_MAX_SESSION_DURATION,
+  DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+} from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
+import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 
 interface AssistantDebugDeploymentDialogProps extends ModalProps {
   deployment: AssistantDebuggerDeployment;
 }
 
-export function AssistantDebugDeploymentDialog(
-  props: AssistantDebugDeploymentDialogProps,
-) {
-  const [selectedTab, setSelectedTab] = useState(0);
+interface DebuggerConfigurationOption {
+  id: string;
+  key: string;
+  label: string;
+  value: ReactNode;
+}
+
+export function AssistantDebugDeploymentDialog({
+  deployment,
+  modalOpen,
+  setModalOpen,
+}: AssistantDebugDeploymentDialogProps) {
+  const navigation = useGlobalNavigation();
+  const assistantId = deployment.getAssistantid();
+  const deploymentId = deployment.getId();
+  const inputAudio = deployment.getInputaudio();
+  const outputAudio = deployment.getOutputaudio();
+  const savedMaxSessionDuration = deployment.getMaxsessionduration();
+  const maxSessionDuration =
+    !savedMaxSessionDuration || savedMaxSessionDuration === '0'
+      ? DEFAULT_MAX_SESSION_DURATION
+      : savedMaxSessionDuration;
+  const idleTimeout = getEffectiveIdleTimeout(deployment.getIdealtimeout());
+  const idlePromptCount =
+    deployment.getIdealtimeoutbackoff() || DEFAULT_IDLE_PROMPT_COUNT;
+  const greetingInterruptible = deployment.hasGreetinginterruptible()
+    ? deployment.getGreetinginterruptible()
+    : true;
+  const unclearInputTimeout = deployment.hasUnclearinputtimeout?.()
+    ? deployment.getUnclearinputtimeout()
+    : Number(DEFAULT_UNCLEAR_INPUT_TIMEOUT);
+
+  const editConfiguration = () => {
+    setModalOpen(false);
+    navigation.goToEditDebugger(assistantId, deploymentId);
+  };
+
+  const openDebugger = () => {
+    setModalOpen(false);
+    navigation.goToAssistantPreview(assistantId);
+  };
+
+  const generalConfiguration: DebuggerConfigurationOption[] = [
+    {
+      id: 'status',
+      key: 'status',
+      label: 'Status',
+      value: (
+        <span className="flex justify-end">
+          <RecordStatusIndicator state={deployment.getStatus()} />
+        </span>
+      ),
+    },
+    {
+      id: 'greeting',
+      key: 'greeting',
+      label: 'Greeting',
+      value: deployment.getGreeting() || '—',
+    },
+    {
+      id: 'error-response',
+      key: 'mistake',
+      label: 'Error response',
+      value: deployment.getMistake() || '—',
+    },
+    {
+      id: 'maximum-session',
+      key: 'max_session_duration',
+      label: 'Maximum session',
+      value: formatSeconds(maxSessionDuration),
+    },
+    {
+      id: 'idle-timeout',
+      key: 'idle_timeout',
+      label: 'Idle timeout',
+      value: formatIdleTimeout(idleTimeout, idlePromptCount),
+    },
+    {
+      id: 'greeting-playback',
+      key: 'greeting_interruptible',
+      label: 'Greeting playback',
+      value: greetingInterruptible ? 'Interruptible' : 'Not interruptible',
+    },
+    {
+      id: 'unclear-input',
+      key: 'unclear_input_timeout',
+      label: 'Unclear input',
+      value: formatSeconds(unclearInputTimeout),
+    },
+  ];
 
   const modalContent = (
     <RightSideModal
-      modalOpen={props.modalOpen}
-      setModalOpen={props.setModalOpen}
-      className="w-[580px]"
-      label="Debugger Deployment"
-      title={props.deployment.getId()}
+      modalOpen={modalOpen}
+      setModalOpen={setModalOpen}
+      className="w-[480px] max-w-[calc(100vw-2rem)]"
+      label={deploymentId}
+      resizable={false}
+      title="Debugger"
     >
-      <div className="relative flex flex-col flex-1 min-h-0">
-        <Tabs
-          tabs={['Audio']}
-          selectedIndex={selectedTab}
-          onChange={setSelectedTab}
-          contained
-          fill
-          aria-label="Debugger deployment tabs"
-          panelClassName="overflow-auto p-0"
-        >
-          <div className="divide-y divide-gray-200 dark:divide-gray-800 w-full">
-            <VoiceInput deployment={props.deployment?.getInputaudio()} />
-            <VoiceOutput deployment={props.deployment?.getOutputaudio()} />
-          </div>
-        </Tabs>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-auto bg-[var(--cds-layer-01)]">
+          <Accordion
+            align="start"
+            aria-label="Debugger configuration"
+            className="debugger-configuration-accordion"
+            size="md"
+          >
+            <DebuggerConfigurationSection
+              icon={Chat}
+              label="General experience"
+              open
+              options={generalConfiguration}
+              summary={`${formatCompactSeconds(maxSessionDuration)} · ${formatCompactSeconds(
+                idleTimeout,
+              )} idle`}
+            />
+            <DebuggerConfigurationSection
+              icon={VoiceActivate}
+              label="Voice input"
+              options={getAudioConfiguration(inputAudio, 'listen.')}
+              summary={getAudioSummary(inputAudio, 'listen.')}
+            />
+            <DebuggerConfigurationSection
+              icon={VolumeUp}
+              label="Voice output"
+              options={getAudioConfiguration(outputAudio, 'speak.')}
+              summary={getAudioSummary(outputAudio, 'speak.')}
+            />
+          </Accordion>
+        </div>
+
+        <ButtonSet className="!w-full shrink-0 [&>button]:!max-w-none [&>button]:!flex-1">
+          <SecondaryButton
+            size="lg"
+            renderIcon={Edit}
+            onClick={editConfiguration}
+          >
+            Edit configuration
+          </SecondaryButton>
+          <PrimaryButton size="lg" renderIcon={Launch} onClick={openDebugger}>
+            Open debugger
+          </PrimaryButton>
+        </ButtonSet>
       </div>
     </RightSideModal>
   );
@@ -56,79 +193,144 @@ export function AssistantDebugDeploymentDialog(
   return createPortal(modalContent, document.body);
 }
 
-const Row = DeploymentRow;
-const SectionHeader = DeploymentSectionHeader;
-
-interface DeploymentAudioProps {
-  deployment?: DeploymentAudioProvider;
-}
-
-function VoiceInput({ deployment }: DeploymentAudioProps) {
+function DebuggerConfigurationSection({
+  icon: Icon,
+  label,
+  open = false,
+  options,
+  summary,
+}: {
+  icon: CarbonIconType;
+  label: string;
+  open?: boolean;
+  options: DebuggerConfigurationOption[];
+  summary: string;
+}) {
   return (
-    <>
-      <SectionHeader label="Speech to text" />
-      {deployment?.getAudiooptionsList() ? (
-        deployment?.getAudiooptionsList().length > 0 && (
-          <>
-            <Row label="Provider">
-              <ProviderPill provider={deployment?.getAudioprovider()} />
-            </Row>
-            {deployment
-              ?.getAudiooptionsList()
-              .filter(detail => detail.getValue())
-              .filter(detail => detail.getKey().startsWith('listen.'))
-              .map((detail, index) => (
-                <Row key={index} label={detail.getKey()}>
-                  <span className="text-sm font-mono text-gray-900 dark:text-gray-100 truncate max-w-[200px] text-right">
-                    {detail.getValue()}
-                  </span>
-                  <CopyButton className="h-6 w-6 shrink-0">
-                    {detail.getValue()}
-                  </CopyButton>
-                </Row>
-              ))}
-          </>
-        )
-      ) : (
-        <div className="px-4 py-3">
-          <YellowNoticeBlock>Voice input is not enabled</YellowNoticeBlock>
-        </div>
-      )}
-    </>
+    <AccordionItem
+      aria-label={`${label}, ${summary}`}
+      open={open}
+      title={
+        <span className="flex min-w-0 items-center gap-2">
+          <Icon
+            size={16}
+            className="shrink-0 text-[var(--cds-icon-secondary)]"
+          />
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--cds-text-primary)]">
+            {label}
+          </span>
+          <span className="max-w-36 shrink truncate text-xs text-[var(--cds-text-secondary)]">
+            {summary}
+          </span>
+        </span>
+      }
+    >
+      <StructuredListWrapper
+        aria-label={`${label} configuration`}
+        className="!mb-0 !w-full"
+        isCondensed
+        selection={false}
+      >
+        <StructuredListBody>
+          {options.map(option => (
+            <StructuredListRow key={option.id}>
+              <StructuredListCell className="!w-[48%] !py-2 !pl-4 !pr-2 align-top">
+                <span className="block text-sm text-[var(--cds-text-primary)]">
+                  {option.label}
+                </span>
+                <span className="block break-all font-mono text-[0.6875rem] leading-4 text-[var(--cds-text-helper)]">
+                  {option.key}
+                </span>
+              </StructuredListCell>
+              <StructuredListCell className="min-w-0 !py-2 !pl-2 !pr-4 align-top">
+                <div className="min-w-0 break-words pt-1.5 text-right text-sm text-[var(--cds-text-primary)]">
+                  {option.value}
+                </div>
+              </StructuredListCell>
+            </StructuredListRow>
+          ))}
+        </StructuredListBody>
+      </StructuredListWrapper>
+    </AccordionItem>
   );
 }
 
-function VoiceOutput({ deployment }: DeploymentAudioProps) {
-  return (
-    <>
-      <SectionHeader label="Text to speech" />
-      {deployment?.getAudiooptionsList() ? (
-        deployment?.getAudiooptionsList().length > 0 && (
-          <>
-            <Row label="Provider">
-              <ProviderPill provider={deployment?.getAudioprovider()} />
-            </Row>
-            {deployment
-              ?.getAudiooptionsList()
-              .filter(detail => detail.getValue())
-              .filter(detail => detail.getKey().startsWith('speak.'))
-              .map((detail, index) => (
-                <Row key={index} label={detail.getKey()}>
-                  <span className="text-sm font-mono text-gray-900 dark:text-gray-100 truncate max-w-[200px] text-right">
-                    {detail.getValue()}
-                  </span>
-                  <CopyButton className="h-6 w-6 shrink-0">
-                    {detail.getValue()}
-                  </CopyButton>
-                </Row>
-              ))}
-          </>
-        )
-      ) : (
-        <div className="px-4 py-3">
-          <YellowNoticeBlock>Voice output is not enabled</YellowNoticeBlock>
-        </div>
-      )}
-    </>
-  );
+function getAudioConfiguration(
+  audio: DeploymentAudioProvider | undefined,
+  optionPrefix: string,
+): DebuggerConfigurationOption[] {
+  if (!audio) {
+    return [{ id: 'status', key: 'status', label: 'Status', value: 'Off' }];
+  }
+
+  return [
+    {
+      id: 'provider',
+      key: 'provider',
+      label: 'Provider',
+      value: formatProviderName(audio.getAudioprovider()),
+    },
+    ...audio
+      .getAudiooptionsList()
+      .filter(option => option.getKey().startsWith(optionPrefix))
+      .map(option => ({
+        id: option.getKey(),
+        key: option.getKey(),
+        label: formatAudioOptionLabel(option.getKey()),
+        value: option.getValue() || '—',
+      })),
+  ];
+}
+
+function getAudioSummary(
+  audio: DeploymentAudioProvider | undefined,
+  optionPrefix: string,
+) {
+  if (!audio) return 'Off';
+
+  const firstOption = audio
+    .getAudiooptionsList()
+    .find(option => option.getKey().startsWith(optionPrefix))
+    ?.getValue();
+  return [formatProviderName(audio.getAudioprovider()), firstOption]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function formatSeconds(value: string | number) {
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? `${seconds} seconds` : 'Off';
+}
+
+function getEffectiveIdleTimeout(value: string) {
+  return !value || value === '0' ? DEFAULT_IDEAL_TIMEOUT : value;
+}
+
+function formatCompactSeconds(value: string | number) {
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? `${seconds} sec` : 'Off';
+}
+
+function formatIdleTimeout(timeout: string, reminderCount: string) {
+  const seconds = Number(timeout);
+  if (!Number.isFinite(seconds) || seconds <= 0) return 'Off';
+
+  const reminders = Number(reminderCount);
+  if (reminders === 0) return `${seconds} seconds · Unlimited`;
+
+  const reminderLabel = reminders === 1 ? 'reminder' : 'reminders';
+  return `${seconds} seconds · ${reminders} ${reminderLabel}`;
+}
+
+function formatAudioOptionLabel(key: string) {
+  if (key.includes('voice')) return 'Voice';
+  if (key.endsWith('model')) return 'Model';
+
+  const name = key.split('.').at(-1)?.replaceAll('_', ' ') || key;
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+}
+
+function formatProviderName(provider: string) {
+  if (!provider) return '—';
+  return `${provider.charAt(0).toUpperCase()}${provider.slice(1)}`;
 }

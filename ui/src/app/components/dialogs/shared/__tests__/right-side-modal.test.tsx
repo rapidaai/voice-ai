@@ -182,6 +182,18 @@ describe('RightSideModal', () => {
     expect(mockDragStart).toHaveBeenCalledTimes(1);
   });
 
+  it('can hide the custom resize affordance for Carbon-only content', () => {
+    render(
+      <RightSideModal modalOpen resizable={false} setModalOpen={jest.fn()}>
+        Drawer content
+      </RightSideModal>,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Resize drawer' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('closes the drawer after dragging past the close threshold', async () => {
     const setModalOpen = jest.fn();
     mockMotionValueGet.mockReturnValue(120);

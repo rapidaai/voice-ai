@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { AssistantPhoneCallDeploymentDialog } from '../assistant-phone-call-deployment-modal';
@@ -34,14 +35,23 @@ jest.mock('@/app/components/dialogs/shared', () => ({
 jest.mock('@/app/components/ui/primitives', () => ({
   CopyButton: ({ children }: any) => <button>{children}</button>,
   InputHelper: ({ children }: any) => <p>{children}</p>,
-  Tabs: ({ tabs, children, selectedIndex = 0 }: any) => (
-    <div>
-      {tabs.map((tab: string) => (
-        <button key={tab}>{tab}</button>
-      ))}
-      {Array.isArray(children) ? children[selectedIndex] : children}
-    </div>
-  ),
+  Tabs: ({ tabs, children, selectedIndex = 0, onChange }: any) => {
+    const React = require('react');
+    return (
+      <div>
+        <div role="tablist">
+          {tabs.map((tab: string, index: number) => (
+            <button role="tab" key={tab} onClick={() => onChange(index)}>
+              {tab}
+            </button>
+          ))}
+        </div>
+        {React.Children.map(children, (child, index) => (
+          <section hidden={selectedIndex !== index}>{child}</section>
+        ))}
+      </div>
+    );
+  },
 }));
 
 jest.mock('@/app/components/layout/container/message/notice-block', () => ({
@@ -51,6 +61,22 @@ jest.mock('@/app/components/layout/container/message/notice-block', () => ({
 jest.mock('@/app/components/domain/pills/provider-model-pill', () => ({
   ProviderPill: ({ provider }: any) => <span>{provider}</span>,
 }));
+
+jest.mock('@/app/components/domain/cards/rapida-credential-card', () => ({
+  RapidaCredentialCard: () => <div>Project credentials</div>,
+}));
+
+jest.mock(
+  '@/app/components/dialogs/shared/deployment-configuration-panel',
+  () => ({
+    DeploymentConfigurationPanel: ({ channelDetails }: any) => (
+      <div>
+        Saved deployment configuration
+        {channelDetails}
+      </div>
+    ),
+  }),
+);
 
 const metadata = (key: string, value: string) => ({
   getKey: () => key,
@@ -67,6 +93,7 @@ const phoneDeployment = (
   getPhoneoptionsList: () => phoneOptions,
   getInputaudio: () => undefined,
   getOutputaudio: () => undefined,
+  getStatus: () => 'ACTIVE',
 });
 
 describe('AssistantPhoneCallDeploymentDialog', () => {
@@ -104,5 +131,28 @@ describe('AssistantPhoneCallDeploymentDialog', () => {
       'wss://voice.client.example/v1/talk/asterisk/ctx/{contextId}',
     );
     expect(document.body.textContent).not.toMatch(/rapida/i);
+  });
+
+  it('separates setup, telephony configuration, and audio', async () => {
+    const user = userEvent.setup();
+    render(
+      <AssistantPhoneCallDeploymentDialog
+        modalOpen
+        setModalOpen={jest.fn()}
+        deployment={phoneDeployment('twilio') as any}
+      />,
+    );
+
+    expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual([
+      'Setup',
+      'Configuration',
+      'Audio',
+    ]);
+    expect(screen.getByText('Step 1')).toBeVisible();
+    expect(screen.getByText('Project credentials')).toBeVisible();
+
+    await user.click(screen.getByRole('tab', { name: 'Configuration' }));
+    expect(screen.getByText('Saved deployment configuration')).toBeVisible();
+    expect(screen.getByText('Telephony')).toBeVisible();
   });
 });

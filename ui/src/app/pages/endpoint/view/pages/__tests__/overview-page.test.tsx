@@ -7,6 +7,7 @@ import { EndpointOverviewPage } from '../overview-page';
 
 const mockNavigate = jest.fn();
 const mockListEndpointLogs = jest.fn();
+const mockOnShowInstruction = jest.fn();
 
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
@@ -18,6 +19,12 @@ jest.mock('@/hooks/use-credential', () => ({
 
 jest.mock('@/clients/endpoint.client', () => ({
   listEndpointLogs: (params: unknown) => mockListEndpointLogs(params),
+}));
+
+jest.mock('@/stores/endpoint', () => ({
+  useEndpointPageStore: () => ({
+    onShowInstruction: mockOnShowInstruction,
+  }),
 }));
 
 jest.mock('recharts', () => {
@@ -215,7 +222,7 @@ describe('EndpointOverviewPage', () => {
     expect(within(usageTile!).getByText('0')).toBeInTheDocument();
   });
 
-  it('opens the create version flow from the overview header', async () => {
+  it('opens integration instructions and the create version flow from adjacent header actions', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     render(
       <EndpointOverviewPage
@@ -224,9 +231,21 @@ describe('EndpointOverviewPage', () => {
       />,
     );
 
-    await user.click(
-      screen.getByRole('button', { name: 'Create new version' }),
-    );
+    const toolbar = screen.getByLabelText('Endpoint overview header actions');
+    const actions = within(toolbar).getAllByRole('button');
+    expect(actions).toHaveLength(2);
+    expect(actions[0]).toHaveAccessibleName('View integration');
+    expect(actions[0]).toHaveClass('cds--header__action');
+    expect(actions[0]).not.toHaveTextContent('View integration');
+    expect(actions[0].querySelector('svg')).toHaveAttribute('width', '20');
+    expect(actions[0].querySelector('svg')).toHaveAttribute('height', '20');
+    expect(actions[1]).toHaveAccessibleName('Create new version');
+    expect(actions[1]).toHaveClass('cds--btn--primary');
+
+    await user.click(actions[0]);
+    expect(mockOnShowInstruction).toHaveBeenCalledTimes(1);
+
+    await user.click(actions[1]);
     expect(mockNavigate).toHaveBeenCalledWith(
       '/deployment/endpoint/endpoint-1/create-endpoint-version',
     );
