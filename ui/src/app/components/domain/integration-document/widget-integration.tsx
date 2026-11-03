@@ -12,11 +12,13 @@ import { CONFIG } from '@/configs';
 interface WidgetIntegrationProps {
   assistantId: string;
   credentialCard?: ReactNode;
+  showDocumentationStep?: boolean;
 }
 
 export function WidgetIntegration({
   assistantId,
   credentialCard,
+  showDocumentationStep = true,
 }: WidgetIntegrationProps) {
   const documentationUrl = useDocumentationUrl();
   const resolvedAssistantId = assistantId || 'YOUR_ASSISTANT_ID';
@@ -70,19 +72,21 @@ window.chatbotConfig = {
         />
       </IntegrationStep>
 
-      <IntegrationStep
-        number={4}
-        title="Customize the experience"
-        description="Review the widget reference for supported layouts, themes, and launcher options."
-      >
-        <Button
-          kind="tertiary"
-          renderIcon={Launch}
-          onClick={() => window.open(documentationUrl, '_blank')}
+      {showDocumentationStep && (
+        <IntegrationStep
+          number={4}
+          title="Customize the experience"
+          description="Review the widget reference for supported layouts, themes, and launcher options."
         >
-          View documentation
-        </Button>
-      </IntegrationStep>
+          <Button
+            kind="tertiary"
+            renderIcon={Launch}
+            onClick={() => window.open(documentationUrl, '_blank')}
+          >
+            View documentation
+          </Button>
+        </IntegrationStep>
+      )}
     </div>
   );
 }

@@ -1,6 +1,12 @@
 import type { AssistantWebpluginDeployment } from '@rapidaai/react';
+import { ButtonSet } from '@carbon/react';
+import { Launch } from '@carbon/icons-react';
 import type { ModalProps } from '@/app/components/ui/primitives';
-import { Tabs } from '@/app/components/ui/primitives';
+import {
+  PrimaryButton,
+  SecondaryButton,
+  Tabs,
+} from '@/app/components/ui/primitives';
 import { RightSideModal } from '@/app/components/dialogs/shared';
 import { DeploymentAudioPanel } from '@/app/components/dialogs/shared/deployment-audio-panel';
 import { DeploymentConfigurationPanel } from '@/app/components/dialogs/shared/deployment-configuration-panel';
@@ -9,6 +15,7 @@ import {
   DeploymentSectionHeader,
 } from '@/app/components/dialogs/shared';
 import { WidgetIntegration } from '@/app/components/domain/integration-document/widget-integration';
+import { useDocumentationUrl } from '@/theme/documentation-url';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -22,6 +29,7 @@ export function AssistantWebWidgetlDeploymentDialog({
   setModalOpen,
 }: AssistantWebWidgetlDeploymentDialogProps) {
   const [selectedTab, setSelectedTab] = useState(0);
+  const documentationUrl = useDocumentationUrl();
   const modalContent = (
     <RightSideModal
       modalOpen={modalOpen}
@@ -41,7 +49,10 @@ export function AssistantWebWidgetlDeploymentDialog({
           aria-label="Web widget deployment tabs"
           panelClassName="overflow-auto !p-0"
         >
-          <WidgetIntegration assistantId={deployment.getAssistantid()} />
+          <WidgetIntegration
+            assistantId={deployment.getAssistantid()}
+            showDocumentationStep={false}
+          />
           <DeploymentConfigurationPanel
             deployment={deployment}
             channelDetails={<WidgetConfiguration deployment={deployment} />}
@@ -51,6 +62,21 @@ export function AssistantWebWidgetlDeploymentDialog({
             outputAudio={deployment.getOutputaudio()}
           />
         </Tabs>
+        <ButtonSet
+          aria-label="Web widget deployment actions"
+          className="!w-full shrink-0 [&>button]:!max-w-none [&>button]:!flex-1"
+        >
+          <SecondaryButton size="lg" onClick={() => setModalOpen(false)}>
+            Close
+          </SecondaryButton>
+          <PrimaryButton
+            size="lg"
+            renderIcon={Launch}
+            onClick={() => window.open(documentationUrl, '_blank')}
+          >
+            View documentation
+          </PrimaryButton>
+        </ButtonSet>
       </div>
     </RightSideModal>
   );

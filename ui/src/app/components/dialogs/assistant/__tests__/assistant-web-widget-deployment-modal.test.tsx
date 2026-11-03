@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
@@ -42,6 +42,14 @@ jest.mock('@rapidaai/react', () => {
   return { AssistantWebpluginDeployment };
 });
 
+jest.mock('@carbon/react', () => ({
+  ButtonSet: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+}));
+
+jest.mock('@carbon/icons-react', () => ({
+  Launch: () => <svg data-testid="launch-icon" />,
+}));
+
 jest.mock('@/app/components/dialogs/shared', () => ({
   RightSideModal: ({ children, className, label, title }: any) => (
     <section className={className} data-testid="widget-details-drawer">
@@ -60,6 +68,12 @@ jest.mock('@/app/components/dialogs/shared', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives', () => ({
+  PrimaryButton: ({ children, onClick }: any) => (
+    <button onClick={onClick}>{children}</button>
+  ),
+  SecondaryButton: ({ children, onClick }: any) => (
+    <button onClick={onClick}>{children}</button>
+  ),
   Tabs: (props: any) => {
     const React = require('react');
     return (
@@ -90,11 +104,17 @@ jest.mock('@/app/components/ui/primitives', () => ({
 jest.mock(
   '@/app/components/domain/integration-document/widget-integration',
   () => ({
-    WidgetIntegration: ({ assistantId }: any) => (
-      <div>Widget integration for {assistantId}</div>
+    WidgetIntegration: ({ assistantId, showDocumentationStep }: any) => (
+      <div data-show-documentation-step={String(showDocumentationStep)}>
+        Widget integration for {assistantId}
+      </div>
     ),
   }),
 );
+
+jest.mock('@/theme/documentation-url', () => ({
+  useDocumentationUrl: () => 'https://docs.example.test',
+}));
 
 jest.mock('@/app/components/dialogs/shared/deployment-audio-panel', () => ({
   DeploymentAudioPanel: () => <div>Deployment audio panel</div>,
@@ -113,6 +133,16 @@ jest.mock(
 );
 
 describe('AssistantWebWidgetlDeploymentDialog', () => {
+  const originalOpen = window.open;
+
+  beforeEach(() => {
+    window.open = jest.fn();
+  });
+
+  afterEach(() => {
+    window.open = originalOpen;
+  });
+
   it('uses full-width Carbon tabs for setup, configuration, and audio', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     const { AssistantWebpluginDeployment } =
@@ -151,5 +181,41 @@ describe('AssistantWebWidgetlDeploymentDialog', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Audio' }));
     expect(screen.getByText('Deployment audio panel')).toBeVisible();
+  });
+
+  it('keeps documentation and close actions in the bottom Carbon action set', async () => {
+    const user = userEvent.setup();
+    const setModalOpen = jest.fn();
+    const { AssistantWebpluginDeployment } =
+      jest.requireMock('@rapidaai/react');
+
+    render(
+      <AssistantWebWidgetlDeploymentDialog
+        modalOpen
+        setModalOpen={setModalOpen}
+        deployment={new AssistantWebpluginDeployment()}
+      />,
+    );
+
+    expect(
+      screen.getByText('Widget integration for assistant-123'),
+    ).toHaveAttribute('data-show-documentation-step', 'false');
+    const actions = screen.getByLabelText('Web widget deployment actions');
+    expect(
+      within(actions)
+        .getAllByRole('button')
+        .map(button => button.textContent),
+    ).toEqual(['Close', 'View documentation']);
+
+    await user.click(within(actions).getByRole('button', { name: 'Close' }));
+    expect(setModalOpen).toHaveBeenCalledWith(false);
+
+    await user.click(
+      within(actions).getByRole('button', { name: 'View documentation' }),
+    );
+    expect(window.open).toHaveBeenCalledWith(
+      'https://docs.example.test',
+      '_blank',
+    );
   });
 });

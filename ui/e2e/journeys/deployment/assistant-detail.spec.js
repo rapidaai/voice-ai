@@ -103,16 +103,11 @@ for (const colorMode of ['light', 'dark']) {
       await expect(page.getByRole('tooltip')).toBeHidden();
       await page.evaluate(() => document.fonts.ready);
       await expect(drawer).toHaveScreenshot(
-        [
-          'assistant',
-          deployment.folder,
-          'success',
-          `lg-${colorMode}.png`,
-        ],
+        ['assistant', deployment.folder, 'success', `lg-${colorMode}.png`],
         { animations: 'disabled', maxDiffPixelRatio: 0.01 },
       );
 
-      await drawer.getByRole('button', { name: 'Close' }).click();
+      await drawer.getByLabel('Close').click();
       await expect(drawer).toBeHidden();
     }
   });
@@ -148,7 +143,12 @@ test('web widget deployment details use the shared integration design', async ({
   await expect(drawer.getByText('Step 1')).toBeVisible();
   await expect(drawer.getByText('Step 2')).toBeVisible();
   await expect(drawer.getByText('Step 3')).toBeVisible();
-  await expect(drawer.getByText('Step 4')).toBeVisible();
+  await expect(drawer.getByText('Step 4')).toHaveCount(0);
+  const actions = drawer.getByLabel('Web widget deployment actions');
+  await expect(actions.getByRole('button', { name: 'Close' })).toBeVisible();
+  await expect(
+    actions.getByRole('button', { name: 'View documentation' }),
+  ).toBeVisible();
   await expect(
     drawer.getByRole('heading', { name: 'Choose a project credential' }),
   ).toBeVisible();
