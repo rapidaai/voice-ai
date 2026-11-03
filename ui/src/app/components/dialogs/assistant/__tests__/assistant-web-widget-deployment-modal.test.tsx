@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { AssistantWebWidgetlDeploymentDialog } from '../assistant-web-widget-deployment-modal';
@@ -18,22 +19,32 @@ jest.mock('@rapidaai/react', () => {
     getOutputaudio() {
       return undefined;
     }
+    getName() {
+      return 'Website assistant';
+    }
+    getSuggestionList() {
+      return ['Track my order'];
+    }
+    getHelpcenterenabled() {
+      return true;
+    }
+    getProductcatalogenabled() {
+      return false;
+    }
+    getArticlecatalogenabled() {
+      return false;
+    }
+    getUploadfileenabled() {
+      return true;
+    }
   }
 
   return { AssistantWebpluginDeployment };
 });
 
-jest.mock('@/configs', () => ({
-  CONFIG: {
-    deployment: {
-      webWidgetScriptUrl: 'https://assets.client.example/widget/app.min.js',
-    },
-  },
-}));
-
 jest.mock('@/app/components/dialogs/shared', () => ({
-  RightSideModal: ({ children, label, title }: any) => (
-    <section>
+  RightSideModal: ({ children, className, label, title }: any) => (
+    <section className={className} data-testid="widget-details-drawer">
       <div>{label}</div>
       <h2>{title}</h2>
       {children}
@@ -41,7 +52,7 @@ jest.mock('@/app/components/dialogs/shared', () => ({
   ),
   DeploymentRow: ({ children, label }: any) => (
     <div>
-      <span>{label}</span>
+      {label}
       {children}
     </div>
   ),
@@ -49,31 +60,61 @@ jest.mock('@/app/components/dialogs/shared', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives', () => ({
-  CopyButton: ({ children }: any) => <button>{children}</button>,
-  Tabs: ({ tabs, children, selectedIndex = 0 }: any) => (
-    <div>
-      {tabs.map((tab: string) => (
-        <button key={tab}>{tab}</button>
-      ))}
-      {Array.isArray(children) ? children[selectedIndex] : children}
-    </div>
-  ),
+  Tabs: (props: any) => {
+    const React = require('react');
+    return (
+      <div
+        data-contained={String(Boolean(props.contained))}
+        data-full-width={String(Boolean(props.fullWidth))}
+      >
+        <div role="tablist" aria-label={props['aria-label']}>
+          {props.tabs.map((tab: string, index: number) => (
+            <button
+              key={tab}
+              role="tab"
+              aria-selected={props.selectedIndex === index}
+              onClick={() => props.onChange(index)}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        {React.Children.map(props.children, (child, index) => (
+          <section hidden={props.selectedIndex !== index}>{child}</section>
+        ))}
+      </div>
+    );
+  },
 }));
 
-jest.mock('@/app/components/ui/editor/code-highlighting', () => ({
-  CodeHighlighting: ({ code }: any) => <pre>{code}</pre>,
+jest.mock(
+  '@/app/components/domain/integration-document/widget-integration',
+  () => ({
+    WidgetIntegration: ({ assistantId }: any) => (
+      <div>Widget integration for {assistantId}</div>
+    ),
+  }),
+);
+
+jest.mock('@/app/components/dialogs/shared/deployment-audio-panel', () => ({
+  DeploymentAudioPanel: () => <div>Deployment audio panel</div>,
 }));
 
-jest.mock('@/app/components/layout/container/message/notice-block', () => ({
-  YellowNoticeBlock: ({ children }: any) => <div>{children}</div>,
-}));
-
-jest.mock('@/app/components/domain/pills/provider-model-pill', () => ({
-  ProviderPill: ({ provider }: any) => <span>{provider}</span>,
-}));
+jest.mock(
+  '@/app/components/dialogs/shared/deployment-configuration-panel',
+  () => ({
+    DeploymentConfigurationPanel: ({ channelDetails }: any) => (
+      <div>
+        Saved deployment configuration
+        {channelDetails}
+      </div>
+    ),
+  }),
+);
 
 describe('AssistantWebWidgetlDeploymentDialog', () => {
-  it('shows tenant-neutral web widget snippets when viewing deployments', () => {
+  it('uses full-width Carbon tabs for setup, configuration, and audio', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     const { AssistantWebpluginDeployment } =
       jest.requireMock('@rapidaai/react');
 
@@ -85,16 +126,30 @@ describe('AssistantWebWidgetlDeploymentDialog', () => {
       />,
     );
 
-    const snippetText = screen
-      .getAllByText((_, node) => node?.tagName === 'PRE')
-      .map(snippet => snippet.textContent)
-      .join('\n');
-
-    expect(snippetText).toContain(
-      'https://assets.client.example/widget/app.min.js',
+    expect(screen.getByTestId('widget-details-drawer')).toHaveClass(
+      'w-[580px]',
+      'max-w-[calc(100vw-2rem)]',
     );
-    expect(snippetText).toContain('assistant_id: "assistant-123"');
-    expect(snippetText).toContain('token: "{PROJECT_KEY}"');
-    expect(snippetText).not.toMatch(/rapida/i);
+    const tabList = screen.getByRole('tablist', {
+      name: 'Web widget deployment tabs',
+    });
+    expect(tabList.parentElement).toHaveAttribute('data-contained', 'true');
+    expect(tabList.parentElement).toHaveAttribute('data-full-width', 'true');
+    expect(
+      screen.getByText('Widget integration for assistant-123'),
+    ).toBeVisible();
+
+    expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual([
+      'Setup',
+      'Configuration',
+      'Audio',
+    ]);
+
+    await user.click(screen.getByRole('tab', { name: 'Configuration' }));
+    expect(screen.getByText('Saved deployment configuration')).toBeVisible();
+    expect(screen.getByText('Website assistant')).toBeVisible();
+
+    await user.click(screen.getByRole('tab', { name: 'Audio' }));
+    expect(screen.getByText('Deployment audio panel')).toBeVisible();
   });
 });

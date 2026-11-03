@@ -359,6 +359,12 @@
   }
 }
 
+.text-provider-combo-row {
+  .cds--combo-box .cds--text-input {
+    border-block-end: none;
+  }
+}
+
 .domain-connected-dropdown-row {
   min-block-size: 2.5rem;
 

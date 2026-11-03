@@ -5,69 +5,38 @@ import '@testing-library/jest-dom';
 
 import { AssistantWebwidgetDeploymentDialog } from '../assistant-instruction-modal';
 
-jest.mock('@/app/components/ui/primitives/modal', () => ({
-  Modal: ({ open, children }: any) => (open ? <div>{children}</div> : null),
-  ModalHeader: ({ title, children }: any) => (
-    <header>
-      <h2>{title}</h2>
-      {children}
-    </header>
-  ),
-  ModalBody: ({ children }: any) => <main>{children}</main>,
-  ModalFooter: ({ children }: any) => <footer>{children}</footer>,
-}));
-
-jest.mock('@/app/components/ui/primitives/button', () => ({
-  PrimaryButton: ({ children, renderIcon: Icon, ...props }: any) => (
-    <button {...props}>
-      {children}
-      {Icon ? <Icon /> : null}
-    </button>
-  ),
-  SecondaryButton: ({ children, ...props }: any) => (
-    <button {...props}>{children}</button>
-  ),
-}));
-
-jest.mock('@carbon/icons-react', () => ({
-  Launch: () => <svg data-testid="documentation-icon" />,
-}));
-
-jest.mock('@/app/components/ui/editor/code-highlighting', () => ({
-  CodeHighlighting: ({ code }: any) => <pre>{code}</pre>,
+jest.mock('@/app/components/dialogs/shared', () => ({
+  RightSideModal: ({
+    children,
+    className,
+    label,
+    modalOpen,
+    setModalOpen,
+    title,
+  }: any) =>
+    modalOpen ? (
+      <aside className={className} data-testid="widget-instruction-drawer">
+        <span>{label}</span>
+        <h2>{title}</h2>
+        <button type="button" onClick={() => setModalOpen(false)}>
+          Close
+        </button>
+        {children}
+      </aside>
+    ) : null,
 }));
 
 jest.mock(
-  '@/app/components/dialogs/shared/deployment-modal-primitives',
+  '@/app/components/domain/integration-document/widget-integration',
   () => ({
-    DeploymentSectionHeader: ({ label }: any) => <h3>{label}</h3>,
+    WidgetIntegration: ({ assistantId }: any) => (
+      <section>Widget integration for {assistantId}</section>
+    ),
   }),
 );
 
-jest.mock('@/theme/documentation-url', () => ({
-  useDocumentationUrl: () => 'https://docs.example.test',
-}));
-
-jest.mock('@/configs', () => ({
-  CONFIG: {
-    deployment: {
-      webWidgetScriptUrl: 'https://assets.client.example/widget/app.min.js',
-    },
-  },
-}));
-
 describe('AssistantWebwidgetDeploymentDialog', () => {
-  const originalOpen = window.open;
-
-  beforeEach(() => {
-    window.open = jest.fn();
-  });
-
-  afterEach(() => {
-    window.open = originalOpen;
-  });
-
-  it('renders deployment snippets with the assistant id', () => {
+  it('uses the shared responsive deployment drawer and integration document', () => {
     render(
       <AssistantWebwidgetDeploymentDialog
         modalOpen
@@ -76,59 +45,20 @@ describe('AssistantWebwidgetDeploymentDialog', () => {
       />,
     );
 
+    expect(screen.getByTestId('widget-instruction-drawer')).toHaveClass(
+      'w-[580px]',
+      'max-w-[calc(100vw-2rem)]',
+    );
+    expect(screen.getByText('Web Widget Deployment')).toBeInTheDocument();
+    expect(screen.getByText('Deployment completed')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Deployment completed' }),
+      screen.getByText('Widget integration for assistant-123'),
     ).toBeInTheDocument();
-    expect(screen.getByText(/app.min.js/)).toBeInTheDocument();
-    expect(screen.getByText(/assistant-123/)).toBeInTheDocument();
   });
 
-  it('keeps web widget snippets tenant neutral', () => {
-    render(
-      <AssistantWebwidgetDeploymentDialog
-        modalOpen
-        setModalOpen={jest.fn()}
-        assistantId="assistant-123"
-      />,
-    );
-
-    const snippets = screen.getAllByText((_, node) => node?.tagName === 'PRE');
-    const snippetText = snippets.map(snippet => snippet.textContent).join('\n');
-
-    expect(snippetText).toContain(
-      'https://assets.client.example/widget/app.min.js',
-    );
-    expect(snippetText).toContain('token: "{PROJECT_KEY}"');
-    expect(snippetText).not.toMatch(/rapida/i);
-  });
-
-  it('opens documentation with the standard action icon', async () => {
-    const user = userEvent.setup({ writeToClipboard: false });
-    render(
-      <AssistantWebwidgetDeploymentDialog
-        modalOpen
-        setModalOpen={jest.fn()}
-        assistantId="assistant-123"
-      />,
-    );
-
-    const documentationButton = screen.getByRole('button', {
-      name: 'View Documentation',
-    });
-    expect(screen.getByTestId('documentation-icon')).toBeInTheDocument();
-
-    await user.click(documentationButton);
-
-    expect(window.open).toHaveBeenCalledWith(
-      'https://docs.example.test',
-      '_blank',
-    );
-  });
-
-  it('closes from the secondary action', async () => {
+  it('closes through the platform drawer action', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     const setModalOpen = jest.fn();
-
     render(
       <AssistantWebwidgetDeploymentDialog
         modalOpen
@@ -138,7 +68,6 @@ describe('AssistantWebwidgetDeploymentDialog', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Close' }));
-
     expect(setModalOpen).toHaveBeenCalledWith(false);
   });
 });

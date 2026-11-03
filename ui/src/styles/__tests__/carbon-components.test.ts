@@ -32,4 +32,21 @@ describe('Carbon component styles', () => {
     expect(carbonStyles).toContain('padding-inline: 0;');
     expect(carbonStyles).toContain('padding-block: 0;');
   });
+
+  it('keeps connected provider model controls on one bottom border', () => {
+    const carbonStyles = readFileSync(
+      resolve(process.cwd(), 'src/styles/carbon.scss'),
+      'utf8',
+    );
+    const connectedProviderStyles = carbonStyles.match(
+      /\.text-provider-combo-row,\s*\.domain-connected-dropdown-row\s*\{([\s\S]*?)\n\}/,
+    )?.[1];
+
+    expect(connectedProviderStyles).toMatch(
+      /\.cds--dropdown,\s*\.cds--list-box,\s*\.cds--list-box__field\s*\{[\s\S]*?border: none;/,
+    );
+    expect(carbonStyles).toMatch(
+      /\.text-provider-combo-row\s*\{\s*\.cds--combo-box \.cds--text-input\s*\{\s*border-block-end: none;/,
+    );
+  });
 });

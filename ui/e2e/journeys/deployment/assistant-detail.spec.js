@@ -8,10 +8,177 @@ const {
 } = require('../../fixtures');
 const {
   ASSISTANT_CONVERSATION_DETAIL_PATH,
+  mockPopulatedAssistantDeployments,
 } = require('../../mocks/clients/assistant');
 const { routeJourneys } = require('../../route-manifest');
 
 const journey = id => routeJourneys.find(candidate => candidate.id === id);
+
+const deploymentDetailScreenshots = [
+  {
+    name: 'SDK / API',
+    dialogName: '2301664620831573002',
+    folder: 'api-details',
+  },
+  {
+    name: 'Web Widget',
+    dialogName: '2301664620831573004',
+    folder: 'widget-details',
+  },
+  {
+    name: 'Phone Call',
+    dialogName: '2301664620831573003',
+    folder: 'phone-details',
+  },
+];
+
+for (const colorMode of ['light', 'dark']) {
+  test(`debugger deployment uses one Carbon detail surface in ${colorMode} mode`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setColorMode(page, colorMode);
+    await authenticatePage(page);
+    await mockPopulatedAssistantDeployments(page);
+    await page.goto('/deployment/assistant/2301664620831571968/deployment');
+
+    const debuggerRow = page.getByRole('row', { name: /Debugger/ });
+    await debuggerRow
+      .getByRole('button', { name: 'Actions for Debugger' })
+      .click();
+    await page.getByText('View deployment details', { exact: true }).click();
+
+    const drawer = page.getByRole('dialog', { name: 'Debugger' });
+    await expect(drawer).toBeVisible();
+    await expect(
+      page.getByText('Edit deployment', { exact: true }),
+    ).toBeHidden();
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.mouse.move(0, 0);
+    await expect(page.getByRole('tooltip')).toBeHidden();
+    await expect(drawer.getByLabel('Debugger configuration')).toBeVisible();
+    await expect(drawer.getByText('Hello, how can I help?')).toBeVisible();
+    await expect(drawer.getByText('Deepgram · nova-3')).toBeVisible();
+    await expect(drawer.getByText('Cartesia · sonic-2')).toBeVisible();
+    await expect(drawer.getByRole('tablist')).toHaveCount(0);
+    await expect(
+      drawer.getByRole('button', { name: 'Edit configuration' }),
+    ).toBeVisible();
+    await expect(
+      drawer.getByRole('button', { name: 'Open debugger' }),
+    ).toBeVisible();
+
+    await page.evaluate(() => document.fonts.ready);
+    await expect(drawer).toHaveScreenshot(
+      ['assistant', 'debugger-details', 'success', `lg-${colorMode}.png`],
+      { animations: 'disabled', maxDiffPixelRatio: 0.01 },
+    );
+  });
+
+  test(`other deployment detail drawers retain ${colorMode} screenshots`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setColorMode(page, colorMode);
+    await authenticatePage(page);
+    await mockPopulatedAssistantDeployments(page);
+    await page.goto('/deployment/assistant/2301664620831571968/deployment');
+
+    for (const deployment of deploymentDetailScreenshots) {
+      const row = page.getByRole('row', { name: deployment.name });
+      await row
+        .getByRole('button', { name: `Actions for ${deployment.name}` })
+        .click();
+      await page.getByText('View deployment details', { exact: true }).click();
+
+      const drawer = page.getByRole('dialog', {
+        name: deployment.dialogName,
+      });
+      await expect(drawer).toBeVisible();
+      await expect(
+        page.getByText('Edit deployment', { exact: true }),
+      ).toBeHidden();
+      await page.evaluate(() => document.activeElement?.blur());
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole('tooltip')).toBeHidden();
+      await page.evaluate(() => document.fonts.ready);
+      await expect(drawer).toHaveScreenshot(
+        [
+          'assistant',
+          deployment.folder,
+          'success',
+          `lg-${colorMode}.png`,
+        ],
+        { animations: 'disabled', maxDiffPixelRatio: 0.01 },
+      );
+
+      await drawer.getByRole('button', { name: 'Close' }).click();
+      await expect(drawer).toBeHidden();
+    }
+  });
+}
+
+test('web widget deployment details use the shared integration design', async ({
+  page,
+}) => {
+  await authenticatePage(page);
+  await mockPopulatedAssistantDeployments(page);
+  await page.goto('/deployment/assistant/2301664620831571968/deployment');
+  await expect(page.getByText('vrsn_2301664620831573004')).toBeVisible();
+
+  const widgetRow = page.getByRole('row', { name: /Web Widget/ });
+  await widgetRow
+    .getByRole('button', { name: 'Actions for Web Widget' })
+    .click();
+  await page.getByText('View deployment details', { exact: true }).click();
+
+  const drawer = page.getByRole('dialog', {
+    name: '2301664620831573004',
+  });
+  await expect(drawer).toBeVisible();
+  const tabList = drawer.getByRole('tablist', {
+    name: 'Web widget deployment tabs',
+  });
+  const setupTab = drawer.getByRole('tab', { name: 'Setup' });
+  const configurationTab = drawer.getByRole('tab', {
+    name: 'Configuration',
+  });
+  const audioTab = drawer.getByRole('tab', { name: 'Audio' });
+  await expect(tabList).toBeVisible();
+  await expect(drawer.getByText('Step 1')).toBeVisible();
+  await expect(drawer.getByText('Step 2')).toBeVisible();
+  await expect(drawer.getByText('Step 3')).toBeVisible();
+  await expect(drawer.getByText('Step 4')).toBeVisible();
+  await expect(
+    drawer.getByRole('heading', { name: 'Choose a project credential' }),
+  ).toBeVisible();
+
+  const setupBounds = await setupTab.boundingBox();
+  const configurationBounds = await configurationTab.boundingBox();
+  const audioBounds = await audioTab.boundingBox();
+  expect(setupBounds).not.toBeNull();
+  expect(configurationBounds).not.toBeNull();
+  expect(audioBounds).not.toBeNull();
+  expect(Math.abs(setupBounds.width - audioBounds.width)).toBeLessThanOrEqual(
+    1,
+  );
+  expect(
+    Math.abs(configurationBounds.width - audioBounds.width),
+  ).toBeLessThanOrEqual(1);
+
+  await configurationTab.click();
+  await expect(drawer.getByText('Session settings')).toBeVisible();
+  await expect(drawer.getByText('Widget settings')).toBeVisible();
+  await expect(drawer.getByText('300 seconds')).toBeVisible();
+  await expect(drawer.getByText('10 seconds')).toBeVisible();
+  await expect(drawer.getByText('Interruptible')).toBeVisible();
+  await expect(drawer.getByText('2 seconds')).toBeVisible();
+
+  await audioTab.click();
+  await expect(drawer.getByText('Voice configuration')).toBeVisible();
+  await expect(drawer.getByText('Input provider')).toBeVisible();
+  await expect(drawer.getByText('Output provider')).toBeVisible();
+});
 
 test('populated assistant journeys expose overview, sessions, versions, and settings', async ({
   page,

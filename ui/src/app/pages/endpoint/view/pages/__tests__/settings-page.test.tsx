@@ -7,7 +7,6 @@ import { EndpointSettingsPage } from '../settings-page';
 
 const mockHideLoader = jest.fn();
 const mockOnShowEditTagVisible = jest.fn();
-const mockOnShowInstruction = jest.fn();
 const mockOnUpdateEndpointDetail = jest.fn();
 const mockShowLoader = jest.fn();
 const mockToastSuccess = jest.fn();
@@ -27,7 +26,6 @@ jest.mock('@/stores/app', () => ({
 jest.mock('@/stores/endpoint', () => ({
   useEndpointPageStore: () => ({
     onShowEditTagVisible: mockOnShowEditTagVisible,
-    onShowInstruction: mockOnShowInstruction,
     onUpdateEndpointDetail: mockOnUpdateEndpointDetail,
   }),
 }));
@@ -106,14 +104,16 @@ describe('EndpointSettingsPage', () => {
     );
   });
 
-  it('keeps endpoint actions in settings and rejects an empty name', async () => {
+  it('keeps settings focused on endpoint metadata and rejects an empty name', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     render(<EndpointSettingsPage currentEndpoint={currentEndpoint} />);
 
     await user.click(screen.getByRole('button', { name: 'Edit tags' }));
-    await user.click(screen.getByRole('button', { name: 'View instructions' }));
     expect(mockOnShowEditTagVisible).toHaveBeenCalledWith(currentEndpoint);
-    expect(mockOnShowInstruction).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole('button', { name: 'View integration' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Instructions')).not.toBeInTheDocument();
 
     await user.click(screen.getByDisplayValue('Customer support analysis'));
     await user.keyboard('{Control>}a{/Control}');

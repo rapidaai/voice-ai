@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { EndpointIntegration } from '../endpoint-integration';
 
@@ -17,16 +18,64 @@ jest.mock('@carbon/react', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives', () => ({
-  Tab: ({ active, className, tabs }: any) => (
+  Tab: ({ active, children, className, tabs }: any) => (
     <div className={className} data-active-tab={active}>
+      <div role="tablist" aria-label="Tabs">
+        {tabs.map((tab: any) => (
+          <button key={tab.label} role="tab" type="button">
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      {children}
       {tabs.map((tab: any) => (
         <section aria-label={`${tab.label} panel`} key={tab.label}>
-          <h2>{tab.label}</h2>
           {tab.element}
         </section>
       ))}
     </div>
   ),
+  Tabs: (props: any) => {
+    const React = require('react');
+    const {
+      children,
+      className,
+      contained,
+      fullWidth,
+      onChange,
+      selectedIndex,
+      tabs,
+    } = props;
+    return (
+      <div
+        className={className}
+        data-contained={String(Boolean(contained))}
+        data-full-width={String(Boolean(fullWidth))}
+      >
+        <div role="tablist" aria-label={props['aria-label']}>
+          {tabs.map((label: string, index: number) => (
+            <button
+              aria-selected={selectedIndex === index}
+              key={label}
+              onClick={() => onChange(index)}
+              role="tab"
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {React.Children.map(children, (child, index) => (
+          <section
+            aria-label={`${tabs[index]} panel`}
+            hidden={selectedIndex !== index}
+          >
+            {child}
+          </section>
+        ))}
+      </div>
+    );
+  },
 }));
 
 jest.mock('@/app/components/domain/cards/rapida-credential-card', () => ({
@@ -54,7 +103,8 @@ const makeEndpoint = (epm?: any) => ({
 });
 
 describe('EndpointIntegration', () => {
-  it('renders Carbon-backed SDK instructions for each supported language', () => {
+  it('renders aligned Carbon tabs and switches SDK instructions', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
     render(
       <EndpointIntegration
         endpoint={
@@ -70,9 +120,15 @@ describe('EndpointIntegration', () => {
       />,
     );
 
-    expect(screen.getByText('Python')).toBeInTheDocument();
-    expect(screen.getByText('TypeScript')).toBeInTheDocument();
-    expect(screen.getByText('Golang')).toBeInTheDocument();
+    const tabList = screen.getByRole('tablist', {
+      name: 'Endpoint integration languages',
+    });
+    expect(tabList.parentElement).toHaveAttribute('data-contained', 'true');
+    expect(tabList.parentElement).toHaveAttribute('data-full-width', 'true');
+    expect(screen.getByRole('tab', { name: 'Python' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     expect(screen.getAllByText('SDK credential card')).toHaveLength(3);
     expect(screen.getAllByText('Step 4')).toHaveLength(3);
 
@@ -93,9 +149,7 @@ describe('EndpointIntegration', () => {
       within(pythonPanel).getByText(/"customerName": StringValue/),
     ).toBeInTheDocument();
 
-    const typeScriptPanel = screen.getByRole('region', {
-      name: 'TypeScript panel',
-    });
+    const typeScriptPanel = screen.getByLabelText('TypeScript panel');
     expect(
       within(typeScriptPanel).getByText(/npm install/),
     ).toBeInTheDocument();
@@ -112,11 +166,18 @@ describe('EndpointIntegration', () => {
       within(typeScriptPanel).getByText(/new StringValue/),
     ).toBeInTheDocument();
 
-    const goPanel = screen.getByRole('region', { name: 'Golang panel' });
+    const goPanel = screen.getByLabelText('Golang panel');
     expect(within(goPanel).getAllByText(/rapida-go/).length).toBeGreaterThan(0);
     expect(
       within(goPanel).getByText(/WithEndpointId\("support-router"\)/),
     ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'TypeScript' }));
+    expect(screen.getByRole('tab', { name: 'TypeScript' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(typeScriptPanel).not.toHaveAttribute('hidden');
   });
 
   it('uses placeholder endpoint values when the model is unavailable', () => {

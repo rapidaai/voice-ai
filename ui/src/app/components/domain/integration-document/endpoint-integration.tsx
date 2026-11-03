@@ -1,65 +1,19 @@
-import { CodeSnippet, Tag } from '@carbon/react';
-import { Tab } from '@/app/components/ui/primitives';
+import { Tabs } from '@/app/components/ui/primitives';
 import { RapidaCredentialCard } from '@/app/components/domain/cards/rapida-credential-card';
+import {
+  IntegrationCodeBlock,
+  IntegrationStep,
+} from './integration-primitives';
 import type {
   Endpoint,
   EndpointProviderModel,
   Variable,
 } from '@rapidaai/react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 interface EndpointIntegrationProps {
   endpoint: Endpoint;
   credentialCard?: ReactNode;
-}
-
-interface CodeBlockProps {
-  code: string;
-  language: string;
-}
-
-interface StepProps {
-  number: number;
-  title: string;
-  description: string;
-  children: ReactNode;
-}
-
-function CodeBlock({ code, language }: CodeBlockProps) {
-  return (
-    <div className="w-full" data-language={language}>
-      <CodeSnippet
-        aria-label={`${language} code snippet`}
-        copyButtonDescription={`Copy ${language} snippet`}
-        copyText={code}
-        feedback="Copied"
-        maxCollapsedNumberOfRows={20}
-        maxExpandedNumberOfRows={40}
-        minCollapsedNumberOfRows={3}
-        type="multi"
-        wrapText
-      >
-        {code}
-      </CodeSnippet>
-    </div>
-  );
-}
-
-function Step({ number, title, description, children }: StepProps) {
-  return (
-    <section className="px-4 py-5 space-y-3 border-b border-gray-200 dark:border-gray-800 last:border-b-0">
-      <div className="flex items-center gap-2.5">
-        <Tag size="sm" type="blue">
-          Step {number}
-        </Tag>
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-          {title}
-        </h3>
-      </div>
-      <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
-      {children}
-    </section>
-  );
 }
 
 export function EndpointIntegration({
@@ -68,40 +22,40 @@ export function EndpointIntegration({
 }: EndpointIntegrationProps) {
   const epm = endpoint.getEndpointprovidermodel();
   const credentials = credentialCard ?? <RapidaCredentialCard />;
+  const [selectedTab, setSelectedTab] = useState(0);
 
-  return (
-    <Tab
-      active="Python"
-      className="bg-white dark:bg-gray-900 sticky top-0 z-10"
-      tabs={[
-        {
-          label: 'Python',
-          element: (
-            <div className="pb-10 w-full">
-              <Step
-                number={1}
-                title="Install the SDK"
-                description="Install the Rapida Python SDK using pip."
-              >
-                <CodeBlock language="bash" code={`pip install rapida-python`} />
-              </Step>
+  const languageTabs = [
+    {
+      label: 'Python',
+      element: (
+        <div className="w-full pb-10" key="Python">
+          <IntegrationStep
+            number={1}
+            title="Install the SDK"
+            description="Install the Rapida Python SDK using pip."
+          >
+            <IntegrationCodeBlock
+              language="bash"
+              code={`pip install rapida-python`}
+            />
+          </IntegrationStep>
 
-              <Step
-                number={2}
-                title="Authenticate"
-                description={`Copy your publishable API key and replace RAPIDA_API_KEY in the code below.`}
-              >
-                {credentials}
-              </Step>
+          <IntegrationStep
+            number={2}
+            title="Authenticate"
+            description={`Copy your publishable API key and replace RAPIDA_API_KEY in the code below.`}
+          >
+            {credentials}
+          </IntegrationStep>
 
-              <Step
-                number={3}
-                title="Import & initialise"
-                description="Import the required classes and create a Rapida client."
-              >
-                <CodeBlock
-                  language="python"
-                  code={`from rapida import RapidaClient, RapidaClientOptions, RapidaEnvironment
+          <IntegrationStep
+            number={3}
+            title="Import & initialise"
+            description="Import the required classes and create a Rapida client."
+          >
+            <IntegrationCodeBlock
+              language="python"
+              code={`from rapida import RapidaClient, RapidaClientOptions, RapidaEnvironment
 from rapida.values import StringValue, AudioValue, FileValue, URLValue
 
 client = RapidaClient(
@@ -110,50 +64,53 @@ client = RapidaClient(
         environment=RapidaEnvironment.PRODUCTION,
     )
 )`}
-                />
-              </Step>
+            />
+          </IntegrationStep>
 
-              <Step
-                number={4}
-                title="Invoke your endpoint"
-                description="Call the endpoint with the required input arguments."
-              >
-                <CodeBlock language="python" code={buildPythonInvoke(epm)} />
-              </Step>
-            </div>
-          ),
-        },
-        {
-          label: 'TypeScript',
-          element: (
-            <div className="pb-10 w-full">
-              <Step
-                number={1}
-                title="Install the SDK"
-                description="Install the Rapida Node.js SDK using npm or yarn."
-              >
-                <CodeBlock
-                  language="bash"
-                  code={`npm install @rapidaai/rapida-node\n# or\nyarn add @rapidaai/rapida-node`}
-                />
-              </Step>
+          <IntegrationStep
+            number={4}
+            title="Invoke your endpoint"
+            description="Call the endpoint with the required input arguments."
+          >
+            <IntegrationCodeBlock
+              language="python"
+              code={buildPythonInvoke(epm)}
+            />
+          </IntegrationStep>
+        </div>
+      ),
+    },
+    {
+      label: 'TypeScript',
+      element: (
+        <div className="w-full pb-10" key="TypeScript">
+          <IntegrationStep
+            number={1}
+            title="Install the SDK"
+            description="Install the Rapida Node.js SDK using npm or yarn."
+          >
+            <IntegrationCodeBlock
+              language="bash"
+              code={`npm install @rapidaai/rapida-node\n# or\nyarn add @rapidaai/rapida-node`}
+            />
+          </IntegrationStep>
 
-              <Step
-                number={2}
-                title="Authenticate"
-                description="Copy your publishable API key and replace RAPIDA_API_KEY in the code below."
-              >
-                {credentials}
-              </Step>
+          <IntegrationStep
+            number={2}
+            title="Authenticate"
+            description="Copy your publishable API key and replace RAPIDA_API_KEY in the code below."
+          >
+            {credentials}
+          </IntegrationStep>
 
-              <Step
-                number={3}
-                title="Import & initialise"
-                description="Import the required classes and create a Rapida client."
-              >
-                <CodeBlock
-                  language="typescript"
-                  code={`import {
+          <IntegrationStep
+            number={3}
+            title="Import & initialise"
+            description="Import the required classes and create a Rapida client."
+          >
+            <IntegrationCodeBlock
+              language="typescript"
+              code={`import {
   RapidaClient,
   RapidaClientOptions,
   RapidaEnvironment,
@@ -171,53 +128,53 @@ const client = new RapidaClient(
     environment: RapidaEnvironment.PRODUCTION,
   }),
 );`}
-                />
-              </Step>
+            />
+          </IntegrationStep>
 
-              <Step
-                number={4}
-                title="Invoke your endpoint"
-                description="Call the endpoint with the required input arguments."
-              >
-                <CodeBlock
-                  language="typescript"
-                  code={buildTypeScriptInvoke(epm)}
-                />
-              </Step>
-            </div>
-          ),
-        },
-        {
-          label: 'Golang',
-          element: (
-            <div className="pb-10 w-full">
-              <Step
-                number={1}
-                title="Install the SDK"
-                description="Add the Rapida Go module to your project."
-              >
-                <CodeBlock
-                  language="bash"
-                  code={`go get github.com/rapidaai/rapida-go`}
-                />
-              </Step>
+          <IntegrationStep
+            number={4}
+            title="Invoke your endpoint"
+            description="Call the endpoint with the required input arguments."
+          >
+            <IntegrationCodeBlock
+              language="typescript"
+              code={buildTypeScriptInvoke(epm)}
+            />
+          </IntegrationStep>
+        </div>
+      ),
+    },
+    {
+      label: 'Golang',
+      element: (
+        <div className="w-full pb-10" key="Golang">
+          <IntegrationStep
+            number={1}
+            title="Install the SDK"
+            description="Add the Rapida Go module to your project."
+          >
+            <IntegrationCodeBlock
+              language="bash"
+              code={`go get github.com/rapidaai/rapida-go`}
+            />
+          </IntegrationStep>
 
-              <Step
-                number={2}
-                title="Authenticate"
-                description="Copy your publishable API key and replace RAPIDA_API_KEY in the code below."
-              >
-                {credentials}
-              </Step>
+          <IntegrationStep
+            number={2}
+            title="Authenticate"
+            description="Copy your publishable API key and replace RAPIDA_API_KEY in the code below."
+          >
+            {credentials}
+          </IntegrationStep>
 
-              <Step
-                number={3}
-                title="Import & initialise"
-                description="Import the required packages and create a Rapida client."
-              >
-                <CodeBlock
-                  language="go"
-                  code={`import (
+          <IntegrationStep
+            number={3}
+            title="Import & initialise"
+            description="Import the required packages and create a Rapida client."
+          >
+            <IntegrationCodeBlock
+              language="go"
+              code={`import (
     "github.com/rapidaai/rapida-go/rapida"
     "github.com/rapidaai/rapida-go/rapida_builders"
 )
@@ -230,21 +187,38 @@ client, err := rapida.GetClient(
 if err != nil {
     log.Fatalf("failed to create client: %v", err)
 }`}
-                />
-              </Step>
+            />
+          </IntegrationStep>
 
-              <Step
-                number={4}
-                title="Invoke your endpoint"
-                description="Build the endpoint definition and invoke it with your inputs."
-              >
-                <CodeBlock language="go" code={buildGolangInvoke(endpoint)} />
-              </Step>
-            </div>
-          ),
-        },
-      ]}
-    />
+          <IntegrationStep
+            number={4}
+            title="Invoke your endpoint"
+            description="Build the endpoint definition and invoke it with your inputs."
+          >
+            <IntegrationCodeBlock
+              language="go"
+              code={buildGolangInvoke(endpoint)}
+            />
+          </IntegrationStep>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <Tabs
+      tabs={languageTabs.map(tab => tab.label)}
+      selectedIndex={selectedTab}
+      onChange={setSelectedTab}
+      contained
+      fullWidth
+      fill
+      aria-label="Endpoint integration languages"
+      className="bg-white dark:bg-gray-900"
+      panelClassName="overflow-auto !p-0"
+    >
+      {languageTabs.map(tab => tab.element)}
+    </Tabs>
   );
 }
 

@@ -40,6 +40,7 @@ export const DEFAULT_UNCLEAR_INPUT_MESSAGE =
   "I didn't catch that. Could you repeat that?";
 export const DEFAULT_IDEAL_TIMEOUT = '10';
 export const DEFAULT_IDLE_PROMPT_COUNT = '2';
+export const DEFAULT_MAX_SESSION_DURATION = '300';
 
 export const validateIdleTimeoutConfig = (config: ExperienceConfig): string => {
   const timeout = config.idealTimeout?.trim() || DEFAULT_IDEAL_TIMEOUT;
@@ -304,7 +305,9 @@ export const ConfigureExperience: FC<{
             min={180}
             max={600}
             step={1}
-            value={parseInt(experienceConfig.maxCallDuration || '300')}
+            value={parseInt(
+              experienceConfig.maxCallDuration || DEFAULT_MAX_SESSION_DURATION,
+            )}
             onChange={({ value }: { value: number }) =>
               update('maxCallDuration', value.toString())
             }

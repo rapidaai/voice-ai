@@ -1,14 +1,16 @@
 import { Endpoint, EndpointProviderModel } from '@rapidaai/react';
-import { SourceControl } from '@carbon/icons-react';
+import { Code, SourceControl } from '@carbon/icons-react';
 import {
   Breadcrumb,
   BreadcrumbItem,
   Button,
+  HeaderGlobalAction,
   HeaderGlobalBar,
 } from '@carbon/react';
 import { useNavigate } from 'react-router-dom';
 
 import { EndpointActivityDashboard } from './endpoint-activity-dashboard';
+import { useEndpointPageStore } from '@/stores/endpoint';
 
 export function EndpointOverviewPage(props: {
   currentEndpoint: Endpoint;
@@ -16,6 +18,7 @@ export function EndpointOverviewPage(props: {
 }) {
   const { currentEndpoint } = props;
   const navigate = useNavigate();
+  const { onShowInstruction } = useEndpointPageStore();
   const endpointId = currentEndpoint.getId();
 
   return (
@@ -40,6 +43,13 @@ export function EndpointOverviewPage(props: {
           aria-label="Endpoint overview header actions"
           className="h-full items-center"
         >
+          <HeaderGlobalAction
+            aria-label="View integration"
+            tooltipAlignment="end"
+            onClick={onShowInstruction}
+          >
+            <Code size={20} />
+          </HeaderGlobalAction>
           <Button
             aria-label="Create new version"
             kind="primary"

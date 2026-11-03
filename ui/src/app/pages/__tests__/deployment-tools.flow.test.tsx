@@ -398,7 +398,14 @@ jest.mock('@/app/components/domain/tools/common', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives/overflow-menu', () => ({
-  OverflowMenu: ({ children }: any) => <div>{children}</div>,
+  OverflowMenu: ({ children, iconDescription, onOpen, open }: any) => (
+    <div data-menu-open={String(Boolean(open))}>
+      <button aria-label={iconDescription} onClick={onOpen}>
+        Open actions
+      </button>
+      {children}
+    </div>
+  ),
   OverflowMenuItem: ({ itemText, onClick }: any) => (
     <button onClick={onClick}>{itemText}</button>
   ),
@@ -489,7 +496,20 @@ jest.mock(
 jest.mock(
   '@/app/components/dialogs/assistant/assistant-debug-deployment-modal',
   () => ({
-    AssistantDebugDeploymentDialog: () => null,
+    AssistantDebugDeploymentDialog: ({ modalOpen, setModalOpen }: any) =>
+      modalOpen ? (
+        <div role="dialog">
+          Debugger details
+          <button onClick={() => setModalOpen(false)}>Close details</button>
+        </div>
+      ) : null,
+  }),
+);
+jest.mock(
+  '@/app/components/dialogs/assistant/assistant-deployment-versions-modal',
+  () => ({
+    AssistantDeploymentVersionsModal: ({ modalOpen }: any) =>
+      modalOpen ? <div role="dialog">Deployment versions</div> : null,
   }),
 );
 jest.mock(
@@ -801,6 +821,63 @@ describe('Deployment and tool flows', () => {
       'assistant-1',
       'debugger-dep-1',
     );
+  });
+
+  it('closes the deployment action menu before opening a modal', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    (GetAssistant as jest.Mock).mockResolvedValue({
+      getSuccess: () => true,
+      getData: () => ({
+        getApideployment: () => null,
+        hasApideployment: () => false,
+        getWebplugindeployment: () => null,
+        hasWebplugindeployment: () => false,
+        getDebuggerdeployment: () => ({
+          getId: () => 'debugger-dep-1',
+          getAssistantid: () => 'assistant-1',
+          getUpdateddate: () => undefined,
+          getMaxsessionduration: () => '300',
+          getIdealtimeout: () => '30',
+          hasGreetinginterruptible: () => false,
+          getGreetinginterruptible: () => false,
+          hasUnclearinputtimeout: () => false,
+          getUnclearinputtimeout: () => 0,
+          getInputaudio: () => null,
+          getOutputaudio: () => null,
+          getCreateddate: () => '2026-01-01',
+        }),
+        hasDebuggerdeployment: () => true,
+        getPhonedeployment: () => null,
+        hasPhonedeployment: () => false,
+      }),
+    });
+
+    render(<ConfigureAssistantDeploymentPage />);
+
+    const actionsButton = await screen.findByRole('button', {
+      name: 'Actions for Debugger',
+    });
+    const actionMenu = actionsButton.parentElement!;
+    await user.click(actionsButton);
+    expect(actionMenu).toHaveAttribute('data-menu-open', 'true');
+
+    await user.click(
+      screen.getByRole('button', { name: 'View deployment details' }),
+    );
+
+    expect(actionMenu).toHaveAttribute('data-menu-open', 'false');
+    expect(screen.getByRole('dialog')).toHaveTextContent('Debugger details');
+
+    await user.click(screen.getByRole('button', { name: 'Close details' }));
+    await user.click(actionsButton);
+    expect(actionMenu).toHaveAttribute('data-menu-open', 'true');
+
+    await user.click(
+      screen.getByRole('button', { name: 'View all versions' }),
+    );
+
+    expect(actionMenu).toHaveAttribute('data-menu-open', 'false');
+    expect(screen.getByRole('dialog')).toHaveTextContent('Deployment versions');
   });
 
   it('create tool validates missing name before submit', async () => {

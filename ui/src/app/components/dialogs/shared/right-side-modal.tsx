@@ -18,6 +18,7 @@ export interface SideModalProps
   label?: string;
   children: ReactNode;
   loading?: boolean;
+  resizable?: boolean;
 }
 
 export function RightSideModal({
@@ -27,6 +28,7 @@ export function RightSideModal({
   setModalOpen,
   children,
   className,
+  resizable = true,
   onClick,
   ...attributes
 }: SideModalProps) {
@@ -98,16 +100,18 @@ export function RightSideModal({
               right: 0.5,
             }}
           >
-            <div className="absolute left-0 bottom-0 top-0 z-10 flex justify-center">
-              <button
-                type="button"
-                aria-label="Resize drawer"
-                onPointerDown={e => {
-                  controls.start(e);
-                }}
-                className="h-1/2 my-auto w-2 cursor-grab touch-none rounded-[2px] bg-border-strong hover:bg-primary active:cursor-grabbing"
-              />
-            </div>
+            {resizable && (
+              <div className="absolute left-0 bottom-0 top-0 z-10 flex justify-center">
+                <button
+                  type="button"
+                  aria-label="Resize drawer"
+                  onPointerDown={e => {
+                    controls.start(e);
+                  }}
+                  className="h-1/2 my-auto w-2 cursor-grab touch-none rounded-[2px] bg-border-strong hover:bg-primary active:cursor-grabbing"
+                />
+              </div>
+            )}
             <div className="relative z-0 h-full overflow-auto flex flex-col">
               {title || label ? (
                 <ModalHeader
