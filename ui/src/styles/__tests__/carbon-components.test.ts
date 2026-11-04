@@ -26,6 +26,12 @@ describe('Carbon component styles', () => {
     expect(carbonStyles).toContain(
       "@use '@carbon/react/scss/components/fluid-number-input';",
     );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/react/scss/components/data-table/expandable';",
+    );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/react/scss/components/data-table/skeleton';",
+    );
     expect(carbonStyles).toContain('.debugger-configuration-accordion');
     expect(carbonStyles).toContain('border-block-start: 0;');
     expect(carbonStyles).toContain('margin-inline-start: 0;');

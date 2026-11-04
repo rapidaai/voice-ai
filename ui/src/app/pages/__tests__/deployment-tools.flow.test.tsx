@@ -2,6 +2,7 @@ import React from 'react';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
+import toast from 'react-hot-toast/headless';
 
 import { ConfigureAssistantDeploymentPage } from '@/app/pages/assistant/actions/create-deployment';
 import { CreateTool } from '@/app/pages/assistant/actions/configure-assistant-tool/create-assistant-tool';
@@ -20,6 +21,7 @@ let mockParams: Record<string, string | undefined> = {
   assistantId: 'assistant-1',
   assistantToolId: 'tool-1',
 };
+let mockCredentials = { authId: 'u1', token: 't1', projectId: 'p1' };
 const mockNavigate = jest.fn();
 const mockShowLoader = jest.fn();
 const mockHideLoader = jest.fn();
@@ -180,6 +182,11 @@ jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }));
 
+jest.mock('react-hot-toast/headless', () => ({
+  __esModule: true,
+  default: { error: jest.fn(), success: jest.fn() },
+}));
+
 jest.mock('@/stores/app', () => ({
   useRapidaStore: () => ({
     loading: false,
@@ -189,7 +196,7 @@ jest.mock('@/stores/app', () => ({
 }));
 
 jest.mock('@/hooks/use-credential', () => ({
-  useCurrentCredential: () => ({ authId: 'u1', token: 't1', projectId: 'p1' }),
+  useCurrentCredential: () => mockCredentials,
 }));
 
 jest.mock('@/hooks/use-global-navigator', () => ({
@@ -561,6 +568,7 @@ describe('Deployment and tool flows', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockParams = { assistantId: 'assistant-1', assistantToolId: 'tool-1' };
+    mockCredentials = { authId: 'u1', token: 't1', projectId: 'p1' };
 
     (GetAssistant as jest.Mock).mockResolvedValue({
       getSuccess: () => true,
@@ -657,6 +665,199 @@ describe('Deployment and tool flows', () => {
       'assistant-1',
     );
     await act(async () => {});
+  });
+
+  it('shows a deployment skeleton matching the table columns instead of empty-state tiles while loading', () => {
+    (GetAssistant as jest.Mock).mockReturnValue(new Promise(() => undefined));
+
+    const { container } = render(<ConfigureAssistantDeploymentPage />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading deployments');
+    expect(container.querySelectorAll('thead th')).toHaveLength(8);
+    expect(
+      screen.queryByRole('heading', { name: 'Deployment' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the deployment skeleton until the newest reload settles', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    let resolveFirst: (value: unknown) => void = () => undefined;
+    let resolveSecond: (value: unknown) => void = () => undefined;
+    const firstRequest = new Promise(resolve => {
+      resolveFirst = resolve;
+    });
+    const secondRequest = new Promise(resolve => {
+      resolveSecond = resolve;
+    });
+    const emptyAssistant = {
+      getApideployment: () => null,
+      hasApideployment: () => false,
+      getWebplugindeployment: () => null,
+      hasWebplugindeployment: () => false,
+      getDebuggerdeployment: () => null,
+      hasDebuggerdeployment: () => false,
+      getPhonedeployment: () => null,
+      hasPhonedeployment: () => false,
+    };
+
+    (GetAssistant as jest.Mock)
+      .mockReturnValueOnce(firstRequest)
+      .mockReturnValueOnce(secondRequest);
+
+    render(<ConfigureAssistantDeploymentPage />);
+    await user.click(
+      screen.getByRole('button', { name: 'Reload deployments' }),
+    );
+
+    await act(async () => {
+      resolveFirst({
+        getSuccess: () => true,
+        getData: () => emptyAssistant,
+      });
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading deployments');
+    expect(
+      screen.queryByRole('heading', { name: 'Deployment' }),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveSecond({
+        getSuccess: () => true,
+        getData: () => emptyAssistant,
+      });
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: 'Deployment' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  it('refetches deployments when the active project changes', async () => {
+    const { rerender } = render(<ConfigureAssistantDeploymentPage />);
+
+    await waitFor(() => expect(GetAssistant).toHaveBeenCalledTimes(1));
+
+    mockCredentials = { authId: 'u1', token: 't2', projectId: 'p2' };
+    rerender(<ConfigureAssistantDeploymentPage />);
+
+    await waitFor(() => expect(GetAssistant).toHaveBeenCalledTimes(2));
+    expect((GetAssistant as jest.Mock).mock.calls[1][2]).toEqual({
+      authorization: 't2',
+      projectId: 'p2',
+      userId: 'u1',
+    });
+  });
+
+  it('clears deployments when the current assistant response has no data', async () => {
+    const { rerender } = render(<ConfigureAssistantDeploymentPage />);
+
+    expect(
+      await screen.findByRole('row', { name: /SDK \/ API/ }),
+    ).toBeInTheDocument();
+
+    (GetAssistant as jest.Mock).mockResolvedValueOnce({
+      getSuccess: () => true,
+      getData: () => null,
+    });
+    mockParams = { ...mockParams, assistantId: 'assistant-2' };
+    rerender(<ConfigureAssistantDeploymentPage />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Deployment' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('row', { name: /SDK \/ API/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('ignores an older deployment response after the newest reload settles', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    let resolveOlder: (value: unknown) => void = () => undefined;
+    let resolveNewest: (value: unknown) => void = () => undefined;
+    const olderRequest = new Promise(resolve => {
+      resolveOlder = resolve;
+    });
+    const newestRequest = new Promise(resolve => {
+      resolveNewest = resolve;
+    });
+    const assistantWithVersion = (versionId: string) => ({
+      getApideployment: () => ({
+        getId: () => versionId,
+        getAssistantid: () => 'assistant-1',
+        getUpdateddate: () => undefined,
+        getMaxsessionduration: () => '300',
+        getIdealtimeout: () => '30',
+        hasGreetinginterruptible: () => false,
+        getGreetinginterruptible: () => false,
+        hasUnclearinputtimeout: () => false,
+        getUnclearinputtimeout: () => 0,
+        getInputaudio: () => null,
+        getOutputaudio: () => null,
+        getCreateddate: () => '2026-01-01',
+      }),
+      hasApideployment: () => true,
+      getWebplugindeployment: () => null,
+      hasWebplugindeployment: () => false,
+      getDebuggerdeployment: () => null,
+      hasDebuggerdeployment: () => false,
+      getPhonedeployment: () => null,
+      hasPhonedeployment: () => false,
+    });
+
+    (GetAssistant as jest.Mock)
+      .mockReturnValueOnce(olderRequest)
+      .mockReturnValueOnce(newestRequest);
+
+    render(<ConfigureAssistantDeploymentPage />);
+    await user.click(
+      screen.getByRole('button', { name: 'Reload deployments' }),
+    );
+
+    await act(async () => {
+      resolveNewest({
+        getSuccess: () => true,
+        getData: () => assistantWithVersion('newest'),
+      });
+    });
+    expect(await screen.findByText('vrsn_newest')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveOlder({
+        getSuccess: () => true,
+        getData: () => assistantWithVersion('older'),
+      });
+    });
+
+    expect(screen.getByText('vrsn_newest')).toBeInTheDocument();
+    expect(screen.queryByText('vrsn_older')).not.toBeInTheDocument();
+  });
+
+  it('reports a rejected request and clears deployments from the prior route', async () => {
+    const { rerender } = render(<ConfigureAssistantDeploymentPage />);
+
+    expect(
+      await screen.findByRole('row', { name: /SDK \/ API/ }),
+    ).toBeInTheDocument();
+
+    (GetAssistant as jest.Mock).mockRejectedValueOnce(
+      new Error('network error'),
+    );
+    mockParams = { ...mockParams, assistantId: 'assistant-2' };
+    rerender(<ConfigureAssistantDeploymentPage />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Deployment' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(mockHideLoader).toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(
+      'Unable to get your assistant. please try again later.',
+    );
+    expect(
+      screen.queryByRole('row', { name: /SDK \/ API/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('create deployment empty state shows add deployment action', async () => {

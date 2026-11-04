@@ -9,7 +9,7 @@ import {
   Phone,
   Deploy,
 } from '@carbon/icons-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Assistant } from '@rapidaai/react';
 import toast from 'react-hot-toast/headless';
@@ -39,6 +39,7 @@ import {
 import {
   ClickableTile,
   DataTable,
+  DataTableSkeleton,
   Table,
   TableBody,
   TableCell,
@@ -70,6 +71,10 @@ const deploymentTableHeaders = [
   { key: 'created', header: 'Created' },
   { key: 'actions', header: 'Actions' },
 ];
+const deploymentSkeletonHeaders = [
+  { key: 'expand', header: '' },
+  ...deploymentTableHeaders,
+];
 
 export const ConfigureAssistantDeploymentPage = () => {
   const { assistantId } = useParams();
@@ -77,6 +82,8 @@ export const ConfigureAssistantDeploymentPage = () => {
   const navi = useGlobalNavigation();
   const { token, authId, projectId } = useCurrentCredential();
   const { showLoader, hideLoader } = useRapidaStore();
+  const [isLoading, setIsLoading] = useState(true);
+  const requestSequence = useRef(0);
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [isApiExpanded, setIsApiExpanded] = useState(false);
@@ -91,34 +98,54 @@ export const ConfigureAssistantDeploymentPage = () => {
 
   const get = useCallback(
     (id: typeof assistantId) => {
-      if (id) {
-        showLoader('block');
-        getAssistantById({
-          assistantId: id,
-          auth: { projectId, token, userId: authId },
-        })
-          .then(epmr => {
-            hideLoader();
-            if (epmr?.getSuccess()) {
-              const a = epmr.getData();
-              if (a) setAssistant(a);
-            } else {
-              const error = epmr?.getError();
-              toast.error(
-                error?.getHumanmessage() ??
-                  'Unable to get your assistant. please try again later.',
-              );
-            }
-          })
-          .catch(() => hideLoader());
+      const requestId = ++requestSequence.current;
+      if (!id) {
+        setAssistant(null);
+        hideLoader();
+        setIsLoading(false);
+        return;
       }
+
+      setIsLoading(true);
+      showLoader('block');
+      getAssistantById({
+        assistantId: id,
+        auth: { projectId, token, userId: authId },
+      })
+        .then(epmr => {
+          if (requestId !== requestSequence.current) return;
+
+          if (epmr?.getSuccess()) {
+            const a = epmr.getData();
+            setAssistant(a ?? null);
+          } else {
+            setAssistant(null);
+            const error = epmr?.getError();
+            toast.error(
+              error?.getHumanmessage() ??
+                'Unable to get your assistant. please try again later.',
+            );
+          }
+        })
+        .catch(() => {
+          if (requestId !== requestSequence.current) return;
+
+          setAssistant(null);
+          toast.error('Unable to get your assistant. please try again later.');
+        })
+        .finally(() => {
+          if (requestId !== requestSequence.current) return;
+
+          hideLoader();
+          setIsLoading(false);
+        });
     },
     [authId, hideLoader, projectId, showLoader, token],
   );
 
   useEffect(() => {
     get(assistantId);
-  }, [assistantId]);
+  }, [assistantId, get]);
 
   const deploymentCount = [
     assistant?.getApideployment(),
@@ -357,7 +384,22 @@ export const ConfigureAssistantDeploymentPage = () => {
 
       <div className="flex flex-1 flex-col bg-surface">
         <div className="flex w-full flex-1 flex-col">
-          {hasAnyDeployment ? (
+          <div role="status" aria-live="polite" className="sr-only">
+            {isLoading ? 'Loading deployments' : ''}
+          </div>
+          {isLoading ? (
+            <div className="no-scrollbar w-full overflow-x-auto">
+              <DataTableSkeleton
+                headers={deploymentSkeletonHeaders}
+                columnCount={deploymentSkeletonHeaders.length}
+                rowCount={4}
+                showHeader
+                showToolbar={false}
+                size="lg"
+                className="min-w-[1240px]"
+              />
+            </div>
+          ) : hasAnyDeployment ? (
             <div
               aria-label="Deployment channels"
               className="no-scrollbar w-full overflow-x-auto"
