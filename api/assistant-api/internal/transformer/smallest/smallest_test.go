@@ -87,17 +87,16 @@ func TestGetTextToSpeechInput_WithOverrides(t *testing.T) {
 	assert.Equal(t, DefaultSampleRate, input.SampleRate)
 }
 
-func TestGetTextToSpeechInput_VoiceOnlyOverrideKeepsLegacyModel(t *testing.T) {
-	// A saved config with a voice override but no model override predates the
-	// Pro default and was paired with the legacy standard model; it must not
-	// silently land on lightning_v3.1_pro, where a standard-pool voice like
-	// magnus isn't available.
+func TestGetTextToSpeechInput_VoiceOnlyOverrideUsesDefaultModel(t *testing.T) {
+	// Only lightning_v3.1_pro is supported going forward - a voice override
+	// with no model override still resolves to the Pro default rather than
+	// falling back to the retiring standard model.
 	cred := newVaultCredential(map[string]interface{}{"key": "k"})
-	opts := utils.Option{"speak.voice.id": "magnus"}
+	opts := utils.Option{"speak.voice.id": "meher"}
 	opt, _ := NewSmallestOption(newTestLogger(), cred, opts)
 	input := opt.GetTextToSpeechInput("hello", map[string]interface{}{})
-	assert.Equal(t, "lightning_v3.1", input.Model)
-	assert.Equal(t, "magnus", input.VoiceID)
+	assert.Equal(t, DefaultTextToSpeechModel, input.Model)
+	assert.Equal(t, "meher", input.VoiceID)
 }
 
 func TestGetTextToSpeechInput_ModelOnlyOverrideUsesDefaultVoice(t *testing.T) {
