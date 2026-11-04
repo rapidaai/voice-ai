@@ -50,7 +50,7 @@
                     "label": "Voice",
                     "type": "dropdown",
                     "required": true,
-                    "default": "meher",
+                    "default": "kaitlyn",
                     "data": "text-to-speech-voices-lightning-v3-1-pro.json",
                     "valueField": "voice_id",
                     "searchable": true,

@@ -38,7 +38,7 @@ const (
 	// lightning_v3.1 retires on 2026-11-30 (served by lightning_v3.1_pro after
 	// that), so default to Pro with a Pro-pool voice.
 	DefaultTextToSpeechModel = "lightning_v3.1_pro"
-	DefaultVoiceID           = "meher"
+	DefaultVoiceID           = "kaitlyn"
 
 	// SourceHeader/SourceName identify this integration to Smallest so usage
 	// can be attributed to Rapida, mirroring the X-Source header other SDK

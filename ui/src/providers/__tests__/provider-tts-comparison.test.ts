@@ -302,7 +302,7 @@ describe('Smallest TTS — config resolution', () => {
   it('produces the expected default keys and values', () => {
     const result = getDefaultsFromConfig(config, 'tts', [], 'smallest');
     expect(findMeta(result, 'speak.model')).toBe('lightning_v3.1_pro');
-    expect(findMeta(result, 'speak.voice.id')).toBe('meher');
+    expect(findMeta(result, 'speak.voice.id')).toBe('kaitlyn');
     expect(findMeta(result, 'speak.language')).toBe('en');
   });
 
@@ -310,7 +310,7 @@ describe('Smallest TTS — config resolution', () => {
     const opts = [
       cred(),
       createMetadata('speak.model', 'lightning_v3.1_pro'),
-      createMetadata('speak.voice.id', 'meher'),
+      createMetadata('speak.voice.id', 'kaitlyn'),
       createMetadata('speak.language', 'en'),
     ];
     expect(validateFromConfig(config, 'tts', 'smallest', opts)).toBeUndefined();
@@ -353,7 +353,7 @@ describe('Smallest TTS — config resolution', () => {
       [createMetadata('speak.model', 'lightning_v3.1_pro')],
       'smallest',
     );
-    expect(findMeta(withPro, 'speak.voice.id')).toBe('meher');
+    expect(findMeta(withPro, 'speak.voice.id')).toBe('kaitlyn');
   });
 
   it('resolves a distinct, non-overlapping voice catalog per model', () => {
@@ -400,7 +400,7 @@ describe('Smallest TTS — config resolution', () => {
     // No voice should be pickable under both models — that's exactly the
     // pairing the live API rejects (see smallest_integration_test.go's
     // TestSmallestTTSVoiceModelMismatch).
-    expect(standardIds.has('meher')).toBe(false);
+    expect(standardIds.has('kaitlyn')).toBe(false);
     expect(proIds.has('magnus')).toBe(false);
     expect([...standardIds].some(id => proIds.has(id))).toBe(false);
   });
