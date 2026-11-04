@@ -1,0 +1,16 @@
+{
+  "telephony": {
+    "parameters": [
+      {
+        "key": "phone",
+        "label": "Phone",
+        "type": "input",
+        "required": true,
+        "default": "",
+        "placeholder": "Enter your Plivo phone number",
+        "helpText": "Phone to receive inbound or make outbound call.",
+        "errorMessage": "Please provide a valid Plivo phone number."
+      }
+    ]
+  }
+}
