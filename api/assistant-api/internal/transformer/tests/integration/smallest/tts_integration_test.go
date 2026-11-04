@@ -302,11 +302,13 @@ func TestSmallestTTSVoiceModelMismatch(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	// meher is a lightning_v3.1_pro-only voice; pairing it with lightning_v3.1
-	// is a real user-reachable mismatch since speak.voice.id accepts free text.
+	// magnus is a standard-pool (lightning_v3.1) voice; pairing it with
+	// lightning_v3.1_pro is a real user-reachable mismatch since speak.voice.id
+	// accepts free text. (lightning_v3.1 itself retires on 2026-11-30 and is
+	// served by lightning_v3.1_pro after that, so it can't anchor this test.)
 	opts := testutil.BuildOptions(map[string]interface{}{
-		"speak.voice.id": "meher",
-		"speak.model":    "lightning_v3.1",
+		"speak.voice.id": "magnus",
+		"speak.model":    "lightning_v3.1_pro",
 	})
 
 	tts, err := smallest.NewSmallestTextToSpeech(ctx, logger, testutil.BuildCredential(pcfg.Credential), collector.OnPacket, opts)

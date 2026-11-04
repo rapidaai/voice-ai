@@ -301,16 +301,16 @@ describe('Smallest TTS — config resolution', () => {
 
   it('produces the expected default keys and values', () => {
     const result = getDefaultsFromConfig(config, 'tts', [], 'smallest');
-    expect(findMeta(result, 'speak.model')).toBe('lightning_v3.1');
-    expect(findMeta(result, 'speak.voice.id')).toBe('magnus');
+    expect(findMeta(result, 'speak.model')).toBe('lightning_v3.1_pro');
+    expect(findMeta(result, 'speak.voice.id')).toBe('meher');
     expect(findMeta(result, 'speak.language')).toBe('en');
   });
 
   it('validates: valid options returns undefined', () => {
     const opts = [
       cred(),
-      createMetadata('speak.model', 'lightning_v3.1'),
-      createMetadata('speak.voice.id', 'magnus'),
+      createMetadata('speak.model', 'lightning_v3.1_pro'),
+      createMetadata('speak.voice.id', 'meher'),
       createMetadata('speak.language', 'en'),
     ];
     expect(validateFromConfig(config, 'tts', 'smallest', opts)).toBeUndefined();
