@@ -87,6 +87,28 @@ func TestGetTextToSpeechInput_WithOverrides(t *testing.T) {
 	assert.Equal(t, DefaultSampleRate, input.SampleRate)
 }
 
+func TestGetTextToSpeechInput_VoiceOnlyOverrideKeepsLegacyModel(t *testing.T) {
+	// A saved config with a voice override but no model override predates the
+	// Pro default and was paired with the legacy standard model; it must not
+	// silently land on lightning_v3.1_pro, where a standard-pool voice like
+	// magnus isn't available.
+	cred := newVaultCredential(map[string]interface{}{"key": "k"})
+	opts := utils.Option{"speak.voice.id": "magnus"}
+	opt, _ := NewSmallestOption(newTestLogger(), cred, opts)
+	input := opt.GetTextToSpeechInput("hello", map[string]interface{}{})
+	assert.Equal(t, "lightning_v3.1", input.Model)
+	assert.Equal(t, "magnus", input.VoiceID)
+}
+
+func TestGetTextToSpeechInput_ModelOnlyOverrideUsesDefaultVoice(t *testing.T) {
+	cred := newVaultCredential(map[string]interface{}{"key": "k"})
+	opts := utils.Option{"speak.model": "lightning_v3.1_pro"}
+	opt, _ := NewSmallestOption(newTestLogger(), cred, opts)
+	input := opt.GetTextToSpeechInput("hello", map[string]interface{}{})
+	assert.Equal(t, "lightning_v3.1_pro", input.Model)
+	assert.Equal(t, DefaultVoiceID, input.VoiceID)
+}
+
 func TestGetTextToSpeechInput_WithSpeed(t *testing.T) {
 	cred := newVaultCredential(map[string]interface{}{"key": "k"})
 	opts := utils.Option{"speak.speed": "1.25"}

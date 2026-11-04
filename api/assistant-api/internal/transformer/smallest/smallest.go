@@ -40,6 +40,13 @@ const (
 	DefaultTextToSpeechModel = "lightning_v3.1_pro"
 	DefaultVoiceID           = "kaitlyn"
 
+	// legacyTextToSpeechModel is the pre-retirement default. A saved config
+	// with an explicit speak.voice.id but no explicit speak.model predates
+	// the Pro default above and was paired with this model; GetTextToSpeechInput
+	// falls back to it instead of DefaultTextToSpeechModel so that pairing isn't
+	// silently broken by a voice from the standard pool landing on the Pro model.
+	legacyTextToSpeechModel = "lightning_v3.1"
+
 	// SourceHeader/SourceName identify this integration to Smallest so usage
 	// can be attributed to Rapida, mirroring the X-Source header other SDK
 	// integrations send on connect.
@@ -148,11 +155,16 @@ func (so *smallestOption) GetTextToSpeechInput(
 	if language, err := so.mdlOpts.GetString(internal_options.SpeakOptionLanguage); err == nil && language != "" {
 		opts.Language = language
 	}
-	if model, err := so.mdlOpts.GetString(internal_options.SpeakOptionModel); err == nil && model != "" {
+	model, hasModel := "", false
+	if m, err := so.mdlOpts.GetString(internal_options.SpeakOptionModel); err == nil && m != "" {
+		model, hasModel = m, true
 		opts.Model = model
 	}
 	if voice, err := so.mdlOpts.GetString(internal_options.SpeakOptionVoiceID); err == nil && voice != "" {
 		opts.VoiceID = voice
+		if !hasModel {
+			opts.Model = legacyTextToSpeechModel
+		}
 	}
 	if speed, err := so.mdlOpts.GetFloat64(internal_options.SpeakOptionSpeed); err == nil && speed > 0 {
 		opts.Speed = speed
