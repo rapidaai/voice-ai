@@ -21,8 +21,8 @@ postgres:
     password: "rapida_db_password"
     user: "rapida_user"
   db: "assistant_db"
-  max_connection: 10
-  ideal_connection: 5
+  max_connection: 5
+  ideal_connection: 1
 
 internal_service:
   web_host: "web-api:9001"

@@ -13,8 +13,8 @@ postgres:
   auth:
     user: "rapida_user"
     password: "rapida_db_password"
-  max_open_connection: 50
-  max_ideal_connection: 25
+  max_open_connection: 5
+  max_ideal_connection: 1
   ssl_mode: "disable"
   slc_cache:
     host: "127.0.0.1"
@@ -36,7 +36,7 @@ redis:
 
 asset_store:
   storage_type: "local"
-  storage_path_prefix: "/opt/rapida-data/assets/workflow"
+  storage_path_prefix: ".local/rapida-data/assets/workflow"
   public_url_prefix: "http://localhost:8080/rapida-data/assets/workflow"
 
 opensearch:

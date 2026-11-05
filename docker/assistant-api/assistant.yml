@@ -13,8 +13,8 @@ postgres:
   auth:
     user: "rapida_user"
     password: "rapida_db_password"
-  max_open_connection: 50
-  max_ideal_connection: 25
+  max_open_connection: 5
+  max_ideal_connection: 1
   ssl_mode: "disable"
   slc_cache:
     host: "redis"

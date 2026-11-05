@@ -71,6 +71,36 @@ check_http_route() {
   printf 'nginx route %s passed\n' "$path"
 }
 
+check_grpc_route() {
+  path=$1
+  expected_owner=$2
+  body_file="$temporary_directory/grpc-body"
+  header_file="$temporary_directory/grpc-headers"
+  request_file="$temporary_directory/grpc-request"
+  printf '\000\000\000\000\000' > "$request_file"
+  status=$(curl --silent --show-error --output "$body_file" --dump-header "$header_file" \
+    --write-out '%{http_code}' --request POST \
+    --header 'Content-Type: application/grpc-web+proto' \
+    --header 'x-grpc-web: 1' \
+    --data-binary "@$request_file" "http://nginx:8080$path")
+
+  if [ "$status" != 200 ]; then
+    printf 'nginx gRPC-Web route %s returned HTTP %s; expected 200\n' "$path" "$status" >&2
+    return 1
+  fi
+  grpc_status=$(sed -n 's/^[Gg]rpc-[Ss]tatus: *//p' "$header_file" | tr -d '\r' | tail -n 1)
+  if [ -z "$grpc_status" ] || [ "$grpc_status" = 12 ]; then
+    printf 'nginx gRPC-Web route %s was not handled by %s; gRPC status %s\n' \
+      "$path" "$expected_owner" "${grpc_status:-missing}" >&2
+    return 1
+  fi
+  if grep -qi '<html' "$body_file"; then
+    printf 'nginx gRPC-Web route %s incorrectly returned the UI fallback\n' "$path" >&2
+    return 1
+  fi
+  printf 'nginx gRPC-Web route %s was handled by %s\n' "$path" "$expected_owner"
+}
+
 check_ui() {
   direct_ui="$temporary_directory/ui.html"
   nginx_ui="$temporary_directory/nginx.html"
@@ -89,6 +119,13 @@ check_ui() {
 
   check_http_route /v1/__smoke__ 404
   check_http_route /oauth/__smoke__ 404
+  check_grpc_route /dashboard_api.DashboardService/GetProjectDashboard web-api
+  check_grpc_route /talk_api.TalkService/GetAllAssistantConversation assistant-api
+
+  ui_route="$temporary_directory/nginx-ui-route.html"
+  curl --fail --silent --show-error --max-time 5 http://nginx:8080/__ui_smoke__ > "$ui_route"
+  grep -qi '<div id="root"' "$ui_route"
+
   retry_json 'nginx web-api health proxy' 'http://nginx:8080/healthz/' \
     '.code == 200 and .success == true and .data.healthy == true'
   printf 'ui and nginx smoke tests passed\n'

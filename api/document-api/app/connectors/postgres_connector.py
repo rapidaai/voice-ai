@@ -63,7 +63,11 @@ class PostgresConnector(Connector):
 
                 # Create the asynchronous engine
                 self._connection_pool = create_engine(
-                    f"postgresql://{self._config.auth.user}:{self._config.auth.password.get_secret_value()}@{self._config.host}:{self._config.port}/{self._config.db}"
+                    f"postgresql://{self._config.auth.user}:{self._config.auth.password.get_secret_value()}@{self._config.host}:{self._config.port}/{self._config.db}",
+                    pool_size=self._config.ideal_connection,
+                    max_overflow=(
+                        self._config.max_connection - self._config.ideal_connection
+                    ),
                 )
                 # acquire connection from pool
                 if not await self.is_connected():
