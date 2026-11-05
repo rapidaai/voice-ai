@@ -302,11 +302,14 @@ func TestSmallestTTSVoiceModelMismatch(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	// meher is a lightning_v3.1_pro-only voice; pairing it with lightning_v3.1
-	// is a real user-reachable mismatch since speak.voice.id accepts free text.
+	// magnus is a standard-pool voice; pairing it with the Pro model is a real
+	// user-reachable mismatch since speak.voice.id accepts free text and isn't
+	// validated against the selected model's voice catalog. The standard
+	// model itself is being retired and will soon be served by the Pro model,
+	// so it can't anchor this test.
 	opts := testutil.BuildOptions(map[string]interface{}{
-		"speak.voice.id": "meher",
-		"speak.model":    "lightning_v3.1",
+		"speak.voice.id": "magnus",
+		"speak.model":    "lightning_v3.1_pro",
 	})
 
 	tts, err := smallest.NewSmallestTextToSpeech(ctx, logger, testutil.BuildCredential(pcfg.Credential), collector.OnPacket, opts)
@@ -334,7 +337,10 @@ func TestSmallestTTSVoiceModelMismatch(t *testing.T) {
 	})
 
 	require.NotNil(t, errPkt, "should surface a TextToSpeechErrorPacket instead of hanging")
-	assert.Contains(t, errPkt.Error.Error(), "Invalid Voice ID")
+	// The live API reports standard/Pro pool mismatches as "Voice '<id>' is not
+	// available on the <model> model" rather than the generic "Invalid Voice ID"
+	// used for unknown voice IDs.
+	assert.Contains(t, errPkt.Error.Error(), "is not available on")
 	assert.Empty(t, collector.AudioPackets(), "mismatched pairing should not produce audio")
 	assert.Empty(t, collector.EndPackets(), "mismatched pairing has no normal completion")
 	t.Logf("mismatch error surfaced: %v", errPkt.Error)

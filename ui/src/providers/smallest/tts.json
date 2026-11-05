@@ -6,7 +6,7 @@
       "label": "Model",
       "type": "dropdown",
       "required": true,
-      "default": "lightning_v3.1",
+      "default": "lightning_v3.1_pro",
       "data": "text-to-speech-models.json",
       "valueField": "model_id",
       "errorMessage": "Please select a valid model for text to speech."
