@@ -65,6 +65,7 @@ Rapida is written in **Go**, using the highly optimized [gRPC](https://github.co
 - **Docker** & **Docker Compose** ([Install](https://www.docker.com/))
 - **Just** command runner ([Install](https://github.com/casey/just#installation))
 - **Go 1.26.10**, **Node.js 22**, and **Yarn 1.22.22** for `just ci`
+- **Process Compose** ([Install](https://f1bonacc1.github.io/process-compose/installation/)) for host-native development
 - **16GB+ RAM** (for all services)
 
 ---
@@ -184,64 +185,129 @@ Add your API keys (OpenAI, Anthropic, Deepgram, Twilio, etc.) in these files.
 
 ---
 
-## Local Development (Without Docker)
+## Local Development with Process Compose
 
-### Set up environment
+Use Process Compose for faster service iteration. The Go APIs and UI run on the host,
+while Docker continues to own PostgreSQL, Redis, and the nginx gateway. This path starts
+the core stack without OpenSearch or Document API.
 
-- Install the nginx; Copy the nginx configuration from `./nginx/nginx.conf`
-- Review service configuration (database connection parameters, redis connection parameters)
-- Create local storage path in `/opt/rapida-data/assets/workflow` and make sure it is writable by user
+### Install Process Compose
+
+Choose one installation method. Homebrew is recommended on macOS and supported on Linux:
 
 ```bash
-sudo mkdir -p /opt/rapida-data/assets/workflow
-sudo chown -R "$USER:$(id -gn)" /opt/rapida-data/assets
+brew install f1bonacc1/tap/process-compose
 ```
 
-### Go Services
+Alternatively, install with the Go toolchain:
 
 ```bash
-# Install dependencies
-go mod download
-
-# Build service
-go build -o bin/web ./cmd/web
-
-# Run service
-./bin/web
+go install github.com/f1bonacc1/process-compose@latest
 ```
 
-Requires PostgreSQL, Redis, OpenSearch running separately.
+The Go installation places the binary in `GOBIN`, or in the `bin` directory under
+`GOPATH` when `GOBIN` is unset. Adding that directory to `PATH` is recommended for direct
+CLI use. The Just recipes also search these Go locations and `./bin/process-compose`.
 
-### React UI
+Prebuilt packages for macOS, Linux, and Windows are available from the
+[latest Process Compose release](https://github.com/F1bonacc1/process-compose/releases/latest).
+Extract the package and place the `process-compose` executable in a directory on `PATH`.
+
+The repository configuration uses Bash. On Windows, run it from WSL 2 with Docker Desktop
+WSL integration enabled.
+
+Verify the required tools before continuing:
 
 ```bash
-# Complete local UI setup, test report, and Storybook build
-just ui
+docker compose version
+just --version
+go version
+node --version
+yarn --version
+process-compose version
+```
 
-# Run the UI app
-just ui-dev
+Expected development versions are Go 1.26.10, Node.js 22, and Yarn 1.22.22.
 
-# Run Storybook
-just ui-storybook
+### Prepare Local Dependencies
 
-# Generate Allure and coverage reports, then view Allure
-just ui-report
-just ui-report-open
+Prepare Go modules, UI dependencies, and local data directories once:
 
-# Build for production
-cd ui && yarn build
+```bash
+just dev-local-setup
+```
+
+### Run the Core Stack
+
+Start Docker first, then start the core development stack. PostgreSQL, Redis, and nginx
+remain Docker-backed processes in this workflow.
+
+```bash
+just dev-local
+```
+
+Process Compose uses control port `8090` because nginx uses application port `8080`.
+Press `Ctrl+C` for an ordered shutdown, or stop it from another terminal:
+
+```bash
+just dev-local-down
+```
+
+The local services are available at:
+
+- UI: <http://localhost:3000>
+- API Gateway: <http://localhost:8080>
+- Web API: <http://localhost:9001>
+- Integration API: <http://localhost:9004>
+- Endpoint API: <http://localhost:9005>
+- Assistant API: <http://localhost:9007>
+
+Check service readiness directly:
+
+```bash
+curl --fail http://localhost:8080/readiness/
+curl --fail http://localhost:9001/readiness/
+curl --fail http://localhost:9004/readiness/
+curl --fail http://localhost:9005/readiness/
+curl --fail http://localhost:9007/readiness/
+```
+
+To run individual host-native processes instead, start dependencies with `just deps`,
+then use `just run-web`, `just run-integration`, `just run-endpoint`,
+`just run-assistant`, or `just run-ui` in separate terminals.
+
+Knowledge mode remains on the Docker workflow. Stop Process Compose with
+`just dev-local-down` first if it is running, then start the knowledge stack:
+
+```bash
+just up-all-with-knowledge
 ```
 
 ---
 
 ## Troubleshooting
 
+**Process Compose is not found:**
+
+```bash
+command -v process-compose
+process-compose version
+```
+
+For a Go installation, ensure the Go binary directory described above is on `PATH`.
+The `just dev-local` recipe can also discover the standard Go installation directory or
+an executable at `./bin/process-compose` when the command is not on `PATH`.
+
 **Port already in use:**
 
 ```bash
-lsof -i :3000    # Find process
-kill -9 <PID>    # Kill it
+for port in 3000 5432 6379 8080 8090 9001 9004 9005 9007; do
+  lsof -nP -iTCP:"$port" -sTCP:LISTEN
+done
 ```
+
+Stop the owning development stack before retrying. Use `just dev-local-down` for Process
+Compose or `just down-all` for the Docker stack.
 
 **Services won't start:**
 
@@ -254,7 +320,7 @@ docker compose ps  # Verify status
 
 ```bash
 # Test connection
-docker compose exec postgres psql -U rapida -d web_db -c "SELECT 1"
+docker compose exec postgres psql -U rapida_user -d web_db -c "SELECT 1"
 
 # Reset everything
 just clean
@@ -268,14 +334,17 @@ just up-all
 ## All Commands
 
 ```bash
-just --list         # Show all available commands
-just setup-local    # Create data directories
-just build-all      # Build all Docker images
-just up-all         # Start all services
-just down-all       # Stop all services
-just logs-all       # View all logs
-just clean          # Remove containers & volumes
-just restart-all    # Restart all services
+just --list          # Show all available commands
+just setup-local     # Create data directories
+just build-all       # Build all Docker images
+just up-all          # Start all services
+just down-all        # Stop all services
+just dev-local-setup # Prepare host-native development dependencies
+just dev-local       # Start the core stack with Process Compose
+just dev-local-down  # Stop the Process Compose stack
+just logs-all        # View all logs
+just clean           # Remove containers & volumes
+just restart-all     # Restart all services
 ```
 
 Run the same repository checks locally:

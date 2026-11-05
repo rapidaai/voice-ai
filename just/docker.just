@@ -2,6 +2,7 @@ compose := "env DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_DEFAULT_PLAT
 compose_knowledge := compose + " -f docker-compose.knowledge.yml"
 core_services := "ui web-api integration-api endpoint-api assistant-api"
 knowledge_services := core_services + " document-api"
+process_compose_port := "8090"
 
 # Create local data directories and permissions.
 setup-local:
@@ -255,3 +256,44 @@ full: up-all
 dev: rebuild-all
     {{compose}} up -d --no-build
     {{compose}} logs -f
+
+# Prepare dependencies for host-native development.
+dev-local-setup: setup-local
+    go mod download
+    @just ui-setup
+
+_process-compose-bin:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    if process_compose_bin="$(command -v process-compose 2>/dev/null)"; then
+      printf '%s\n' "$process_compose_bin"
+      exit 0
+    fi
+
+    if command -v go >/dev/null 2>&1; then
+      go_bin="$(go env GOBIN)"
+      if [[ -z "$go_bin" ]]; then
+        go_bin="$(go env GOPATH)/bin"
+      fi
+      if [[ -x "$go_bin/process-compose" ]]; then
+        printf '%s\n' "$go_bin/process-compose"
+        exit 0
+      fi
+    fi
+
+    if [[ -x ./bin/process-compose ]]; then
+      printf '%s\n' ./bin/process-compose
+      exit 0
+    fi
+
+    echo "Process Compose is required: https://f1bonacc1.github.io/process-compose/installation/" >&2
+    exit 1
+
+# Run the core stack locally with Process Compose.
+dev-local:
+    "$(just _process-compose-bin)" -f process-compose.yml -p {{process_compose_port}} up
+
+# Stop the local Process Compose stack.
+dev-local-down:
+    "$(just _process-compose-bin)" -p {{process_compose_port}} down

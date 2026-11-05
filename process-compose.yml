@@ -1,0 +1,186 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/F1bonacc1/process-compose/main/schemas/process-compose-schema.json
+# Start with `process-compose -p 8090 up`; port 8080 belongs to the nginx gateway.
+
+version: "0.5"
+name: voice-ai
+is_strict: true
+ordered_shutdown: true
+
+shell:
+  shell_command: bash
+  shell_argument: -c
+
+processes:
+  datastores:
+    description: PostgreSQL and Redis managed by Docker Compose
+    command: |
+      set -euo pipefail
+      if docker exec rapida__postgres pg_isready -U rapida_user -d web_db >/dev/null 2>&1 \
+        && docker exec rapida__redis redis-cli ping | grep -q PONG; then
+        echo "Reusing healthy PostgreSQL and Redis containers."
+        exec docker logs --tail 20 --follow rapida__postgres
+      else
+        exec docker compose -f docker-compose.yml up postgres redis
+      fi
+    availability:
+      restart: on_failure
+      backoff_seconds: 2
+      max_restarts: 3
+    readiness_probe:
+      exec:
+        command: >-
+          docker exec rapida__postgres
+          pg_isready -U rapida_user -d web_db
+          && docker exec rapida__redis
+          redis-cli ping | grep -q PONG
+      initial_delay_seconds: 2
+      period_seconds: 2
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 30
+  web-api:
+    description: Web API on port 9001
+    command: just run-web
+    depends_on:
+      datastores:
+        condition: process_healthy
+    availability:
+      restart: on_failure
+      backoff_seconds: 2
+      max_restarts: 3
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: "9001"
+        path: /readiness/
+        scheme: http
+      initial_delay_seconds: 2
+      period_seconds: 2
+      timeout_seconds: 2
+      success_threshold: 1
+      failure_threshold: 60
+
+  integration-api:
+    description: Integration API on port 9004
+    command: just run-integration
+    depends_on:
+      datastores:
+        condition: process_healthy
+    availability:
+      restart: on_failure
+      backoff_seconds: 2
+      max_restarts: 3
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: "9004"
+        path: /readiness/
+        scheme: http
+      initial_delay_seconds: 2
+      period_seconds: 2
+      timeout_seconds: 2
+      success_threshold: 1
+      failure_threshold: 60
+
+  endpoint-api:
+    description: Endpoint API on port 9005
+    command: just run-endpoint
+    depends_on:
+      datastores:
+        condition: process_healthy
+    availability:
+      restart: on_failure
+      backoff_seconds: 2
+      max_restarts: 3
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: "9005"
+        path: /readiness/
+        scheme: http
+      initial_delay_seconds: 2
+      period_seconds: 2
+      timeout_seconds: 2
+      success_threshold: 1
+      failure_threshold: 60
+
+  assistant-api:
+    description: Assistant API on port 9007
+    command: just run-assistant
+    depends_on:
+      datastores:
+        condition: process_healthy
+    availability:
+      restart: on_failure
+      backoff_seconds: 2
+      max_restarts: 3
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: "9007"
+        path: /readiness/
+        scheme: http
+      initial_delay_seconds: 2
+      period_seconds: 2
+      timeout_seconds: 2
+      success_threshold: 1
+      failure_threshold: 60
+
+  ui:
+    description: UI development server on port 3000
+    command: just run-ui
+    depends_on:
+      web-api:
+        condition: process_healthy
+      integration-api:
+        condition: process_healthy
+      endpoint-api:
+        condition: process_healthy
+      assistant-api:
+        condition: process_healthy
+    availability:
+      restart: on_failure
+      backoff_seconds: 2
+      max_restarts: 3
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: "3000"
+        path: /
+        scheme: http
+      initial_delay_seconds: 5
+      period_seconds: 2
+      timeout_seconds: 2
+      success_threshold: 1
+      failure_threshold: 60
+
+  gateway:
+    description: nginx gateway on port 8080
+    command: >-
+      docker compose -f docker-compose.yml
+      -f docker-compose.process-compose.yml
+      up --no-deps nginx
+    depends_on:
+      ui:
+        condition: process_healthy
+    availability:
+      restart: on_failure
+      backoff_seconds: 2
+      max_restarts: 3
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: "8080"
+        path: /readiness/
+        scheme: http
+      initial_delay_seconds: 2
+      period_seconds: 2
+      timeout_seconds: 2
+      success_threshold: 1
+      failure_threshold: 30
+    shutdown:
+      command: >-
+        docker compose -f docker-compose.yml
+        -f docker-compose.process-compose.yml
+        stop nginx
+      timeout_seconds: 20
