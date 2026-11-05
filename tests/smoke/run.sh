@@ -89,6 +89,12 @@ check_ui() {
 
   check_http_route /v1/__smoke__ 404
   check_http_route /oauth/__smoke__ 404
+  check_http_route /dashboard_api.DashboardService/GetProjectDashboard 404
+
+  ui_route="$temporary_directory/nginx-ui-route.html"
+  curl --fail --silent --show-error --max-time 5 http://nginx:8080/__ui_smoke__ > "$ui_route"
+  grep -qi '<div id="root"' "$ui_route"
+
   retry_json 'nginx web-api health proxy' 'http://nginx:8080/healthz/' \
     '.code == 200 and .success == true and .data.healthy == true'
   printf 'ui and nginx smoke tests passed\n'
