@@ -13,7 +13,7 @@ postgres:
   auth:
     user: "rapida_user"
     password: "rapida_db_password"
-  max_open_connection: 2
+  max_open_connection: 5
   max_ideal_connection: 1
   ssl_mode: "disable"
 

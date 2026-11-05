@@ -15,7 +15,8 @@ processes:
     description: PostgreSQL and Redis managed by Docker Compose
     command: |
       set -euo pipefail
-      if docker exec rapida__postgres pg_isready -U rapida_user -d web_db >/dev/null 2>&1 \
+      if docker exec rapida__postgres \
+        pg_isready -h 127.0.0.1 -p 5432 -U rapida_user -d web_db >/dev/null 2>&1 \
         && docker exec rapida__redis redis-cli ping | grep -q PONG; then
         echo "Reusing healthy PostgreSQL and Redis containers."
         exec docker logs --tail 20 --follow rapida__postgres
@@ -30,7 +31,7 @@ processes:
       exec:
         command: >-
           docker exec rapida__postgres
-          pg_isready -U rapida_user -d web_db
+          pg_isready -h 127.0.0.1 -p 5432 -U rapida_user -d web_db
           && docker exec rapida__redis
           redis-cli ping | grep -q PONG
       initial_delay_seconds: 2
@@ -106,7 +107,7 @@ processes:
 
   assistant-api:
     description: Assistant API on port 9007
-    command: just run-assistant
+    command: mkdir -p .local/rapida-data/assets/workflow && exec just run-assistant
     depends_on:
       datastores:
         condition: process_healthy

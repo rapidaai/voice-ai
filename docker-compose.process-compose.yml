@@ -4,3 +4,5 @@ services:
       - "assistant-api=host-gateway"
       - "ui=host-gateway"
       - "web-api=host-gateway"
+    volumes:
+      - ./.local/rapida-data/assets:/app/rapida-data/assets

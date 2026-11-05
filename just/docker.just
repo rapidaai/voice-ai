@@ -274,7 +274,8 @@ _process-compose-bin:
     if command -v go >/dev/null 2>&1; then
       go_bin="$(go env GOBIN)"
       if [[ -z "$go_bin" ]]; then
-        go_bin="$(go env GOPATH)/bin"
+        go_path="$(go env GOPATH)"
+        go_bin="${go_path%%:*}/bin"
       fi
       if [[ -x "$go_bin/process-compose" ]]; then
         printf '%s\n' "$go_bin/process-compose"
