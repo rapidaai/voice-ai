@@ -20,20 +20,18 @@ export function EndpointMetrics({ metrics }: { metrics: Array<Metric> }) {
       />
     );
   return (
-    <div className="divide-y divide-gray-200 dark:divide-gray-800 w-full">
+    <div className="divide-y divide-border-subtle w-full">
       {metrics.map((metric, index) => (
         <div
           key={`metrics-idx-${index}`}
           className="flex items-center justify-between h-12 px-4 gap-4"
         >
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-medium uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400 shrink-0">
+            <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted shrink-0">
               {metric.getName()}
             </span>
             <Tooltip
-              icon={
-                <Information size={14} className="text-gray-400 shrink-0" />
-              }
+              icon={<Information size={14} className="text-muted shrink-0" />}
             >
               <p className="font-normal text-sm p-1 px-2">
                 {metric.getDescription()}
@@ -70,11 +68,11 @@ const MetricValue = ({ value }: MetricValueProps) => {
   }
 
   if (value === 'false') {
-    return <CheckmarkFilled size={20} className="text-green-500" />;
+    return <CheckmarkFilled size={20} className="text-support-success" />;
   }
 
   if (value === 'true') {
-    return <ErrorFilled size={20} className="text-red-500" />;
+    return <ErrorFilled size={20} className="text-support-error" />;
   }
 
   return <span className="tabular-nums">{value}</span>;

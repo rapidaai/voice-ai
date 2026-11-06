@@ -236,8 +236,7 @@ describe('Dashboard HomePage', () => {
 
     expect(await screen.findByText('12,486')).toBeInTheDocument();
     expect(container.querySelector('[data-dashboard-page]')).toHaveClass(
-      'bg-gray-100',
-      'dark:bg-[#161616]',
+      'bg-layer',
     );
     expect(container.querySelector('[data-dashboard-kpi-strip]')).toHaveClass(
       'gap-4',
@@ -248,13 +247,7 @@ describe('Dashboard HomePage', () => {
     );
     expect(cards).toHaveLength(6);
     cards.forEach(card => {
-      expect(card).toHaveClass(
-        'border',
-        'border-gray-200',
-        'bg-white',
-        'dark:border-gray-800',
-        'dark:bg-[#262626]',
-      );
+      expect(card).toHaveClass('border', 'border-border-subtle', 'bg-surface');
     });
   });
 

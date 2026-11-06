@@ -205,7 +205,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
       <ConfirmDialogComponent />
       <Helmet title="Connect new websocket"></Helmet>
       <TabForm
-        className="bg-linear-to-r from-white hover:shadow-alternate to-violet-500/5 dark:from-gray-950/30 dark:via-gray-950/10 dark:to-violet-950/20"
+        className="bg-linear-to-r from-surface hover:shadow-alternate to-data-1/5 via-surface/10 "
         formHeading="Complete all steps to connect your WebSocket."
         activeTab={activeTab}
         onChangeActiveTab={() => {}}
@@ -261,7 +261,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
                         setHeaders(h);
                       }}
                       actionButtonLabel="Add Header"
-                      inputClass="bg-light-background dark:bg-gray-950"
+                      inputClass="bg-light-background bg-surface"
                     />
                   </FieldSet>
                   <FieldSet>
@@ -272,7 +272,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
                         setParameters(v);
                       }}
                       actionButtonLabel="Add Parameter"
-                      inputClass="bg-light-background dark:bg-gray-950"
+                      inputClass="bg-light-background bg-surface"
                     />
                   </FieldSet>
                 </div>

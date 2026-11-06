@@ -46,7 +46,7 @@ function ConfigSelect({
             {options.map((option, index) => (
               <TableFormRow key={optionList[index].id}>
                 <TableFormCell className="w-8 text-center">
-                  <span className="handle cursor-grab inline-flex items-center justify-center p-2 text-gray-400">
+                  <span className="handle cursor-grab inline-flex items-center justify-center p-2 text-muted">
                     <Draggable size={16} />
                   </span>
                 </TableFormCell>
@@ -94,11 +94,7 @@ function ConfigSelect({
           {label}
         </TertiaryButton>
       </div>
-      {helperText && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-          {helperText}
-        </p>
-      )}
+      {helperText && <p className="text-xs text-muted mt-2">{helperText}</p>}
     </div>
   );
 }

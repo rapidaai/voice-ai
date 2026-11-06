@@ -57,7 +57,7 @@ export function DeploymentConfigurationPanel({
     : Number(DEFAULT_UNCLEAR_INPUT_TIMEOUT);
 
   return (
-    <div className="w-full divide-y divide-gray-200 dark:divide-gray-800">
+    <div className="w-full divide-y divide-border-subtle ">
       <section>
         <DeploymentRow label="Status">
           <RecordStatusIndicator state={status || 'UNKNOWN'} />
@@ -91,10 +91,7 @@ export function DeploymentConfigurationPanel({
         </DeploymentRow>
         <DeploymentRow label="Unclear input timeout">
           <ConfigurationValue
-            value={withSeconds(
-              unclearInputTimeout.toString(),
-              'Disabled',
-            )}
+            value={withSeconds(unclearInputTimeout.toString(), 'Disabled')}
           />
         </DeploymentRow>
       </section>
@@ -133,7 +130,7 @@ function ConfigurationValue({
 }) {
   return (
     <span
-      className={`max-w-[320px] break-words text-right text-sm text-gray-900 dark:text-gray-100 ${
+      className={`max-w-[320px] break-words text-right text-sm text-foreground ${
         mono ? 'font-mono' : ''
       }`}
     >

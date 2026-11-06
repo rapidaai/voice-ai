@@ -1,7 +1,11 @@
 import { PageActionButtonBlock } from '@/app/components/layout/blocks/page-action-button-block';
 import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
 import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
-import { PrimaryButton, GhostButton } from '@/app/components/ui/primitives';
+import {
+  GhostButton,
+  InputCheckbox,
+  PrimaryButton,
+} from '@/app/components/ui/primitives';
 import { Select } from '@/app/components/ui/primitives';
 import { Slider } from '@/app/components/ui/primitives';
 import { InputGroup } from '@/app/components/ui/primitives';
@@ -38,7 +42,12 @@ function HarmfulCategoriesTable() {
           className="flex items-center border-b border-muted last:border-b-0 py-2"
         >
           <div className="flex items-center w-[120px]">
-            <input type="checkbox" checked={true} className="mr-2" />
+            <InputCheckbox
+              checked
+              readOnly
+              aria-label={`${cat.label} category enabled`}
+              className="mr-2"
+            />
             <span className="font-medium">{cat.label}</span>
           </div>
           <div className="ml-4 w-[120px]">
@@ -157,7 +166,7 @@ export const ConfigureAssistantContentFilterPage = () => {
         <PageTitleBlock>Content moderation & filter</PageTitleBlock>
       </PageHeaderBlock>
       <div className="overflow-auto flex flex-col flex-1 pb-20">
-        <div className="bg-white dark:bg-gray-900">
+        <div className="bg-surface ">
           <InputGroup title="Harmful categories">
             <div className="p-6 space-y-6">
               <HarmfulCategoriesBlock />

@@ -2,7 +2,11 @@ import { useState } from 'react';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { useRapidaStore } from '@/stores/app';
 import { TabForm } from '@/app/components/ui/composites';
-import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
+import {
+  GhostButton,
+  PrimaryButton,
+  SecondaryButton,
+} from '@/app/components/ui/primitives';
 import { ButtonSet, Slider } from '@carbon/react';
 import {
   ChevronDown,
@@ -358,10 +362,11 @@ export function CreateAgentKit() {
                     </FieldSet>
                   </div>
 
-                  <button
+                  <GhostButton
+                    size="sm"
                     type="button"
                     onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="flex items-center gap-1.5 text-xs font-medium text-[var(--cds-text-secondary)] hover:text-[var(--cds-text-primary)] transition-colors"
+                    className="w-fit"
                   >
                     <ChevronDown
                       size={16}
@@ -370,10 +375,10 @@ export function CreateAgentKit() {
                       }`}
                     />
                     {showAdvanced ? 'Hide' : 'Show'} advanced settings
-                  </button>
+                  </GhostButton>
 
                   {showAdvanced && (
-                    <div className="pt-6 border-t border-gray-200 dark:border-gray-800 flex flex-col gap-8">
+                    <div className="pt-6 border-t border-border-subtle flex flex-col gap-8">
                       <div className="flex flex-col gap-6">
                         <SectionDivider label="Connection tuning" />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -531,7 +536,7 @@ export function CreateAgentKit() {
                           setParameters(p);
                         }}
                         initialValues={parameters}
-                        inputClass="bg-light-background dark:bg-gray-950"
+                        inputClass="bg-light-background bg-surface"
                       />
                     </FieldSet>
                   </div>
@@ -593,7 +598,9 @@ export function CreateAgentKit() {
                       className="text-xs tracking-wide uppercase"
                     >
                       Name{' '}
-                      <span className="text-red-500 ml-0.5 normal-case">*</span>
+                      <span className="text-support-error ml-0.5 normal-case">
+                        *
+                      </span>
                     </FormLabel>
                     <Input
                       name="agent_name"
@@ -684,9 +691,9 @@ export function CreateAgentKit() {
                   {/* Deployments section */}
                   <div className="flex flex-col gap-6">
                     <SectionDivider label="Deployments" />
-                    <dl className="bg-white dark:bg-gray-950">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 divide-x divide-gray-200 dark:divide-gray-800">
-                        <div className="border-y border-gray-200 dark:border-gray-800 grid grid-rows-[1fr_auto]">
+                    <dl className="bg-surface ">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 divide-x divide-border-subtle ">
+                        <div className="border-y border-border-subtle grid grid-rows-[1fr_auto]">
                           <div className="px-4 py-2">
                             <Phone className="w-6 h-6 opacity-70 mt-4" />
                             <div className="flex items-center gap-2 mt-4">
@@ -694,45 +701,47 @@ export function CreateAgentKit() {
                                 Phone call
                               </h3>
                             </div>
-                            <p className="text-sm/6 text-gray-600 md:max-w-2xs dark:text-gray-400">
+                            <p className="text-sm/6 text-muted md:max-w-2xs ">
                               Enable voice conversations over phone call
                             </p>
                           </div>
-                          <button
+                          <PrimaryButton
+                            size="md"
                             onClick={() => {
                               if (assistant)
                                 goToConfigureCall(assistant.getId());
                             }}
-                            className="cursor-pointer flex justify-between items-center border-t border-gray-200 dark:border-gray-800 px-4 py-2 text-sm/6 text-blue-500 hover:bg-blue-600 hover:text-white transition-all delay-200"
+                            className="w-full max-w-none! border-t border-border-subtle"
+                            renderIcon={ChevronRight}
                           >
                             Enable phone call
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
+                          </PrimaryButton>
                         </div>
 
-                        <div className="border-y border-gray-200 dark:border-gray-800 grid grid-rows-[1fr_auto]">
+                        <div className="border-y border-border-subtle grid grid-rows-[1fr_auto]">
                           <div className="px-4 py-2">
                             <Code className="w-6 h-6 opacity-70 mt-4" />
                             <div className="flex items-center gap-2 mt-4">
                               <h3 className="text-base/7 font-semibold">API</h3>
                             </div>
-                            <p className="text-sm/6 text-gray-600 md:max-w-2xs dark:text-gray-400">
+                            <p className="text-sm/6 text-muted md:max-w-2xs ">
                               Integrate into your application using SDKs
                             </p>
                           </div>
-                          <button
+                          <PrimaryButton
+                            size="md"
                             onClick={() => {
                               if (assistant)
                                 goToConfigureApi(assistant.getId());
                             }}
-                            className="cursor-pointer flex justify-between items-center border-t border-gray-200 dark:border-gray-800 px-4 py-2 text-sm/6 text-blue-500 hover:bg-blue-600 hover:text-white transition-all delay-200"
+                            className="w-full max-w-none! border-t border-border-subtle"
+                            renderIcon={ChevronRight}
                           >
                             Enable API
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
+                          </PrimaryButton>
                         </div>
 
-                        <div className="border-y border-gray-200 dark:border-gray-800 grid grid-rows-[1fr_auto]">
+                        <div className="border-y border-border-subtle grid grid-rows-[1fr_auto]">
                           <div className="px-4 py-2">
                             <Globe className="w-6 h-6 opacity-70 mt-4" />
                             <div className="flex items-center gap-2 mt-4">
@@ -740,24 +749,25 @@ export function CreateAgentKit() {
                                 Web Widget
                               </h3>
                             </div>
-                            <p className="text-sm/6 text-gray-600 md:max-w-2xs dark:text-gray-400">
+                            <p className="text-sm/6 text-muted md:max-w-2xs ">
                               Embed on your website to handle text and voice
                               customer queries.
                             </p>
                           </div>
-                          <button
+                          <PrimaryButton
+                            size="md"
                             onClick={() => {
                               if (assistant)
                                 goToConfigureWeb(assistant.getId());
                             }}
-                            className="cursor-pointer flex justify-between items-center border-t border-gray-200 dark:border-gray-800 px-4 py-2 text-sm/6 text-blue-500 hover:bg-blue-600 hover:text-white transition-all delay-200"
+                            className="w-full max-w-none! border-t border-border-subtle"
+                            renderIcon={ChevronRight}
                           >
                             Deploy to Web Widget
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
+                          </PrimaryButton>
                         </div>
 
-                        <div className="border-y border-gray-200 dark:border-gray-800 grid grid-rows-[1fr_auto]">
+                        <div className="border-y border-border-subtle grid grid-rows-[1fr_auto]">
                           <div className="px-4 py-2">
                             <Debug className="w-6 h-6 opacity-70 mt-4" />
                             <div className="flex items-center gap-2 mt-4">
@@ -765,20 +775,21 @@ export function CreateAgentKit() {
                                 Debugger / Testing
                               </h3>
                             </div>
-                            <p className="text-sm/6 text-gray-600 md:max-w-2xs dark:text-gray-400">
+                            <p className="text-sm/6 text-muted md:max-w-2xs ">
                               Deploy the agent for testing and debugging.
                             </p>
                           </div>
-                          <button
+                          <PrimaryButton
+                            size="md"
                             onClick={() => {
                               if (assistant)
                                 goToConfigureDebugger(assistant.getId());
                             }}
-                            className="cursor-pointer flex justify-between items-center border-t border-gray-200 dark:border-gray-800 px-4 py-2 text-sm/6 text-blue-500 hover:bg-blue-600 hover:text-white transition-all delay-200"
+                            className="w-full max-w-none! border-t border-border-subtle"
+                            renderIcon={ChevronRight}
                           >
                             Deploy to Debugger / Testing
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
+                          </PrimaryButton>
                         </div>
                       </div>
                     </dl>
@@ -788,13 +799,13 @@ export function CreateAgentKit() {
                   <div className="flex flex-col gap-6">
                     <SectionDivider label="Analysis" />
                     <div
-                      className="bg-white dark:bg-gray-950 cursor-pointer"
+                      className="bg-surface cursor-pointer"
                       onClick={() => {
                         if (assistant)
                           goToCreateAssistantAnalysis(assistant.getId());
                       }}
                     >
-                      <div className="flex w-full justify-between gap-4 select-none border-y border-gray-200 dark:border-gray-800 px-4 py-3">
+                      <div className="flex w-full justify-between gap-4 select-none border-y border-border-subtle px-4 py-3">
                         <div className="text-left text-sm/7 font-semibold text-pretty">
                           Gain insights from every interaction — automatic
                           conversation transcripts, quality, sentiment, and SOP
@@ -809,13 +820,13 @@ export function CreateAgentKit() {
                   <div className="flex flex-col gap-6">
                     <SectionDivider label="Webhook & Integration" />
                     <div
-                      className="bg-white dark:bg-gray-950 cursor-pointer"
+                      className="bg-surface cursor-pointer"
                       onClick={() => {
                         if (assistant)
                           goToCreateAssistantWebhook(assistant.getId());
                       }}
                     >
-                      <div className="flex w-full justify-between gap-4 select-none border-y border-gray-200 dark:border-gray-800 px-4 py-3">
+                      <div className="flex w-full justify-between gap-4 select-none border-y border-border-subtle px-4 py-3">
                         <div className="text-left text-sm/7 font-semibold text-pretty">
                           Keep your workflows connected by triggering events
                           when key actions happen — conversation started /

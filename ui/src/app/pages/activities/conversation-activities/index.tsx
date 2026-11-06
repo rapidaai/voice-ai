@@ -342,7 +342,7 @@ export const ListingPage: FC<{}> = () => {
                             </span>
                           </Tag>
                         ) : (
-                          <span className="text-gray-400 text-sm">N/A</span>
+                          <span className="text-muted text-sm">N/A</span>
                         )}
                       </TableCell>
                     )}
@@ -353,7 +353,7 @@ export const ListingPage: FC<{}> = () => {
                             {row.getBody()}
                           </p>
                         ) : (
-                          <span className="text-gray-400 text-sm">N/A</span>
+                          <span className="text-muted text-sm">N/A</span>
                         )}
                       </TableCell>
                     )}

@@ -406,7 +406,7 @@ const ConfigureAssistantWebDeployment: FC<{ assistantId: string }> = ({
           goToDeploymentAssistant(assistantId);
         }}
       />
-      <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-900">
+      <div className="flex flex-col flex-1 min-h-0 bg-surface ">
         <TabForm
           formHeading="Complete all steps to configure your web widget deployment."
           activeTab={activeTab}

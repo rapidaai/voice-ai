@@ -57,7 +57,7 @@ import { ChatCompletePrompt } from '@/utils/prompt';
 import toast from 'react-hot-toast/headless';
 import { ConfigureAssistantNextDialog } from '@/app/components/dialogs/assistant';
 import { SectionDivider } from '@/app/components/layout/blocks/section-divider';
-import { CornerBorderOverlay } from '@/app/components/ui/primitives';
+import { ActionCard } from '@/app/components/ui/primitives';
 import {
   Add,
   ArrowUpRight,
@@ -446,30 +446,28 @@ export function CreateAssistantPage() {
                   conversational agents across multiple channels.
                 </DocNoticeBlock>
                 <div className="px-8 pt-6 pb-8 max-w-4xl flex flex-col gap-8">
-                  {/* Quick start — Usecase Template tile */}
-                  <button
-                    type="button"
-                    className="group relative w-full flex items-start justify-between gap-4 p-4 text-left bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors duration-100"
+                  {/* Quick start Usecase Template tile */}
+                  <ActionCard
+                    className="group relative w-full flex items-start justify-between gap-4 p-4 text-left bg-surface border border-border-subtle hover:bg-layer transition-colors duration-100"
                     onClick={() => setTemplateModalOpen(true)}
                   >
-                    <CornerBorderOverlay />
                     <div className="flex flex-col gap-1 min-w-0">
-                      <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--cds-text-secondary)]">
+                      <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted">
                         Quick start
                       </span>
-                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <span className="text-sm font-medium text-foreground ">
                         Usecase Template
                       </span>
-                      <span className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
+                      <span className="text-xs text-muted leading-relaxed">
                         Browse 8 pre-configured assistant templates and
                         auto-fill your form.
                       </span>
                     </div>
                     <ArrowUpRight
-                      className="shrink-0 mt-0.5 text-[var(--cds-text-secondary)] group-hover:text-primary transition-colors"
+                      className="shrink-0 mt-0.5 text-muted group-hover:text-primary transition-colors"
                       size={16}
                     />
-                  </button>
+                  </ActionCard>
 
                   {/* Model configuration section */}
                   <div className="flex flex-col gap-6">
@@ -553,7 +551,7 @@ export function CreateAssistantPage() {
                     totalSelected={selectedToolName ? 1 : 0}
                     totalCount={tools.length}
                     onCancel={() => setSelectedToolName(null)}
-                    className="[&_[class*=divider]]:hidden [&_.cds--btn]:transition-colors [&_.cds--btn:hover]:!bg-primary [&_.cds--btn:hover]:!text-white"
+                    className="[&_[class*=divider]]:hidden [&_.cds--btn]:transition-colors [&_.cds--btn:hover]:!bg-primary [&_.cds--btn:hover]:!text-on-primary"
                   >
                     {selectedToolName && (
                       <>
@@ -760,7 +758,7 @@ export function CreateAssistantPage() {
             body: (
               <div className="px-8 pt-8 pb-8 max-w-2xl">
                 <Stack gap={7}>
-                  <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">
+                  <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted ">
                     Identity
                   </p>
                   <TextInput
@@ -780,7 +778,7 @@ export function CreateAssistantPage() {
                     rows={4}
                     helperText="Provide a description to explain what this assistant is about."
                   />
-                  <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">
+                  <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted ">
                     Labels
                   </p>
                   <TagInput

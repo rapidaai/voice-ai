@@ -18,7 +18,7 @@ export function ProjectUserGroupAvatar({
     >
       {members.map((member, index) => (
         <li key={`${member.name}-${index}`} aria-label={member.name}>
-          <div className="block rounded-[2px] border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600">
+          <div className="block rounded-[2px] border border-border-subtle hover:border-border-strong ">
             <TextImage size={size} name={member.name} />
           </div>
         </li>

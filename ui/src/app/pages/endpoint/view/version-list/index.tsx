@@ -44,7 +44,7 @@ function VersionId({ id }: { id: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <span className="inline-flex items-center gap-1 font-mono text-[13px] text-gray-600 dark:text-gray-400">
+    <span className="inline-flex items-center gap-1 font-mono text-[13px] text-muted ">
       {version}
       <Button
         hasIconOnly

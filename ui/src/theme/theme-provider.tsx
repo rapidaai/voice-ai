@@ -10,7 +10,13 @@ import React, {
 } from 'react';
 import { THEME_STORAGE_KEY } from './theme-config';
 import { safeStorageGet, safeStorageSet } from './theme-storage';
-import { ResolvedThemeMode, ThemeManifest, ThemeMode } from './types';
+import {
+  ResolvedThemeMode,
+  ThemeColorField,
+  ThemeManifest,
+  ThemeMode,
+} from './types';
+import themeContract from './theme-contract.json';
 
 interface ThemeContextValue {
   theme: ThemeManifest;
@@ -51,14 +57,26 @@ export const applyThemeToDocument = (
   const root = document.documentElement;
   const colors = theme.colors[resolvedMode];
 
-  root.dataset.brand = theme.id;
-  root.dataset.colorMode = resolvedMode;
-  root.dataset.themeReady = 'true';
+  root.setAttribute(themeContract.documentAttributes.brand, theme.id);
+  root.setAttribute(themeContract.documentAttributes.colorMode, resolvedMode);
+  root.setAttribute(
+    themeContract.documentAttributes.carbonTheme,
+    colors.carbonTheme,
+  );
+  root.setAttribute(themeContract.documentAttributes.themeReady, 'true');
+  root.setAttribute(
+    themeContract.documentAttributes.themeSchema,
+    String(theme.schemaVersion),
+  );
   root.style.colorScheme = resolvedMode;
-  root.style.setProperty('--brand-primary', colors.primary);
-  root.style.setProperty('--brand-primary-hover', colors.primaryHover);
-  root.style.setProperty('--brand-primary-active', colors.primaryActive);
-  root.style.setProperty('--brand-on-primary', colors.onPrimary);
+  for (const field of Object.keys(
+    themeContract.colorFields,
+  ) as ThemeColorField[]) {
+    root.style.setProperty(
+      themeContract.colorFields[field].property,
+      colors[field],
+    );
+  }
 
   if (theme.brand.favicon) {
     const icons = document.querySelectorAll<HTMLLinkElement>(

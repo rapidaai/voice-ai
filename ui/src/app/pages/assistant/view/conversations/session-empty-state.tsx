@@ -23,19 +23,11 @@ export function SessionEmptyState({
       )}
     >
       <div className="flex max-w-md flex-col items-center">
-        <Icon
-          aria-hidden="true"
-          size={32}
-          className="text-[var(--cds-icon-secondary)]"
-        />
+        <Icon aria-hidden="true" size={32} className="text-icon-secondary" />
         <Text as="h2" variant="heading-03" className="mt-4">
           {title}
         </Text>
-        <Text
-          as="p"
-          variant="body-01"
-          className="mt-2 text-[var(--cds-text-secondary)]"
-        >
+        <Text as="p" variant="body-01" className="mt-2 text-muted">
           {description}
         </Text>
       </div>

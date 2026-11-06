@@ -410,7 +410,7 @@ const ConfigureAssistantCallDeployment: FC<{ assistantId: string }> = ({
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-900">
+    <div className="flex flex-col flex-1 min-h-0 bg-surface ">
       <ConfirmDialogComponent />
       <TabForm
         formHeading="Complete all steps to configure your phone call deployment."

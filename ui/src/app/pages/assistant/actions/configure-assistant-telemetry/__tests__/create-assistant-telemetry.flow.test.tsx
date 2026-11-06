@@ -245,7 +245,6 @@ describe('Create assistant telemetry flow', () => {
 
     const pageRoot = container.querySelector('section > div') as HTMLElement;
     expect(pageRoot).toBeInTheDocument();
-    expect(pageRoot).toHaveClass('bg-white');
-    expect(pageRoot).toHaveClass('dark:bg-gray-900');
+    expect(pageRoot).toHaveClass('bg-surface');
   });
 });

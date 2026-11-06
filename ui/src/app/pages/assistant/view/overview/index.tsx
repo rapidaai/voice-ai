@@ -29,7 +29,7 @@ export const Overview: FC<{ currentAssistant: Assistant }> = ({
 
   return (
     <div className="flex flex-col flex-1 grow">
-      <header className="flex h-12 shrink-0 items-center justify-between bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+      <header className="flex h-12 shrink-0 items-center justify-between bg-surface border-b border-border-subtle ">
         <div className="min-w-0 pl-4">
           <Breadcrumb noTrailingSlash>
             <BreadcrumbItem href="/deployment/assistant">
@@ -66,7 +66,7 @@ export const Overview: FC<{ currentAssistant: Assistant }> = ({
         !currentAssistant.getDebuggerdeployment() &&
         !currentAssistant.getWebplugindeployment() &&
         !currentAssistant.getPhonedeployment() && (
-          <div className="max-md:bg-[var(--cds-notification-background-warning)]">
+          <div className="max-md:bg-notification-warning">
             <ActionNotification
               kind="warning"
               title="Your assistant is ready, but not live yet."

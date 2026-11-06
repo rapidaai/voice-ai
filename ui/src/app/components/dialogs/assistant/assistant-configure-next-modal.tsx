@@ -102,7 +102,7 @@ export function ConfigureAssistantNextDialog({
 
       <ModalBody hasScrollingContent>
         {/* Deployment channels */}
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted mb-3">
           Deployment Channels
         </h2>
         <div className="grid grid-cols-2 gap-4 mb-6">
@@ -114,12 +114,9 @@ export function ConfigureAssistantNextDialog({
                 className="!rounded-none !p-4 !flex !flex-col"
                 onClick={option.onClick}
               >
-                <Icon
-                  size={24}
-                  className="text-gray-500 dark:text-gray-400 mb-3"
-                />
+                <Icon size={24} className="text-muted mb-3" />
                 <p className="text-sm font-semibold mb-1">{option.title}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed flex-1">
+                <p className="text-xs text-muted leading-relaxed flex-1">
                   {option.description}
                 </p>
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-primary mt-3">
@@ -131,7 +128,7 @@ export function ConfigureAssistantNextDialog({
         </div>
 
         {/* Automation */}
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted mb-3">
           Automation & Integrations
         </h2>
         <div className="flex flex-col gap-2">
@@ -143,13 +140,10 @@ export function ConfigureAssistantNextDialog({
                 className="!rounded-none !p-4 !flex !flex-row !items-center !gap-4"
                 onClick={option.onClick}
               >
-                <Icon
-                  size={24}
-                  className="text-gray-500 dark:text-gray-400 shrink-0"
-                />
+                <Icon size={24} className="text-muted shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold">{option.title}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  <p className="text-xs text-muted mt-0.5">
                     {option.description}
                   </p>
                 </div>

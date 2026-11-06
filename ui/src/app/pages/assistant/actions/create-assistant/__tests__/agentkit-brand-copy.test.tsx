@@ -165,6 +165,9 @@ jest.mock('@/app/components/ui/composites/tab-form', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives/button', () => ({
+  GhostButton: ({ children, isLoading: _isLoading, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
   PrimaryButton: ({ children, isLoading: _isLoading, ...props }: any) => (
     <button {...props}>{children}</button>
   ),
@@ -295,12 +298,14 @@ const theme: ThemeManifest = {
   allowModeSelection: false,
   colors: {
     light: {
+      carbonTheme: 'white',
       primary: '#111111',
       primaryHover: '#222222',
       primaryActive: '#333333',
       onPrimary: '#ffffff',
     },
     dark: {
+      carbonTheme: 'g100',
       primary: '#eeeeee',
       primaryHover: '#dddddd',
       primaryActive: '#cccccc',

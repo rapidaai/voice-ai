@@ -232,9 +232,9 @@ export const PreviewPhoneAgent = ({
       <div
         role="toolbar"
         aria-label="Phone debugger toolbar"
-        className="flex h-12 shrink-0 items-center border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)]"
+        className="flex h-12 shrink-0 items-center border-b border-border-subtle bg-layer"
       >
-        <h1 className="min-w-0 flex-1 truncate px-4 text-sm font-semibold text-[var(--cds-text-primary)]">
+        <h1 className="min-w-0 flex-1 truncate px-4 text-sm font-semibold text-foreground">
           {assistant?.getName() || 'Phone debugger'}
         </h1>
         <IconOnlyButton
@@ -247,7 +247,7 @@ export const PreviewPhoneAgent = ({
           aria-pressed={isConfigurationOpen}
           className={`!h-12 !w-12 shrink-0 !border-b-2 ${
             isConfigurationOpen
-              ? '!border-b-[var(--cds-border-interactive)] !bg-[var(--cds-layer-selected-01)]'
+              ? '!border-b-primary !bg-layer-selected'
               : '!border-b-transparent'
           }`}
           onClick={() => setIsConfigurationOpen(open => !open)}
@@ -255,9 +255,9 @@ export const PreviewPhoneAgent = ({
       </div>
 
       <div className="relative flex min-h-0 flex-1">
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--cds-background)]">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface">
           {!embedded ? (
-            <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-200 dark:border-gray-800 shrink-0">
+            <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border-subtle shrink-0">
               <IconOnlyButton
                 kind="ghost"
                 size="sm"
@@ -267,7 +267,7 @@ export const PreviewPhoneAgent = ({
                   window.location.href = `/deployment/assistant/${assistantId}/overview`;
                 }}
               />
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              <span className="text-sm font-medium text-foreground ">
                 Back to Assistant
               </span>
             </div>
@@ -285,7 +285,7 @@ export const PreviewPhoneAgent = ({
                     isLoading={!assistant}
                     heading
                     skeletonWidth="60%"
-                    className="text-xl font-semibold text-gray-900 dark:text-gray-100"
+                    className="text-xl font-semibold text-foreground "
                   >
                     Debug Phone Call
                   </Text>
@@ -293,7 +293,7 @@ export const PreviewPhoneAgent = ({
                     as="p"
                     isLoading={!assistant}
                     skeletonWidth="80%"
-                    className="text-[var(--cds-text-secondary)]"
+                    className="text-muted"
                   >
                     Place a live test call to validate your phone deployment
                     end-to-end.
@@ -353,7 +353,7 @@ export const PreviewPhoneAgent = ({
               </Stack>
             </div>
 
-            <div className="flex h-12 shrink-0 items-stretch justify-end border-t border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)]">
+            <div className="flex h-12 shrink-0 items-stretch justify-end border-t border-border-subtle bg-layer">
               {callStatus === 'success' ? (
                 <GhostButton
                   size="md"
@@ -381,16 +381,16 @@ export const PreviewPhoneAgent = ({
             <button
               type="button"
               aria-label="Close configuration overlay"
-              className="absolute inset-0 z-10 bg-[var(--cds-overlay)] xl:hidden"
+              className="absolute inset-0 z-10 bg-overlay xl:hidden"
               onClick={() => setIsConfigurationOpen(false)}
             />
             <aside
               id="phone-debugger-details-panel"
               aria-label="Session configuration"
-              className="absolute inset-y-0 right-0 z-20 flex w-full flex-col border-l border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)] sm:w-[24rem] xl:relative xl:z-auto"
+              className="absolute inset-y-0 right-0 z-20 flex w-full flex-col border-l border-border-subtle bg-layer sm:w-[24rem] xl:relative xl:z-auto"
             >
-              <div className="flex h-12 shrink-0 items-center border-b border-[var(--cds-border-subtle-01)] px-4">
-                <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--cds-text-primary)]">
+              <div className="flex h-12 shrink-0 items-center border-b border-border-subtle px-4">
+                <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
                   Session configuration
                 </h2>
                 <IconOnlyButton

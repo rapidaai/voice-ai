@@ -154,8 +154,8 @@ export function TextProvider({
               <span>Model</span>
             </div>
           </div>
-          <div className="text-provider-combo-row flex w-full items-stretch bg-[var(--cds-field)] border-b border-b-[var(--cds-border-strong)]">
-            <div className="w-48 shrink-0 border-r border-gray-200 dark:border-gray-700">
+          <div className="text-provider-combo-row flex w-full items-stretch border-b border-b-border-strong bg-field">
+            <div className="w-48 shrink-0 border-r border-border-subtle">
               <Dropdown
                 id="text-provider"
                 titleText="Model provider"

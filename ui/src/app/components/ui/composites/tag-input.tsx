@@ -83,7 +83,7 @@ export function TagInput({
       )}
       {suggestedTags.length > 0 && (
         <div className="mt-3">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-muted mb-1.5">
             Suggestions
           </p>
           <div className="flex flex-wrap gap-1">

@@ -39,6 +39,45 @@ Avoid importing production page or domain code from a specific shared component 
 unless the module has a default export, owns a browser-only dependency, or a focused
 test mock needs a file-level boundary.
 
+## Carbon Component Inventory
+
+The shared component layer owns the Carbon boundary. A wrapper preserves the application
+API while delegating interaction, accessibility, and state behavior to the named Carbon
+primitive.
+
+| Application component or family | Carbon implementation | Verification |
+| --- | --- | --- |
+| Buttons, icon buttons, and loading buttons | `Button` and `ButtonSkeleton` | `primitives/__tests__/button.test.tsx` |
+| Breadcrumb, dropdown, list box, select, slider, toggle, tabs, tooltip, overflow menu, pagination, checkbox, text input, and text area wrappers | Matching Carbon component | Focused tests under `primitives/__tests__` |
+| Static cards and tiles | `Tile` and `SkeletonPlaceholder` | Domain component tests and stable browser journeys |
+| Radio selection cards | `RadioTile` | `primitives/__tests__/checkbox-card.test.tsx` |
+| Modal and form wrappers | Carbon modal, form, stack, and field components | Primitive tests plus route form tests |
+| Table, table head, row, header, body, and cell wrappers | Carbon table primitives | Tests under `table/__tests__` and `table/table.stories.tsx` |
+| Notifications, toast, loading, empty state, and status indicators | Carbon notification, loading, button, and preview indicator components | Tests under `feedback/__tests__` |
+| Date filter, tag input, table toolbar filter, and menu composites | Carbon date, tag, checkbox, popover, button, and overflow-menu primitives | Tests under `composites/__tests__` |
+| Code and JSON editors | Carbon actions around Monaco or CodeMirror editor surfaces | `editor/__tests__/editor-components.test.tsx` and the registered editor adapter |
+
+Carbon does not supply every product interaction. The following retained composites use
+native semantics only where substituting a Carbon component would remove required
+behavior. Their colors still resolve through semantic Tailwind aliases backed by Carbon
+properties.
+
+| Retained composite | Why a direct Carbon replacement is not complete | Behavioral coverage |
+| --- | --- | --- |
+| `composites/query-search` | This is a parser-driven inline token editor with editable filter chips, field and logic pickers, and an anchored calendar. Carbon supplies surrounding controls but has no query-grammar editor with its focus and token-editing contract. | `composites/query-search/__tests__/query-search-model.test.ts` and `composites/query-search/__tests__/query-search.test.tsx` |
+| `primitives/ScalableTextarea` | Carbon `TextArea` owns ordinary text areas. The prompt editor variant needs content-driven height, an inline action slot, and no nested field wrapper. | `primitives/__tests__/textarea.test.tsx` |
+| `table/TableForm` | It is a compact form grid whose cells contain Carbon fields. It is not tabular data, so DataTable selection, sorting, and row behavior would be misleading. | `table/__tests__/table-form.test.tsx` |
+| `table/ScrollableResizableTable` | It composes Carbon table primitives but retains the application column-resize contract, which Carbon DataTable does not provide. | `table/__tests__/data-table.test.tsx` |
+| `composites/TabForm` | It is an interactive setup rail with per-step descriptions and route-owned action regions. Carbon progress indicators do not expose this navigation and content contract. | `composites/__tests__/tab-form.test.tsx` |
+| Agentflow canvas editors | React Flow owns drag, selection, connection, and canvas focus behavior. Carbon fields and actions are composed inside nodes and panels; native canvas triggers remain inside the React Flow boundary. | Agentflow unit tests and create-agentflow Playwright journeys |
+| Audio and voice controls | Browser media elements and the voice SDK own playback, capture, and push-to-talk lifecycles. Carbon buttons are used for ordinary surrounding actions. | Audio-player and voice-agent unit tests plus preview-agent browser journeys |
+| `dialogs/shared/RightSideModal` resize handle | Carbon has no drawer-width resize control. The native button is a pointer-driven separator handle with a fixed accessible name; all ordinary modal actions remain Carbon controls. | `dialogs/shared/__tests__/right-side-modal.test.tsx` |
+| Hidden form and upload inputs | React Hook Form requires hidden identity inputs, and react-dropzone owns its hidden file-input props. These elements have no visual or direct interaction surface; visible fields and actions use Carbon. | Workspace and project modal tests plus the create-knowledge-document flow test |
+
+Provider and route code must use these shared wrappers for ordinary controls. A new native
+control requires a row in this inventory with a Carbon gap, an owner, and focused behavior
+coverage. Visual preference is not a sufficient exception.
+
 ## Carbon Typography
 
 Use the `Text` primitive from `primitives/text.tsx` for Carbon typesets. The UI bundles
@@ -65,10 +104,16 @@ variant. When a component cannot render `Text`, compose its class name from
 `tracking-*` typography utilities in page or layout code.
 
 Primary action labels must use the shared `PrimaryButton`. It renders labels through
-`Text` with the productive `body-compact-01` typeset and owns the white-on-primary
-color contract for default, hover, and active states. Dark mode uses an accessible
-darker ramp derived from the configured primary color. Do not restyle primary button
-typography or colors in page code.
+`Text` with the productive `body-compact-01` typeset. The selected Carbon preset and
+configured brand ramp own default, hover, active, and foreground colors. Do not
+restyle primary button typography or colors in page code.
+
+Use Carbon components for controls, fields, navigation, tables, notifications,
+overlays, and loading states. Domain composites may combine Carbon primitives while
+preserving their states, keyboard behavior, type roles, spacing, and icon conventions.
+Use Tailwind semantic classes for component layout and color roles. Do not add a
+component stylesheet, literal palette class, structural `dark:` color pair, arbitrary
+color, or direct Carbon property expression.
 
 ### Utility styles
 

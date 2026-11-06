@@ -88,19 +88,14 @@ const Toggletip =
 type VoicePhase = 'idle' | 'connecting' | 'listening';
 
 function VoiceActionIcon(props: ComponentProps<typeof VoiceMode>) {
-  return (
-    <VoiceMode
-      {...props}
-      style={{ ...props.style, fill: 'var(--cds-link-primary)' }}
-    />
-  );
+  return <VoiceMode {...props} className={cn(props.className, 'fill-link')} />;
 }
 
 function StopActionIcon(props: ComponentProps<typeof StopFilledAlt>) {
   return (
     <StopFilledAlt
       {...props}
-      style={{ ...props.style, fill: 'var(--cds-support-error)' }}
+      className={cn(props.className, 'fill-support-error')}
     />
   );
 }
@@ -255,8 +250,8 @@ function PreviewVoiceAgentV2Workspace({
 }) {
   const navigate = useNavigate();
   const { resolvedMode } = useTheme();
-  const chatBackgroundColor = resolvedMode === 'dark' ? '#161616' : '#f4f4f4';
-  const chatActionColor = resolvedMode === 'dark' ? '#262626' : '#ffffff';
+  const chatBackgroundColor = 'var(--color-surface)';
+  const chatActionColor = 'var(--color-chat-prompt)';
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const conversationRef = useRef<HTMLElement>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -1079,8 +1074,7 @@ function PreviewVoiceAgentV2Workspace({
           aria-pressed={isConfigurationOpen}
           className={cn(
             'h-12! w-12! shrink-0 border-b-2! border-b-transparent!',
-            isConfigurationOpen &&
-              'border-b-[var(--cds-border-interactive)]! bg-[var(--cds-layer-selected-01)]!',
+            isConfigurationOpen && 'border-b-primary! bg-layer-selected!',
           )}
           onClick={toggleConfiguration}
         >
@@ -1096,7 +1090,7 @@ function PreviewVoiceAgentV2Workspace({
         voicePhase === 'idle' ? null : (
           <div
             data-testid="voice-session-dock"
-            className="bg-[var(--cds-chat-prompt-background,var(--cds-background))] px-2 py-2"
+            className="bg-chat-prompt px-2 py-2"
           >
             {voicePhase === 'connecting' ? (
               <div
@@ -1124,7 +1118,7 @@ function PreviewVoiceAgentV2Workspace({
                 <div
                   role="status"
                   aria-live="polite"
-                  className="flex min-h-10 min-w-40 flex-1 items-center gap-2 px-2 text-sm text-[var(--cds-text-primary)]"
+                  className="flex min-h-10 min-w-40 flex-1 items-center gap-2 px-2 text-sm text-foreground"
                 >
                   {isVoiceMuted ? (
                     <MicrophoneOff size={16} />
@@ -1167,7 +1161,7 @@ function PreviewVoiceAgentV2Workspace({
                       renderIcon={StopActionIcon}
                       iconDescription="End voice conversation"
                       tooltipPosition="top"
-                      className="!text-[var(--cds-support-error)]"
+                      className="!text-support-error"
                       onClick={() => setIsEndConfirmationOpen(true)}
                     />
                   </div>
@@ -1196,7 +1190,7 @@ function PreviewVoiceAgentV2Workspace({
               <Toggletip align="top-end" autoAlign>
                 <ToggletipButton
                   label="Voice is not configured"
-                  className="!flex !h-8 !w-8 items-center justify-center hover:bg-[var(--cds-background-hover)]"
+                  className="!flex !h-8 !w-8 items-center justify-center hover:bg-surface-hover"
                 >
                   <VoiceActionIcon size={16} />
                 </ToggletipButton>
@@ -1358,7 +1352,7 @@ function PreviewVoiceAgentV2Workspace({
               type="button"
               tabIndex={-1}
               aria-label="Close details panel"
-              className="absolute inset-0 z-10 bg-black/40 min-[1056px]:hidden"
+              className="absolute inset-0 z-10 bg-surface-inverse/40 min-[1056px]:hidden"
               onClick={closePanel}
             />
           ) : null}
@@ -1371,14 +1365,14 @@ function PreviewVoiceAgentV2Workspace({
               aria-modal={isOverlayPanel ? true : undefined}
               aria-labelledby="debugger-details-title"
               aria-label="Session configuration"
-              className="absolute inset-y-0 right-0 z-20 flex w-full shrink-0 flex-col border-l border-[var(--cds-border-subtle-01)] bg-[var(--cds-background)] shadow-2xl sm:w-96 min-[1056px]:static min-[1056px]:z-auto min-[1056px]:shadow-none"
+              className="absolute inset-y-0 right-0 z-20 flex w-full shrink-0 flex-col border-l border-border-subtle bg-surface shadow-2xl sm:w-96 min-[1056px]:static min-[1056px]:z-auto min-[1056px]:shadow-none"
               onKeyDown={handlePanelKeyDown}
             >
               <Layer level={1} className="flex min-h-0 flex-1 flex-col">
-                <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)] pl-4">
+                <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-border-subtle bg-layer pl-4">
                   <h2
                     id="debugger-details-title"
-                    className="min-w-0 truncate text-sm font-semibold text-[var(--cds-text-primary)]"
+                    className="min-w-0 truncate text-sm font-semibold text-foreground"
                   >
                     Session configuration
                   </h2>
@@ -1392,7 +1386,7 @@ function PreviewVoiceAgentV2Workspace({
                   />
                 </header>
 
-                <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--cds-layer-01)]">
+                <div className="min-h-0 flex-1 overflow-y-auto bg-layer">
                   <section aria-label="Session settings">
                     <Accordion
                       aria-label="Session configuration sections"
@@ -1416,12 +1410,12 @@ function PreviewVoiceAgentV2Workspace({
                               <span className="flex min-w-0 items-center gap-2">
                                 <ItemIcon
                                   size={16}
-                                  className="shrink-0 text-[var(--cds-icon-secondary)]"
+                                  className="shrink-0 text-icon-secondary"
                                 />
-                                <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--cds-text-primary)]">
+                                <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
                                   {item.label}
                                 </span>
-                                <span className="max-w-36 shrink truncate text-xs text-[var(--cds-text-secondary)]">
+                                <span className="max-w-36 shrink truncate text-xs text-muted">
                                   {summary}
                                 </span>
                               </span>
@@ -1437,16 +1431,16 @@ function PreviewVoiceAgentV2Workspace({
                                 {item.configuration.map(option => (
                                   <StructuredListRow key={option.id}>
                                     <StructuredListCell className="!w-[48%] !py-2 !pl-4 !pr-2 align-top">
-                                      <span className="block text-sm text-[var(--cds-text-primary)]">
+                                      <span className="block text-sm text-foreground">
                                         {option.label}
                                       </span>
-                                      <span className="block break-all font-mono text-[0.6875rem] leading-4 text-[var(--cds-text-helper)]">
+                                      <span className="block break-all font-mono text-[0.6875rem] leading-4 text-helper">
                                         {option.key}
                                       </span>
                                     </StructuredListCell>
                                     <StructuredListCell className="min-w-0 !py-2 !pl-2 !pr-4 align-top">
                                       <div className="flex min-w-0 items-start justify-end gap-1 text-right">
-                                        <span className="min-w-0 break-all pt-1.5 text-sm text-[var(--cds-text-primary)]">
+                                        <span className="min-w-0 break-all pt-1.5 text-sm text-foreground">
                                           {option.value}
                                         </span>
                                         {isCopyableConfigurationKey(
@@ -1475,12 +1469,12 @@ function PreviewVoiceAgentV2Workspace({
                           <span className="flex min-w-0 items-center gap-2">
                             <ValueVariable
                               size={16}
-                              className="shrink-0 text-[var(--cds-icon-secondary)]"
+                              className="shrink-0 text-icon-secondary"
                             />
-                            <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--cds-text-primary)]">
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
                               Arguments
                             </span>
-                            <span className="max-w-36 shrink truncate text-xs text-[var(--cds-text-secondary)]">
+                            <span className="max-w-36 shrink truncate text-xs text-muted">
                               {promptVariables.length} variables
                             </span>
                           </span>
@@ -1493,10 +1487,10 @@ function PreviewVoiceAgentV2Workspace({
                           {promptVariables.length === 0 ? (
                             <div className="flex min-h-32 items-center justify-center px-4 text-center">
                               <div>
-                                <p className="text-sm font-semibold text-[var(--cds-text-primary)]">
+                                <p className="text-sm font-semibold text-foreground">
                                   No arguments defined
                                 </p>
-                                <p className="mt-1 text-sm text-[var(--cds-text-secondary)]">
+                                <p className="mt-1 text-sm text-muted">
                                   This assistant does not expose prompt
                                   variables.
                                 </p>
@@ -1520,7 +1514,7 @@ function PreviewVoiceAgentV2Workspace({
                                     </span>
                                     <span
                                       aria-hidden="true"
-                                      className="text-xs font-normal text-[var(--cds-text-helper)]"
+                                      className="text-xs font-normal text-helper"
                                     >
                                       {helperText}
                                     </span>
@@ -1543,9 +1537,9 @@ function PreviewVoiceAgentV2Workspace({
                                   return (
                                     <div
                                       key={variable.name}
-                                      className="border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-field-01)] px-4 py-3 last:border-b-0"
+                                      className="border-b border-border-subtle bg-field px-4 py-3 last:border-b-0"
                                     >
-                                      <p className="mb-2 font-mono text-sm font-medium text-[var(--cds-text-primary)]">
+                                      <p className="mb-2 font-mono text-sm font-medium text-foreground">
                                         {label}
                                       </p>
                                       <InlineNotification

@@ -68,7 +68,7 @@ function MetadataTags({ values }: { values: Array<string | undefined> }) {
   const visibleValues = availableValues(values);
 
   if (visibleValues.length === 0) {
-    return <span className="text-sm text-[var(--cds-text-secondary)]">—</span>;
+    return <span className="text-sm text-muted">—</span>;
   }
 
   return (
@@ -257,7 +257,7 @@ export function VoiceCatalog(props: {
                             if (cell.info.header === 'name') {
                               return (
                                 <TableCell key={cell.id}>
-                                  <span className="font-semibold text-[var(--cds-text-primary)]">
+                                  <span className="font-semibold text-foreground">
                                     {voice.title}
                                   </span>
                                 </TableCell>
@@ -292,11 +292,12 @@ export function VoiceCatalog(props: {
                               return (
                                 <TableCell key={cell.id}>
                                   <div className="flex min-w-0 items-center justify-between gap-2">
-                                    <code className="min-w-0 truncate text-xs text-[var(--cds-text-primary)]">
+                                    <code className="min-w-0 truncate text-xs text-foreground">
                                       {voice.voiceId}
                                     </code>
                                     <CopyButton
                                       align="left"
+                                      kind="ghost"
                                       size="sm"
                                       feedback="Copied"
                                       iconDescription={`Copy ${voice.title} voice ID`}
@@ -334,7 +335,7 @@ export function VoiceCatalog(props: {
                                 ) : (
                                   <span
                                     aria-label="Preview unavailable"
-                                    className="text-[var(--cds-text-secondary)]"
+                                    className="text-muted"
                                   >
                                     —
                                   </span>
@@ -350,10 +351,10 @@ export function VoiceCatalog(props: {
                             key={`${row.id}-details`}
                           >
                             <div className="px-4 py-5">
-                              <p className="text-xs font-semibold text-[var(--cds-text-secondary)]">
+                              <p className="text-xs font-semibold text-muted">
                                 Description
                               </p>
-                              <p className="mt-2 max-w-4xl text-sm leading-5 text-[var(--cds-text-primary)]">
+                              <p className="mt-2 max-w-4xl text-sm leading-5 text-foreground">
                                 {voice.description ||
                                   'No description provided.'}
                               </p>
@@ -375,7 +376,7 @@ export function VoiceCatalog(props: {
 
             {filteredVoices.length > 0 && (
               <Pagination
-                className="mt-auto shrink-0 border-t border-[var(--cds-border-subtle-01)]"
+                className="mt-auto shrink-0 border-t border-border-subtle"
                 id="voice-catalog-pagination"
                 totalItems={filteredVoices.length}
                 page={page}

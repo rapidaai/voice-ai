@@ -1,6 +1,11 @@
-import { TableCell } from './table-cell';
 import { TableRow } from './table-row';
 import { InputCheckbox } from '@/app/components/ui/primitives/input-checkbox';
+import {
+  Table as CarbonTable,
+  TableBody as CarbonTableBody,
+  TableHead as CarbonTableHead,
+  TableHeader as CarbonTableHeader,
+} from '@carbon/react';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { HTMLAttributes, MouseEvent as ReactMouseEvent } from 'react';
 
@@ -69,11 +74,11 @@ export function ScrollableResizableTable({
           maxWidth: '100% !important',
         }}
       >
-        <table className="w-full border-collapse bg-white dark:bg-gray-900 border-y ">
-          <thead className="uppercase">
-            <TableRow className="bg-gray-100 dark:bg-gray-950">
+        <CarbonTable className="w-full border-collapse bg-surface border-y ">
+          <CarbonTableHead className="uppercase">
+            <TableRow className="bg-layer ">
               {isActionable && (
-                <TableCell className="w-8 h-8 ">
+                <CarbonTableHeader className="w-8 h-8 ">
                   <div className="w-8 h-8 flex justify-center items-center">
                     <InputCheckbox
                       aria-label="Select all rows"
@@ -82,17 +87,17 @@ export function ScrollableResizableTable({
                       }
                     />
                   </div>
-                </TableCell>
+                </CarbonTableHeader>
               )}
 
               {isExpandable && (
-                <TableCell className="w-8 h-8 ">
+                <CarbonTableHeader className="w-8 h-8 ">
                   <div className="w-8 h-8 flex justify-center items-center"></div>
-                </TableCell>
+                </CarbonTableHeader>
               )}
 
               {columns.map((column, index) => (
-                <TableCell
+                <CarbonTableHeader
                   key={column.key}
                   className="px-2 py-2 text-left uppercase text-xs/6 font-medium tracking-wider relative text-muted"
                   style={{ width: column.width }}
@@ -124,18 +129,18 @@ export function ScrollableResizableTable({
                       }}
                     ></div>
                   )}
-                </TableCell>
+                </CarbonTableHeader>
               ))}
 
               {isOptionable && (
-                <TableCell className="w-10 px-2 py-2 text-left uppercase text-xs/6 font-medium tracking-wider text-muted">
+                <CarbonTableHeader className="w-10 px-2 py-2 text-left uppercase text-xs/6 font-medium tracking-wider text-muted">
                   {optionLabel}
-                </TableCell>
+                </CarbonTableHeader>
               )}
             </TableRow>
-          </thead>
-          <tbody>{children}</tbody>
-        </table>
+          </CarbonTableHead>
+          <CarbonTableBody>{children}</CarbonTableBody>
+        </CarbonTable>
       </div>
     </div>
   );

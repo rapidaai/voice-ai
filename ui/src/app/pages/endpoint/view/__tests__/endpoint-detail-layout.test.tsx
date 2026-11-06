@@ -83,12 +83,19 @@ jest.mock('@carbon/react', () => ({
   Button: ({
     children,
     className,
+    iconDescription,
     kind,
     renderIcon: Icon,
     size,
     ...props
   }: any) => (
-    <button className={className} data-kind={kind} data-size={size} {...props}>
+    <button
+      aria-label={iconDescription}
+      className={className}
+      data-kind={kind}
+      data-size={size}
+      {...props}
+    >
       {Icon ? <Icon size={16} /> : null}
       {children}
     </button>

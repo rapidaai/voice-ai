@@ -127,7 +127,7 @@ export const Steps: Story = {
     const [activeTab, setActiveTab] = useState('profile');
 
     return (
-      <div className="h-[520px] border border-gray-200 dark:border-gray-800">
+      <div className="h-[520px] border border-border-subtle">
         <TabForm
           activeTab={activeTab}
           onChangeActiveTab={setActiveTab}

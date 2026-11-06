@@ -48,10 +48,8 @@ const LogInspectorDisplay: FC<
     <div className="mb-2 flex min-w-0 items-center gap-2">
       <span
         className={[
-          'font-mono text-xs text-gray-500',
-          document.level.toLowerCase() === 'error'
-            ? 'text-red-600 dark:text-red-400'
-            : '',
+          'font-mono text-xs text-muted',
+          document.level.toLowerCase() === 'error' ? 'text-support-error ' : '',
         ].join(' ')}
       >
         {document.level.toLowerCase()}
@@ -64,16 +62,16 @@ const LogInspectorDisplay: FC<
         ))}
       </div>
       {occurredAtLabel && (
-        <span className="ml-auto whitespace-nowrap font-mono text-xs text-gray-500">
+        <span className="ml-auto whitespace-nowrap font-mono text-xs text-muted">
           {occurredAtLabel}
         </span>
       )}
     </div>
-    <p className="truncate font-mono text-sm text-gray-900 dark:text-gray-100">
+    <p className="truncate font-mono text-sm text-foreground ">
       {display.primary}
     </p>
     {display.secondary && (
-      <p className="mt-1 truncate font-mono text-xs text-gray-500">
+      <p className="mt-1 truncate font-mono text-xs text-muted">
         {display.secondary}
       </p>
     )}
@@ -166,7 +164,7 @@ const EosLogMainTable: FC<LogRendererProps> = ({ document }) => {
   const display = getEosLogDisplay(document);
 
   return (
-    <p className="truncate font-mono text-[13px] text-gray-900 dark:text-gray-100">
+    <p className="truncate font-mono text-[13px] text-foreground ">
       {display.primary}
     </p>
   );

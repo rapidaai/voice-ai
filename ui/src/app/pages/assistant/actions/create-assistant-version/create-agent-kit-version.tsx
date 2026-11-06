@@ -3,7 +3,11 @@ import { useRapidaStore } from '@/stores/app';
 import { useCredential } from '@/hooks/use-credential';
 import { useParams } from 'react-router-dom';
 import { Helmet } from '@/app/components/app-shell/helmet';
-import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
+import {
+  GhostButton,
+  PrimaryButton,
+  SecondaryButton,
+} from '@/app/components/ui/primitives';
 import {
   ButtonSet,
   Slider,
@@ -448,10 +452,11 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
                     </FieldSet>
                   </div>
 
-                  <button
+                  <GhostButton
+                    size="sm"
                     type="button"
                     onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="flex items-center gap-1.5 text-xs font-medium text-[var(--cds-text-secondary)] hover:text-[var(--cds-text-primary)] transition-colors"
+                    className="w-fit"
                   >
                     <ChevronDown
                       size={16}
@@ -460,10 +465,10 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
                       }`}
                     />
                     {showAdvanced ? 'Hide' : 'Show'} advanced settings
-                  </button>
+                  </GhostButton>
 
                   {showAdvanced && (
-                    <div className="pt-6 border-t border-gray-200 dark:border-gray-800 flex flex-col gap-8">
+                    <div className="pt-6 border-t border-border-subtle flex flex-col gap-8">
                       <div className="flex flex-col gap-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <FieldSet>
@@ -629,7 +634,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
                           setParameters(parameters);
                         }}
                         initialValues={parameters}
-                        inputClass="bg-light-background dark:bg-gray-950"
+                        inputClass="bg-light-background bg-surface"
                       />
                     </FieldSet>
                   </div>

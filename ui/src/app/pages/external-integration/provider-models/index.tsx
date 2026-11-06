@@ -26,7 +26,7 @@ export function ProviderModelPage() {
       <PageHeaderBlock>
         <div className="flex items-center gap-3">
           <PageTitleBlock>Providers and Models</PageTitleBlock>
-          <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+          <span className="text-xs text-muted tabular-nums">
             {`${filteredProviders.length}/${INTEGRATION_PROVIDER.length}`}
           </span>
         </div>

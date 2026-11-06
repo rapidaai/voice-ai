@@ -17,6 +17,7 @@ import {
 import { Fragment, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { cn } from '@/utils';
+import { GhostButton } from '@/app/components/ui/primitives';
 
 export function EndpointSideNav(props: { endpointId: string }) {
   const [expanded, setExpanded] = useState(true);
@@ -34,7 +35,7 @@ export function EndpointSideNav(props: { endpointId: string }) {
     <div
       className={cn(
         'relative flex h-full shrink-0 flex-col',
-        'border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900',
+        'border-r border-border-subtle bg-surface ',
         'transition-all duration-200',
         expanded ? 'w-56' : 'w-12',
       )}
@@ -120,27 +121,21 @@ export function EndpointSideNav(props: { endpointId: string }) {
         </SideNavItems>
       </SideNav>
 
-      <div className="shrink-0 border-t border-gray-200 dark:border-gray-800">
-        <button
+      <div className="shrink-0 border-t border-border-subtle ">
+        <GhostButton
+          size="sm"
           type="button"
           onClick={() => setExpanded(current => !current)}
+          renderIcon={expanded ? SidePanelClose : SidePanelOpen}
+          hasIconOnly={!expanded}
+          iconDescription={expanded ? 'Collapse nav' : 'Expand nav'}
           className={cn(
-            'flex h-10 w-full cursor-pointer items-center px-4',
-            'text-[var(--cds-text-secondary)]',
-            'hover:bg-[var(--cds-layer-hover-01)] hover:text-[var(--cds-text-primary)]',
-            'transition-colors duration-100',
+            'h-10 w-full max-w-none!',
+            !expanded && 'justify-center',
           )}
-          aria-label={expanded ? 'Collapse nav' : 'Expand nav'}
         >
-          <span className="shrink-0">
-            {expanded ? (
-              <SidePanelClose size={16} />
-            ) : (
-              <SidePanelOpen size={16} />
-            )}
-          </span>
-          {expanded && <span className="ml-3 truncate text-xs">Collapse</span>}
-        </button>
+          {expanded ? 'Collapse' : null}
+        </GhostButton>
       </div>
     </div>
   );

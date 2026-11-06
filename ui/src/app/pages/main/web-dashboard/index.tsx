@@ -235,20 +235,12 @@ function PanelHeader({
   action?: ReactNode;
 }) {
   return (
-    <header className="flex min-h-[76px] items-start justify-between gap-4 border-b border-gray-200 px-6 py-4 dark:border-gray-800">
+    <header className="flex min-h-[76px] items-start justify-between gap-4 border-b border-border-subtle px-6 py-4 ">
       <div>
-        <Text
-          as="h2"
-          variant="heading-02"
-          className="text-[var(--cds-text-primary)]"
-        >
+        <Text as="h2" variant="heading-02" className="text-foreground">
           {title}
         </Text>
-        <Text
-          as="p"
-          variant="body-compact-01"
-          className="mt-1 text-[var(--cds-text-secondary)]"
-        >
+        <Text as="p" variant="body-compact-01" className="mt-1 text-muted">
           {subtitle}
         </Text>
       </div>
@@ -262,32 +254,28 @@ function DashboardNoActivity() {
     <section
       data-dashboard-empty
       aria-labelledby="dashboard-getting-started-title"
-      className="flex min-h-[420px] items-center bg-[var(--cds-layer-01)]"
+      className="flex min-h-[420px] items-center bg-layer"
     >
       <div className="mx-auto w-full max-w-[640px] px-6 py-12 md:px-12 md:py-16">
-        <div className="flex h-12 w-12 items-center justify-center bg-[var(--cds-background-brand)] text-white">
+        <div className="flex h-12 w-12 items-center justify-center bg-primary text-on-primary">
           <Bot aria-hidden="true" size={24} />
         </div>
 
-        <Text
-          as="p"
-          variant="label-01"
-          className="mt-8 text-[var(--cds-text-secondary)]"
-        >
+        <Text as="p" variant="label-01" className="mt-8 text-muted">
           Getting started
         </Text>
         <Text
           as="h1"
           id="dashboard-getting-started-title"
           variant="heading-05"
-          className="mt-2 text-[var(--cds-text-primary)]"
+          className="mt-2 text-foreground"
         >
           Your dashboard is not ready yet
         </Text>
         <Text
           as="p"
           variant="body-02"
-          className="mt-4 max-w-[520px] text-[var(--cds-text-secondary)]"
+          className="mt-4 max-w-[520px] text-muted"
         >
           Create an assistant and run a test conversation. Sessions, latency,
           and health will appear here after the first session.
@@ -312,13 +300,13 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
   return (
     <article
       data-dashboard-kpi
-      className="flex h-[156px] flex-col border border-gray-200 bg-white dark:border-gray-800 dark:bg-[#262626]"
+      className="flex h-[156px] flex-col border border-border-subtle bg-surface "
     >
-      <div className="flex h-10 shrink-0 items-center border-b border-gray-200 px-4 dark:border-gray-800">
+      <div className="flex h-10 shrink-0 items-center border-b border-border-subtle px-4 ">
         <Text
           as="h2"
           variant="heading-compact-01"
-          className="truncate text-[var(--cds-text-primary)]"
+          className="truncate text-foreground"
         >
           {metric.label}
         </Text>
@@ -327,14 +315,11 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
         <Text
           as="p"
           variant="heading-05"
-          className="tabular-nums text-[var(--cds-text-primary)]"
+          className="tabular-nums text-foreground"
         >
           {metric.value}
           {metric.unit && (
-            <Text
-              variant="body-compact-02"
-              className="ml-1 text-[var(--cds-text-secondary)]"
-            >
+            <Text variant="body-compact-02" className="ml-1 text-muted">
               {metric.unit}
             </Text>
           )}
@@ -344,8 +329,8 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
           variant="label-01"
           className={
             metric.comparisonTone === 'danger'
-              ? 'text-[var(--cds-support-error)]'
-              : 'text-[var(--cds-text-secondary)]'
+              ? 'text-support-error'
+              : 'text-muted'
           }
         >
           {metric.comparison}
@@ -376,7 +361,7 @@ function ActivityPanel({
   return (
     <section
       data-dashboard-panel
-      className="h-full border border-gray-200 bg-white dark:border-gray-800 dark:bg-[#262626]"
+      className="h-full border border-border-subtle bg-surface "
     >
       <PanelHeader
         title="Conversation activity"
@@ -385,16 +370,16 @@ function ActivityPanel({
           <div className="flex shrink-0 flex-col gap-1 sm:flex-row sm:gap-4">
             <Text
               variant="label-01"
-              className="flex items-center gap-1.5 text-[var(--cds-text-secondary)]"
+              className="flex items-center gap-1.5 text-muted"
             >
-              <span className="h-2.5 w-2.5 bg-[var(--cds-interactive)]" />
+              <span className="h-2.5 w-2.5 bg-primary" />
               Sessions
             </Text>
             <Text
               variant="label-01"
-              className="flex items-center gap-1.5 text-[var(--cds-text-secondary)]"
+              className="flex items-center gap-1.5 text-muted"
             >
-              <span className="h-2.5 w-2.5 bg-[var(--cds-support-error)]" />
+              <span className="h-2.5 w-2.5 bg-support-error" />
               Failed
             </Text>
           </div>
@@ -425,25 +410,25 @@ function ActivityPanel({
                 >
                   <stop
                     offset="0%"
-                    stopColor="var(--cds-interactive)"
+                    stopColor="var(--color-primary)"
                     stopOpacity={0.24}
                   />
                   <stop
                     offset="100%"
-                    stopColor="var(--cds-interactive)"
+                    stopColor="var(--color-primary)"
                     stopOpacity={0.02}
                   />
                 </linearGradient>
               </defs>
               <CartesianGrid
-                stroke="var(--cds-border-subtle-01)"
+                stroke="var(--color-border-subtle)"
                 vertical={false}
               />
               <XAxis
                 dataKey="label"
                 tick={{
                   className: typographyClassNames['label-01'],
-                  fill: 'var(--cds-text-secondary)',
+                  fill: 'var(--color-muted)',
                 }}
                 tickLine={false}
                 axisLine={false}
@@ -452,7 +437,7 @@ function ActivityPanel({
                 width={42}
                 tick={{
                   className: typographyClassNames['label-01'],
-                  fill: 'var(--cds-text-secondary)',
+                  fill: 'var(--color-muted)',
                 }}
                 tickLine={false}
                 axisLine={false}
@@ -460,16 +445,16 @@ function ActivityPanel({
               <Tooltip
                 wrapperClassName={typographyClassNames['label-01']}
                 contentStyle={{
-                  border: '1px solid var(--cds-border-subtle-01)',
-                  background: 'var(--cds-layer-01)',
-                  color: 'var(--cds-text-primary)',
+                  border: '1px solid var(--color-border-subtle)',
+                  background: 'var(--color-layer)',
+                  color: 'var(--color-foreground)',
                 }}
               />
               <Area
                 type="monotone"
                 dataKey="sessions"
                 name="Sessions"
-                stroke="var(--cds-interactive)"
+                stroke="var(--color-primary)"
                 fill="url(#projectActivityGradient)"
                 strokeWidth={2}
                 activeDot={{ r: 4 }}
@@ -479,7 +464,7 @@ function ActivityPanel({
                 type="monotone"
                 dataKey="failed"
                 name="Failed"
-                stroke="var(--cds-support-error)"
+                stroke="var(--color-support-error)"
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
@@ -509,28 +494,24 @@ function HealthPanel({ analytics }: { analytics: ProjectDashboardAnalytics }) {
   return (
     <section
       data-dashboard-panel
-      className="h-full border border-gray-200 bg-white dark:border-gray-800 dark:bg-[#262626]"
+      className="h-full border border-border-subtle bg-surface "
     >
       <PanelHeader
         title="Health summary"
         subtitle="Signals that may need attention"
       />
-      <ul className="divide-y divide-gray-200 px-6 dark:divide-gray-800">
+      <ul className="divide-y divide-border-subtle px-6 ">
         <li className="flex min-h-[106px] items-start gap-4 py-5">
           <WarningAltFilled
             size={24}
             aria-hidden="true"
-            className="mt-0.5 shrink-0 text-[var(--cds-support-error)]"
+            className="mt-0.5 shrink-0 text-support-error"
           />
           <div className="min-w-0 flex-1">
             <Text as="p" variant="heading-compact-01">
               Failed sessions
             </Text>
-            <Text
-              as="p"
-              variant="label-01"
-              className="mt-2 text-[var(--cds-text-secondary)]"
-            >
+            <Text as="p" variant="label-01" className="mt-2 text-muted">
               {numberFormatter.format(recentFailures)} recent{' '}
               {recentFailures === 1 ? 'failure' : 'failures'}
             </Text>
@@ -543,17 +524,13 @@ function HealthPanel({ analytics }: { analytics: ProjectDashboardAnalytics }) {
           <WarningAltFilled
             size={24}
             aria-hidden="true"
-            className="mt-0.5 shrink-0 text-[var(--cds-support-warning)]"
+            className="mt-0.5 shrink-0 text-support-warning"
           />
           <div className="min-w-0 flex-1">
             <Text as="p" variant="heading-compact-01">
               Slow sessions
             </Text>
-            <Text
-              as="p"
-              variant="label-01"
-              className="mt-2 text-[var(--cds-text-secondary)]"
-            >
+            <Text as="p" variant="label-01" className="mt-2 text-muted">
               Response latency above {numberFormatter.format(threshold)} ms
             </Text>
           </div>
@@ -565,17 +542,13 @@ function HealthPanel({ analytics }: { analytics: ProjectDashboardAnalytics }) {
           <CheckmarkFilled
             size={24}
             aria-hidden="true"
-            className="mt-0.5 shrink-0 text-[var(--cds-support-success)]"
+            className="mt-0.5 shrink-0 text-support-success"
           />
           <div className="min-w-0 flex-1">
             <Text as="p" variant="heading-compact-01">
               Healthy assistants
             </Text>
-            <Text
-              as="p"
-              variant="label-01"
-              className="mt-2 text-[var(--cds-text-secondary)]"
-            >
+            <Text as="p" variant="label-01" className="mt-2 text-muted">
               Based on success rate and latency
             </Text>
           </div>
@@ -602,19 +575,15 @@ function EmptyContent({
       <WarningAltFilled
         size={40}
         aria-hidden="true"
-        className="text-[var(--cds-text-disabled)]"
+        className="text-disabled"
       />
-      <Text
-        as="h3"
-        variant="heading-02"
-        className="mt-4 text-[var(--cds-text-primary)]"
-      >
+      <Text as="h3" variant="heading-02" className="mt-4 text-foreground">
         {title}
       </Text>
       <Text
         as="p"
         variant="body-compact-01"
-        className="mt-1 max-w-sm text-[var(--cds-text-secondary)]"
+        className="mt-1 max-w-sm text-muted"
       >
         {description}
       </Text>
@@ -638,7 +607,7 @@ function StatePanel({
       ? 'Analytics are unavailable'
       : `${title} is unavailable`;
   return (
-    <Tile className="h-full border! border-gray-200! bg-white! p-0! dark:border-gray-800! dark:bg-[#262626]!">
+    <Tile className="h-full border! border-border-subtle! bg-surface! p-0! ">
       <PanelHeader title={title} subtitle={subtitle} />
       <EmptyContent
         title={isEmpty ? `No ${title.toLowerCase()} yet` : unavailableTitle}
@@ -662,7 +631,7 @@ function BreakdownPanel({
   values: DashboardBreakdown[];
 }) {
   return (
-    <Tile className="h-full border! border-gray-200! bg-white! p-0! dark:border-gray-800! dark:bg-[#262626]!">
+    <Tile className="h-full border! border-border-subtle! bg-surface! p-0! ">
       <PanelHeader title={title} subtitle={subtitle} />
       {values.length ? (
         <div className="grid gap-6 p-6 sm:grid-cols-2">
@@ -674,10 +643,10 @@ function BreakdownPanel({
                   {value.value}
                 </Text>
               </div>
-              <div className="h-1 bg-gray-200 dark:bg-gray-800">
+              <div className="h-1 bg-layer ">
                 <div
                   data-dashboard-bar
-                  className="h-full bg-[var(--cds-interactive)]"
+                  className="h-full bg-primary"
                   style={{ width: `${value.width}%` }}
                 />
               </div>
@@ -720,7 +689,7 @@ function RecentFailuresTable({
   );
 
   return (
-    <Tile className="h-full border! border-gray-200! bg-white! p-0! dark:border-gray-800! dark:bg-[#262626]!">
+    <Tile className="h-full border! border-border-subtle! bg-surface! p-0! ">
       <PanelHeader
         title="Recent failures"
         subtitle="Latest sessions that need investigation"
@@ -763,7 +732,7 @@ function RecentFailuresTable({
                             failureRoutes.get(row.id) ? (
                               <a
                                 href={failureRoutes.get(row.id)}
-                                className="text-[var(--cds-link-primary)] hover:underline focus:underline"
+                                className="text-link hover:underline focus:underline"
                               >
                                 <Text variant="heading-compact-01">
                                   {cell.value}
@@ -824,7 +793,7 @@ function AssistantsTable({
   );
 
   return (
-    <Tile className="border! border-gray-200! bg-white! p-0! dark:border-gray-800! dark:bg-[#262626]!">
+    <Tile className="border! border-border-subtle! bg-surface! p-0! ">
       <PanelHeader
         title="Top assistants"
         subtitle="Assistants ranked by conversation volume"
@@ -880,7 +849,7 @@ function AssistantsTable({
                                 type={successTones.get(row.id) || 'gray'}
                                 className={
                                   cell.value === 'Watch'
-                                    ? 'bg-[var(--cds-support-warning)]! text-[var(--cds-text-primary)]!'
+                                    ? 'bg-support-warning! text-foreground!'
                                     : undefined
                                 }
                               >
@@ -891,7 +860,7 @@ function AssistantsTable({
                                 href={`/deployment/assistant/${encodeURIComponent(
                                   row.id,
                                 )}`}
-                                className="text-[var(--cds-link-primary)] hover:underline focus:underline"
+                                className="text-link hover:underline focus:underline"
                               >
                                 <Text variant="heading-compact-01">
                                   {cell.value}
@@ -934,7 +903,7 @@ function DashboardLoading() {
         {[0, 1, 2, 3].map(item => (
           <div
             data-dashboard-loading-card
-            className="h-[156px] border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-[#262626]"
+            className="h-[156px] border border-border-subtle bg-surface p-4 "
             key={item}
             aria-hidden="true"
           >
@@ -947,7 +916,7 @@ function DashboardLoading() {
       <div className="mb-4 grid gap-4 xl:grid-cols-16">
         <div
           data-dashboard-loading-card
-          className="h-[396px] border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-[#262626] xl:col-span-11"
+          className="h-[396px] border border-border-subtle bg-surface p-6 xl:col-span-11"
         >
           <SkeletonText width="30%" heading />
           <SkeletonText width="45%" />
@@ -955,7 +924,7 @@ function DashboardLoading() {
         </div>
         <div
           data-dashboard-loading-card
-          className="h-[396px] border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-[#262626] xl:col-span-5"
+          className="h-[396px] border border-border-subtle bg-surface p-6 xl:col-span-5"
         >
           <SkeletonText width="55%" heading />
           <SkeletonText width="75%" />
@@ -968,7 +937,7 @@ function DashboardLoading() {
         {[0, 1].map(item => (
           <div
             data-dashboard-loading-card
-            className="h-[260px] border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-[#262626]"
+            className="h-[260px] border border-border-subtle bg-surface p-6 "
             key={item}
             aria-hidden="true"
           >
@@ -1162,7 +1131,7 @@ export const HomePage = () => {
     return (
       <main
         data-dashboard-page
-        className="flex min-h-0 flex-1 overflow-auto bg-gray-100 text-[var(--cds-text-primary)] dark:bg-[#161616]"
+        className="flex min-h-0 flex-1 overflow-auto bg-layer text-foreground "
       >
         <div data-dashboard-content className="flex min-h-full flex-1">
           <EmptyState
@@ -1181,7 +1150,7 @@ export const HomePage = () => {
   return (
     <main
       data-dashboard-page
-      className="min-h-0 flex-1 overflow-auto bg-gray-100 text-[var(--cds-text-primary)] dark:bg-[#161616]"
+      className="min-h-0 flex-1 overflow-auto bg-layer text-foreground "
     >
       <div
         data-dashboard-content
@@ -1190,11 +1159,7 @@ export const HomePage = () => {
         {dashboard && !isDashboardActivityEmpty && (
           <div className="col-span-full mb-4">
             <section className="flex items-center gap-2">
-              <Text
-                as="h1"
-                variant="heading-03"
-                className="text-[var(--cds-text-primary)]"
-              >
+              <Text as="h1" variant="heading-03" className="text-foreground">
                 Dashboard
               </Text>
               {dashboard.getPartial() && (

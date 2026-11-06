@@ -887,9 +887,7 @@ describe('Deployment and tool flows', () => {
     await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    await user.click(
-      within(screen.getByRole('dialog')).getByText('Debugger'),
-    );
+    await user.click(within(screen.getByRole('dialog')).getByText('Debugger'));
     expect(mockGlobalNavigation.goToConfigureDebugger).toHaveBeenCalledWith(
       'assistant-1',
     );
@@ -916,9 +914,7 @@ describe('Deployment and tool flows', () => {
     await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    await user.click(
-      within(screen.getByRole('dialog')).getByText('SDK / API'),
-    );
+    await user.click(within(screen.getByRole('dialog')).getByText('SDK / API'));
     expect(mockGlobalNavigation.goToConfigureApi).toHaveBeenCalledWith(
       'assistant-1',
     );
@@ -936,9 +932,7 @@ describe('Deployment and tool flows', () => {
     await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    await user.click(
-      within(screen.getByRole('dialog')).getByText('Debugger'),
-    );
+    await user.click(within(screen.getByRole('dialog')).getByText('Debugger'));
     expect(mockGlobalNavigation.goToConfigureDebugger).toHaveBeenCalledWith(
       'assistant-1',
     );
@@ -1073,9 +1067,7 @@ describe('Deployment and tool flows', () => {
     await user.click(actionsButton);
     expect(actionMenu).toHaveAttribute('data-menu-open', 'true');
 
-    await user.click(
-      screen.getByRole('button', { name: 'View all versions' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'View all versions' }));
 
     expect(actionMenu).toHaveAttribute('data-menu-open', 'false');
     expect(screen.getByRole('dialog')).toHaveTextContent('Deployment versions');

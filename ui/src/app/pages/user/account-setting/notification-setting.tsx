@@ -68,17 +68,17 @@ export const NotificationSetting = () => {
       className="flex flex-1 h-full overflow-hidden"
       onSubmit={handleSubmit(onSubmit)} // Use the onSubmit handler
     >
-      <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-900">
+      <div className="flex-1 min-h-0 flex flex-col bg-surface ">
         {/* Scrollable region */}
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <header className="px-8 pt-8 pb-6 border-b border-gray-200 dark:border-gray-800">
-            <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400 mb-1.5">
+          <header className="px-8 pt-8 pb-6 border-b border-border-subtle ">
+            <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted mb-1.5">
               Account Settings
             </p>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 leading-tight">
+            <h1 className="text-xl font-semibold text-foreground leading-tight">
               Notification Preferences
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1.5 leading-relaxed">
+            <p className="text-sm text-muted mt-1.5 leading-relaxed">
               Choose which email notifications you want to receive for system
               and workspace events.
             </p>
@@ -91,13 +91,13 @@ export const NotificationSetting = () => {
                 key={notificationCategory.category}
               >
                 <SectionDivider label={notificationCategory.category} />
-                <div className="border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+                <div className="border border-border-subtle bg-surface ">
                   {notificationCategory.items.map((item, idx) => (
                     <div
                       className={cn(
                         'flex items-start gap-3 px-4 py-4',
                         idx !== notificationCategory.items.length - 1 &&
-                          'border-b border-gray-200 dark:border-gray-800',
+                          'border-b border-border-subtle ',
                       )}
                       key={item.id}
                     >
@@ -131,7 +131,7 @@ export const NotificationSetting = () => {
               type="submit"
               isLoading={isSaving}
               disabled={isSaving}
-              className="h-full min-w-[12rem] px-6 rounded-none border-l border-gray-200 dark:border-gray-800"
+              className="h-full min-w-[12rem] px-6 rounded-none border-l border-border-subtle "
             >
               Save changes
             </PrimaryButton>

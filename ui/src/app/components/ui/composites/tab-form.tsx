@@ -28,15 +28,13 @@ export function TabForm({
 
   return (
     <section className="flex flex-1 min-h-0 overflow-hidden">
-      <aside className="w-80 hidden md:flex flex-col shrink-0 border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950">
-        <div className="px-6 pt-6 pb-5 border-b border-gray-200 dark:border-gray-800">
-          <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--cds-text-secondary)] mb-1.5">
+      <aside className="w-80 hidden md:flex flex-col shrink-0 border-r border-border-subtle bg-layer ">
+        <div className="px-6 pt-6 pb-5 border-b border-border-subtle ">
+          <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted mb-1.5">
             Setup Progress
           </p>
           {formHeading && (
-            <p className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
-              {formHeading}
-            </p>
+            <p className="text-xs text-muted leading-relaxed">{formHeading}</p>
           )}
         </div>
 
@@ -53,14 +51,13 @@ export function TabForm({
                     <span
                       className={cn(
                         'flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-xs font-semibold transition-colors duration-150',
-                        isCompleted &&
-                          'bg-primary text-[var(--brand-on-primary)]',
+                        isCompleted && 'bg-primary text-on-primary',
                         isActive &&
                           !isCompleted &&
-                          'bg-primary text-[var(--brand-on-primary)] ring-4 ring-primary/10',
+                          'bg-primary text-on-primary ring-4 ring-primary/10',
                         !isActive &&
                           !isCompleted &&
-                          'bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-700 text-[var(--cds-text-secondary)]',
+                          'bg-surface border-2 border-border-subtle text-muted',
                       )}
                     >
                       {isCompleted ? (
@@ -73,9 +70,7 @@ export function TabForm({
                       <span
                         className={cn(
                           'w-px flex-1 min-h-8',
-                          isCompleted
-                            ? 'bg-primary'
-                            : 'bg-gray-200 dark:bg-gray-800',
+                          isCompleted ? 'bg-primary' : 'bg-layer ',
                         )}
                       />
                     )}
@@ -92,9 +87,7 @@ export function TabForm({
                     <span
                       className={cn(
                         'text-[10px] font-semibold tracking-[0.1em] uppercase mb-0.5',
-                        isActive
-                          ? 'text-primary'
-                          : 'text-[var(--cds-text-secondary)]',
+                        isActive ? 'text-primary' : 'text-muted',
                       )}
                     >
                       Step {index + 1}
@@ -103,16 +96,16 @@ export function TabForm({
                       className={cn(
                         'text-sm font-medium leading-snug',
                         isActive
-                          ? 'text-gray-900 dark:text-gray-100'
+                          ? 'text-foreground '
                           : isCompleted
-                            ? 'text-[var(--cds-text-secondary)]'
-                            : 'text-[var(--cds-text-secondary)]',
+                            ? 'text-muted'
+                            : 'text-muted',
                       )}
                     >
                       {item.name}
                     </span>
                     {item.description && (
-                      <span className="text-xs text-[var(--cds-text-secondary)] mt-1 leading-relaxed">
+                      <span className="text-xs text-muted mt-1 leading-relaxed">
                         {item.description}
                       </span>
                     )}
@@ -125,7 +118,7 @@ export function TabForm({
       </aside>
 
       {/* Content area: flex column so footer sits below scroll */}
-      <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-900">
+      <div className="flex-1 min-h-0 flex flex-col bg-surface ">
         <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
           {form.map(
             item =>
@@ -134,15 +127,15 @@ export function TabForm({
                   key={`form-body-${item.code}`}
                   className="flex flex-col flex-1"
                 >
-                  <header className="px-4 pt-8 pb-6 border-b border-gray-200 dark:border-gray-800">
-                    <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--cds-text-secondary)] mb-1.5">
+                  <header className="px-4 pt-8 pb-6 border-b border-border-subtle ">
+                    <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted mb-1.5">
                       Step {activeIndex + 1} of {form.length}
                     </p>
-                    <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 leading-tight">
+                    <h1 className="text-xl font-semibold text-foreground leading-tight">
                       {item.name}
                     </h1>
                     {item.description && (
-                      <p className="text-sm text-[var(--cds-text-secondary)] mt-1.5 leading-relaxed">
+                      <p className="text-sm text-muted mt-1.5 leading-relaxed">
                         {item.description}
                       </p>
                     )}

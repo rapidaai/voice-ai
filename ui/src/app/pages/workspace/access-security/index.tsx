@@ -18,7 +18,7 @@ export function AccessSecurityPage() {
           <DescriptiveHeading heading="Organization Security" />
         </div>
         <section>
-          <div className="border rounded-[2px] px-5 py-3 bg-white dark:bg-gray-800 flex dark:border-gray-700">
+          <div className="border rounded-[2px] px-5 py-3 bg-surface flex border-border-subtle">
             <div className="">
               <h3 className="font-medium text-lg ">
                 Two-Factor Authentication

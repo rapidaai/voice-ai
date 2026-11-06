@@ -51,7 +51,7 @@ function VersionId({ id }: { id: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <span className="inline-flex items-center gap-1 font-mono text-[13px] text-gray-600 dark:text-gray-400">
+    <span className="inline-flex items-center gap-1 font-mono text-[13px] text-muted ">
       {version}
       <Button
         hasIconOnly
@@ -263,7 +263,7 @@ export function Version(props: VersionProps) {
             totalSelected={1}
             onCancel={() => setSelectedVersionId(null)}
             totalCount={filteredRows.length}
-            className="[&_[class*=divider]]:hidden [&_.cds--btn]:transition-colors [&_.cds--btn:hover]:!bg-primary [&_.cds--btn:hover]:!text-white"
+            className="[&_[class*=divider]]:hidden [&_.cds--btn]:transition-colors [&_.cds--btn:hover]:!bg-primary [&_.cds--btn:hover]:!text-on-primary"
           >
             <TableBatchAction
               renderIcon={Rocket}

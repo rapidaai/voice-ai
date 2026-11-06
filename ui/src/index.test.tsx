@@ -47,9 +47,10 @@ describe('application entry point', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  it('normalizes permissive config values and continues startup', () => {
+  it('keeps permissive version 1 values and continues startup', () => {
     mockConfiguredTheme = {
       ...developmentConfig.theme,
+      schemaVersion: 1,
       links: {
         ...developmentConfig.theme.links,
         support: 'client support channel',
@@ -84,11 +85,23 @@ describe('application entry point', () => {
     expect(mockRender).toHaveBeenCalledTimes(1);
   });
 
-  it('applies the normalized theme before rendering the application', () => {
+  it('applies a valid theme before rendering the application', () => {
     jest.isolateModules(() => require('./index'));
 
     expect(mockApplyThemeToDocument).toHaveBeenCalledWith(
-      developmentConfig.theme,
+      expect.objectContaining({
+        ...developmentConfig.theme,
+        colors: {
+          light: {
+            ...developmentConfig.theme.colors.light,
+            carbonTheme: 'white',
+          },
+          dark: {
+            ...developmentConfig.theme.colors.dark,
+            carbonTheme: 'g100',
+          },
+        },
+      }),
       'light',
     );
     expect(mockInitializeAnalytics).toHaveBeenCalledTimes(1);
@@ -99,5 +112,35 @@ describe('application entry point', () => {
     expect(mockApplyThemeToDocument.mock.invocationCallOrder[0]).toBeLessThan(
       mockRender.mock.invocationCallOrder[0],
     );
+  });
+
+  it('renders fixed neutral output before analytics or React for invalid version 2', () => {
+    mockConfiguredTheme = {
+      ...developmentConfig.theme,
+      schemaVersion: 2,
+      colors: {
+        ...developmentConfig.theme.colors,
+        light: {
+          carbonTheme: 'white',
+          primary: '#0353e9',
+          primaryHover: '#002d9c',
+          onPrimary: '#ffffff',
+        },
+      },
+    };
+
+    jest.isolateModules(() => require('./index'));
+
+    expect(document.getElementById('root')).toHaveTextContent(
+      'Application configuration error',
+    );
+    expect(document.documentElement).not.toHaveAttribute('data-brand');
+    expect(
+      document.documentElement.style.getPropertyValue('--brand-primary'),
+    ).toBe('');
+    expect(mockApplyThemeToDocument).not.toHaveBeenCalled();
+    expect(mockInitializeAnalytics).not.toHaveBeenCalled();
+    expect(mockCreateRoot).not.toHaveBeenCalled();
+    expect(mockRender).not.toHaveBeenCalled();
   });
 });

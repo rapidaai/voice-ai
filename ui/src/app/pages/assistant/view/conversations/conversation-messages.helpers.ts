@@ -8,39 +8,37 @@ type RoleVisual = {
 };
 
 export const getRoleVisual = (role: string): RoleVisual => {
-  const normalized = role.toLowerCase();
-  if (normalized === 'rapida') {
+  const roleKey = role.toLowerCase();
+  if (roleKey === 'rapida') {
     return {
       label: 'Assistant',
       shortLabel: 'A',
       toneClassName:
-        'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+        'bg-support-info/10 text-support-info border-support-info ',
     };
   }
 
-  if (normalized === 'assistant') {
+  if (roleKey === 'assistant') {
     return {
       label: 'Assistant',
       shortLabel: 'A',
       toneClassName:
-        'bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800',
+        'bg-support-info/10 text-support-info border-support-info ',
     };
   }
 
-  if (normalized === 'user') {
+  if (roleKey === 'user') {
     return {
       label: 'User',
       shortLabel: 'U',
-      toneClassName:
-        'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700',
+      toneClassName: 'bg-layer text-muted border-border-subtle ',
     };
   }
 
   return {
     label: role || 'Unknown',
     shortLabel: (role || '?').slice(0, 1).toUpperCase(),
-    toneClassName:
-      'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700',
+    toneClassName: 'bg-layer text-muted border-border-subtle ',
   };
 };
 

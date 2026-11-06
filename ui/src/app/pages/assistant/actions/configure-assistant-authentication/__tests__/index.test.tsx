@@ -254,7 +254,9 @@ jest.mock('@/app/components/ui/primitives/button', () => ({
 }));
 
 jest.mock('@carbon/react', () => ({
-  Header: ({ children, ...props }: any) => <header {...props}>{children}</header>,
+  Header: ({ children, ...props }: any) => (
+    <header {...props}>{children}</header>
+  ),
   HeaderName: ({ children, href, prefix: _prefix, ...props }: any) => (
     <a href={href} {...props}>
       {children}

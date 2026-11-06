@@ -16,6 +16,7 @@ import {
   AssistantNavItem,
 } from './assistant-nav-config';
 import { Assistant } from '@rapidaai/react';
+import { GhostButton } from '@/app/components/ui/primitives';
 
 const getVisibleNavItems = (
   section: AssistantNavSection,
@@ -173,8 +174,8 @@ export const AssistantSideNav: FC<AssistantSideNavProps> = ({
     <div
       className={cn(
         'relative shrink-0 flex flex-col h-full',
-        'bg-white dark:bg-gray-900',
-        'border-r border-gray-200 dark:border-gray-800',
+        'bg-surface ',
+        'border-r border-border-subtle ',
         'transition-all duration-200',
         expanded ? 'w-56' : 'w-12',
       )}
@@ -202,27 +203,21 @@ export const AssistantSideNav: FC<AssistantSideNavProps> = ({
         </SideNavItems>
       </SideNav>
 
-      <div className="shrink-0 border-t border-gray-200 dark:border-gray-800">
-        <button
+      <div className="shrink-0 border-t border-border-subtle ">
+        <GhostButton
+          size="sm"
           type="button"
           onClick={onToggle}
+          renderIcon={expanded ? SidePanelClose : SidePanelOpen}
+          hasIconOnly={!expanded}
+          iconDescription={expanded ? 'Collapse nav' : 'Expand nav'}
           className={cn(
-            'flex items-center h-10 w-full cursor-pointer px-4',
-            'text-gray-700 dark:text-gray-300',
-            'hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-100',
-            'transition-colors duration-100',
+            'h-10 w-full max-w-none!',
+            !expanded && 'justify-center',
           )}
-          aria-label={expanded ? 'Collapse nav' : 'Expand nav'}
         >
-          <span className="shrink-0">
-            {expanded ? (
-              <SidePanelClose size={16} />
-            ) : (
-              <SidePanelOpen size={16} />
-            )}
-          </span>
-          {expanded && <span className="text-xs truncate ml-3">Collapse</span>}
-        </button>
+          {expanded ? 'Collapse' : null}
+        </GhostButton>
       </div>
     </div>
   );

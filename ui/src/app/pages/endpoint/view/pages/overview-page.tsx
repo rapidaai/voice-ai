@@ -22,9 +22,9 @@ export function EndpointOverviewPage(props: {
   const endpointId = currentEndpoint.getId();
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col bg-[var(--cds-background)]">
+    <main className="flex min-h-0 flex-1 flex-col bg-surface">
       <header
-        className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer)]"
+        className="flex h-12 shrink-0 items-center justify-between border-b border-border-subtle bg-layer"
         data-testid="endpoint-page-header"
       >
         <div className="min-w-0 pl-4">

@@ -26,7 +26,9 @@ import {
 } from '@carbon/react';
 import { cn } from '@/utils';
 
-type InputSize = 'sm' | 'md' | 'lg' | 'xl';
+type InputSize = NonNullable<
+  ComponentPropsWithoutRef<typeof CarbonTextInput>['size']
+>;
 type StackOrientation = 'horizontal' | 'vertical';
 
 export interface CarbonFormProps {

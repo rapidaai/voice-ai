@@ -27,7 +27,7 @@ export function DebuggerDeploymentSuccessDialog({
     <Modal open={modalOpen} onClose={closeDialog} size="sm">
       <ModalHeader title="Deployment completed" onClose={closeDialog} />
       <ModalBody>
-        <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+        <p className="text-sm text-muted leading-relaxed">
           Your debugger is ready. Use the preview to test your assistant in a
           sandbox environment before deploying to other channels.
         </p>
