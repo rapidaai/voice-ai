@@ -11,6 +11,13 @@ export interface KnowledgeViewOutletContext {
   onReload: () => void;
 }
 
+interface LoadedKnowledgeContext {
+  knowledgeId: string;
+  projectId: string;
+  token: string;
+  userId: string;
+}
+
 export function KnowledgeViewLayout() {
   const { id } = useParams();
   const [userId, token, projectId] = useCredential();
@@ -28,13 +35,27 @@ export function KnowledgeViewLayout() {
   );
   const requestRef = useRef(0);
   const pendingRequestRef = useRef<number | null>(null);
+  const loadedContextRef = useRef<LoadedKnowledgeContext | null>(null);
 
   const onReload = useCallback(() => {
     const requestId = ++requestRef.current;
+    const requestContext = id
+      ? { knowledgeId: id, projectId, token, userId }
+      : null;
+    const loadedContext = loadedContextRef.current;
     const hasCurrentKnowledge =
-      useKnowledgePageStore.getState().currentKnowledge?.getId() === id;
-    if (!hasCurrentKnowledge) clearCurrentKnowledge();
-    if (!id) {
+      requestContext !== null &&
+      loadedContext?.knowledgeId === requestContext.knowledgeId &&
+      loadedContext.projectId === requestContext.projectId &&
+      loadedContext.token === requestContext.token &&
+      loadedContext.userId === requestContext.userId &&
+      useKnowledgePageStore.getState().currentKnowledge?.getId() ===
+        requestContext.knowledgeId;
+    if (!hasCurrentKnowledge) {
+      loadedContextRef.current = null;
+      clearCurrentKnowledge();
+    }
+    if (!requestContext) {
       setCurrentKnowledgeStatus('error');
       return;
     }
@@ -43,14 +64,19 @@ export function KnowledgeViewLayout() {
     showLoader('overlay');
     pendingRequestRef.current = requestId;
     getKnowledgeBaseDetail({
-      knowledgeId: id,
-      auth: { projectId, token, userId },
+      knowledgeId: requestContext.knowledgeId,
+      auth: {
+        projectId: requestContext.projectId,
+        token: requestContext.token,
+        userId: requestContext.userId,
+      },
       callback: (_error, response) => {
         if (requestId !== requestRef.current) return;
         pendingRequestRef.current = null;
         hideLoader();
         const knowledge = response?.getSuccess() ? response.getData() : null;
         if (knowledge) {
+          loadedContextRef.current = requestContext;
           setCurrentKnowledge(knowledge);
           return;
         }

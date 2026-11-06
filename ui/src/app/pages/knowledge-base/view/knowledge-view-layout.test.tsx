@@ -13,13 +13,16 @@ import { KnowledgeViewLayout } from './knowledge-view.layout';
 const mockShowLoader = jest.fn();
 const mockHideLoader = jest.fn();
 const mockGoTo = jest.fn();
+let mockUserId = 'user-1';
+let mockToken = 'token-1';
+let mockProjectId = 'project-1';
 
 jest.mock('@/clients/knowledge.client', () => ({
   getKnowledgeBaseDetail: jest.fn(),
 }));
 
 jest.mock('@/hooks/use-credential', () => ({
-  useCredential: () => ['user-1', 'token-1', 'project-1'],
+  useCredential: () => [mockUserId, mockToken, mockProjectId],
 }));
 
 jest.mock('@/stores/app', () => ({
@@ -78,19 +81,26 @@ const KnowledgeRoutes = () =>
     },
   ]);
 
-function renderFileRoute() {
-  return render(
+function KnowledgeFileRoute() {
+  return (
     <MemoryRouter
       initialEntries={['/knowledge/knowledge-1/add-knowledge-file']}
     >
       <KnowledgeRoutes />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderFileRoute() {
+  return render(<KnowledgeFileRoute />);
 }
 
 describe('KnowledgeViewLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUserId = 'user-1';
+    mockToken = 'token-1';
+    mockProjectId = 'project-1';
     useKnowledgePageStore.setState({
       currentKnowledge: null,
       currentKnowledgeStatus: 'idle',
@@ -224,6 +234,41 @@ describe('KnowledgeViewLayout', () => {
     expect(useKnowledgePageStore.getState().currentKnowledge).toBe(knowledge);
     expect(useKnowledgePageStore.getState().currentKnowledgeStatus).toBe(
       'ready',
+    );
+  });
+
+  it('clears cached knowledge when the project context changes', async () => {
+    const knowledge = {
+      getId: () => 'knowledge-1',
+      getName: () => 'First project knowledge',
+    } as any;
+    mockedGetKnowledgeBaseDetail
+      .mockImplementationOnce(({ callback }: any) =>
+        callback(null, {
+          getSuccess: () => true,
+          getData: () => knowledge,
+        }),
+      )
+      .mockImplementationOnce(({ callback }: any) =>
+        callback(null, { getSuccess: () => false, getError: () => null }),
+      );
+
+    const view = renderFileRoute();
+    await waitFor(() =>
+      expect(useKnowledgePageStore.getState().currentKnowledge).toBe(knowledge),
+    );
+
+    mockProjectId = 'project-2';
+    view.rerender(<KnowledgeFileRoute />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Knowledge not available' }),
+    ).toBeInTheDocument();
+    expect(useKnowledgePageStore.getState().currentKnowledge).toBeNull();
+    expect(mockedGetKnowledgeBaseDetail).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        auth: expect.objectContaining({ projectId: 'project-2' }),
+      }),
     );
   });
 });
