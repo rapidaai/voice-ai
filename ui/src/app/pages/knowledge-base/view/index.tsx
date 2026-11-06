@@ -1,25 +1,21 @@
 import { Helmet } from '@/app/components/app-shell/helmet';
-import { useRapidaStore } from '@/stores/app';
 import { useCredential } from '@/hooks/use-credential';
-import { useCallback, useEffect, useState } from 'react';
-import toast from 'react-hot-toast/headless';
-import { useParams } from 'react-router-dom';
+import { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { Tab } from '@/app/components/ui/primitives';
 import { Documents } from './documents';
-import { GetKnowledgeResponse } from '@rapidaai/react';
 import { cn } from '@/utils';
 import { toHumanReadableRelativeTime } from '@/utils/date';
 import { useKnowledgePageStore } from '@/stores/knowledge/knowledge.store';
 import { CreateTagDialog } from '@/app/components/dialogs/shared/create-tag-modal';
 import { UpdateDescriptionDialog } from '@/app/components/dialogs/shared';
 import { Tag } from '@rapidaai/react';
-import { ServiceError } from '@rapidaai/react';
 import { DocumentSegments } from '@/app/pages/knowledge-base/view/document-segments';
 import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
 import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
 import { CreateKnowledgeDocumentDialog } from '@/app/components/dialogs/knowledge';
 import { Add } from '@carbon/icons-react';
-import { getKnowledgeBaseDetail } from '@/clients/knowledge.client';
+import type { KnowledgeViewOutletContext } from './knowledge-view.layout';
 
 /**
  *
@@ -27,48 +23,9 @@ import { getKnowledgeBaseDetail } from '@/clients/knowledge.client';
  */
 export function ViewKnowledgePage() {
   const [userId, token, projectId] = useCredential();
-  const { showLoader, hideLoader } = useRapidaStore();
   const [createKnowledgeOpen, setCreateKnowledgeOpen] = useState(false);
-  const { onChangeCurrentKnowledge, currentKnowledge, ...knowledgeActions } =
-    useKnowledgePageStore();
-
-  const { id } = useParams();
-
-  const afterGetKnowledge = useCallback(
-    (err: ServiceError | null, uvcr: GetKnowledgeResponse | null) => {
-      hideLoader();
-      if (uvcr?.getSuccess()) {
-        const kb = uvcr.getData();
-        if (kb) onChangeCurrentKnowledge(kb);
-      } else {
-        let errorMessage = uvcr?.getError();
-        if (errorMessage) {
-          toast.error(errorMessage.getHumanmessage());
-        }
-        toast.error(
-          'Unable to get your knowledgebase, please try again later.',
-        );
-      }
-    },
-    [hideLoader, onChangeCurrentKnowledge],
-  );
-
-  const getKnowledge = useCallback(
-    (knowledgeId?: string) => {
-      if (!knowledgeId) return;
-      showLoader('overlay');
-      getKnowledgeBaseDetail({
-        knowledgeId,
-        auth: { projectId, token, userId },
-        callback: afterGetKnowledge,
-      });
-    },
-    [afterGetKnowledge, projectId, showLoader, token, userId],
-  );
-
-  useEffect(() => {
-    getKnowledge(id);
-  }, [getKnowledge, id]);
+  const { currentKnowledge, ...knowledgeActions } = useKnowledgePageStore();
+  const { onReload } = useOutletContext<KnowledgeViewOutletContext>();
 
   return (
     <>
@@ -165,9 +122,7 @@ export function ViewKnowledgePage() {
           modalOpen={createKnowledgeOpen}
           setModalOpen={setCreateKnowledgeOpen}
           knowledgeId={currentKnowledge?.getId()!}
-          onReload={() => {
-            getKnowledge(id);
-          }}
+          onReload={onReload}
         />
         {currentKnowledge && (
           <Tab

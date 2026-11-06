@@ -10,9 +10,12 @@ import type { RouteObject } from 'react-router-dom';
 import { useKnowledgePageStore } from '@/stores/knowledge/knowledge.store';
 import { breadcrumb, type BreadcrumbLabelProps } from './breadcrumb-handle';
 import { WorkspaceRouteLayout } from './workspace-route-layout';
+import { KnowledgeViewLayout } from '@/app/pages/knowledge-base/view/knowledge-view.layout';
 
 function KnowledgeBreadcrumbLabel({ params }: BreadcrumbLabelProps) {
   const knowledge = useKnowledgePageStore(state => state.currentKnowledge);
+  const status = useKnowledgePageStore(state => state.currentKnowledgeStatus);
+  if (status === 'error') return <>Knowledge unavailable</>;
   if (!knowledge || knowledge.getId() !== params.id) {
     return <SkeletonText className="mb-0!" width="8rem" />;
   }
@@ -33,6 +36,7 @@ export const knowledgeRoute: RouteObject = {
     },
     {
       path: ':id',
+      element: <KnowledgeViewLayout />,
       handle: { breadcrumb: { render: KnowledgeBreadcrumbLabel } },
       children: [
         { index: true, element: <KnowledgeViewKnowledgePage /> },

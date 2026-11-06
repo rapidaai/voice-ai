@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, type MouseEventHandler, type ReactNode } from 'react';
 import {
   Breadcrumb as CarbonBreadcrumb,
   BreadcrumbItem as CarbonBreadcrumbItem,
@@ -13,6 +13,7 @@ export interface BreadcrumbItemData {
   href?: string;
   className?: string;
   isCurrentPage?: boolean;
+  onClick?: MouseEventHandler<HTMLElement>;
   /** Render custom content inside the BreadcrumbItem instead of a plain link. */
   render?: () => ReactNode;
 }
@@ -71,6 +72,7 @@ export function Breadcrumb({
                     className={overflowItem.className}
                     href={overflowItem.href}
                     itemText={overflowItem.label}
+                    onClick={overflowItem.onClick}
                   />
                 ))}
               </CarbonOverflowMenu>

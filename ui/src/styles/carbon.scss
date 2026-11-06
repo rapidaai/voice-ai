@@ -357,12 +357,6 @@
   }
 }
 
-@media (width <= 640px) {
-  .global-breadcrumb .cds--breadcrumb-item:first-child:not(:only-child) {
-    display: none;
-  }
-}
-
 .text-provider-combo-row,
 .domain-connected-dropdown-row {
   .cds--dropdown,

@@ -63,3 +63,19 @@ test('mobile breadcrumb keeps overflow and the current route visible', async ({
     'page',
   );
 });
+
+test('mobile two-item breadcrumb keeps its parent link', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await authenticatePage(page);
+  await page.goto('/organization/users');
+  await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
+
+  const breadcrumb = page.locator('.global-breadcrumb');
+  await expect(
+    breadcrumb.getByRole('link', { name: 'Organization' }),
+  ).toHaveAttribute('href', '/organization');
+  await expect(breadcrumb.getByText('Users')).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+});

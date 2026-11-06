@@ -10,20 +10,23 @@ import type { RouteObject } from 'react-router-dom';
 
 export const authRoute: RouteObject = {
   path: '/auth',
-  element: (
-    <IgnoreBox>
-      <AuthenticationLayout />
-    </IgnoreBox>
-  ),
   children: [
-    { index: true, element: <AuthSignInPage /> },
-    { path: 'signin', element: <AuthSignInPage /> },
-    { path: 'signup', element: <AuthSignUpPage /> },
-    { path: 'forgot-password', element: <AuthForgotPasswordPage /> },
     {
-      path: 'change-password/:token',
-      element: <AuthChangePasswordPage />,
+      element: (
+        <IgnoreBox>
+          <AuthenticationLayout />
+        </IgnoreBox>
+      ),
+      children: [
+        { index: true, element: <AuthSignInPage /> },
+        { path: 'signin', element: <AuthSignInPage /> },
+        { path: 'signup', element: <AuthSignUpPage /> },
+        { path: 'forgot-password', element: <AuthForgotPasswordPage /> },
+        {
+          path: 'change-password/:token',
+          element: <AuthChangePasswordPage />,
+        },
+      ],
     },
-    { path: '*', element: null },
   ],
 };

@@ -12,6 +12,8 @@ export type AssistantTypeProperty = {
    */
   currentAssistant: Assistant | null;
 
+  currentAssistantStatus: 'idle' | 'loading' | 'ready' | 'error';
+
   /**
    * list of assistant
    */
@@ -41,6 +43,10 @@ export type AssistantTypeAction = {
    * @returns
    */
   onChangeCurrentAssistant: (assistant: Assistant) => void;
+
+  onChangeCurrentAssistantStatus: (
+    status: AssistantTypeProperty['currentAssistantStatus'],
+  ) => void;
 
   /**
    *

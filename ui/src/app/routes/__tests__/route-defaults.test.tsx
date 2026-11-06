@@ -169,6 +169,23 @@ describe('route defaults', () => {
     expect(screen.getByText(expectedText)).toBeInTheDocument();
   });
 
+  it('redirects the assistant playground parent to chat', async () => {
+    renderRoutes(
+      [deploymentRoute],
+      '/deployment/assistant/assistant-1/playground',
+      true,
+    );
+
+    expect(
+      await screen.findByText('Embedded chat debugger'),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByText('/deployment/assistant/assistant-1/playground/chat'),
+      ).toBeInTheDocument(),
+    );
+  });
+
   it('redirects the onboarding root to organization setup', async () => {
     renderRoutes([onboardingRoute], '/onboarding', true);
 

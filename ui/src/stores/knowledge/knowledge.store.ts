@@ -15,6 +15,8 @@ import {
 
 const initialKnowledgeType: KnowledgeTypeProperty = {
   currentKnowledge: null,
+
+  currentKnowledgeStatus: 'idle',
   /**
    * list of endpoint where these will be part of it
    */
@@ -38,7 +40,14 @@ export const useKnowledgePageStore = create<KnowledgeType>((set, get) => ({
    */
 
   onChangeCurrentKnowledge: (currentKnowledge: Knowledge) => {
-    set({ currentKnowledge: currentKnowledge });
+    set({
+      currentKnowledge: currentKnowledge,
+      currentKnowledgeStatus: 'ready',
+    });
+  },
+
+  onChangeCurrentKnowledgeStatus: status => {
+    set({ currentKnowledgeStatus: status });
   },
 
   /**

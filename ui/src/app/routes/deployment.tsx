@@ -62,6 +62,8 @@ import { WorkspaceRouteLayout } from './workspace-route-layout';
 
 function AssistantBreadcrumbLabel({ params }: BreadcrumbLabelProps) {
   const assistant = useAssistantPageStore(state => state.currentAssistant);
+  const status = useAssistantPageStore(state => state.currentAssistantStatus);
+  if (status === 'error') return <>Assistant unavailable</>;
   if (!assistant || assistant.getId() !== params.assistantId) {
     return <SkeletonText className="mb-0!" width="8rem" />;
   }
@@ -206,6 +208,7 @@ export const deploymentRoute: RouteObject = {
               path: 'playground',
               handle: breadcrumb('Playground'),
               children: [
+                { index: true, element: <Navigate to="chat" replace /> },
                 {
                   path: 'chat',
                   element: <PreviewVoiceAgentV2Page embedded />,

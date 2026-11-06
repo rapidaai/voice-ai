@@ -76,11 +76,24 @@ jest.mock('@carbon/react', () => ({
     children,
     className,
     'aria-current': ariaCurrent,
-  }: any) => (
-    <li aria-current={ariaCurrent} className={className}>
-      {children}
-    </li>
-  ),
+  }: any) => {
+    const react = jest.requireActual('react');
+    const content = react.isValidElement(children) ? (
+      react.cloneElement(children, {
+        'aria-current': ariaCurrent,
+        className: 'cds--link',
+      })
+    ) : (
+      <span aria-current={ariaCurrent} className="cds--link">
+        {children}
+      </span>
+    );
+    return (
+      <li aria-current={ariaCurrent} className={className}>
+        {content}
+      </li>
+    );
+  },
   BreadcrumbSkeleton: ({ className }: any) => (
     <div className={className} data-testid="breadcrumb-skeleton" />
   ),
@@ -90,7 +103,11 @@ jest.mock('@carbon/react', () => ({
       {children}
     </div>
   ),
-  OverflowMenuItem: ({ href, itemText }: any) => <a href={href}>{itemText}</a>,
+  OverflowMenuItem: ({ href, itemText, onClick }: any) => (
+    <a href={href} onClick={onClick}>
+      {itemText}
+    </a>
+  ),
   HeaderGlobalBar: ({ children }: any) => <div>{children}</div>,
   HeaderGlobalAction: ({
     children,
@@ -163,22 +180,26 @@ function renderHeader(
   value: React.ContextType<typeof AuthContext> = {},
 ) {
   const router = createMemoryRouter(routes, { initialEntries: [initialEntry] });
-  return render(
+  const view = render(
     <AuthContext.Provider value={value}>
       <RouterProvider router={router} />
     </AuthContext.Provider>,
   );
+  return { ...view, router };
 }
 
 const breadcrumb = (label: string) => ({ breadcrumb: { label } });
 
 describe('Actionable header project switcher', () => {
+  const originalMatchMedia = window.matchMedia;
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockResolvedMode = 'light';
     mockTheme.allowModeSelection = true;
     mockRapidaLoading = false;
     mockRapidaLoadingType = undefined;
+    window.matchMedia = originalMatchMedia;
   });
 
   it('renders ancestor links, current location, and project selection', async () => {
@@ -270,10 +291,11 @@ describe('Actionable header project switcher', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('uses Carbon overflow and renders dynamic route metadata', () => {
+  it('uses router navigation from Carbon overflow', async () => {
+    const user = userEvent.setup();
     const AssistantName = () => <>Support bot</>;
 
-    renderHeader(
+    const { router } = renderHeader(
       [
         {
           path: 'deployment',
@@ -282,6 +304,7 @@ describe('Actionable header project switcher', () => {
             {
               path: 'assistant',
               handle: breadcrumb('Assistants'),
+              element: <ActionableHeader />,
               children: [
                 {
                   path: ':assistantId',
@@ -290,7 +313,7 @@ describe('Actionable header project switcher', () => {
                     {
                       path: 'create-new-version',
                       handle: breadcrumb('Create version'),
-                      element: <ActionableHeader />,
+                      element: <div />,
                     },
                   ],
                 },
@@ -301,6 +324,7 @@ describe('Actionable header project switcher', () => {
       ],
       '/deployment/assistant/2301664620831571968/create-new-version',
     );
+    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue();
 
     expect(
       screen.getByRole('button', { name: 'Show hidden breadcrumb items' }),
@@ -320,6 +344,64 @@ describe('Actionable header project switcher', () => {
     expect(
       screen.queryByRole('link', { name: 'Create version' }),
     ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Assistants' }));
+    expect(navigate).toHaveBeenCalledWith(
+      '/deployment/assistant',
+      expect.objectContaining({ fromRouteId: expect.any(String) }),
+    );
+  });
+
+  it('preserves Carbon current-page props for a dynamic label', () => {
+    const AssistantName = () => <>Support bot</>;
+
+    renderHeader(
+      [
+        {
+          path: 'deployment',
+          handle: breadcrumb('Deployment'),
+          children: [
+            {
+              path: ':assistantId',
+              handle: { breadcrumb: { render: AssistantName } },
+              element: <ActionableHeader />,
+            },
+          ],
+        },
+      ],
+      '/deployment/assistant-1',
+    );
+
+    expect(screen.getByText('Support bot')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByText('Support bot')).toHaveClass('cds--link');
+  });
+
+  it('supports legacy media query listeners', () => {
+    const addListener = jest.fn();
+    const removeListener = jest.fn();
+    window.matchMedia = jest.fn().mockReturnValue({
+      matches: false,
+      addListener,
+      removeListener,
+    });
+
+    const result = renderHeader(
+      [
+        {
+          path: 'dashboard',
+          handle: breadcrumb('Dashboard'),
+          element: <ActionableHeader />,
+        },
+      ],
+      '/dashboard',
+    );
+
+    expect(addListener).toHaveBeenCalledTimes(1);
+    result.unmount();
+    expect(removeListener).toHaveBeenCalledTimes(1);
   });
 
   it('renders loading skeletons while a blocking request is active', () => {

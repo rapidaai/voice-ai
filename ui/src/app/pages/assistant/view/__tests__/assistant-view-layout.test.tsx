@@ -9,6 +9,7 @@ jest.mock('@/clients/assistant.client', () => ({
 
 const mockClearAssistantState = jest.fn();
 const mockSetCurrentAssistant = jest.fn();
+const mockSetCurrentAssistantStatus = jest.fn();
 
 jest.mock('@/stores/assistant/assistant.store', () => ({
   useAssistantPageStore: (selector?: (state: any) => unknown) => {
@@ -16,6 +17,7 @@ jest.mock('@/stores/assistant/assistant.store', () => ({
       currentAssistant: null,
       clear: mockClearAssistantState,
       onChangeCurrentAssistant: mockSetCurrentAssistant,
+      onChangeCurrentAssistantStatus: mockSetCurrentAssistantStatus,
     };
     return selector ? selector(state) : state;
   },
@@ -122,6 +124,7 @@ describe('AssistantViewLayout', () => {
       screen.getByRole('button', { name: 'Back to assistants' }),
     ).toBeVisible();
     expect(mockHideLoader).toHaveBeenCalled();
+    expect(mockSetCurrentAssistantStatus).toHaveBeenCalledWith('error');
   });
 
   it('starts with the assistant navigation collapsed on a small screen', async () => {

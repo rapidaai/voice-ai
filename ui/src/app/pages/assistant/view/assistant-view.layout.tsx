@@ -20,6 +20,9 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
   const setCurrentAssistant = useAssistantPageStore(
     state => state.onChangeCurrentAssistant,
   );
+  const setCurrentAssistantStatus = useAssistantPageStore(
+    state => state.onChangeCurrentAssistantStatus,
+  );
   const { assistantId } = useParams();
   const [navExpanded, setNavExpanded] = useState(
     () => !window.matchMedia?.('(max-width: 767px)').matches,
@@ -45,6 +48,7 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
     clearAssistantState();
     setUnknownState(false);
     if (assistantId) {
+      setCurrentAssistantStatus('loading');
       showLoader();
       getAssistantById({
         assistantId,
@@ -57,9 +61,11 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
             return;
           }
 
+          setCurrentAssistantStatus('error');
           setUnknownState(true);
         })
         .catch(() => {
+          setCurrentAssistantStatus('error');
           setUnknownState(true);
           hideLoader();
         });
@@ -70,6 +76,7 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
     hideLoader,
     projectId,
     setCurrentAssistant,
+    setCurrentAssistantStatus,
     showLoader,
     token,
     userId,

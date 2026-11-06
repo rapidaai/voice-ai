@@ -1,7 +1,13 @@
-import { useState, useContext, useEffect, type HTMLAttributes } from 'react';
+import {
+  useState,
+  useContext,
+  useEffect,
+  type HTMLAttributes,
+  type MouseEvent,
+} from 'react';
 import { ProjectRole } from '@rapidaai/react';
 import { cn } from '@/utils';
-import { useMatches, type UIMatch } from 'react-router-dom';
+import { useMatches, useNavigate, type UIMatch } from 'react-router-dom';
 import { CustomLink } from '@/app/components/ui/primitives';
 import { AuthContext } from '@/context/auth-context';
 import { Moon, Sun, UserAvatar } from '@carbon/icons-react';
@@ -23,6 +29,7 @@ export function ActionableHeader({
   ...attributes
 }: HTMLAttributes<HTMLElement>) {
   const matches = useMatches() as UIMatch<unknown, AppRouteHandle>[];
+  const navigate = useNavigate();
   const { loading, loadingType } = useRapidaStore();
   const isLoading = loading && loadingType === 'block';
   const [maxVisibleBreadcrumbItems, setMaxVisibleBreadcrumbItems] = useState(
@@ -35,8 +42,12 @@ export function ActionableHeader({
 
     const updateVisibleItems = () =>
       setMaxVisibleBreadcrumbItems(media.matches ? 2 : 3);
-    media.addEventListener('change', updateVisibleItems);
-    return () => media.removeEventListener('change', updateVisibleItems);
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', updateVisibleItems);
+      return () => media.removeEventListener('change', updateVisibleItems);
+    }
+    media.addListener(updateVisibleItems);
+    return () => media.removeListener(updateVisibleItems);
   }, []);
 
   const breadcrumbMatches = matches.filter(match => match.handle?.breadcrumb);
@@ -46,7 +57,9 @@ export function ActionableHeader({
       'label' in definition ? (
         definition.label
       ) : (
-        <definition.render params={match.params} />
+        <span>
+          <definition.render params={match.params} />
+        </span>
       );
     const isCurrentPage = index === breadcrumbMatches.length - 1;
 
@@ -54,6 +67,20 @@ export function ActionableHeader({
       label,
       href: match.pathname,
       isCurrentPage,
+      onClick: (event: MouseEvent<HTMLElement>) => {
+        if (
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        ) {
+          return;
+        }
+        event.preventDefault();
+        navigate(match.pathname);
+      },
       render: isCurrentPage
         ? undefined
         : () => <CustomLink to={match.pathname}>{label}</CustomLink>,
