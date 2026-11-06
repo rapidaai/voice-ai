@@ -4,9 +4,10 @@ import { Version } from '@/app/pages/assistant/view/version-list';
 import { useAssistantPageStore } from '@/stores/assistant/assistant.store';
 import { useParams } from 'react-router-dom';
 
-export const ViewAssistantPage = () => {
+export const ViewAssistantPage = ({ tab: selectedTab }: { tab?: string }) => {
   const assistantAction = useAssistantPageStore();
-  const { tab = 'overview' } = useParams();
+  const { tab: routeTab = 'overview' } = useParams();
+  const tab = selectedTab ?? routeTab;
   if (!assistantAction.currentAssistant) {
     return null;
   }

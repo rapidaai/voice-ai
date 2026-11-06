@@ -1,10 +1,15 @@
 import React from 'react';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { DeploymentRoute } from '../deployment';
-import { OnbaordingRoute } from '../onborading';
-import { StaticRoute } from '../static';
+import {
+  MemoryRouter,
+  type RouteObject,
+  useLocation,
+  useRoutes,
+} from 'react-router-dom';
+import { deploymentRoute } from '../deployment';
+import { onboardingRoute } from '../onborading';
+import { staticRoute } from '../static';
 
 jest.mock('@/app/components/layout/container/protected-box', () => ({
   ProtectedBox: ({ children }: { children: React.ReactNode }) => (
@@ -124,16 +129,24 @@ const CurrentPath = () => {
   return <output>{location.pathname}</output>;
 };
 
+const TestRoutes = ({ routes }: { routes: RouteObject[] }) => useRoutes(routes);
+
+function renderRoutes(
+  routes: RouteObject[],
+  initialEntry: string,
+  showLocation = false,
+) {
+  return render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      {showLocation && <CurrentPath />}
+      <TestRoutes routes={routes} />
+    </MemoryRouter>,
+  );
+}
+
 describe('route defaults', () => {
   it('redirects the deployment root to assistants', async () => {
-    render(
-      <MemoryRouter initialEntries={['/deployment']}>
-        <CurrentPath />
-        <Routes>
-          <Route path="/deployment/*" element={<DeploymentRoute />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderRoutes([deploymentRoute], '/deployment', true);
 
     expect(await screen.findByText('Assistant listing')).toBeInTheDocument();
     await waitFor(() =>
@@ -151,26 +164,13 @@ describe('route defaults', () => {
       'Embedded phone debugger',
     ],
   ])('renders the native assistant playground at %s', (path, expectedText) => {
-    render(
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/deployment/*" element={<DeploymentRoute />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderRoutes([deploymentRoute], path);
 
     expect(screen.getByText(expectedText)).toBeInTheDocument();
   });
 
   it('redirects the onboarding root to organization setup', async () => {
-    render(
-      <MemoryRouter initialEntries={['/onboarding']}>
-        <CurrentPath />
-        <Routes>
-          <Route path="/onboarding/*" element={<OnbaordingRoute />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderRoutes([onboardingRoute], '/onboarding', true);
 
     expect(
       await screen.findByText('Organization onboarding'),
@@ -185,13 +185,7 @@ describe('route defaults', () => {
     ['/static/terms-conditions', 'Terms page'],
     ['/static/missing', 'Not found page'],
   ])('renders the static subjourney for %s', (path, expectedText) => {
-    render(
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/static/*" element={<StaticRoute />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderRoutes([staticRoute], path);
 
     expect(screen.getByText(expectedText)).toBeInTheDocument();
   });

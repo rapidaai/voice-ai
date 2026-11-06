@@ -6,11 +6,12 @@ type EndpointViewOutletContext = {
   onReload: () => void;
 };
 
-export function ViewEndpointPage() {
+export function ViewEndpointPage({ tab: selectedTab }: { tab?: string }) {
   const { currentEndpoint, currentEndpointProviderModel } =
     useEndpointPageStore();
 
-  const { tab = 'overview' } = useParams();
+  const { tab: routeTab = 'overview' } = useParams();
+  const tab = selectedTab ?? routeTab;
   const { onReload } = useOutletContext<EndpointViewOutletContext>();
 
   return (

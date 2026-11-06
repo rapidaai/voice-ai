@@ -1,8 +1,8 @@
 import React from 'react';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { AuthRoute } from '../auth';
+import { MemoryRouter, useRoutes } from 'react-router-dom';
+import { authRoute } from '../auth';
 
 jest.mock('@/app/pages/authentication', () => ({
   AuthSignInPage: () => <div>Sign in route</div>,
@@ -25,12 +25,12 @@ jest.mock('@/app/components/layout/container/protected-box', () => ({
   ),
 }));
 
+const AuthRoutes = () => useRoutes([authRoute]);
+
 const renderAuthRoute = (initialEntry: string) =>
   render(
     <MemoryRouter initialEntries={[initialEntry]}>
-      <Routes>
-        <Route path="/auth/*" element={<AuthRoute />} />
-      </Routes>
+      <AuthRoutes />
     </MemoryRouter>,
   );
 

@@ -1,23 +1,11 @@
-import { MissionBox } from '@/app/components/layout/container/mission-box';
-import { ProtectedBox } from '@/app/components/layout/container/protected-box';
 import { AccountSettingPage } from '@/app/pages/user';
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import type { RouteObject } from 'react-router-dom';
+import { breadcrumb } from './breadcrumb-handle';
+import { WorkspaceRouteLayout } from './workspace-route-layout';
 
-export function AccountRoute() {
-  return (
-    <Routes>
-      <Route
-        key="setting"
-        path=""
-        element={
-          <ProtectedBox>
-            <MissionBox>
-              <AccountSettingPage />
-            </MissionBox>
-          </ProtectedBox>
-        }
-      />
-    </Routes>
-  );
-}
+export const accountRoute: RouteObject = {
+  path: '/account',
+  element: <WorkspaceRouteLayout />,
+  handle: breadcrumb('Account'),
+  children: [{ index: true, element: <AccountSettingPage /> }],
+};

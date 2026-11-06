@@ -1,33 +1,17 @@
 import { ProtectedBox } from '@/app/components/layout/container/protected-box';
-import { Outlet, Route, Routes } from 'react-router-dom';
+import { Outlet, type RouteObject } from 'react-router-dom';
 import { ConnectGmailAction, ConnectSlackAction } from '../pages/connect/index';
 
-/**
- *
- * @returns all the route which is needed for preview
- */
-export function ConnectActionRoute() {
-  return (
-    <Routes>
-      <Route
-        path="/"
-        element={
-          <ProtectedBox>
-            <Outlet />
-          </ProtectedBox>
-        }
-      >
-        <Route
-          key="/connect-action/gmail"
-          path="gmail"
-          element={<ConnectGmailAction />}
-        />
-        <Route
-          key="/connect-action/slack"
-          path="slack"
-          element={<ConnectSlackAction />}
-        />
-      </Route>
-    </Routes>
-  );
-}
+export const connectActionRoute: RouteObject = {
+  path: '/connect-action',
+  element: (
+    <ProtectedBox>
+      <Outlet />
+    </ProtectedBox>
+  ),
+  children: [
+    { path: 'gmail', element: <ConnectGmailAction /> },
+    { path: 'slack', element: <ConnectSlackAction /> },
+    { path: '*', element: null },
+  ],
+};

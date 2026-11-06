@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { MemoryRouter } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { AuthContext } from '@/context/auth-context';
 import { ActionableHeader } from './actionable-header';
+import { breadcrumb } from '@/app/routes/breadcrumb-handle';
 
 const projectRoles = [
   { id: 'project-a', projectid: 'project-a', projectname: 'Project Alpha' },
@@ -13,19 +14,36 @@ const meta = {
   component: ActionableHeader,
   tags: ['autodocs'],
   decorators: [
-    Story => (
-      <AuthContext.Provider
-        value={{
-          projectRoles,
-          currentProjectRole: projectRoles[0],
-          setCurrentProjectRole: () => undefined,
-        }}
-      >
-        <MemoryRouter initialEntries={['/deployment/assistant']}>
-          <Story />
-        </MemoryRouter>
-      </AuthContext.Provider>
-    ),
+    Story => {
+      const router = createMemoryRouter(
+        [
+          {
+            path: 'deployment',
+            handle: breadcrumb('Deployment'),
+            children: [
+              {
+                path: 'assistant',
+                handle: breadcrumb('Assistants'),
+                element: <Story />,
+              },
+            ],
+          },
+        ],
+        { initialEntries: ['/deployment/assistant'] },
+      );
+
+      return (
+        <AuthContext.Provider
+          value={{
+            projectRoles,
+            currentProjectRole: projectRoles[0],
+            setCurrentProjectRole: () => undefined,
+          }}
+        >
+          <RouterProvider router={router} />
+        </AuthContext.Provider>
+      );
+    },
   ],
   parameters: {
     docs: {

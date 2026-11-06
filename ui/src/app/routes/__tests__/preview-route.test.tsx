@@ -1,8 +1,8 @@
 import React from 'react';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { PreviewRoute } from '../preview';
+import { MemoryRouter, useRoutes } from 'react-router-dom';
+import { previewRoute } from '../preview';
 
 jest.mock('@/app/components/layout/container/protected-box', () => ({
   ProtectedBox: ({ children }: { children: React.ReactNode }) => (
@@ -14,20 +14,23 @@ jest.mock('@/app/pages/preview-agent', () => ({
   PublicPreviewVoiceAgentPage: () => <div>Public preview</div>,
 }));
 
+const PreviewRoutes = () =>
+  useRoutes([
+    previewRoute,
+    {
+      path: '/deployment/assistant/:assistantId/playground/chat',
+      element: <div>Assistant chat debugger</div>,
+    },
+    {
+      path: '/deployment/assistant/:assistantId/playground/phone',
+      element: <div>Assistant phone debugger</div>,
+    },
+  ]);
+
 const renderPreviewRoute = (path: string) =>
   render(
     <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/preview/*" element={<PreviewRoute />} />
-        <Route
-          path="/deployment/assistant/:assistantId/playground/chat"
-          element={<div>Assistant chat debugger</div>}
-        />
-        <Route
-          path="/deployment/assistant/:assistantId/playground/phone"
-          element={<div>Assistant phone debugger</div>}
-        />
-      </Routes>
+      <PreviewRoutes />
     </MemoryRouter>,
   );
 

@@ -1,5 +1,3 @@
-import { MissionBox } from '@/app/components/layout/container/mission-box';
-import { ProtectedBox } from '@/app/components/layout/container/protected-box';
 import {
   ConversationActivityListingPage,
   KnowledgeActivityListingPage,
@@ -8,55 +6,49 @@ import {
   TraceExplorerPage,
   ToolActivityListingPage,
 } from '@/app/pages/activities';
-import { Routes, Route, Outlet } from 'react-router-dom';
+import type { RouteObject } from 'react-router-dom';
 import { CONFIG } from '@/configs';
+import { breadcrumb } from './breadcrumb-handle';
+import { WorkspaceRouteLayout } from './workspace-route-layout';
 
-export function ObservabilityRoute() {
-  const telemetryEnabled = CONFIG.workspace.features?.telemetry !== false;
-
-  return (
-    <Routes>
-      <Route
-        path="/"
-        element={
-          <ProtectedBox>
-            <MissionBox>
-              <Outlet />
-            </MissionBox>
-          </ProtectedBox>
-        }
-      >
-        <Route index key="logs" path="/" element={<LLMActivityListingPage />} />
-        <Route
-          key="request-logs"
-          path="/request"
-          element={<RequestActivityListingPage />}
-        />
-        {CONFIG.workspace.features?.knowledge !== false && (
-          <Route
-            key="knowledge-logs"
-            path="/knowledge"
-            element={<KnowledgeActivityListingPage />}
-          />
-        )}
-        <Route
-          key="tool-logs"
-          path="/tool"
-          element={<ToolActivityListingPage />}
-        />
-        <Route
-          key="conversation-logs"
-          path="/conversation"
-          element={<ConversationActivityListingPage />}
-        />
-        {telemetryEnabled && (
-          <Route
-            key="trace-explorer"
-            path="/traces"
-            element={<TraceExplorerPage />}
-          />
-        )}
-      </Route>
-    </Routes>
-  );
-}
+export const observabilityRoute: RouteObject = {
+  path: '/logs',
+  element: <WorkspaceRouteLayout />,
+  handle: breadcrumb('Logs'),
+  children: [
+    { index: true, element: <LLMActivityListingPage /> },
+    {
+      path: 'request',
+      element: <RequestActivityListingPage />,
+      handle: breadcrumb('Requests'),
+    },
+    ...(CONFIG.workspace.features?.knowledge !== false
+      ? [
+          {
+            path: 'knowledge',
+            element: <KnowledgeActivityListingPage />,
+            handle: breadcrumb('Knowledge'),
+          },
+        ]
+      : []),
+    {
+      path: 'tool',
+      element: <ToolActivityListingPage />,
+      handle: breadcrumb('Tools'),
+    },
+    {
+      path: 'conversation',
+      element: <ConversationActivityListingPage />,
+      handle: breadcrumb('Conversations'),
+    },
+    ...(CONFIG.workspace.features?.telemetry !== false
+      ? [
+          {
+            path: 'traces',
+            element: <TraceExplorerPage />,
+            handle: breadcrumb('Traces'),
+          },
+        ]
+      : []),
+  ],
+};

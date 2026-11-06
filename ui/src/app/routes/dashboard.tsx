@@ -1,22 +1,11 @@
-import { MissionBox } from '@/app/components/layout/container/mission-box';
-import { ProtectedBox } from '@/app/components/layout/container/protected-box';
 import { DashboardHomePage } from '@/app/pages/main';
-import React from 'react';
-import { Route, Routes } from 'react-router-dom';
+import type { RouteObject } from 'react-router-dom';
+import { breadcrumb } from './breadcrumb-handle';
+import { WorkspaceRouteLayout } from './workspace-route-layout';
 
-export function DashboardRoute() {
-  return (
-    <Routes>
-      <Route
-        path="/"
-        element={
-          <ProtectedBox>
-            <MissionBox>
-              <DashboardHomePage />
-            </MissionBox>
-          </ProtectedBox>
-        }
-      />
-    </Routes>
-  );
-}
+export const dashboardRoute: RouteObject = {
+  path: '/dashboard',
+  element: <WorkspaceRouteLayout />,
+  handle: breadcrumb('Dashboard'),
+  children: [{ index: true, element: <DashboardHomePage /> }],
+};

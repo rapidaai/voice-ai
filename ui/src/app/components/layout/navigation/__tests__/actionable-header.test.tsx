@@ -2,6 +2,11 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
+import {
+  createMemoryRouter,
+  RouterProvider,
+  type RouteObject,
+} from 'react-router-dom';
 
 import {
   ActionableHeader,
@@ -37,14 +42,8 @@ const mockTheme = {
 
 let mockResolvedMode: 'light' | 'dark' = 'light';
 
-let mockPathname = '/dashboard/assistant/list';
 let mockRapidaLoading = false;
 let mockRapidaLoadingType: string | undefined;
-
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useLocation: () => ({ pathname: mockPathname }),
-}));
 
 jest.mock('@/theme/theme-provider', () => ({
   useTheme: () => ({
@@ -73,10 +72,25 @@ jest.mock('@carbon/icons-react', () => ({
 
 jest.mock('@carbon/react', () => ({
   Breadcrumb: ({ children }: any) => <ol>{children}</ol>,
-  BreadcrumbItem: ({ children }: any) => <li>{children}</li>,
+  BreadcrumbItem: ({
+    children,
+    className,
+    'aria-current': ariaCurrent,
+  }: any) => (
+    <li aria-current={ariaCurrent} className={className}>
+      {children}
+    </li>
+  ),
   BreadcrumbSkeleton: ({ className }: any) => (
     <div className={className} data-testid="breadcrumb-skeleton" />
   ),
+  OverflowMenu: ({ children, iconDescription }: any) => (
+    <div>
+      <button type="button" aria-label={iconDescription} />
+      {children}
+    </div>
+  ),
+  OverflowMenuItem: ({ href, itemText }: any) => <a href={href}>{itemText}</a>,
   HeaderGlobalBar: ({ children }: any) => <div>{children}</div>,
   HeaderGlobalAction: ({
     children,
@@ -108,6 +122,7 @@ jest.mock('@carbon/react', () => ({
     itemToString,
     onChange,
     isLoading,
+    className,
   }: any) => {
     const selectedIndex = Math.max(
       items.findIndex((x: any) => x === selectedItem),
@@ -119,6 +134,7 @@ jest.mock('@carbon/react', () => ({
         aria-label={ariaLabel ?? label}
         data-testid={id}
         data-loading={String(Boolean(isLoading))}
+        className={className}
         value={String(selectedIndex)}
         onChange={e => {
           const idx = Number(e.target.value);
@@ -141,30 +157,65 @@ const projectRoles = [
   { id: 'r2', projectid: 'p2', projectname: 'Beta' },
 ] as any;
 
+function renderHeader(
+  routes: RouteObject[],
+  initialEntry: string,
+  value: React.ContextType<typeof AuthContext> = {},
+) {
+  const router = createMemoryRouter(routes, { initialEntries: [initialEntry] });
+  return render(
+    <AuthContext.Provider value={value}>
+      <RouterProvider router={router} />
+    </AuthContext.Provider>,
+  );
+}
+
+const breadcrumb = (label: string) => ({ breadcrumb: { label } });
+
 describe('Actionable header project switcher', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockPathname = '/dashboard/assistant/list';
     mockResolvedMode = 'light';
     mockTheme.allowModeSelection = true;
     mockRapidaLoading = false;
     mockRapidaLoadingType = undefined;
   });
 
-  it('renders project dropdown in header and switches project on selection', async () => {
+  it('renders ancestor links, current location, and project selection', async () => {
     const user = userEvent.setup();
     const setCurrentProjectRole = jest.fn();
 
-    render(
-      <AuthContext.Provider
-        value={{
-          projectRoles,
-          currentProjectRole: projectRoles[0],
-          setCurrentProjectRole,
-        }}
-      >
-        <ActionableHeader className="custom-header" data-testid="header" />
-      </AuthContext.Provider>,
+    renderHeader(
+      [
+        {
+          path: 'dashboard',
+          handle: breadcrumb('Dashboard'),
+          children: [
+            {
+              path: 'assistant',
+              handle: breadcrumb('Assistants'),
+              children: [
+                {
+                  path: 'list',
+                  handle: breadcrumb('List'),
+                  element: (
+                    <ActionableHeader
+                      className="custom-header"
+                      data-testid="header"
+                    />
+                  ),
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      '/dashboard/assistant/list',
+      {
+        projectRoles,
+        currentProjectRole: projectRoles[0],
+        setCurrentProjectRole,
+      },
     );
 
     expect(screen.getByTestId('header')).toHaveClass(
@@ -172,21 +223,25 @@ describe('Actionable header project switcher', () => {
       'bg-shell',
       'border-border-subtle',
     );
-    expect(screen.getByRole('link', { name: 'dashboard' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
       'href',
       '/dashboard',
     );
-    expect(screen.getByRole('link', { name: 'assistant' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Assistants' })).toHaveAttribute(
       'href',
       '/dashboard/assistant',
     );
-    expect(screen.getByRole('link', { name: 'list' })).toHaveAttribute(
-      'href',
-      '/dashboard/assistant/list',
+    expect(screen.getByText('List').closest('li')).toHaveAttribute(
+      'aria-current',
+      'page',
     );
+    expect(
+      screen.queryByRole('link', { name: 'List' }),
+    ).not.toBeInTheDocument();
 
     const projectSelector = screen.getByLabelText('Select project');
     expect(projectSelector).toBeInTheDocument();
+    expect(projectSelector).toHaveClass('max-sm:w-12!', 'max-sm:min-w-12!');
     expect(screen.getByRole('option', { name: 'Alpha' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Beta' })).toBeInTheDocument();
 
@@ -194,20 +249,97 @@ describe('Actionable header project switcher', () => {
     expect(setCurrentProjectRole).toHaveBeenCalledWith(projectRoles[1]);
   });
 
+  it('renders the dashboard as a non-interactive current location', () => {
+    renderHeader(
+      [
+        {
+          path: 'dashboard',
+          handle: breadcrumb('Dashboard'),
+          element: <ActionableHeader />,
+        },
+      ],
+      '/dashboard',
+    );
+
+    expect(screen.getByText('Dashboard')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Dashboard' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('uses Carbon overflow and renders dynamic route metadata', () => {
+    const AssistantName = () => <>Support bot</>;
+
+    renderHeader(
+      [
+        {
+          path: 'deployment',
+          handle: breadcrumb('Deployment'),
+          children: [
+            {
+              path: 'assistant',
+              handle: breadcrumb('Assistants'),
+              children: [
+                {
+                  path: ':assistantId',
+                  handle: { breadcrumb: { render: AssistantName } },
+                  children: [
+                    {
+                      path: 'create-new-version',
+                      handle: breadcrumb('Create version'),
+                      element: <ActionableHeader />,
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      '/deployment/assistant/2301664620831571968/create-new-version',
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Show hidden breadcrumb items' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Assistants' })).toHaveAttribute(
+      'href',
+      '/deployment/assistant',
+    );
+    expect(screen.getByRole('link', { name: 'Support bot' })).toHaveAttribute(
+      'href',
+      '/deployment/assistant/2301664620831571968',
+    );
+    expect(screen.getByText('Create version').closest('li')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Create version' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('renders loading skeletons while a blocking request is active', () => {
     mockRapidaLoading = true;
     mockRapidaLoadingType = 'block';
 
-    render(
-      <AuthContext.Provider
-        value={{
-          projectRoles,
-          currentProjectRole: projectRoles[0],
-          setCurrentProjectRole: jest.fn(),
-        }}
-      >
-        <ActionableHeader />
-      </AuthContext.Provider>,
+    renderHeader(
+      [
+        {
+          path: 'dashboard',
+          handle: breadcrumb('Dashboard'),
+          element: <ActionableHeader />,
+        },
+      ],
+      '/dashboard',
+      {
+        projectRoles,
+        currentProjectRole: projectRoles[0],
+        setCurrentProjectRole: jest.fn(),
+      },
     );
 
     expect(screen.getByTestId('breadcrumb-skeleton')).toHaveClass('pl-4');

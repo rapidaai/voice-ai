@@ -260,10 +260,13 @@ export const NavigationAndActions: Story = {
     return (
       <Stack gap={6} className="max-w-4xl">
         <Breadcrumb
+          maxVisibleItems={3}
           items={[
-            { label: 'Components', href: '#' },
-            { label: 'UI', href: '#' },
-            { label: 'Primitives' },
+            { label: 'Deployment', href: '#' },
+            { label: 'Assistants', href: '#' },
+            { label: 'Support bot', href: '#' },
+            { label: 'Sessions', href: '#' },
+            { label: 'Session 2101', isCurrentPage: true },
           ]}
         />
         <div className="flex flex-wrap items-center gap-4">
