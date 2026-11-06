@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Outlet, useParams } from 'react-router-dom';
 import { getKnowledgeBaseDetail } from '@/clients/knowledge.client';
 import { ErrorContainer } from '@/app/components/ui/feedback';
@@ -26,9 +26,14 @@ export function KnowledgeViewLayout() {
   const setCurrentKnowledgeStatus = useKnowledgePageStore(
     state => state.onChangeCurrentKnowledgeStatus,
   );
+  const requestRef = useRef(0);
+  const pendingRequestRef = useRef<number | null>(null);
 
   const onReload = useCallback(() => {
-    clearCurrentKnowledge();
+    const requestId = ++requestRef.current;
+    const hasCurrentKnowledge =
+      useKnowledgePageStore.getState().currentKnowledge?.getId() === id;
+    if (!hasCurrentKnowledge) clearCurrentKnowledge();
     if (!id) {
       setCurrentKnowledgeStatus('error');
       return;
@@ -36,17 +41,20 @@ export function KnowledgeViewLayout() {
 
     setCurrentKnowledgeStatus('loading');
     showLoader('overlay');
+    pendingRequestRef.current = requestId;
     getKnowledgeBaseDetail({
       knowledgeId: id,
       auth: { projectId, token, userId },
       callback: (_error, response) => {
+        if (requestId !== requestRef.current) return;
+        pendingRequestRef.current = null;
         hideLoader();
         const knowledge = response?.getSuccess() ? response.getData() : null;
         if (knowledge) {
           setCurrentKnowledge(knowledge);
           return;
         }
-        setCurrentKnowledgeStatus('error');
+        setCurrentKnowledgeStatus(hasCurrentKnowledge ? 'ready' : 'error');
       },
     });
   }, [
@@ -63,7 +71,14 @@ export function KnowledgeViewLayout() {
 
   useEffect(() => {
     onReload();
-  }, [onReload]);
+    return () => {
+      requestRef.current += 1;
+      if (pendingRequestRef.current !== null) {
+        pendingRequestRef.current = null;
+        hideLoader();
+      }
+    };
+  }, [hideLoader, onReload]);
 
   if (status === 'error') {
     return (

@@ -1,5 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { AssistantViewLayout } from '../assistant-view.layout';
 import { getAssistantById } from '@/clients/assistant.client';
 
@@ -71,8 +72,23 @@ const mockedGetAssistantById = getAssistantById as jest.MockedFunction<
   typeof getAssistantById
 >;
 
+function AssistantOverview() {
+  const navigate = useNavigate();
+  return (
+    <>
+      <div>Assistant overview</div>
+      <button
+        type="button"
+        onClick={() => navigate('/deployment/assistant/assistant-2/overview')}
+      >
+        Open next assistant
+      </button>
+    </>
+  );
+}
+
 function renderLayout() {
-  render(
+  return render(
     <MemoryRouter
       initialEntries={['/deployment/assistant/assistant-1/overview']}
     >
@@ -81,7 +97,7 @@ function renderLayout() {
           path="/deployment/assistant/:assistantId"
           element={<AssistantViewLayout />}
         >
-          <Route path="overview" element={<div>Assistant overview</div>} />
+          <Route path="overview" element={<AssistantOverview />} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -125,6 +141,54 @@ describe('AssistantViewLayout', () => {
     ).toBeVisible();
     expect(mockHideLoader).toHaveBeenCalled();
     expect(mockSetCurrentAssistantStatus).toHaveBeenCalledWith('error');
+  });
+
+  it('ignores a response from the previous assistant route', async () => {
+    const user = userEvent.setup();
+    const assistantTwo = { getId: () => 'assistant-2' } as any;
+    let resolveFirstRequest: (value: any) => void = () => undefined;
+    let resolveSecondRequest: (value: any) => void = () => undefined;
+    mockedGetAssistantById
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveFirstRequest = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveSecondRequest = resolve;
+          }),
+      );
+
+    renderLayout();
+    await user.click(
+      screen.getByRole('button', { name: 'Open next assistant' }),
+    );
+    await waitFor(() =>
+      expect(mockedGetAssistantById).toHaveBeenCalledTimes(2),
+    );
+
+    await act(async () => {
+      resolveSecondRequest({
+        getSuccess: () => true,
+        getData: () => assistantTwo,
+      });
+    });
+    await act(async () => {
+      resolveFirstRequest({
+        getSuccess: () => false,
+        getData: () => null,
+      });
+    });
+
+    expect(mockSetCurrentAssistant).toHaveBeenCalledTimes(1);
+    expect(mockSetCurrentAssistant).toHaveBeenCalledWith(assistantTwo);
+    expect(mockSetCurrentAssistantStatus).not.toHaveBeenCalledWith('error');
+    expect(
+      screen.queryByRole('heading', { name: 'Assistant not available' }),
+    ).not.toBeInTheDocument();
   });
 
   it('starts with the assistant navigation collapsed on a small screen', async () => {

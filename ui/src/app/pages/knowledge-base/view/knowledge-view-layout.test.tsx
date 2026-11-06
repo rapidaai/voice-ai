@@ -1,5 +1,11 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, useRoutes } from 'react-router-dom';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import {
+  MemoryRouter,
+  useNavigate,
+  useOutletContext,
+  useRoutes,
+} from 'react-router-dom';
 import { getKnowledgeBaseDetail } from '@/clients/knowledge.client';
 import { useKnowledgePageStore } from '@/stores/knowledge/knowledge.store';
 import { KnowledgeViewLayout } from './knowledge-view.layout';
@@ -39,6 +45,25 @@ jest.mock('@/app/components/ui/feedback', () => ({
 const mockedGetKnowledgeBaseDetail =
   getKnowledgeBaseDetail as jest.MockedFunction<typeof getKnowledgeBaseDetail>;
 
+function KnowledgeFilePage() {
+  const navigate = useNavigate();
+  const { onReload } = useOutletContext<{ onReload: () => void }>();
+  return (
+    <>
+      <div>Upload knowledge file</div>
+      <button type="button" onClick={onReload}>
+        Reload knowledge
+      </button>
+      <button
+        type="button"
+        onClick={() => navigate('/knowledge/knowledge-2/add-knowledge-file')}
+      >
+        Open next knowledge
+      </button>
+    </>
+  );
+}
+
 const KnowledgeRoutes = () =>
   useRoutes([
     {
@@ -47,7 +72,7 @@ const KnowledgeRoutes = () =>
       children: [
         {
           path: 'add-knowledge-file',
-          element: <div>Upload knowledge file</div>,
+          element: <KnowledgeFilePage />,
         },
       ],
     },
@@ -107,6 +132,98 @@ describe('KnowledgeViewLayout', () => {
     ).toBeInTheDocument();
     expect(useKnowledgePageStore.getState().currentKnowledgeStatus).toBe(
       'error',
+    );
+  });
+
+  it('ignores a response from the previous knowledge route', async () => {
+    const user = userEvent.setup();
+    const callbacks: Array<(error: null, response: any) => void> = [];
+    const knowledgeTwo = {
+      getId: () => 'knowledge-2',
+      getName: () => 'Second knowledge',
+    } as any;
+    mockedGetKnowledgeBaseDetail.mockImplementation(({ callback }: any) => {
+      callbacks.push(callback);
+    });
+
+    renderFileRoute();
+    await user.click(
+      screen.getByRole('button', { name: 'Open next knowledge' }),
+    );
+    await waitFor(() => expect(callbacks).toHaveLength(2));
+
+    await act(async () => {
+      callbacks[1](null, {
+        getSuccess: () => true,
+        getData: () => knowledgeTwo,
+      });
+    });
+    await act(async () => {
+      callbacks[0](null, {
+        getSuccess: () => false,
+        getError: () => null,
+      });
+    });
+
+    expect(useKnowledgePageStore.getState().currentKnowledge).toBe(
+      knowledgeTwo,
+    );
+    expect(useKnowledgePageStore.getState().currentKnowledgeStatus).toBe(
+      'ready',
+    );
+    expect(
+      screen.queryByRole('heading', { name: 'Knowledge not available' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('ignores a response after the knowledge layout unmounts', async () => {
+    let callback: (error: null, response: any) => void = () => undefined;
+    mockedGetKnowledgeBaseDetail.mockImplementation((request: any) => {
+      callback = request.callback;
+    });
+
+    const view = renderFileRoute();
+    await waitFor(() =>
+      expect(mockedGetKnowledgeBaseDetail).toHaveBeenCalledTimes(1),
+    );
+    view.unmount();
+    await act(async () => {
+      callback(null, { getSuccess: () => false, getError: () => null });
+    });
+
+    expect(useKnowledgePageStore.getState().currentKnowledgeStatus).not.toBe(
+      'error',
+    );
+    expect(mockHideLoader).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the current page when a reload fails', async () => {
+    const user = userEvent.setup();
+    const knowledge = {
+      getId: () => 'knowledge-1',
+      getName: () => 'Product knowledge',
+    } as any;
+    mockedGetKnowledgeBaseDetail
+      .mockImplementationOnce(({ callback }: any) =>
+        callback(null, {
+          getSuccess: () => true,
+          getData: () => knowledge,
+        }),
+      )
+      .mockImplementationOnce(({ callback }: any) =>
+        callback(null, { getSuccess: () => false, getError: () => null }),
+      );
+
+    renderFileRoute();
+    await waitFor(() =>
+      expect(useKnowledgePageStore.getState().currentKnowledge).toBe(knowledge),
+    );
+    await user.click(screen.getByRole('button', { name: 'Reload knowledge' }));
+
+    expect(screen.getByText('Upload knowledge file')).toBeInTheDocument();
+    expect(useKnowledgePageStore.getState().currentKnowledge).toBe(knowledge);
+    expect(useKnowledgePageStore.getState().currentKnowledgeStatus).toBe(
+      'ready',
     );
   });
 });

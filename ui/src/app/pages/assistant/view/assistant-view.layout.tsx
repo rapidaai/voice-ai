@@ -45,16 +45,21 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
   }, []);
 
   useEffect(() => {
+    let isCurrentRequest = true;
+    let isRequestPending = false;
     clearAssistantState();
     setUnknownState(false);
     if (assistantId) {
       setCurrentAssistantStatus('loading');
       showLoader();
+      isRequestPending = true;
       getAssistantById({
         assistantId,
         auth: { projectId, token, userId },
       })
         .then(epmr => {
+          if (!isCurrentRequest) return;
+          isRequestPending = false;
           hideLoader();
           if (epmr?.getSuccess() && epmr.getData()) {
             setCurrentAssistant(epmr.getData()!);
@@ -65,11 +70,18 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
           setUnknownState(true);
         })
         .catch(() => {
+          if (!isCurrentRequest) return;
+          isRequestPending = false;
+          hideLoader();
           setCurrentAssistantStatus('error');
           setUnknownState(true);
-          hideLoader();
         });
     }
+
+    return () => {
+      isCurrentRequest = false;
+      if (isRequestPending) hideLoader();
+    };
   }, [
     assistantId,
     clearAssistantState,
