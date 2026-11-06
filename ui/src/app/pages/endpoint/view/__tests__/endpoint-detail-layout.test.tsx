@@ -221,6 +221,7 @@ const makeEndpoint = () =>
 
 const renderEndpointDetailRoute = (
   initialEntry = '/deployment/endpoint/endpoint-1/overview',
+  selectedTab?: string,
 ) =>
   render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -233,7 +234,7 @@ const renderEndpointDetailRoute = (
             path="create-endpoint-version"
             element={<section>Create endpoint version</section>}
           />
-          <Route path=":tab" element={<ViewEndpointPage />} />
+          <Route path=":tab" element={<ViewEndpointPage tab={selectedTab} />} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -332,5 +333,15 @@ describe('Endpoint detail layout', () => {
     expect(
       within(endpointNav).getByRole('link', { name: 'Add new version' }),
     ).toHaveClass('cds--side-nav__link--current');
+  });
+
+  it('prefers an explicit non-overview tab over the route tab', () => {
+    renderEndpointDetailRoute(
+      '/deployment/endpoint/endpoint-1/logs',
+      'settings',
+    );
+
+    expect(screen.getByText('Endpoint settings')).toBeInTheDocument();
+    expect(screen.queryByText('Endpoint logs')).not.toBeInTheDocument();
   });
 });

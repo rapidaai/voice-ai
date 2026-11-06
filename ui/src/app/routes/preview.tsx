@@ -1,5 +1,5 @@
 import { PublicPreviewVoiceAgentPage } from '@/app/pages/preview-agent';
-import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { Navigate, type RouteObject, useParams } from 'react-router-dom';
 
 function AssistantPlaygroundRedirect({
   channel,
@@ -20,29 +20,25 @@ function AssistantPlaygroundRedirect({
   );
 }
 
-/**
- *
- * @returns all the route which is needed for preview
- */
-export function PreviewRoute() {
-  return (
-    <Routes>
-      <Route
-        path="call/:assistantId/"
-        element={<AssistantPlaygroundRedirect channel="phone" />}
-      />
-      <Route
-        path="chat/:assistantId"
-        element={<AssistantPlaygroundRedirect channel="chat" />}
-      />
-      <Route
-        path="v2/chat/:assistantId"
-        element={<AssistantPlaygroundRedirect channel="chat" />}
-      />
-      <Route
-        path="public/assistant/:assistantId"
-        element={<PublicPreviewVoiceAgentPage />}
-      />
-    </Routes>
-  );
-}
+export const previewRoute: RouteObject = {
+  path: '/preview',
+  children: [
+    {
+      path: 'call/:assistantId',
+      element: <AssistantPlaygroundRedirect channel="phone" />,
+    },
+    {
+      path: 'chat/:assistantId',
+      element: <AssistantPlaygroundRedirect channel="chat" />,
+    },
+    {
+      path: 'v2/chat/:assistantId',
+      element: <AssistantPlaygroundRedirect channel="chat" />,
+    },
+    {
+      path: 'public/assistant/:assistantId',
+      element: <PublicPreviewVoiceAgentPage />,
+    },
+    { path: '*', element: null },
+  ],
+};

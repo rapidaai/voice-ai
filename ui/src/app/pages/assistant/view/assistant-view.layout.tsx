@@ -20,6 +20,9 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
   const setCurrentAssistant = useAssistantPageStore(
     state => state.onChangeCurrentAssistant,
   );
+  const setCurrentAssistantStatus = useAssistantPageStore(
+    state => state.onChangeCurrentAssistantStatus,
+  );
   const { assistantId } = useParams();
   const [navExpanded, setNavExpanded] = useState(
     () => !window.matchMedia?.('(max-width: 767px)').matches,
@@ -42,34 +45,50 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
   }, []);
 
   useEffect(() => {
+    let isCurrentRequest = true;
+    let isRequestPending = false;
     clearAssistantState();
     setUnknownState(false);
     if (assistantId) {
+      setCurrentAssistantStatus('loading');
       showLoader();
+      isRequestPending = true;
       getAssistantById({
         assistantId,
         auth: { projectId, token, userId },
       })
         .then(epmr => {
+          if (!isCurrentRequest) return;
+          isRequestPending = false;
           hideLoader();
           if (epmr?.getSuccess() && epmr.getData()) {
             setCurrentAssistant(epmr.getData()!);
             return;
           }
 
+          setCurrentAssistantStatus('error');
           setUnknownState(true);
         })
         .catch(() => {
-          setUnknownState(true);
+          if (!isCurrentRequest) return;
+          isRequestPending = false;
           hideLoader();
+          setCurrentAssistantStatus('error');
+          setUnknownState(true);
         });
     }
+
+    return () => {
+      isCurrentRequest = false;
+      if (isRequestPending) hideLoader();
+    };
   }, [
     assistantId,
     clearAssistantState,
     hideLoader,
     projectId,
     setCurrentAssistant,
+    setCurrentAssistantStatus,
     showLoader,
     token,
     userId,

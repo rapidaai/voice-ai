@@ -12,6 +12,8 @@ export type KnowledgeTypeProperty = {
    */
   currentKnowledge: Knowledge | null;
 
+  currentKnowledgeStatus: 'idle' | 'loading' | 'ready' | 'error';
+
   /**
    *
    */
@@ -61,6 +63,9 @@ export type KnowledgeAction = {
    * @returns
    */
   onChangeCurrentKnowledge: (knowledge: Knowledge) => void;
+  onChangeCurrentKnowledgeStatus: (
+    status: KnowledgeTypeProperty['currentKnowledgeStatus'],
+  ) => void;
   /**
    *
    * @returns

@@ -1,4 +1,9 @@
-import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import {
+  Navigate,
+  Outlet,
+  type RouteObject,
+  useLocation,
+} from 'react-router-dom';
 import { GeneralFooter } from '@/app/components/layout/footer/general-footer';
 import { PublicShellHeader } from '@/app/components/layout/public-shell/public-shell-header';
 import { ProtectedBox } from '@/app/components/layout/container/protected-box';
@@ -60,29 +65,20 @@ export function OnboardingLayout() {
   );
 }
 
-export function OnbaordingRoute() {
-  return (
-    <Routes>
-      <Route
-        path="/"
-        element={
-          <ProtectedBox>
-            <OnboardingLayout />
-          </ProtectedBox>
-        }
-      >
-        <Route index element={<Navigate to="organization" replace />} />
-        <Route
-          key="organization"
-          path="organization"
-          element={<OnboardingCreateOrganizationPage />}
-        />
-        <Route
-          key="project"
-          path="project"
-          element={<OnboardingCreateProjectPage />}
-        />
-      </Route>
-    </Routes>
-  );
-}
+export const onboardingRoute: RouteObject = {
+  path: '/onboarding',
+  element: (
+    <ProtectedBox>
+      <OnboardingLayout />
+    </ProtectedBox>
+  ),
+  children: [
+    { index: true, element: <Navigate to="organization" replace /> },
+    {
+      path: 'organization',
+      element: <OnboardingCreateOrganizationPage />,
+    },
+    { path: 'project', element: <OnboardingCreateProjectPage /> },
+    { path: '*', element: null },
+  ],
+};

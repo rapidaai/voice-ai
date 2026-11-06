@@ -6,7 +6,35 @@ const require = createRequire(import.meta.url);
 const {
   checkJourneyDecisions,
   checkSubjourneyDecisions,
+  readRouteObjectPaths,
 } = require('./check-e2e-route-coverage.cjs');
+
+test('discovers only nested route object paths', () => {
+  const paths = readRouteObjectPaths(`
+    const legacy = <Route path="legacy" />;
+
+    export const deploymentRoute: RouteObject = {
+      path: '/deployment',
+      children: [
+        { path: 'assistant' },
+        {
+          path: 'endpoint',
+          children: [{ path: ':endpointId' }],
+        },
+        ...(enabled ? [{ path: 'traces' }] : []),
+        { path: '*' },
+      ],
+    };
+  `);
+
+  assert.deepEqual(paths, [
+    '/',
+    'assistant',
+    'endpoint',
+    'endpoint/:endpointId',
+    'traces',
+  ]);
+});
 
 test('accepts a journey with all route check decisions', () => {
   const result = checkJourneyDecisions([

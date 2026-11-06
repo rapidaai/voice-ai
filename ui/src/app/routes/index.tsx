@@ -1,17 +1,17 @@
-export { AuthRoute } from '@/app/routes/auth';
-export { OnbaordingRoute } from '@/app/routes/onborading';
-export { DeploymentRoute } from '@/app/routes/deployment';
-export { DashboardRoute } from '@/app/routes/dashboard';
-export { StaticRoute } from '@/app/routes/static';
-export { AccountRoute } from '@/app/routes/account';
-export { IntegrationRoute } from '@/app/routes/integration';
-export { ObservabilityRoute } from '@/app/routes/observability';
-export { OrganizationRoute } from '@/app/routes/organization';
-export { KnowledgeRoute } from '@/app/routes/knowledge';
+export { authRoute } from '@/app/routes/auth';
+export { onboardingRoute } from '@/app/routes/onborading';
+export { deploymentRoute } from '@/app/routes/deployment';
+export { dashboardRoute } from '@/app/routes/dashboard';
+export { staticRoute } from '@/app/routes/static';
+export { accountRoute } from '@/app/routes/account';
+export { integrationRoute } from '@/app/routes/integration';
+export { observabilityRoute } from '@/app/routes/observability';
+export { organizationRoute } from '@/app/routes/organization';
+export { knowledgeRoute } from '@/app/routes/knowledge';
 export {
-  ConnectKnowledgeRoute,
-  CommonConnectRoute,
-  ConnectCRMRoute,
+  connectKnowledgeRoute,
+  commonConnectRoute,
+  connectCRMRoute,
 } from '@/app/routes/connect-knowledge';
-export { ConnectActionRoute } from '@/app/routes/connect-action';
-export { PreviewRoute } from '@/app/routes/preview';
+export { connectActionRoute } from '@/app/routes/connect-action';
+export { previewRoute } from '@/app/routes/preview';

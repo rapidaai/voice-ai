@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
@@ -8,6 +8,7 @@ import { ViewKnowledgePage } from './index';
 const mockHideLoader = jest.fn();
 const mockOnChangeCurrentKnowledge = jest.fn();
 const mockShowLoader = jest.fn();
+const mockOnReload = jest.fn();
 
 let mockCurrentKnowledge: any = {
   getCreateddate: () => '2026-01-01T00:00:00Z',
@@ -22,7 +23,7 @@ jest.mock('react-hot-toast/headless', () => ({
 }));
 
 jest.mock('react-router-dom', () => ({
-  useParams: () => ({ id: 'knowledge-1' }),
+  useOutletContext: () => ({ onReload: mockOnReload }),
 }));
 
 jest.mock('@rapidaai/react', () => ({
@@ -141,15 +142,13 @@ describe('ViewKnowledgePage', () => {
     jest.clearAllMocks();
   });
 
-  it('renders the add document action with a Carbon icon', async () => {
+  it('renders the add document action with a Carbon icon', () => {
     render(<ViewKnowledgePage />);
 
     expect(screen.getByRole('button', { name: /add new document/i }));
     expect(screen.getByTestId('add-icon')).not.toHaveAttribute(
       'data-stroke-width',
     );
-
-    await waitFor(() => expect(mockShowLoader).toHaveBeenCalledWith('overlay'));
   });
 
   it('opens create document dialog for the current knowledge', async () => {

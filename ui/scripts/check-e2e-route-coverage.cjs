@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const ts = require('typescript');
 const {
   routeRoots,
   routeJourneys,
@@ -23,20 +24,116 @@ function readJSON(filePath) {
 }
 
 function readAppRouteRoots() {
-  const source = fs.readFileSync(appRouteFile, 'utf8');
+  const sources = [
+    fs.readFileSync(appRouteFile, 'utf8'),
+    ...routeSourceFiles().map(fileName =>
+      fs.readFileSync(path.join(routeDir, fileName), 'utf8'),
+    ),
+  ];
   const roots = new Set();
-  const routePathPattern =
-    /<Route\b[^>]*\bpath=(?:\{)?["'`]([^"'`{}]+)["'`](?:\})?/g;
-  let match;
+  const objectPathPattern = /\bpath:\s*["'`]([^"'`{}]+)["'`]/g;
 
-  while ((match = routePathPattern.exec(source))) {
-    const value = match[1];
-    if (value === '/' || value === '*') continue;
-    const root = value.replace(/\/\*$/, '');
-    if (root.startsWith('/')) roots.add(root);
+  for (const source of sources) {
+    objectPathPattern.lastIndex = 0;
+    let match;
+    while ((match = objectPathPattern.exec(source))) {
+      const value = match[1];
+      if (value === '/' || value === '*') continue;
+      if (value.startsWith('/')) roots.add(value);
+    }
   }
 
   return [...roots].sort();
+}
+
+function readStringProperty(object, propertyName) {
+  const property = object.properties.find(
+    candidate =>
+      ts.isPropertyAssignment(candidate) &&
+      candidate.name.getText().replace(/["']/g, '') === propertyName,
+  );
+
+  if (
+    !property ||
+    (!ts.isStringLiteral(property.initializer) &&
+      !ts.isNoSubstitutionTemplateLiteral(property.initializer))
+  ) {
+    return undefined;
+  }
+
+  return property.initializer.text;
+}
+
+function readChildrenProperty(object) {
+  const property = object.properties.find(
+    candidate =>
+      ts.isPropertyAssignment(candidate) &&
+      candidate.name.getText().replace(/["']/g, '') === 'children',
+  );
+  return property?.initializer;
+}
+
+function readRouteObjectPaths(source) {
+  const sourceFile = ts.createSourceFile(
+    'routes.tsx',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const paths = [];
+
+  const walkChildren = (expression, parentPath) => {
+    if (ts.isParenthesizedExpression(expression)) {
+      walkChildren(expression.expression, parentPath);
+      return;
+    }
+    if (ts.isConditionalExpression(expression)) {
+      walkChildren(expression.whenTrue, parentPath);
+      walkChildren(expression.whenFalse, parentPath);
+      return;
+    }
+    if (!ts.isArrayLiteralExpression(expression)) return;
+
+    for (const element of expression.elements) {
+      if (ts.isSpreadElement(element)) {
+        walkChildren(element.expression, parentPath);
+      } else if (ts.isObjectLiteralExpression(element)) {
+        walkRoute(element, parentPath, false);
+      }
+    }
+  };
+
+  const walkRoute = (object, parentPath, isRoot) => {
+    const routePath = readStringProperty(object, 'path');
+    let currentPath = parentPath;
+
+    if (routePath && routePath !== '*') {
+      const segment = routePath.replace(/^\/+|\/+$/g, '');
+      currentPath = isRoot
+        ? ''
+        : [parentPath, segment].filter(Boolean).join('/');
+      paths.push(isRoot ? '/' : currentPath);
+    }
+
+    const children = readChildrenProperty(object);
+    if (children) walkChildren(children, currentPath);
+  };
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (
+        declaration.type?.getText(sourceFile) === 'RouteObject' &&
+        declaration.initializer &&
+        ts.isObjectLiteralExpression(declaration.initializer)
+      ) {
+        walkRoute(declaration.initializer, '', true);
+      }
+    }
+  }
+
+  return paths;
 }
 
 function routeSourceFiles() {
@@ -57,16 +154,10 @@ function routeKey(fileName, routePath) {
 
 function readRouteSourceEntries() {
   const entries = new Map();
-  const routePathPattern =
-    /<Route\b[^>]*\bpath=(?:\{)?["'`]([^"'`{}]*)["'`](?:\})?/g;
 
   for (const fileName of routeSourceFiles()) {
     const source = fs.readFileSync(path.join(routeDir, fileName), 'utf8');
-    let match;
-
-    while ((match = routePathPattern.exec(source))) {
-      const routePath = match[1];
-      if (routePath === '*') continue;
+    for (const routePath of readRouteObjectPaths(source)) {
       increment(entries, routeKey(fileName, routePath));
     }
   }
@@ -325,4 +416,5 @@ module.exports = {
   checkSubjourneyDecisions,
   checkRouteCoverage,
   readAppRouteRoots,
+  readRouteObjectPaths,
 };

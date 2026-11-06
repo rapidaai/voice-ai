@@ -20,6 +20,8 @@ const intialAssistant: AssistantTypeProperty = {
    */
   currentAssistant: null,
 
+  currentAssistantStatus: 'idle',
+
   /**
    * list of assistant
    */
@@ -89,7 +91,11 @@ export const useAssistantPageStore = create<AssistantType>((set, get) => ({
    * @param assistant
    */
   onChangeCurrentAssistant: (assistant: Assistant) => {
-    set({ currentAssistant: assistant });
+    set({ currentAssistant: assistant, currentAssistantStatus: 'ready' });
+  },
+
+  onChangeCurrentAssistantStatus: status => {
+    set({ currentAssistantStatus: status });
   },
 
   /**

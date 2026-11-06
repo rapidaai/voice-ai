@@ -523,8 +523,9 @@ const routeJourneys = [
 ];
 
 const sourceRouteInventory = {
-  'account.tsx': [{ path: '', journey: 'account.settings' }],
+  'account.tsx': [{ path: '/', journey: 'account.settings' }],
   'auth.tsx': [
+    { path: '/', journey: 'auth.signin' },
     { path: 'signup', journey: 'auth.signup' },
     { path: 'signin', journey: 'auth.signin' },
     { path: 'forgot-password', journey: 'auth.forgotPassword' },
@@ -574,15 +575,9 @@ const sourceRouteInventory = {
   ],
   'dashboard.tsx': [{ path: '/', journey: 'dashboard.home' }],
   'deployment.tsx': [
-    {
-      path: '/',
-      journey: 'deployment.assistant',
-    },
+    { path: '/', journey: 'deployment.assistant' },
     { path: 'endpoint', journey: 'deployment.endpoint' },
-    {
-      path: 'endpoint/create-endpoint',
-      journey: 'deployment.createEndpoint',
-    },
+    { path: 'endpoint/create-endpoint', journey: 'deployment.createEndpoint' },
     {
       path: 'endpoint/configure-endpoint',
       journey: 'deployment.createEndpoint',
@@ -596,165 +591,30 @@ const sourceRouteInventory = {
       journey: 'deployment.endpointOverview',
     },
     {
-      path: 'create-endpoint-version',
+      path: 'endpoint/:endpointId/overview',
+      journey: 'deployment.endpointOverview',
+    },
+    {
+      path: 'endpoint/:endpointId/logs',
+      journey: 'deployment.endpointLogs',
+    },
+    {
+      path: 'endpoint/:endpointId/versions',
+      journey: 'deployment.endpointVersions',
+    },
+    {
+      path: 'endpoint/:endpointId/settings',
+      journey: 'deployment.endpointSettings',
+    },
+    {
+      path: 'endpoint/:endpointId/playground',
+      journey: 'deployment.endpointPlayground',
+    },
+    {
+      path: 'endpoint/:endpointId/create-endpoint-version',
       journey: 'deployment.createEndpointVersion',
     },
-    {
-      path: ':tab',
-      count: 2,
-      journey: 'deployment.assistantOverview',
-    },
     { path: 'assistant', journey: 'deployment.assistant' },
-    {
-      path: 'assistant/:assistantId',
-      journey: 'deployment.assistantOverview',
-    },
-    {
-      path: 'playground/chat',
-      journey: 'deployment.assistantPlaygroundChat',
-    },
-    {
-      path: 'playground/phone',
-      journey: 'deployment.assistantPlaygroundPhone',
-    },
-    {
-      path: 'sessions/:sessionId',
-      journey: 'deployment.assistantSessionDetail',
-    },
-    {
-      path: 'create-new-version',
-      journey: 'deployment.assistantCreateVersion',
-    },
-    {
-      path: 'create-websocket-version',
-      deferredReason: 'Assistant version fixtures are not available yet.',
-    },
-    {
-      path: 'create-agentkit-version',
-      journey: 'deployment.assistantCreateAgentkitVersion',
-    },
-    {
-      path: 'create-agentflow-version',
-      journey: 'deployment.assistantCreateAgentflowVersion',
-    },
-    {
-      path: 'edit-assistant/',
-      journey: 'deployment.assistantSettings',
-    },
-    {
-      path: 'edit-agentflow/',
-      deferredReason: 'Agentflow fixtures are not available yet.',
-    },
-    {
-      path: 'configure-analysis/',
-      journey: 'deployment.assistantAnalysis',
-    },
-    {
-      path: 'configure-analysis/create',
-      deferredReason: 'Assistant analysis fixtures are not available yet.',
-    },
-    {
-      path: 'configure-analysis/:analysisId',
-      deferredReason: 'Assistant analysis fixtures are not available yet.',
-    },
-    {
-      path: 'configure-tool',
-      journey: 'deployment.assistantTools',
-    },
-    {
-      path: 'configure-tool/create',
-      deferredReason: 'Assistant tool fixtures are not available yet.',
-    },
-    {
-      path: 'configure-tool/:assistantToolId',
-      deferredReason: 'Assistant tool fixtures are not available yet.',
-    },
-    {
-      path: 'configure-webhook/',
-      journey: 'deployment.assistantWebhooks',
-    },
-    {
-      path: 'configure-webhook/create',
-      deferredReason: 'Assistant webhook fixtures are not available yet.',
-    },
-    {
-      path: 'configure-webhook/:webhookId',
-      deferredReason: 'Assistant webhook fixtures are not available yet.',
-    },
-    {
-      path: 'configure-authentication/',
-      journey: 'deployment.assistantAuthentication',
-    },
-    {
-      path: 'configure-authentication/create',
-      deferredReason:
-        'Assistant authentication fixtures are not available yet.',
-    },
-    {
-      path: 'configure-authentication/edit',
-      deferredReason:
-        'Assistant authentication fixtures are not available yet.',
-    },
-    {
-      path: 'configure-telemetry/',
-      journey: 'deployment.assistantTelemetry',
-    },
-    {
-      path: 'configure-telemetry/create',
-      deferredReason: 'Assistant telemetry fixtures are not available yet.',
-    },
-    {
-      path: 'configure-telemetry/:telemetryId',
-      deferredReason: 'Assistant telemetry fixtures are not available yet.',
-    },
-    {
-      path: 'configure-storage/',
-      journey: 'deployment.assistantStorage',
-    },
-    {
-      path: 'configure-storage/create',
-      deferredReason: 'Assistant storage fixtures are not available yet.',
-    },
-    {
-      path: 'configure-storage/:storageId',
-      deferredReason: 'Assistant storage fixtures are not available yet.',
-    },
-    {
-      path: 'deployment/',
-      journey: 'deployment.assistantDeployments',
-    },
-    {
-      path: 'deployment/web/',
-      deferredReason: 'Assistant deployment fixtures are not available yet.',
-    },
-    {
-      path: 'deployment/web/:deploymentId/',
-      deferredReason: 'Assistant deployment fixtures are not available yet.',
-    },
-    {
-      path: 'deployment/call/',
-      deferredReason: 'Assistant deployment fixtures are not available yet.',
-    },
-    {
-      path: 'deployment/call/:deploymentId/',
-      deferredReason: 'Assistant deployment fixtures are not available yet.',
-    },
-    {
-      path: 'deployment/api/',
-      deferredReason: 'Assistant deployment fixtures are not available yet.',
-    },
-    {
-      path: 'deployment/api/:deploymentId/',
-      deferredReason: 'Assistant deployment fixtures are not available yet.',
-    },
-    {
-      path: 'deployment/debugger/',
-      deferredReason: 'Assistant deployment fixtures are not available yet.',
-    },
-    {
-      path: 'deployment/debugger/:deploymentId/',
-      deferredReason: 'Assistant deployment fixtures are not available yet.',
-    },
     {
       path: 'assistant/create-assistant',
       journey: 'deployment.createAssistant',
@@ -771,10 +631,175 @@ const sourceRouteInventory = {
       path: 'assistant/create-agentflow',
       journey: 'deployment.createAgentflow',
     },
+    {
+      path: 'assistant/:assistantId',
+      journey: 'deployment.assistantOverview',
+    },
+    {
+      path: 'assistant/:assistantId/overview',
+      journey: 'deployment.assistantOverview',
+    },
+    {
+      path: 'assistant/:assistantId/version-history',
+      journey: 'deployment.assistantVersions',
+    },
+    {
+      path: 'assistant/:assistantId/sessions',
+      journey: 'deployment.assistantSessions',
+    },
+    {
+      path: 'assistant/:assistantId/sessions/:sessionId',
+      journey: 'deployment.assistantSessionDetail',
+    },
+    {
+      path: 'assistant/:assistantId/playground',
+      journey: 'deployment.assistantPlaygroundChat',
+    },
+    {
+      path: 'assistant/:assistantId/playground/chat',
+      journey: 'deployment.assistantPlaygroundChat',
+    },
+    {
+      path: 'assistant/:assistantId/playground/phone',
+      journey: 'deployment.assistantPlaygroundPhone',
+    },
+    {
+      path: 'assistant/:assistantId/create-new-version',
+      journey: 'deployment.assistantCreateVersion',
+    },
+    {
+      path: 'assistant/:assistantId/create-websocket-version',
+      deferredReason: 'Assistant version fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/create-agentkit-version',
+      journey: 'deployment.assistantCreateAgentkitVersion',
+    },
+    {
+      path: 'assistant/:assistantId/create-agentflow-version',
+      journey: 'deployment.assistantCreateAgentflowVersion',
+    },
+    {
+      path: 'assistant/:assistantId/edit-assistant',
+      journey: 'deployment.assistantSettings',
+    },
+    {
+      path: 'assistant/:assistantId/edit-agentflow',
+      deferredReason: 'Agentflow fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/configure-analysis',
+      journey: 'deployment.assistantAnalysis',
+    },
+    {
+      path: 'assistant/:assistantId/configure-analysis/create',
+      deferredReason: 'Assistant analysis fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/configure-analysis/:analysisId',
+      deferredReason: 'Assistant analysis fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/configure-tool',
+      journey: 'deployment.assistantTools',
+    },
+    {
+      path: 'assistant/:assistantId/configure-tool/create',
+      deferredReason: 'Assistant tool fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/configure-tool/:assistantToolId',
+      deferredReason: 'Assistant tool fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/configure-webhook',
+      journey: 'deployment.assistantWebhooks',
+    },
+    {
+      path: 'assistant/:assistantId/configure-webhook/create',
+      deferredReason: 'Assistant webhook fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/configure-webhook/:webhookId',
+      deferredReason: 'Assistant webhook fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/configure-authentication',
+      journey: 'deployment.assistantAuthentication',
+    },
+    {
+      path: 'assistant/:assistantId/configure-authentication/create',
+      deferredReason:
+        'Assistant authentication fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/configure-authentication/edit',
+      deferredReason:
+        'Assistant authentication fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/configure-telemetry',
+      journey: 'deployment.assistantTelemetry',
+    },
+    {
+      path: 'assistant/:assistantId/configure-telemetry/create',
+      deferredReason: 'Assistant telemetry fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/configure-telemetry/:telemetryId',
+      deferredReason: 'Assistant telemetry fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/configure-storage',
+      journey: 'deployment.assistantStorage',
+    },
+    {
+      path: 'assistant/:assistantId/configure-storage/create',
+      deferredReason: 'Assistant storage fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/configure-storage/:storageId',
+      deferredReason: 'Assistant storage fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/deployment',
+      journey: 'deployment.assistantDeployments',
+    },
+    {
+      path: 'assistant/:assistantId/deployment/web',
+      deferredReason: 'Assistant deployment fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/deployment/web/:deploymentId',
+      deferredReason: 'Assistant deployment fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/deployment/call',
+      deferredReason: 'Assistant deployment fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/deployment/call/:deploymentId',
+      deferredReason: 'Assistant deployment fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/deployment/api',
+      deferredReason: 'Assistant deployment fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/deployment/api/:deploymentId',
+      deferredReason: 'Assistant deployment fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/deployment/debugger',
+      deferredReason: 'Assistant deployment fixtures are not available yet.',
+    },
+    {
+      path: 'assistant/:assistantId/deployment/debugger/:deploymentId',
+      deferredReason: 'Assistant deployment fixtures are not available yet.',
+    },
   ],
   'integration.tsx': [
     { path: '/', journey: 'integration.models' },
-    { path: '', journey: 'integration.models' },
     { path: 'models', journey: 'integration.models' },
     {
       path: 'models/:provider',
@@ -787,7 +812,7 @@ const sourceRouteInventory = {
     { path: 'personal-credential', journey: 'integration.personalCredential' },
   ],
   'knowledge.tsx': [
-    { path: '', disabledFeature: 'workspace.features.knowledge' },
+    { path: '/', disabledFeature: 'workspace.features.knowledge' },
     {
       path: 'create-knowledge',
       disabledFeature: 'workspace.features.knowledge',
@@ -803,16 +828,12 @@ const sourceRouteInventory = {
     },
   ],
   'observability.tsx': [
-    {
-      path: '/',
-      count: 2,
-      journey: 'logs.llm',
-    },
-    { path: '/request', journey: 'logs.request' },
-    { path: '/knowledge', disabledFeature: 'workspace.features.knowledge' },
-    { path: '/tool', journey: 'logs.tool' },
-    { path: '/conversation', journey: 'logs.conversation' },
-    { path: '/traces', journey: 'logs.traces' },
+    { path: '/', journey: 'logs.llm' },
+    { path: 'request', journey: 'logs.request' },
+    { path: 'knowledge', disabledFeature: 'workspace.features.knowledge' },
+    { path: 'tool', journey: 'logs.tool' },
+    { path: 'conversation', journey: 'logs.conversation' },
+    { path: 'traces', journey: 'logs.traces' },
   ],
   'onborading.tsx': [
     { path: '/', journey: 'onboarding.organization' },
@@ -821,14 +842,17 @@ const sourceRouteInventory = {
   ],
   'organization.tsx': [
     { path: '/', journey: 'organization.overview' },
-    { path: '', journey: 'organization.overview' },
     { path: 'users', journey: 'organization.users' },
     { path: 'projects', journey: 'organization.projects' },
     { path: 'security', journey: 'organization.security' },
   ],
   'preview.tsx': [
     {
-      path: 'call/:assistantId/',
+      path: '/',
+      deferredReason: 'Preview root intentionally renders no standalone page.',
+    },
+    {
+      path: 'call/:assistantId',
       deferredReason:
         'Legacy phone preview redirects to the assistant playground.',
     },
@@ -849,6 +873,10 @@ const sourceRouteInventory = {
     },
   ],
   'static.tsx': [
+    {
+      path: '/',
+      deferredReason: 'Static root is covered by the static not-found route.',
+    },
     { path: 'privacy-policy', journey: 'static.privacy' },
     { path: 'terms-conditions', journey: 'static.terms' },
   ],

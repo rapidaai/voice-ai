@@ -1,48 +1,33 @@
-import { MissionBox } from '@/app/components/layout/container/mission-box';
-import { ProtectedBox } from '@/app/components/layout/container/protected-box';
 import {
   OrganizationOverviewPage,
   OrganizationUserPage,
   OrganizationProjectPage,
   OrganizationAccessSecurityPage,
 } from '@/app/pages/workspace';
-import { Routes, Route, Outlet } from 'react-router-dom';
+import type { RouteObject } from 'react-router-dom';
+import { breadcrumb } from './breadcrumb-handle';
+import { WorkspaceRouteLayout } from './workspace-route-layout';
 
-export function OrganizationRoute() {
-  return (
-    <Routes>
-      <Route
-        key="/organization"
-        path="/"
-        element={
-          <ProtectedBox>
-            <MissionBox>
-              <Outlet />
-            </MissionBox>
-          </ProtectedBox>
-        }
-      >
-        <Route
-          key="/organization/overview"
-          path=""
-          element={<OrganizationOverviewPage />}
-        />
-        <Route
-          key="organization-users"
-          path="users"
-          element={<OrganizationUserPage />}
-        />
-        <Route
-          key="organization-projects"
-          path="projects"
-          element={<OrganizationProjectPage />}
-        />
-        <Route
-          key="organization-security"
-          path="security"
-          element={<OrganizationAccessSecurityPage />}
-        />
-      </Route>
-    </Routes>
-  );
-}
+export const organizationRoute: RouteObject = {
+  path: '/organization',
+  element: <WorkspaceRouteLayout />,
+  handle: breadcrumb('Organization'),
+  children: [
+    { index: true, element: <OrganizationOverviewPage /> },
+    {
+      path: 'users',
+      element: <OrganizationUserPage />,
+      handle: breadcrumb('Users'),
+    },
+    {
+      path: 'projects',
+      element: <OrganizationProjectPage />,
+      handle: breadcrumb('Projects'),
+    },
+    {
+      path: 'security',
+      element: <OrganizationAccessSecurityPage />,
+      handle: breadcrumb('Security'),
+    },
+  ],
+};

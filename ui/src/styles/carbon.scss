@@ -338,6 +338,25 @@
   }
 }
 
+// Keep the global breadcrumb on one line and reserve its final item for context.
+.global-breadcrumb {
+  .cds--breadcrumb {
+    display: flex;
+    flex-wrap: nowrap;
+  }
+
+  .cds--breadcrumb-item:last-child {
+    min-width: 0;
+
+    .cds--link {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+}
+
 .text-provider-combo-row,
 .domain-connected-dropdown-row {
   .cds--dropdown,

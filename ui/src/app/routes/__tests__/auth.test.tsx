@@ -1,8 +1,10 @@
 import React from 'react';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { AuthRoute } from '../auth';
+import { MemoryRouter, useRoutes } from 'react-router-dom';
+import { authRoute } from '../auth';
+
+const mockIgnoreBoxRender = jest.fn();
 
 jest.mock('@/app/pages/authentication', () => ({
   AuthSignInPage: () => <div>Sign in route</div>,
@@ -20,21 +22,25 @@ jest.mock(
 );
 
 jest.mock('@/app/components/layout/container/protected-box', () => ({
-  IgnoreBox: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  IgnoreBox: ({ children }: { children: React.ReactNode }) => {
+    mockIgnoreBoxRender();
+    return <div>{children}</div>;
+  },
 }));
+
+const AuthRoutes = () =>
+  useRoutes([authRoute, { path: '*', element: <div>Not found route</div> }]);
 
 const renderAuthRoute = (initialEntry: string) =>
   render(
     <MemoryRouter initialEntries={[initialEntry]}>
-      <Routes>
-        <Route path="/auth/*" element={<AuthRoute />} />
-      </Routes>
+      <AuthRoutes />
     </MemoryRouter>,
   );
 
 describe('AuthRoute', () => {
+  beforeEach(() => jest.clearAllMocks());
+
   it.each([
     ['/auth', 'Sign in route'],
     ['/auth/signin', 'Sign in route'],
@@ -45,5 +51,12 @@ describe('AuthRoute', () => {
     renderAuthRoute(path);
 
     expect(screen.getByText(expectedText)).toBeInTheDocument();
+  });
+
+  it('does not mount the session-clearing layout for an unknown auth path', () => {
+    renderAuthRoute('/auth/missing');
+
+    expect(mockIgnoreBoxRender).not.toHaveBeenCalled();
+    expect(screen.getByText('Not found route')).toBeInTheDocument();
   });
 });

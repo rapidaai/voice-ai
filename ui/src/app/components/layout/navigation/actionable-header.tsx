@@ -1,7 +1,13 @@
-import { useState, useContext, useMemo, type HTMLAttributes } from 'react';
+import {
+  useState,
+  useContext,
+  useEffect,
+  type HTMLAttributes,
+  type MouseEvent,
+} from 'react';
 import { ProjectRole } from '@rapidaai/react';
 import { cn } from '@/utils';
-import { useLocation } from 'react-router-dom';
+import { useMatches, useNavigate, type UIMatch } from 'react-router-dom';
 import { CustomLink } from '@/app/components/ui/primitives';
 import { AuthContext } from '@/context/auth-context';
 import { Moon, Sun, UserAvatar } from '@carbon/icons-react';
@@ -16,29 +22,70 @@ import { Breadcrumb } from '@/app/components/ui/primitives';
 import { Dropdown } from '@/app/components/ui/primitives';
 import { useRapidaStore } from '@/stores/app';
 import { useTheme } from '@/theme/theme-provider';
+import type { AppRouteHandle } from '@/app/routes/breadcrumb-handle';
 
 export function ActionableHeader({
   className,
   ...attributes
 }: HTMLAttributes<HTMLElement>) {
-  const location = useLocation();
-  const { pathname } = location;
+  const matches = useMatches() as UIMatch<unknown, AppRouteHandle>[];
+  const navigate = useNavigate();
   const { loading, loadingType } = useRapidaStore();
   const isLoading = loading && loadingType === 'block';
+  const [maxVisibleBreadcrumbItems, setMaxVisibleBreadcrumbItems] = useState(
+    () => (window.matchMedia?.('(max-width: 640px)').matches === true ? 2 : 3),
+  );
 
-  const breadcrumbs = useMemo(() => {
-    const pathParts = pathname.split('/').filter(part => part?.trim() !== '');
-    return pathParts.map((part, partIndex) => {
-      const previousParts = pathParts.slice(0, partIndex);
-      return {
-        label: part,
-        href:
-          previousParts?.length > 0
-            ? `/${previousParts?.join('/')}/${part}`
-            : `/${part}`,
-      };
-    });
-  }, [pathname]);
+  useEffect(() => {
+    const media = window.matchMedia?.('(max-width: 640px)');
+    if (!media) return;
+
+    const updateVisibleItems = () =>
+      setMaxVisibleBreadcrumbItems(media.matches ? 2 : 3);
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', updateVisibleItems);
+      return () => media.removeEventListener('change', updateVisibleItems);
+    }
+    media.addListener(updateVisibleItems);
+    return () => media.removeListener(updateVisibleItems);
+  }, []);
+
+  const breadcrumbMatches = matches.filter(match => match.handle?.breadcrumb);
+  const breadcrumbs = breadcrumbMatches.map((match, index) => {
+    const definition = match.handle.breadcrumb!;
+    const label =
+      'label' in definition ? (
+        definition.label
+      ) : (
+        <span>
+          <definition.render params={match.params} />
+        </span>
+      );
+    const isCurrentPage = index === breadcrumbMatches.length - 1;
+
+    return {
+      label,
+      href: match.pathname,
+      isCurrentPage,
+      onClick: (event: MouseEvent<HTMLElement>) => {
+        if (
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        ) {
+          return;
+        }
+        event.preventDefault();
+        navigate(match.pathname);
+      },
+      render: isCurrentPage
+        ? undefined
+        : () => <CustomLink to={match.pathname}>{label}</CustomLink>,
+    };
+  });
 
   return (
     <header
@@ -53,15 +100,9 @@ export function ActionableHeader({
     >
       <Breadcrumb
         isLoading={isLoading}
-        className="pl-4"
-        items={breadcrumbs.map(x => ({
-          label: x.label,
-          render: () => (
-            <CustomLink className="capitalize" to={x.href}>
-              {x.label}
-            </CustomLink>
-          ),
-        }))}
+        maxVisibleItems={maxVisibleBreadcrumbItems}
+        className="global-breadcrumb min-w-0 overflow-hidden pl-4"
+        items={breadcrumbs}
       />
       <CustomerOptions isLoading={isLoading} />
     </header>
@@ -101,7 +142,7 @@ export function CustomerOptions({
           onChange={({ selectedItem }) => {
             if (selectedItem) setCurrentProjectRole(selectedItem);
           }}
-          className="project-selector-dropdown"
+          className="project-selector-dropdown max-sm:w-12! max-sm:min-w-12!"
           isLoading={isLoading}
         />
       )}

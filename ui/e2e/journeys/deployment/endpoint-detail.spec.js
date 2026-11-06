@@ -43,7 +43,11 @@ test('endpoint overview summarizes logs and opens the simplified playground', as
   await expect(
     page.getByTestId('endpoint-request-performance-chart'),
   ).toBeVisible();
-  await expect(page.getByText('Customer support analysis')).toBeVisible();
+  await expect(
+    page
+      .getByTestId('endpoint-page-header')
+      .getByText('Customer support analysis'),
+  ).toBeVisible();
   const integrationAction = page.getByRole('button', {
     name: 'View integration',
   });
