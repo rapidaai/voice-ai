@@ -715,7 +715,11 @@ describe('Dashboard HomePage', () => {
           { group: 'Sessions', key: expect.any(String), value: 428 },
           { group: 'Failed', key: expect.any(String), value: 18 },
         ]),
+        options: expect.objectContaining({ theme: 'white' }),
       }),
+    );
+    expect(mockLineChart.mock.calls.at(-1)?.[0].options).not.toHaveProperty(
+      'color',
     );
     expect(
       screen.getByRole('table', { name: 'Recent Failures' }),

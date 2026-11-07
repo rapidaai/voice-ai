@@ -31,7 +31,6 @@ import {
   type ChartTabularData,
   type LineChartOptions,
 } from '@carbon/charts-react';
-import '@carbon/charts-react/styles.css';
 import {
   DashboardAssistantHealth,
   DashboardFailureCode,
@@ -395,12 +394,6 @@ function ActivityPanel({
         mapsTo: 'value',
         scaleType: ScaleTypes.LINEAR,
       },
-    },
-    color: {
-      scale:
-        resolvedMode === 'dark'
-          ? { Sessions: '#4589ff', Failed: '#ff8389' }
-          : { Sessions: '#0f62fe', Failed: '#da1e28' },
     },
     curve: 'curveMonotoneX',
     grid: { x: { enabled: false }, y: { enabled: true } },

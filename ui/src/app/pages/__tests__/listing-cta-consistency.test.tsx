@@ -222,7 +222,7 @@ describe('listing page create CTAs', () => {
     expect(
       screen.getAllByRole('button', { name: 'Create new assistant' }),
     ).toHaveLength(1);
-    expect(screen.getByText('1/4')).toBeInTheDocument();
+    expect(screen.getByText('1 of 4')).toBeInTheDocument();
     expect(screen.queryByText('Create new Assistant')).not.toBeInTheDocument();
 
     unmount();
@@ -231,7 +231,7 @@ describe('listing page create CTAs', () => {
     expect(
       screen.getAllByRole('button', { name: 'Create new endpoint' }),
     ).toHaveLength(1);
-    expect(screen.getByText('1/5')).toBeInTheDocument();
+    expect(screen.getByText('1 of 5')).toBeInTheDocument();
     expect(screen.queryByText('Add new endpoint')).not.toBeInTheDocument();
   });
 

@@ -8,6 +8,7 @@ describe('external style adapters', () => {
   it('loads only the registered third-party adapters', () => {
     const imports = readStyles('global-styles.ts');
 
+    expect(imports).toContain("import '@carbon/charts-react/styles.css'");
     expect(imports).toContain("import './externals/editors.css'");
     expect(imports).toContain("import './externals/flatpickr.css'");
     expect(imports).toContain("import './externals/voice-visualizer.css'");
