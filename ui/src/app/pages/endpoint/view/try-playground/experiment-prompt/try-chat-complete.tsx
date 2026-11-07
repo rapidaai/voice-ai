@@ -119,26 +119,26 @@ export function TryChatComplete(props: {
   return (
     <form
       onSubmit={handleSubmit(onInvoke)}
-      className="flex min-h-0 flex-1 flex-col bg-[var(--cds-background)]"
+      className="flex min-h-0 flex-1 flex-col bg-surface"
     >
       <PlaygroundHeader
         isValid={isValid}
         loading={loading}
         disabled={hasUnsupportedVariables}
       />
-      <div className="min-h-0 flex-1 overflow-auto bg-[var(--cds-background)]">
+      <div className="min-h-0 flex-1 overflow-auto bg-surface">
         <div
           className="grid min-h-full w-full lg:grid-cols-[minmax(18rem,2fr)_minmax(0,3fr)]"
           data-testid="endpoint-playground-console"
         >
           <section
-            className="flex min-h-0 flex-col border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)] lg:border-b-0 lg:border-r"
+            className="flex min-h-0 flex-col border-b border-border-subtle bg-layer lg:border-b-0 lg:border-r"
             aria-labelledby="playground-arguments-title"
           >
-            <div className="border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-02)] px-4 py-3">
+            <div className="border-b border-border-subtle bg-layer-elevated px-4 py-3">
               <h2
                 id="playground-arguments-title"
-                className="text-sm font-semibold text-[var(--cds-text-primary)]"
+                className="text-sm font-semibold text-foreground"
               >
                 Arguments
               </h2>

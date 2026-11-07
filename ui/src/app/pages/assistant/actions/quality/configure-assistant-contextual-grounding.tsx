@@ -38,7 +38,7 @@ export const ConfigureAssistantContextualGroundingPage = () => {
       </PageHeaderBlock>
 
       <div className="overflow-auto flex flex-col flex-1 pb-20">
-        <div className=" bg-white dark:bg-gray-900">
+        <div className=" bg-surface ">
           <InputGroup title="Grounding">
             <div className="p-6 space-y-6">
               <FieldSet>

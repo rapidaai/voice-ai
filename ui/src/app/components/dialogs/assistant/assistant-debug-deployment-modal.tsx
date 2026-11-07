@@ -141,7 +141,7 @@ export function AssistantDebugDeploymentDialog({
       title="Debugger"
     >
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-auto bg-[var(--cds-layer-01)]">
+        <div className="min-h-0 flex-1 overflow-auto bg-layer">
           <Accordion
             align="start"
             aria-label="Debugger configuration"
@@ -212,14 +212,11 @@ function DebuggerConfigurationSection({
       open={open}
       title={
         <span className="flex min-w-0 items-center gap-2">
-          <Icon
-            size={16}
-            className="shrink-0 text-[var(--cds-icon-secondary)]"
-          />
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--cds-text-primary)]">
+          <Icon size={16} className="shrink-0 text-icon-secondary" />
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
             {label}
           </span>
-          <span className="max-w-36 shrink truncate text-xs text-[var(--cds-text-secondary)]">
+          <span className="max-w-36 shrink truncate text-xs text-muted">
             {summary}
           </span>
         </span>
@@ -235,15 +232,15 @@ function DebuggerConfigurationSection({
           {options.map(option => (
             <StructuredListRow key={option.id}>
               <StructuredListCell className="!w-[48%] !py-2 !pl-4 !pr-2 align-top">
-                <span className="block text-sm text-[var(--cds-text-primary)]">
+                <span className="block text-sm text-foreground">
                   {option.label}
                 </span>
-                <span className="block break-all font-mono text-[0.6875rem] leading-4 text-[var(--cds-text-helper)]">
+                <span className="block break-all font-mono text-[0.6875rem] leading-4 text-helper">
                   {option.key}
                 </span>
               </StructuredListCell>
               <StructuredListCell className="min-w-0 !py-2 !pl-2 !pr-4 align-top">
-                <div className="min-w-0 break-words pt-1.5 text-right text-sm text-[var(--cds-text-primary)]">
+                <div className="min-w-0 break-words pt-1.5 text-right text-sm text-foreground">
                   {option.value}
                 </div>
               </StructuredListCell>

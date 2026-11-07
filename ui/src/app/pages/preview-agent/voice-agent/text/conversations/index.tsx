@@ -1,6 +1,5 @@
-import { FloatingTooltip as Tooltip } from '@/app/components/ui/primitives';
 import { BrandedLogo } from '@/app/components/layout/brand/branded-logo';
-import { TextImage } from '@/app/components/ui/primitives';
+import { IconOnlyButton, UserAvatar } from '@/app/components/ui/primitives';
 import { toHumanReadableRelativeTimeFromDate } from '@/utils/date';
 import {
   Feedback,
@@ -18,6 +17,7 @@ import { MessageFeedbackDialog } from '@/app/components/dialogs/shared/message-f
 import MarkdownPreview from '@uiw/react-markdown-preview';
 import { cn } from '@/utils';
 import { useTheme } from '@/theme/theme-provider';
+import { Copy, ThumbsDown, ThumbsUp } from '@carbon/icons-react';
 
 export const ConversationMessages: FC<{ vag: VoiceAgent }> = ({ vag }) => {
   const messages = useAgentMessages(vag);
@@ -25,6 +25,7 @@ export const ConversationMessages: FC<{ vag: VoiceAgent }> = ({ vag }) => {
   const { user } = useCurrentCredential();
   const { theme } = useTheme();
   const queryName = searchParams.get('name');
+  const userName = (user?.name || queryName || 'user').trim() || 'user';
   const ctrRef = useRef<HTMLDivElement>(null);
   /**
    *
@@ -66,11 +67,16 @@ export const ConversationMessages: FC<{ vag: VoiceAgent }> = ({ vag }) => {
         return (
           <div
             key={groupIdx}
-            className="message-cntnt p-2.5 pb-4 group relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 hover:bg-gray-100 rounded-xl dark:hover:bg-gray-950"
+            className="message-cntnt p-2.5 pb-4 group relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 hover:bg-layer rounded-xl "
           >
             <div className="row-span-2 min-w-(--space-9)">
               {isUser ? (
-                <TextImage name={user?.name || queryName || 'user'} size={10} />
+                <UserAvatar
+                  aria-label={userName}
+                  name={userName}
+                  role="img"
+                  size="lg"
+                />
               ) : (
                 <div className="bg-primary text-on-primary w-10 h-10 flex items-center justify-center rounded-xs">
                   <BrandedLogo
@@ -99,9 +105,8 @@ export const ConversationMessages: FC<{ vag: VoiceAgent }> = ({ vag }) => {
                   <div key={`${idx}-${midx}`} data-key={msg.id}>
                     <MarkdownPreview
                       source={x}
-                      className="prose! dark:prose-invert! prose-sm! font-mono! max-w-6xl!"
+                      className="prose! prose-sm! max-w-6xl! bg-transparent! font-mono! prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-code:text-foreground prose-a:text-link"
                       style={{
-                        background: 'transparent',
                         fontSize: '14px',
                       }}
                     />
@@ -147,100 +152,37 @@ export const MessageAction: FC<{ vag: VoiceAgent; message: Message }> = ({
           'feedback-btn flex justify-start items-center mt-4',
         )}
       >
-        <Tooltip content={'Copy'}>
-          <button
-            type="button"
-            onClick={() => {
-              navigator.clipboard.writeText(message.messages.join('\n'));
-            }}
-            className={cn(
-              'text-gray-500 hover:text-gray-700 cursor-pointer group flex items-center justify-center flex-none text-sm p-1 rounded-[2px] hover:bg-gray-600/10',
-            )}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className="w-5 h-5"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75"
-              />
-            </svg>
-          </button>
-        </Tooltip>
-        <Tooltip content={'Helpful'}>
-          <button
-            type="button"
-            onClick={() => {
-              handleHelpfulnessFeedback(message.id, Feedback.Helpful);
-            }}
-            className={cn(
-              message.feedback === Feedback.Helpful &&
-                'bg-blue-600/10! text-blue-600!',
-              'text-gray-500 hover:text-blue-600 cursor-pointer group flex items-center justify-center flex-none text-sm p-1 rounded-[2px] hover:bg-blue-600/10',
-            )}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.2"
-              viewBox="0 0 24 24"
-              className="w-6 h-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M18 12.25h-1.25m1.25 0-.734 5.277a2 2 0 0 1-2.185 1.714l-6.933-.712a1 1 0 0 1-.898-.994V9.75c2.024 0 2.455-2.515 2.521-4.151.024-.6.672-1.026 1.208-.758a2.298 2.298 0 0 1 1.271 2.056V9.75H18a1.25 1.25 0 1 1 0 2.5Z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4.75 9.75a1 1 0 0 1 1-1h.5a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1h-.5a1 1 0 0 1-1-1v-8.5Z"
-              />
-            </svg>
-          </button>
-        </Tooltip>
-
-        <Tooltip content={'Not helpful'}>
-          <button
-            type="button"
-            onClick={() => {
-              setShowFeedbackModal(true);
-            }}
-            className={cn(
-              message.feedback === Feedback.NotHelpful &&
-                'bg-red-600/10! text-red-600!',
-              'text-gray-500 hover:text-red-600 cursor-pointer group flex items-center justify-center flex-none text-sm p-1 rounded-[2px] hover:bg-red-600/10',
-            )}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.2"
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="w-6 h-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M18 11.758h-1.25m1.25 0-.734-5.277a2 2 0 0 0-2.185-1.714l-6.933.711a1 1 0 0 0-.898.995v7.785c2.024 0 2.455 2.515 2.521 4.15.024.6.672 1.027 1.208.758a2.298 2.298 0 0 0 1.271-2.055v-2.853H18a1.25 1.25 0 1 0 0-2.5Z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4.75 5.75a1 1 0 0 1 1-1h.5a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1h-.5a1 1 0 0 1-1-1v-8.5Z"
-              />
-            </svg>
-          </button>
-        </Tooltip>
+        <IconOnlyButton
+          kind="ghost"
+          size="sm"
+          renderIcon={Copy}
+          iconDescription="Copy message"
+          onClick={() => navigator.clipboard.writeText(message.messages.join('\n'))}
+        />
+        <IconOnlyButton
+          kind="ghost"
+          size="sm"
+          renderIcon={ThumbsUp}
+          iconDescription="Helpful"
+          aria-pressed={message.feedback === Feedback.Helpful}
+          className={cn(
+            message.feedback === Feedback.Helpful && 'text-support-info!',
+          )}
+          onClick={() =>
+            handleHelpfulnessFeedback(message.id, Feedback.Helpful)
+          }
+        />
+        <IconOnlyButton
+          kind="ghost"
+          size="sm"
+          renderIcon={ThumbsDown}
+          iconDescription="Not helpful"
+          aria-pressed={message.feedback === Feedback.NotHelpful}
+          className={cn(
+            message.feedback === Feedback.NotHelpful && 'text-support-error!',
+          )}
+          onClick={() => setShowFeedbackModal(true)}
+        />
       </div>
 
       <MessageFeedbackDialog

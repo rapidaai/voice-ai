@@ -3,6 +3,8 @@
   $theme: themes.$white
 );
 @use '@carbon/styles/scss/grid';
+@use '@carbon/styles/scss/layout';
+@use '@carbon/styles/scss/components/user-avatar';
 @use '@carbon/react/scss/components/button';
 @use '@carbon/react/scss/components/tooltip';
 @use '@carbon/react/scss/components/toggletip';
@@ -72,42 +74,6 @@
   padding-block: 0;
 }
 
-// ─── DatePicker calendar background ─────────────────────────────────────────
-.flatpickr-calendar,
-.flatpickr-months,
-.flatpickr-month,
-.flatpickr-weekdays,
-.flatpickr-weekday {
-  background: var(--cds-field, var(--cds-layer, #ffffff));
-}
-
-[data-color-mode='dark'] .flatpickr-calendar,
-[data-color-mode='dark'] .flatpickr-months,
-[data-color-mode='dark'] .flatpickr-month,
-[data-color-mode='dark'] .flatpickr-weekdays,
-[data-color-mode='dark'] .flatpickr-weekday {
-  background: #393939;
-}
-
-.flatpickr-day {
-  color: var(--cds-text-primary);
-}
-
-.flatpickr-day.prevMonthDay,
-.flatpickr-day.nextMonthDay {
-  color: var(--cds-text-disabled);
-}
-
-.flatpickr-current-month .flatpickr-monthDropdown-months,
-.flatpickr-current-month input.cur-year {
-  color: var(--cds-text-primary);
-}
-
-.flatpickr-months .flatpickr-prev-month svg,
-.flatpickr-months .flatpickr-next-month svg {
-  fill: var(--cds-icon-primary);
-}
-
 .query-search-date-calendar .query-search-date-form-row {
   display: grid;
   grid-template-columns: 1fr 7.5rem;
@@ -150,8 +116,8 @@
 
 // ─── Batch action buttons ───────────────────────────────────────────────────
 .cds--batch-actions .cds--batch-summary__cancel {
-  background-color: var(--cds-button-secondary, #393939);
-  color: var(--cds-text-on-color, #ffffff);
+  background-color: var(--cds-button-secondary);
+  color: var(--cds-text-on-color);
 }
 .cds--batch-actions .cds--action-list .cds--btn,
 .cds--batch-actions .cds--action-list .cds--btn::before,
@@ -161,17 +127,62 @@
   box-shadow: none;
 }
 
-// ─── Light theme (default) — Carbon white ───────────────────────────────────
+// Carbon presets are selected by the resolved theme contract.
 :root {
   @include carbon-theme.theme(themes.$white);
+}
 
-  // Custom primary overrides
+:root[data-carbon-theme='white'] {
+  @include carbon-theme.theme(themes.$white);
+}
+
+:root[data-carbon-theme='g10'] {
+  @include carbon-theme.theme(themes.$g10);
+}
+
+:root[data-carbon-theme='g90'] {
+  @include carbon-theme.theme(themes.$g90);
+}
+
+:root[data-carbon-theme='g100'] {
+  @include carbon-theme.theme(themes.$g100);
+}
+
+// Version 1 preserves its established brand and dark primary behavior.
+:root[data-theme-schema='1'] {
+  --cds-background-brand: var(--brand-primary);
+  --cds-interactive: var(--brand-primary);
+  --cds-button-tertiary: var(--brand-primary);
+  --cds-button-tertiary-hover: var(--brand-primary-hover);
+  --cds-button-tertiary-active: var(--brand-primary-active);
+  --cds-focus: var(--brand-primary);
+  --cds-border-interactive: var(--brand-primary);
+  --cds-link-primary: var(--brand-primary);
+  --cds-link-primary-hover: var(--brand-primary-hover);
+}
+
+:root[data-theme-schema='1'][data-color-mode='light'] {
+  --cds-button-primary: var(--brand-primary);
+  --cds-button-primary-hover: var(--brand-primary-hover);
+  --cds-button-primary-active: var(--brand-primary-active);
+  --cds-text-on-color: var(--brand-on-primary);
+}
+
+:root[data-theme-schema='1'][data-color-mode='dark'] {
+  --cds-background: #0a0a0a;
+  --cds-layer-01: #161616;
+  --cds-button-primary: #0f62fe;
+  --cds-button-primary-hover: #0353e9;
+  --cds-button-primary-active: #002d9c;
+  --cds-text-on-color: #ffffff;
+}
+
+:root[data-theme-schema='2'] {
   --cds-background-brand: var(--brand-primary);
   --cds-interactive: var(--brand-primary);
   --cds-button-primary: var(--brand-primary);
   --cds-button-primary-hover: var(--brand-primary-hover);
   --cds-button-primary-active: var(--brand-primary-active);
-  --cds-text-on-color: var(--brand-on-primary);
   --cds-button-tertiary: var(--brand-primary);
   --cds-button-tertiary-hover: var(--brand-primary-hover);
   --cds-button-tertiary-active: var(--brand-primary-active);
@@ -181,44 +192,56 @@
   --cds-link-primary-hover: var(--brand-primary-hover);
 }
 
-// ─── Dark theme — Carbon g100 ───────────────────────────────────────────────
-:root[data-color-mode='dark'] {
-  @include carbon-theme.theme(themes.$g100);
+:root[data-theme-schema='2']
+  .cds--btn--primary:not(:disabled):not(.cds--modal-close),
+:root[data-theme-schema='2'] .cds--btn--tertiary:not(:disabled):hover,
+:root[data-theme-schema='2'] .cds--btn--tertiary:not(:disabled):active {
+  --cds-text-on-color: var(--brand-on-primary);
+  --cds-icon-on-color: var(--brand-on-primary);
+  color: var(--brand-on-primary);
 
-  // Background — use page bg color, not transparent
-  --cds-background: #0a0a0a;
-  --cds-background-brand: var(--brand-primary);
-  --cds-layer-01: #161616;
-
-  // Focus / interactive — use primary instead of g100 default white
-  --cds-focus: var(--brand-primary);
-  --cds-border-interactive: var(--brand-primary);
-  --cds-interactive: var(--brand-primary);
-  --cds-link-primary: var(--brand-primary);
-  --cds-link-primary-hover: var(--brand-primary-hover);
-  --cds-text-on-color: #ffffff;
-  --cds-button-tertiary: var(--brand-primary);
-  --cds-button-tertiary-hover: var(--brand-primary-hover);
-  --cds-button-tertiary-active: var(--brand-primary-active);
+  svg {
+    fill: currentColor;
+  }
 }
 
 .app-primary-button.cds--btn--primary:not(:disabled) {
   background-color: var(--cds-button-primary);
-  color: #ffffff;
 
   &:hover {
     background-color: var(--cds-button-primary-hover);
-    color: #ffffff;
   }
 
   &:active {
     background-color: var(--cds-button-primary-active);
-    color: #ffffff;
   }
 
   svg {
     fill: currentColor;
   }
+}
+
+:root[data-theme-schema='1']
+  .app-primary-button.cds--btn--primary:not(:disabled) {
+  color: #ffffff;
+
+  &:hover,
+  &:active {
+    color: #ffffff;
+  }
+}
+
+.cds--menu-button__menu,
+.cds--menu-button__menu .cds--popover-content,
+.cds--menu {
+  border: 1px solid var(--cds-border-subtle) !important;
+  box-shadow: none !important;
+}
+
+.cds--menu-button__menu .cds--menu-item__label,
+.cds--menu .cds--menu-item__label {
+  font-size: 0.8125rem;
+  font-weight: 500;
 }
 
 .assistant-settings-save {
@@ -446,8 +469,6 @@
   }
 }
 
-// ─── Tag tokens (light/dark) ─────────────────────────────────────────────────
-// ─── Remove dotted underline from DefinitionTooltip wrapping tags ────────────
 // ─── Remove dotted underline from DefinitionTooltip wrapping tags ────────────
 .cds--definition-term {
   border-bottom: none !important;
@@ -461,22 +482,4 @@
 // ─── SideNav submenu items font weight ───────────────────────────────────────
 .cds--side-nav__menu-item .cds--side-nav__link-text {
   font-weight: 500;
-}
-
-:root {
-  --cds-tag-background-cool-gray: #dde1e6;
-  --cds-tag-color-cool-gray: #121619;
-  --cds-tag-hover-cool-gray: #cdd3da;
-  --cds-tag-background-gray: #e0e0e0;
-  --cds-tag-color-gray: #161616;
-  --cds-tag-hover-gray: #cacaca;
-}
-
-:root[data-color-mode='dark'] {
-  --cds-tag-background-cool-gray: #343a3f;
-  --cds-tag-color-cool-gray: #dde1e6;
-  --cds-tag-hover-cool-gray: #4d5358;
-  --cds-tag-background-gray: #393939;
-  --cds-tag-color-gray: #e0e0e0;
-  --cds-tag-hover-gray: #474747;
 }

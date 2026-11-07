@@ -329,10 +329,10 @@ describe('PreviewVoiceAgentV2', () => {
       hasContentMaxWidth: true,
       customProperties: {
         'messages-max-width': '45rem',
-        '$chat-shell-background': '#f4f4f4',
-        '$chat-prompt-background': '#ffffff',
-        '$ai-aura-start-sm': '#f4f4f4',
-        '$ai-aura-end': '#f4f4f4',
+        '$chat-shell-background': 'var(--color-surface)',
+        '$chat-prompt-background': 'var(--color-chat-prompt)',
+        '$ai-aura-start-sm': 'var(--color-surface)',
+        '$ai-aura-end': 'var(--color-surface)',
       },
     });
     const toolbar = screen.getByRole('toolbar', {
@@ -999,12 +999,12 @@ describe('PreviewVoiceAgentV2', () => {
       within(chatInputControls)
         .getByRole('button', { name: 'Start voice conversation' })
         .querySelector('svg'),
-    ).toHaveStyle({ fill: 'var(--cds-link-primary)' });
+    ).toHaveClass('fill-link');
     expect(
       within(chatInputControls)
         .getByRole('button', { name: 'Stop chat session' })
         .querySelector('svg'),
-    ).toHaveStyle({ fill: 'var(--cds-support-error)' });
+    ).toHaveClass('fill-support-error');
     await user.click(
       within(chatInputControls).getByRole('button', {
         name: 'Stop chat session',
@@ -1262,7 +1262,7 @@ describe('PreviewVoiceAgentV2', () => {
       'whitespace-nowrap',
     );
     expect(screen.getByTestId('voice-session-dock')).toHaveClass(
-      'bg-[var(--cds-chat-prompt-background,var(--cds-background))]',
+      'bg-chat-prompt',
     );
     expect(screen.getByTestId('voice-connecting-row')).toHaveClass(
       'flex',
@@ -1356,7 +1356,7 @@ describe('PreviewVoiceAgentV2', () => {
     expect(endButton).not.toHaveTextContent('End');
 
     await user.click(microphoneDropdown);
-    await user.click(screen.getByRole('option', { name: 'USB Microphone' }));
+    await user.keyboard('{ArrowDown}{Enter}');
     expect(mockSetActiveMediaDevice).toHaveBeenCalledWith('usb');
 
     await user.click(muteButton);
@@ -1969,10 +1969,10 @@ describe('PreviewVoiceAgentV2', () => {
     await screen.findByRole('heading', { name: 'Delivery concierge' });
     expect(mockCarbonChatProps.injectCarbonTheme).toBe('g100');
     expect(mockCarbonChatProps.layout.customProperties).toMatchObject({
-      '$chat-shell-background': '#161616',
-      '$chat-prompt-background': '#262626',
-      '$ai-aura-start-sm': '#161616',
-      '$ai-aura-end': '#161616',
+      '$chat-shell-background': 'var(--color-surface)',
+      '$chat-prompt-background': 'var(--color-chat-prompt)',
+      '$ai-aura-start-sm': 'var(--color-surface)',
+      '$ai-aura-end': 'var(--color-surface)',
     });
   });
 

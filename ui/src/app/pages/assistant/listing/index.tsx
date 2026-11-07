@@ -142,7 +142,7 @@ export function AssistantPage() {
       <PageHeaderBlock>
         <div className="flex items-center gap-3">
           <PageTitleBlock>Assistants</PageTitleBlock>
-          <span className="text-xs text-[var(--cds-text-secondary)] tabular-nums">
+          <span className="text-xs text-muted tabular-nums">
             {assistantAction.assistants.length}/{assistantAction.totalCount}
           </span>
         </div>
@@ -402,25 +402,25 @@ function CreateAssistantDialog({
               <ClickableTile
                 key={option.title}
                 onClick={() => onSelect(option.path)}
-                className="group !flex !min-h-[220px] !flex-col !rounded-none !border !border-gray-200 !bg-gray-50 !p-0 transition-colors hover:!border-primary dark:!border-gray-700 dark:!bg-gray-800 dark:hover:!border-primary"
+                className="group !flex !min-h-[220px] !flex-col !rounded-none !border !border-border-subtle !bg-layer !p-0 transition-colors hover:!border-primary "
               >
                 <div className="flex flex-1 flex-col p-5">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-primary/10 text-primary dark:bg-primary/10">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-primary/10 text-primary ">
                       <Icon size={24} />
                     </div>
                     <ArrowRight
                       size={20}
-                      className="mt-1 shrink-0 text-gray-400 transition-transform group-hover:translate-x-1 group-hover:text-primary dark:text-gray-500"
+                      className="mt-1 shrink-0 text-muted transition-transform group-hover:translate-x-1 group-hover:text-primary "
                     />
                   </div>
-                  <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                  <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-muted ">
                     {option.eyebrow}
                   </p>
-                  <h2 className="mt-2 text-xl font-semibold leading-tight text-gray-900 dark:text-white">
+                  <h2 className="mt-2 text-xl font-semibold leading-tight text-foreground ">
                     {option.title}
                   </h2>
-                  <p className="mt-3 flex-1 text-sm leading-5 text-gray-600 dark:text-gray-300">
+                  <p className="mt-3 flex-1 text-sm leading-5 text-muted ">
                     {option.description}
                   </p>
                   <span className="mt-6 inline-flex items-center gap-1 text-sm font-medium text-primary">

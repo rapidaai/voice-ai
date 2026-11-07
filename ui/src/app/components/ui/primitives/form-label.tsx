@@ -14,7 +14,7 @@ export function FormLabel(props: FormLabelProp) {
       className={cn(
         // Carbon label-01
         'text-xs font-medium leading-4 tracking-[0.02em]',
-        'text-gray-600 dark:text-gray-400',
+        'text-muted ',
         'cursor-pointer',
         props.className,
       )}

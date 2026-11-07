@@ -13,7 +13,7 @@ import { ClickableKnowledgeCard } from '@/app/components/domain/cards/knowledge-
 import { EmptyState } from '@/app/components/ui/feedback';
 import { HowKnowledgeWorksDialog } from '@/app/components/dialogs/knowledge';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
-import { GhostButton } from '@/app/components/ui/primitives';
+import { GhostButton, PrimaryButton } from '@/app/components/ui/primitives';
 import { Add, Renew } from '@carbon/icons-react';
 import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
 import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
@@ -76,22 +76,24 @@ export function KnowledgePage() {
           </div>
         </div>
         {/* Carbon UI Shell toolbar pattern */}
-        <div className="flex items-stretch h-12 border-l border-gray-200 dark:border-gray-800">
-          <button
+        <div className="flex items-stretch h-12 border-l border-border-subtle ">
+          <GhostButton
+            size="md"
             type="button"
             onClick={() => sethiw(!hiw)}
-            className="flex items-center px-4 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border-r border-gray-200 dark:border-gray-800 transition-colors whitespace-nowrap"
+            className="h-full whitespace-nowrap border-r border-border-subtle"
           >
             How it works?
-          </button>
-          <button
+          </GhostButton>
+          <PrimaryButton
+            size="md"
             type="button"
             onClick={() => goToCreateKnowledge()}
-            className="flex items-center gap-2 px-4 text-sm text-white bg-primary hover:bg-primary/90 transition-colors whitespace-nowrap"
+            className="h-full whitespace-nowrap"
+            renderIcon={Add}
           >
             Add new knowledge
-            <Add className="w-4 h-4" />
-          </button>
+          </PrimaryButton>
         </div>
       </PageHeaderBlock>
 

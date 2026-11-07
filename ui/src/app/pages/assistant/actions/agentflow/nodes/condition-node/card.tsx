@@ -30,7 +30,7 @@ export function ConditionNodeCard({
       {toolbar}
       {handles}
       <Tile className={cardClass} style={{ width }}>
-        <div className="flex h-12 items-center gap-3 border-b border-gray-200 px-4 text-gray-900 dark:border-gray-800 dark:text-white">
+        <div className="flex h-12 items-center gap-3 border-b border-border-subtle px-4 text-foreground ">
           <Icon size={18} className="shrink-0" />
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="min-w-0 truncate text-base font-semibold">
@@ -39,8 +39,8 @@ export function ConditionNodeCard({
             {validationPill}
           </div>
         </div>
-        <div className="flex h-12 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-800">
-          <div className="flex items-center gap-1 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
+        <div className="flex h-12 items-center justify-between border-b border-border-subtle px-4 ">
+          <div className="flex items-center gap-1 text-xs font-semibold uppercase text-muted ">
             Condition
             <Toggletip align="right">
               <ToggletipButton label="Show information">
@@ -59,9 +59,9 @@ export function ConditionNodeCard({
           {outputRows.map(row => (
             <div
               key={`${node.id}-condition-row-${row.id}`}
-              className="flex h-10 w-full min-w-0 items-center gap-3 overflow-hidden px-7 py-0 text-sm text-gray-800 dark:text-gray-100"
+              className="flex h-10 w-full min-w-0 items-center gap-3 overflow-hidden px-7 py-0 text-sm text-foreground "
             >
-              <span className="w-8 shrink-0 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
+              <span className="w-8 shrink-0 text-xs font-semibold uppercase text-muted ">
                 {row.prefix}
               </span>
               <span

@@ -2,7 +2,7 @@ import { Helmet } from '@/app/components/app-shell/helmet';
 import { useCredential } from '@/hooks/use-credential';
 import { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Tab } from '@/app/components/ui/primitives';
+import { PrimaryButton, Tab } from '@/app/components/ui/primitives';
 import { Documents } from './documents';
 import { cn } from '@/utils';
 import { toHumanReadableRelativeTime } from '@/utils/date';
@@ -95,7 +95,7 @@ export function ViewKnowledgePage() {
         <PageHeaderBlock>
           <div className="flex items-center gap-3">
             <PageTitleBlock>{currentKnowledge?.getName()}</PageTitleBlock>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
+            <div className="text-xs text-muted ">
               {currentKnowledge?.getCreateddate() &&
                 toHumanReadableRelativeTime(
                   currentKnowledge?.getCreateddate()!,
@@ -103,17 +103,18 @@ export function ViewKnowledgePage() {
             </div>
           </div>
           {/* Carbon UI Shell toolbar pattern */}
-          <div className="flex items-stretch h-12 border-l border-gray-200 dark:border-gray-800">
-            <button
+          <div className="flex items-stretch h-12 border-l border-border-subtle ">
+            <PrimaryButton
+              size="md"
               type="button"
               onClick={() => {
                 if (currentKnowledge) setCreateKnowledgeOpen(true);
               }}
-              className="flex items-center gap-2 px-4 text-sm text-white bg-primary hover:bg-primary/90 transition-colors whitespace-nowrap"
+              className="h-full whitespace-nowrap"
+              renderIcon={Add}
             >
               Add new document
-              <Add className="w-4 h-4" />
-            </button>
+            </PrimaryButton>
           </div>
         </PageHeaderBlock>
 
@@ -130,7 +131,7 @@ export function ViewKnowledgePage() {
             strict={false}
             className={cn(
               'sticky top-0 z-1',
-              'bg-white border-t border-b dark:bg-gray-900 dark:border-gray-800',
+              'bg-surface border-t border-b border-border-subtle',
             )}
             tabs={[
               {

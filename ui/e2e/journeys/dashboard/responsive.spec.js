@@ -20,7 +20,12 @@ test('dashboard requests the default range exactly once', async ({ page }) => {
   expect(getDashboardRequests(page)[0].durationMs).toBe(
     30 * 24 * 60 * 60 * 1000,
   );
-  await expect(page.getByLabel('Date range')).toHaveCount(0);
+  await expect(page.getByLabel('Time range', { exact: true })).toHaveValue(
+    '30d',
+  );
+  await expect(
+    page.locator('[data-dashboard-card]').filter({ hasText: 'Last 30 days' }),
+  ).toHaveCount(0);
   await expect(page.getByLabel('Auto-refresh')).toHaveCount(0);
 });
 
@@ -54,10 +59,10 @@ test('dashboard stacks activity and health panels at lg width', async ({
   await gotoJourney(page, dashboardJourney);
 
   const activity = page
-    .getByRole('heading', { name: 'Conversation activity' })
+    .getByRole('heading', { name: 'Conversation Activity' })
     .locator('xpath=ancestor::section');
   const health = page
-    .getByRole('heading', { name: 'Health summary' })
+    .getByRole('heading', { name: 'Health Summary' })
     .locator('xpath=ancestor::section');
   const [activityBounds, healthBounds] = await Promise.all([
     activity.boundingBox(),
@@ -71,6 +76,30 @@ test('dashboard stacks activity and health panels at lg width', async ({
   );
   expect(healthBounds.x).toBe(activityBounds.x);
   expect(healthBounds.width).toBe(activityBounds.width);
+});
+
+test('dashboard keeps the time range available in the compact header while scrolling', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await gotoJourney(page, dashboardJourney);
+
+  const dashboard = page.locator('[data-dashboard-page]');
+  const stickyHeader = page.locator('[data-page-header-sticky]');
+  await dashboard.evaluate(element => element.scrollTo({ top: 500 }));
+
+  await expect(stickyHeader).toHaveAttribute('data-stuck', 'true');
+  await expect(
+    stickyHeader.locator('[data-page-header-sticky-content]'),
+  ).toHaveCSS('height', '40px');
+  const stickyTimeRange = stickyHeader.getByRole('combobox', {
+    name: 'Time range',
+  });
+  await expect(stickyTimeRange).toBeVisible();
+  await expect(stickyTimeRange).toHaveCSS('height', '40px');
+  await expect(page.getByRole('combobox', { name: 'Time range' })).toHaveCount(
+    1,
+  );
 });
 
 for (const viewport of [
@@ -96,10 +125,10 @@ for (const viewport of [
         { maxDiffPixelRatio: 0.01 },
       );
       await expect(
-        page.getByText('Recent failures', { exact: true }),
+        page.getByText('Recent Failures', { exact: true }),
       ).toBeVisible();
       await expect(
-        page.getByText('Top assistants', { exact: true }),
+        page.getByText('Top Assistants', { exact: true }),
       ).toBeVisible();
     });
   }

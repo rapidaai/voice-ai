@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { useRapidaStore } from '@/stores/app';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
 import { ButtonSet } from '@carbon/react';
 import {
@@ -180,12 +180,14 @@ export function CreateWebsocket() {
       <Helmet title="Create an assistant"></Helmet>
       <ConfirmDialogComponent />
 
-      <TabForm
-        formHeading="Complete all steps to connect with a websocket"
-        activeTab={activeTab}
-        onChangeActiveTab={() => {}}
+      <CreateFullPageWithHeader
+        title="Connect WebSocket"
+        eyebrow="Assistant"
+        description="Complete all steps to connect with a WebSocket."
+        activeStep={activeTab}
+        onChangeStep={() => {}}
         errorMessage={errorMessage}
-        form={[
+        steps={[
           {
             name: 'Configuration',
             description: 'Configure and connect the agent using a websocket',
@@ -201,7 +203,7 @@ export function CreateWebsocket() {
                   <a
                     target="_blank"
                     href={assistantDocsUrl}
-                    className="h-7 flex items-center font-medium hover:underline ml-auto text-[var(--cds-link-primary)]"
+                    className="ml-auto flex h-7 items-center font-medium text-foreground underline"
                     rel="noreferrer"
                   >
                     Read documentation
@@ -227,7 +229,7 @@ export function CreateWebsocket() {
                         setHeaders(h);
                       }}
                       actionButtonLabel="Add Header"
-                      inputClass="bg-light-background dark:bg-gray-950"
+                      inputClass="bg-light-background bg-surface"
                     />
                   </FieldSet>
                   <FieldSet>
@@ -238,7 +240,7 @@ export function CreateWebsocket() {
                         setParameters(v);
                       }}
                       actionButtonLabel="Add Parameter"
-                      inputClass="bg-light-background dark:bg-gray-950"
+                      inputClass="bg-light-background bg-surface"
                     />
                   </FieldSet>
                 </div>
@@ -357,22 +359,22 @@ export function CreateWebsocket() {
                   <a
                     target="_blank"
                     href={assistantDocsUrl}
-                    className="h-7 flex items-center font-medium hover:underline ml-auto text-[var(--cds-link-primary)]"
+                    className="ml-auto flex h-7 items-center font-medium text-foreground underline"
                     rel="noreferrer"
                   >
                     Read documentation
                     <Launch className="shrink-0 w-4 h-4 ml-1.5" />
                   </a>
                 </YellowNoticeBlock>
-                <div className="border-gray-500">
+                <div className="border-border-subtle">
                   <div className="grid grid-cols-1 gap-10">
                     <div className="group">
-                      <h3 className="px-4 py-2 sm:px-2 font-medium text-pretty text-gray-600 dark:text-gray-400">
+                      <h3 className="px-4 py-2 sm:px-2 font-medium text-pretty text-muted ">
                         Deployments
                       </h3>
-                      <dl className="bg-white dark:bg-gray-950">
+                      <dl className="bg-surface ">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 divide-x">
-                          <div className="border-y border-gray-300 dark:border-gray-800 grid grid-rows-[1fr_auto] max-md:border-t max-xl:last:hidden max-lg:nth-[3]:hidden last:border-r-0 max-xl:nth-[3]:border-r-0 max-lg:nth-[2]:border-r-0">
+                          <div className="border-y border-border-subtle grid grid-rows-[1fr_auto] max-md:border-t max-xl:last:hidden max-lg:nth-[3]:hidden last:border-r-0 max-xl:nth-[3]:border-r-0 max-lg:nth-[2]:border-r-0">
                             <div className="grid grid-cols-1 items-center">
                               <div className="px-4 py-2 sm:px-2">
                                 <Phone className="w-6 h-6 opacity-70 mt-4" />
@@ -381,24 +383,25 @@ export function CreateWebsocket() {
                                     Phone call
                                   </h3>
                                 </div>
-                                <p className="text-sm/6 text-gray-600 md:max-w-2xs dark:text-gray-400">
+                                <p className="text-sm/6 text-muted md:max-w-2xs ">
                                   Enable voice conversations over phone call
                                 </p>
                               </div>
                             </div>
-                            <button
+                            <PrimaryButton
+                              size="md"
                               onClick={() => {
                                 if (assistant)
                                   goToConfigureCall(assistant.getId());
                               }}
-                              className="cursor-pointer flex justify-between items-center border-t border-gray-200 dark:border-gray-800 px-4 py-2 max-md:border-y sm:px-2 text-sm/6 text-blue-500 hover:bg-blue-600 hover:text-white transition-all delay-200"
+                              className="w-full max-w-none! border-t border-border-subtle max-md:border-y"
+                              renderIcon={ChevronRight}
                             >
                               Enable phone call
-                              <ChevronRight className="w-4 h-4" />
-                            </button>
+                            </PrimaryButton>
                           </div>
                           {/*  */}
-                          <div className="border-y border-gray-300 dark:border-gray-800 grid grid-rows-[1fr_auto] max-md:border-t max-xl:last:hidden max-lg:nth-[3]:hidden last:border-r-0 max-xl:nth-[3]:border-r-0 max-lg:nth-[2]:border-r-0">
+                          <div className="border-y border-border-subtle grid grid-rows-[1fr_auto] max-md:border-t max-xl:last:hidden max-lg:nth-[3]:hidden last:border-r-0 max-xl:nth-[3]:border-r-0 max-lg:nth-[2]:border-r-0">
                             <div className="grid grid-cols-1 items-center">
                               <div className="px-4 py-2 sm:px-2">
                                 <Code className="w-6 h-6 opacity-70 mt-4" />
@@ -407,25 +410,26 @@ export function CreateWebsocket() {
                                     API
                                   </h3>
                                 </div>
-                                <p className="text-sm/6 text-gray-600 md:max-w-2xs dark:text-gray-400">
+                                <p className="text-sm/6 text-muted md:max-w-2xs ">
                                   Integrate into your application using sdks
                                 </p>
                               </div>
                             </div>
-                            <button
+                            <PrimaryButton
+                              size="md"
                               onClick={() => {
                                 if (assistant)
                                   goToConfigureApi(assistant.getId());
                               }}
-                              className="cursor-pointer flex justify-between items-center border-t border-gray-200 dark:border-gray-800 px-4 py-2 max-md:border-y sm:px-2 text-sm/6 text-blue-500 hover:bg-blue-600 hover:text-white transition-all delay-200"
+                              className="w-full max-w-none! border-t border-border-subtle max-md:border-y"
+                              renderIcon={ChevronRight}
                             >
                               Enable Api
-                              <ChevronRight className="w-4 h-4" />
-                            </button>
+                            </PrimaryButton>
                           </div>
 
                           {/*  */}
-                          <div className="border-y border-gray-300 dark:border-gray-800 grid grid-rows-[1fr_auto] max-md:border-t max-xl:last:hidden max-lg:nth-[3]:hidden last:border-r-0 max-xl:nth-[3]:border-r-0 max-lg:nth-[2]:border-r-0">
+                          <div className="border-y border-border-subtle grid grid-rows-[1fr_auto] max-md:border-t max-xl:last:hidden max-lg:nth-[3]:hidden last:border-r-0 max-xl:nth-[3]:border-r-0 max-lg:nth-[2]:border-r-0">
                             <div className="grid grid-cols-1 items-center">
                               <div className="px-4 py-2 sm:px-2">
                                 <Globe className="w-6 h-6 opacity-70 mt-4" />
@@ -434,26 +438,27 @@ export function CreateWebsocket() {
                                     Web Widget
                                   </h3>
                                 </div>
-                                <p className="text-sm/6 text-gray-600 md:max-w-2xs dark:text-gray-400">
+                                <p className="text-sm/6 text-muted md:max-w-2xs ">
                                   Embed on your website to handle text and voice
                                   customer query.
                                 </p>
                               </div>
                             </div>
-                            <button
+                            <PrimaryButton
+                              size="md"
                               onClick={() => {
                                 if (assistant)
                                   goToConfigureWeb(assistant.getId());
                               }}
-                              className="cursor-pointer flex justify-between items-center border-t border-gray-200 dark:border-gray-800 px-4 py-2 max-md:border-y sm:px-2 text-sm/6 text-blue-500 hover:bg-blue-600 hover:text-white transition-all delay-200"
+                              className="w-full max-w-none! border-t border-border-subtle max-md:border-y"
+                              renderIcon={ChevronRight}
                             >
                               Deploy to Web Widget
-                              <ChevronRight className="w-4 h-4" />
-                            </button>
+                            </PrimaryButton>
                           </div>
                           {/* Web Widget */}
 
-                          <div className="border-y border-gray-300 dark:border-gray-800 grid grid-rows-[1fr_auto] max-md:border-t max-xl:last:hidden max-lg:nth-[3]:hidden last:border-r-0 max-xl:nth-[3]:border-r-0 max-lg:nth-[2]:border-r-0">
+                          <div className="border-y border-border-subtle grid grid-rows-[1fr_auto] max-md:border-t max-xl:last:hidden max-lg:nth-[3]:hidden last:border-r-0 max-xl:nth-[3]:border-r-0 max-lg:nth-[2]:border-r-0">
                             <div className="grid grid-cols-1 items-center">
                               <div className="px-4 py-2 sm:px-2">
                                 <Debug className="w-6 h-6 opacity-70 mt-4" />
@@ -462,21 +467,22 @@ export function CreateWebsocket() {
                                     Debugger / Testing
                                   </h3>
                                 </div>
-                                <p className="text-sm/6 text-gray-600 md:max-w-2xs dark:text-gray-400">
+                                <p className="text-sm/6 text-muted md:max-w-2xs ">
                                   Deploy the agent for testing and debugging.
                                 </p>
                               </div>
                             </div>
-                            <button
+                            <PrimaryButton
+                              size="md"
                               onClick={() => {
                                 if (assistant)
                                   goToConfigureDebugger(assistant.getId());
                               }}
-                              className="cursor-pointer flex justify-between items-center border-t border-gray-200 dark:border-gray-800 px-4 py-2 max-md:border-y sm:px-2 text-sm/6 text-blue-500 hover:bg-blue-600 hover:text-white transition-all delay-200"
+                              className="w-full max-w-none! border-t border-border-subtle max-md:border-y"
+                              renderIcon={ChevronRight}
                             >
                               Deploy to Debugger / Testing
-                              <ChevronRight className="w-4 h-4" />
-                            </button>
+                            </PrimaryButton>
                           </div>
                           {/* Debugger / Testing */}
                         </div>
@@ -484,11 +490,11 @@ export function CreateWebsocket() {
                       </dl>
                     </div>
                     <div className="group">
-                      <h3 className="px-4 py-2 sm:px-2 font-medium text-pretty text-gray-600 dark:text-gray-400">
+                      <h3 className="px-4 py-2 sm:px-2 font-medium text-pretty text-muted ">
                         Analysis
                       </h3>
                       <div
-                        className="bg-white dark:bg-gray-950"
+                        className="bg-surface "
                         onClick={() => {
                           if (assistant)
                             goToCreateAssistantAnalysis(assistant.getId());
@@ -505,11 +511,11 @@ export function CreateWebsocket() {
                       </div>
                     </div>
                     <div className="group">
-                      <h3 className="px-4 py-2 sm:px-2  font-medium text-pretty  text-gray-600 dark:text-gray-400">
+                      <h3 className="px-4 py-2 sm:px-2 font-medium text-pretty text-muted ">
                         Webhook & Integration
                       </h3>
                       <div
-                        className="bg-white dark:bg-gray-950"
+                        className="bg-surface "
                         onClick={() => {
                           if (assistant)
                             goToCreateAssistantWebhook(assistant.getId());

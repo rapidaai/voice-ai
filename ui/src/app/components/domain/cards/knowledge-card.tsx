@@ -62,7 +62,7 @@ export function ClickableKnowledgeCard({
           </CardDescription>
         </div>
       </div>
-      <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800 px-4 divide-x divide-gray-100 dark:divide-gray-800">
+      <div className="flex items-center text-xs text-muted border-t border-border-subtle px-4 divide-x divide-border-subtle ">
         <div className="py-3 pr-4">
           {formatHumanReadableNumber(knowledge.getDocumentcount())} docs
         </div>

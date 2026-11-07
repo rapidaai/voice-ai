@@ -39,3 +39,4 @@ export * from './text-image';
 export * from './textarea';
 export * from './tile';
 export * from './tooltip';
+export * from './user-avatar';

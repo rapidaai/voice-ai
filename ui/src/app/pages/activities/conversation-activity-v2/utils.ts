@@ -16,29 +16,29 @@ import { toHumanReadableDateTimeFromDate } from '@/utils/date';
 const MIN_VISIBLE_WIDTH_PCT = 0.75;
 
 export const COMPONENT_COLORS: Record<string, string> = {
-  call: '#0f62fe',
-  telephony: '#0f62fe',
-  conversation: '#8a3ffc',
-  turn: '#4589ff',
-  stt: '#198038',
-  agent: '#f1c21b',
-  tool: '#ff7eb6',
-  tts: '#fa4d56',
-  vad: '#007d79',
-  eos: '#007d79',
-  denoise: '#1192e8',
-  webhook: '#ee538b',
-  analysis: '#a56eff',
-  authentication: '#009d9a',
-  recording: '#6fdc8c',
-  storage: '#d2a106',
-  sip: '#ff832b',
-  webrtc: '#33b1ff',
-  usage: '#6f6f6f',
-  log: '#6f6f6f',
-  metric: '#6f6f6f',
-  metadata: '#6f6f6f',
-  error: '#da1e28',
+  call: 'var(--color-data-1)',
+  telephony: 'var(--color-data-1)',
+  conversation: 'var(--color-data-1)',
+  turn: 'var(--color-data-2)',
+  stt: 'var(--color-data-4)',
+  agent: 'var(--color-data-3)',
+  tool: 'var(--color-data-5)',
+  tts: 'var(--color-data-5)',
+  vad: 'var(--color-data-2)',
+  eos: 'var(--color-data-2)',
+  denoise: 'var(--color-data-2)',
+  webhook: 'var(--color-data-5)',
+  analysis: 'var(--color-data-1)',
+  authentication: 'var(--color-data-2)',
+  recording: 'var(--color-data-4)',
+  storage: 'var(--color-data-3)',
+  sip: 'var(--color-data-3)',
+  webrtc: 'var(--color-data-2)',
+  usage: 'var(--color-muted)',
+  log: 'var(--color-muted)',
+  metric: 'var(--color-muted)',
+  metadata: 'var(--color-muted)',
+  error: 'var(--color-data-5)',
 };
 
 const METRIC_COMPONENT_PREFIXES: readonly string[] = [
@@ -778,7 +778,7 @@ export const getDocumentColor = (doc: TimelineDocument): string => {
   }
 
   const component = getDocumentComponent(doc);
-  return COMPONENT_COLORS[component] || '#6f6f6f';
+  return COMPONENT_COLORS[component] || 'var(--color-muted)';
 };
 
 export const buildTimelineItems = (

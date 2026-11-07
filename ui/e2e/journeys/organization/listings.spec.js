@@ -1,6 +1,7 @@
 const {
   expect,
   gotoJourney,
+  setColorMode,
   test,
   WORKSPACE_LIST_PATHS,
 } = require('../../fixtures');
@@ -20,6 +21,26 @@ const userListPath = WORKSPACE_LIST_PATHS.find(path =>
 const projectListPath = WORKSPACE_LIST_PATHS.find(path =>
   path.endsWith('/web_api.ProjectService/GetAllProject'),
 );
+
+for (const [colorMode, expectedFill] of [
+  ['light', 'rgb(22, 22, 22)'],
+  ['dark', 'rgb(244, 244, 244)'],
+]) {
+  test(`invite modal close icon uses the Carbon ${colorMode} theme color`, async ({
+    page,
+  }) => {
+    await setColorMode(page, colorMode);
+    await gotoJourney(page, journey('users'));
+    await page
+      .getByRole('button', { name: 'Invite user', exact: true })
+      .first()
+      .click();
+
+    await expect(
+      page.locator('.cds--modal.is-visible .cds--modal-close__icon'),
+    ).toHaveCSS('fill', expectedFill);
+  });
+}
 
 test('organization listings show actionable empty states', async ({ page }) => {
   await gotoJourney(page, journey('users'));

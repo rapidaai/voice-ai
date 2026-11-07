@@ -34,7 +34,7 @@ import {
 } from '@/app/components/domain/providers/text-to-speech/provider';
 import { useConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-confirmation';
 import { DebuggerDeploymentSuccessDialog } from '@/app/components/dialogs/assistant';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -537,10 +537,10 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
         }}
         assistantId={assistantId}
       />
-      <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-900">
+      <div className="flex flex-col flex-1 min-h-0 bg-surface ">
         {isSectionMode && editSection ? (
           <div className="flex flex-col flex-1 min-h-0">
-            <div className="px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-800">
+            <div className="px-6 pt-6 pb-4 border-b border-border-subtle ">
               <h2 className="text-2xl font-light tracking-tight">
                 Edit {sectionTitleMap[editSection]} settings
               </h2>
@@ -548,9 +548,9 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
             <div className="flex-1 overflow-auto">
               {sectionBodyMap[editSection]}
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800">
+            <div className="px-6 py-4 border-t border-border-subtle ">
               {errorMessage && (
-                <p className="text-sm text-red-600 dark:text-red-400 mb-3">
+                <p className="text-sm text-support-error mb-3">
                   {errorMessage}
                 </p>
               )}
@@ -575,12 +575,14 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
             </div>
           </div>
         ) : (
-          <TabForm
-            formHeading="Complete all steps to configure your debugger deployment."
-            activeTab={activeTab}
-            onChangeActiveTab={handleTabChange}
+          <CreateFullPageWithHeader
+            title="Deploy debugger"
+            eyebrow="Deployment"
+            description="Complete all steps to configure your debugger deployment."
+            activeStep={activeTab}
+            onChangeStep={handleTabChange}
             errorMessage={errorMessage}
-            form={[
+            steps={[
               {
                 code: 'experience',
                 name: 'General Experience',

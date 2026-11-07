@@ -85,6 +85,20 @@ jest.mock('@/app/components/ui/primitives/button', () => ({
       {children}
     </button>
   ),
+  PrimaryButton: ({
+    children,
+    isLoading: _isLoading,
+    renderIcon: Icon,
+    ...props
+  }: React.ComponentProps<'button'> & {
+    isLoading?: boolean;
+    renderIcon?: React.ElementType;
+  }) => (
+    <button type="button" {...props}>
+      {Icon ? <Icon /> : null}
+      {children}
+    </button>
+  ),
 }));
 
 jest.mock('@/app/components/ui/feedback/empty-state', () => ({

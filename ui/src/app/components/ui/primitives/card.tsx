@@ -13,6 +13,7 @@ import type {
 } from 'react';
 import { Link } from 'react-router-dom';
 import { CornerBorderOverlay } from '@/app/components/ui/primitives/corner-border';
+import { Tile as CarbonTile } from '@carbon/react';
 
 // Shared card primitives.
 
@@ -23,16 +24,16 @@ export function BaseCard({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div
+    <CarbonTile
       className={cn(
-        'bg-white dark:bg-gray-950/20 border border-gray-200 dark:border-gray-800 relative group flex flex-col transition-colors duration-100',
+        'bg-layer border border-border-subtle relative group flex flex-col transition-colors duration-100',
         className,
       )}
       {...props}
     >
       <CornerBorderOverlay />
       {children}
-    </div>
+    </CarbonTile>
   );
 }
 
@@ -50,7 +51,7 @@ export function LinkCard({
     <Link
       to={to}
       className={cn(
-        'bg-white dark:bg-gray-950/20 border border-gray-200 dark:border-gray-800 relative group flex flex-col transition-colors duration-100',
+        'bg-surface border border-border-subtle relative group flex flex-col transition-colors duration-100',
         className,
       )}
     >
@@ -75,20 +76,20 @@ export function ActionCard({
   };
 
   return (
-    <div
+    <CarbonTile
       role="button"
       tabIndex={0}
       onClick={onClick}
       onKeyDown={handleKeyDown}
       className={cn(
-        'bg-white dark:bg-gray-950/20 border border-gray-200 dark:border-gray-800 relative group flex flex-col transition-colors duration-100 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
+        'bg-layer border border-border-subtle relative group flex flex-col transition-colors duration-100 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
         className,
       )}
       {...props}
     >
       <CornerBorderOverlay />
       {children}
-    </div>
+    </CarbonTile>
   );
 }
 
@@ -97,17 +98,17 @@ export function ActionCard({
 interface CardProps extends HTMLAttributes<HTMLDivElement> {}
 export function Card({ children, className, ...props }: CardProps) {
   return (
-    <div
+    <CarbonTile
       className={cn(
         // Carbon tile: no border radius, 1px border
-        'dark:bg-gray-950 bg-white relative group flex flex-col overflow-hidden p-4 h-fit border rounded-none',
+        'bg-layer relative group flex flex-col overflow-hidden p-4 h-fit border rounded-none',
         className,
       )}
       {...props}
     >
       <CornerBorderOverlay />
       {children}
-    </div>
+    </CarbonTile>
   );
 }
 
@@ -124,7 +125,7 @@ export function ClickableCard({
       {/* Carbon clickable tile: no shadow, hover = subtle bg tint */}
       <Card
         className={cn(
-          'group cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/60 transition-colors duration-100',
+          'group cursor-pointer hover:bg-layer transition-colors duration-100',
           className,
         )}
       >
@@ -155,8 +156,8 @@ export function CardTitle({
         <Tooltip
           icon={
             <span className="relative flex h-2 w-2 ml-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-[2px] bg-blue-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-[2px] h-2 w-2 bg-blue-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-[2px] bg-support-info opacity-75"></span>
+              <span className="relative inline-flex rounded-[2px] h-2 w-2 bg-support-info"></span>
             </span>
           }
         >

@@ -117,7 +117,7 @@ export function EndpointPage() {
       <PageHeaderBlock>
         <div className="flex items-center gap-3">
           <PageTitleBlock>Hosted Endpoints</PageTitleBlock>
-          <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+          <span className="text-xs text-muted tabular-nums">
             {endpointActions.endpoints.length}/{endpointActions.totalCount}
           </span>
         </div>

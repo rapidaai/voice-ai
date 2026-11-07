@@ -97,6 +97,7 @@
 }
 
 @theme inline {
+  --color-*: initial;
   --font-sans: 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
   --font-weight-medium: 450;
@@ -105,49 +106,103 @@
   /* IBM Plex Medium — headings, card titles */
   --font-weight-bold: 700;
   /* IBM Plex Bold — reserved, rarely used */
-  --color-primary: var(--brand-primary);
-  --color-secondary: #f4ede4;
+  --color-secondary: var(--cds-button-secondary);
   --color-light-background: var(--cds-layer-01);
-  --color-primary-dark: var(--brand-primary);
   --color-surface: var(--cds-background);
+  --color-surface-hover: var(--cds-background-hover);
+  --color-surface-inverse: var(--cds-background-inverse);
+  --color-surface-inverse-hover: var(--cds-background-inverse-hover);
   --color-shell: var(--cds-layer-01);
   --color-layer: var(--cds-layer-01);
+  --color-layer-elevated: var(--cds-layer-02);
   --color-layer-hover: var(--cds-layer-hover-01);
+  --color-layer-selected: var(--cds-layer-selected-01);
+  --color-layer-accent: var(--cds-layer-accent-01);
+  --color-field: var(--cds-field-01);
   --color-foreground: var(--cds-text-primary);
   --color-muted: var(--cds-text-secondary);
-  --color-border-subtle: color-mix(
-    in oklab,
-    var(--cds-border-subtle-01) 55%,
-    transparent
-  );
+  --color-helper: var(--cds-text-helper);
+  --color-disabled: var(--cds-text-disabled);
+  --color-placeholder: var(--cds-text-placeholder);
+  --color-inverse: var(--cds-text-inverse);
+  --color-icon-primary: var(--cds-icon-primary);
+  --color-icon-secondary: var(--cds-icon-secondary);
+  --color-icon-disabled: var(--cds-icon-disabled);
+  --color-border-subtle: var(--cds-border-subtle-01);
   --color-border-strong: var(--cds-border-strong-01);
-  --color-custom-gray: rgba(31, 31, 31, 0.1);
-  --color-custom-pink: rgba(200, 153, 241, 0.1);
-  --color-custom-blue: rgba(159, 194, 238, 0.1);
-
-  --color-gray-50: #fcfcfc;
-  --color-gray-100: #f8f8f8;
-  --color-gray-200: #eaeaea;
-  --color-gray-300: #d6d6d6;
-  --color-gray-400: #b0b0b0;
-  --color-gray-500: #808080;
-  --color-gray-600: #666666;
-  --color-gray-700: #4d4d4d;
-  --color-gray-800: #333333;
-  --color-gray-900: #1a1a1a;
-  --color-gray-950: #0d0d0d;
-
-  --color-slate-50: #fcfcfc;
-  --color-slate-100: #f8f8f8;
-  --color-slate-200: #eaeaea;
-  --color-slate-300: #d6d6d6;
-  --color-slate-400: #b0b0b0;
-  --color-slate-500: #808080;
-  --color-slate-600: #666666;
-  --color-slate-700: #4d4d4d;
-  --color-slate-800: #333333;
-  --color-slate-900: #1a1a1a;
-  --color-slate-950: #0d0d0d;
+  --color-link: var(--cds-link-primary);
+  --color-overlay: var(--cds-overlay);
+  --color-notification-warning: var(--cds-notification-background-warning);
+  --color-chat-prompt: var(--cds-chat-prompt-background);
+  --color-support-error: var(--cds-support-error);
+  --color-support-success: var(--cds-support-success);
+  --color-support-warning: var(--cds-support-warning);
+  --color-support-info: var(--cds-support-info);
+  --color-data-1: var(--cds-button-primary);
+  --color-data-2: var(--cds-support-info);
+  --color-data-3: var(--cds-support-warning);
+  --color-data-4: var(--cds-support-success);
+  --color-data-5: var(--cds-support-error);
+  --color-note-warning-background: color-mix(
+    in srgb,
+    var(--cds-support-warning) 18%,
+    var(--cds-layer-01)
+  );
+  --color-note-warning-fold: color-mix(
+    in srgb,
+    var(--cds-support-warning) 34%,
+    var(--cds-layer-01)
+  );
+  --color-note-warning-edge: color-mix(
+    in srgb,
+    var(--cds-support-warning) 52%,
+    var(--cds-layer-01)
+  );
+  --color-note-info-background: color-mix(
+    in srgb,
+    var(--cds-support-info) 18%,
+    var(--cds-layer-01)
+  );
+  --color-note-info-fold: color-mix(
+    in srgb,
+    var(--cds-support-info) 34%,
+    var(--cds-layer-01)
+  );
+  --color-note-info-edge: color-mix(
+    in srgb,
+    var(--cds-support-info) 52%,
+    var(--cds-layer-01)
+  );
+  --color-note-success-background: color-mix(
+    in srgb,
+    var(--cds-support-success) 18%,
+    var(--cds-layer-01)
+  );
+  --color-note-success-fold: color-mix(
+    in srgb,
+    var(--cds-support-success) 34%,
+    var(--cds-layer-01)
+  );
+  --color-note-success-edge: color-mix(
+    in srgb,
+    var(--cds-support-success) 52%,
+    var(--cds-layer-01)
+  );
+  --color-note-brand-background: color-mix(
+    in srgb,
+    var(--cds-button-primary) 18%,
+    var(--cds-layer-01)
+  );
+  --color-note-brand-fold: color-mix(
+    in srgb,
+    var(--cds-button-primary) 34%,
+    var(--cds-layer-01)
+  );
+  --color-note-brand-edge: color-mix(
+    in srgb,
+    var(--cds-button-primary) 52%,
+    var(--cds-layer-01)
+  );
 
   --background-image-gradient-1: linear-gradient(
     1deg,
@@ -188,7 +243,6 @@
     infinite;
   --animate-text-slide-8: text-slide-8 20s cubic-bezier(0.83, 0, 0.17, 1)
     infinite;
-  --grid-line-color: color-mix(in oklab, var(--color-white) 10%, transparent);
   @keyframes slideUp {
     0% {
       transform: translateY(0);
@@ -490,6 +544,13 @@
   }
 }
 
+@theme {
+  --color-primary: var(--cds-button-primary);
+  --color-primary-hover: var(--cds-button-primary-hover);
+  --color-primary-active: var(--cds-button-primary-active);
+  --color-primary-dark: var(--cds-button-primary);
+}
+
 /*
   The default border color has changed to `currentcolor` in Tailwind CSS v4,
   so we've added these compatibility styles to make sure everything still
@@ -498,27 +559,75 @@
   If we ever want to remove these styles, we need to add an explicit border
   color utility to any element that depends on these defaults.
 */
+@utility text-on-primary {
+  color: var(--brand-on-primary);
+}
+
+.prose {
+  --tw-prose-body: var(--cds-text-primary);
+  --tw-prose-headings: var(--cds-text-primary);
+  --tw-prose-lead: var(--cds-text-secondary);
+  --tw-prose-links: var(--cds-link-primary);
+  --tw-prose-bold: var(--cds-text-primary);
+  --tw-prose-counters: var(--cds-text-secondary);
+  --tw-prose-bullets: var(--cds-icon-secondary);
+  --tw-prose-hr: var(--cds-border-subtle-01);
+  --tw-prose-quotes: var(--cds-text-secondary);
+  --tw-prose-quote-borders: var(--cds-border-strong-01);
+  --tw-prose-captions: var(--cds-text-helper);
+  --tw-prose-kbd: var(--cds-text-primary);
+  --tw-prose-kbd-shadows: initial;
+  --tw-prose-code: var(--cds-text-primary);
+  --tw-prose-pre-code: var(--cds-text-inverse);
+  --tw-prose-pre-bg: var(--cds-background-inverse);
+  --tw-prose-th-borders: var(--cds-border-strong-01);
+  --tw-prose-td-borders: var(--cds-border-subtle-01);
+  --tw-prose-invert-body: var(--cds-text-primary);
+  --tw-prose-invert-headings: var(--cds-text-primary);
+  --tw-prose-invert-lead: var(--cds-text-secondary);
+  --tw-prose-invert-links: var(--cds-link-primary);
+  --tw-prose-invert-bold: var(--cds-text-primary);
+  --tw-prose-invert-counters: var(--cds-text-secondary);
+  --tw-prose-invert-bullets: var(--cds-icon-secondary);
+  --tw-prose-invert-hr: var(--cds-border-subtle-01);
+  --tw-prose-invert-quotes: var(--cds-text-secondary);
+  --tw-prose-invert-quote-borders: var(--cds-border-strong-01);
+  --tw-prose-invert-captions: var(--cds-text-helper);
+  --tw-prose-invert-kbd: var(--cds-text-primary);
+  --tw-prose-invert-kbd-shadows: initial;
+  --tw-prose-invert-code: var(--cds-text-primary);
+  --tw-prose-invert-pre-code: var(--cds-text-inverse);
+  --tw-prose-invert-pre-bg: var(--cds-background-inverse);
+  --tw-prose-invert-th-borders: var(--cds-border-strong-01);
+  --tw-prose-invert-td-borders: var(--cds-border-subtle-01);
+}
+
+.prose :where(kbd):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
+  box-shadow: none;
+}
+
+:root[data-theme-schema='1'] {
+  --color-primary: var(--brand-primary);
+  --color-primary-hover: var(--brand-primary-hover);
+  --color-primary-active: var(--brand-primary-active);
+  --color-primary-dark: var(--brand-primary);
+}
+
+:root[data-theme-schema='1'][data-color-mode='dark'] .text-on-primary {
+  color: var(--cds-text-on-color);
+}
+
 @layer base {
   *,
   ::after,
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
+    border-color: var(--color-border-subtle, currentcolor);
   }
 }
 
 @layer base {
-  *,
-  ::before,
-  ::after {
-    @apply dark:border-slate-700/70;
-  }
-
-  .text-muted {
-    @apply text-gray-500 dark:text-gray-500;
-  }
-
   .form-label {
     font-size: 0.87rem !important;
     line-height: 1.75 !important;

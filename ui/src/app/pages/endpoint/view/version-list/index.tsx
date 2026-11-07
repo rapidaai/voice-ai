@@ -2,15 +2,18 @@ import { Endpoint, EndpointProviderModel } from '@rapidaai/react';
 import { useEndpointProviderModelPageStore } from '@/stores/endpoint';
 import { useRapidaStore } from '@/stores/app';
 import { useCurrentCredential } from '@/hooks/use-credential';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast/headless';
 import { toHumanReadableDateTime } from '@/utils/date';
 import { TableSection } from '@/app/components/layout/sections/table-section';
+import { ConfirmDialog } from '@/app/components/dialogs/shared';
 import { Pagination } from '@/app/components/ui/primitives';
 import IconIndicator from '@carbon/react/es/components/IconIndicator';
 import { auditActorLabel, createdAuditActor } from '@/utils/audit-actor';
 import {
   Button,
+  DataTable,
+  DataTableSkeleton,
   Table,
   TableHead,
   TableRow,
@@ -22,7 +25,7 @@ import {
   TableToolbarSearch,
   TableBatchActions,
   TableBatchAction,
-  RadioButton,
+  TableSelectRow,
 } from '@carbon/react';
 import { Copy, Checkmark, Rocket, Renew } from '@carbon/icons-react';
 import { EmptyState } from '@/app/components/ui/feedback';
@@ -35,6 +38,8 @@ const headers = [
   { key: 'createdDate', header: 'Date' },
 ];
 
+const skeletonHeaders = [{ key: 'select', header: '' }, ...headers];
+
 function VersionId({ id }: { id: string }) {
   const [copied, setCopied] = useState(false);
   const version = `vrsn_${id}`;
@@ -44,7 +49,7 @@ function VersionId({ id }: { id: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <span className="inline-flex items-center gap-1 font-mono text-[13px] text-gray-600 dark:text-gray-400">
+    <span className="inline-flex items-center gap-1 font-mono text-[13px] text-muted ">
       {version}
       <Button
         hasIconOnly
@@ -66,13 +71,13 @@ export function Version(props: {
   const { authId, token, projectId } = useCurrentCredential();
   const rapidaContext = useRapidaStore();
   const endpointProviderAction = useEndpointProviderModelPageStore();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(
+  const [isFetching, setIsFetching] = useState(true);
+  const [pendingDeploymentId, setPendingDeploymentId] = useState<string | null>(
     null,
   );
 
   const fetchVersions = () => {
-    rapidaContext.showLoader();
+    setIsFetching(true);
     endpointProviderAction.onChangeCurrentEndpoint(props.currentEndpoint);
     endpointProviderAction.getEndpointProviderModels(
       props.currentEndpoint.getId(),
@@ -80,11 +85,11 @@ export function Version(props: {
       token,
       authId,
       (err: string) => {
-        rapidaContext.hideLoader();
+        setIsFetching(false);
         toast.error(err);
       },
       (_data: EndpointProviderModel[]) => {
-        rapidaContext.hideLoader();
+        setIsFetching(false);
       },
     );
   };
@@ -123,19 +128,23 @@ export function Version(props: {
 
   const versions = endpointProviderAction.endpointProviderModels;
 
-  const filteredVersions = searchTerm
-    ? versions.filter(
-        epm =>
-          `vrsn_${epm.getId()}`
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          (epm.getDescription() || '')
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()),
-      )
-    : versions;
+  if (isFetching) {
+    return (
+      <TableSection className="min-h-0 overflow-hidden bg-surface">
+        <DataTableSkeleton
+          headers={skeletonHeaders}
+          columnCount={skeletonHeaders.length}
+          rowCount={5}
+          showHeader={false}
+          showToolbar
+          size="lg"
+          className="w-full"
+        />
+      </TableSection>
+    );
+  }
 
-  if (versions.length === 0 && !rapidaContext.loading) {
+  if (versions.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <EmptyState
@@ -146,128 +155,188 @@ export function Version(props: {
     );
   }
 
-  return (
-    <TableSection>
-      <TableToolbar>
-        <TableBatchActions
-          shouldShowBatchActions={!!selectedVersionId}
-          totalSelected={selectedVersionId ? 1 : 0}
-          onCancel={() => setSelectedVersionId(null)}
-          totalCount={filteredVersions.length}
-        >
-          <TableBatchAction
-            renderIcon={Rocket}
-            onClick={() => {
-              if (selectedVersionId) {
-                deployRevision(selectedVersionId);
-                setSelectedVersionId(null);
-              }
-            }}
-          >
-            Deploy version
-          </TableBatchAction>
-        </TableBatchActions>
-        <TableToolbarContent>
-          <TableToolbarSearch
-            placeholder="Search versions..."
-            onChange={(e: any) => setSearchTerm(e.target?.value || '')}
-          />
-          <Button
-            hasIconOnly
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            kind="ghost"
-            onClick={fetchVersions}
-            tooltipPosition="bottom"
-          />
-        </TableToolbarContent>
-      </TableToolbar>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableHeader className="!w-12" />
-            {headers.map(h => (
-              <TableHeader key={h.key}>{h.header}</TableHeader>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {filteredVersions.map((epm, idx) => {
-            const isDeployed =
-              endpointProviderAction.currentEndpoint?.getEndpointprovidermodelid() ===
-              epm.getId();
+  const tableRows = versions.map(version => {
+    const isDeployed =
+      endpointProviderAction.currentEndpoint?.getEndpointprovidermodelid() ===
+      version.getId();
 
-            return (
-              <TableRow
-                key={idx}
-                isSelected={selectedVersionId === epm.getId()}
-                onClick={() =>
-                  !isDeployed &&
-                  setSelectedVersionId(
-                    selectedVersionId === epm.getId() ? null : epm.getId(),
-                  )
-                }
-                className={!isDeployed ? 'cursor-pointer' : ''}
-              >
-                <TableCell
-                  className="!w-12 !pr-0"
-                  onClick={e => e.stopPropagation()}
-                >
-                  <RadioButton
-                    id={`ep-version-select-${epm.getId()}`}
-                    name="ep-version-select"
-                    labelText=""
-                    hideLabel
-                    checked={selectedVersionId === epm.getId()}
-                    onChange={() =>
-                      setSelectedVersionId(
-                        selectedVersionId === epm.getId() ? null : epm.getId(),
-                      )
-                    }
-                    disabled={isDeployed}
+    return {
+      id: version.getId(),
+      description: version.getDescription() || 'Initial endpoint version',
+      version: `vrsn_${version.getId()}`,
+      status: isDeployed ? 'In use' : 'Available',
+      createdBy: auditActorLabel(createdAuditActor(version)),
+      createdDate: version.getCreateddate()
+        ? toHumanReadableDateTime(version.getCreateddate()!)
+        : '—',
+      disabled: isDeployed,
+    };
+  });
+
+  return (
+    <TableSection className="min-h-0 bg-surface">
+      <DataTable rows={tableRows} headers={headers} radio>
+        {({
+          rows,
+          headers: tableHeaders,
+          selectedRows,
+          getBatchActionProps,
+          getHeaderProps,
+          getRowProps,
+          getSelectionProps,
+          getTableProps,
+          getToolbarProps,
+          onInputChange,
+        }) => {
+          const batchActionProps = getBatchActionProps();
+          const selectedVersion = selectedRows[0]
+            ? versions.find(version => version.getId() === selectedRows[0].id)
+            : undefined;
+
+          return (
+            <>
+              <TableToolbar {...getToolbarProps()}>
+                {selectedVersion && (
+                  <TableBatchActions
+                    {...batchActionProps}
+                    shouldShowBatchActions
+                  >
+                    <TableBatchAction
+                      renderIcon={Rocket}
+                      iconDescription="Deploy Version"
+                      onClick={() =>
+                        setPendingDeploymentId(selectedVersion.getId())
+                      }
+                    >
+                      Deploy Version
+                    </TableBatchAction>
+                  </TableBatchActions>
+                )}
+                <TableToolbarContent>
+                  <TableToolbarSearch
+                    placeholder="Search versions..."
+                    onChange={onInputChange}
                   />
-                </TableCell>
-                <TableCell className="text-sm">
-                  {epm.getDescription() || 'Initial endpoint version'}
-                </TableCell>
-                <TableCell className="text-sm">
-                  <VersionId id={epm.getId()} />
-                </TableCell>
-                <TableCell className="text-sm">
-                  {isDeployed ? (
-                    <IconIndicator kind="succeeded" label="In use" size={16} />
-                  ) : (
-                    <IconIndicator
-                      kind="incomplete"
-                      label="Available"
-                      size={16}
-                    />
-                  )}
-                </TableCell>
-                <TableCell className="text-sm">
-                  {auditActorLabel(createdAuditActor(epm))}
-                </TableCell>
-                <TableCell className="text-[13px] whitespace-nowrap">
-                  {epm.getCreateddate()
-                    ? toHumanReadableDateTime(epm.getCreateddate()!)
-                    : '—'}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-      <Pagination
-        totalItems={endpointProviderAction.totalCount}
-        page={endpointProviderAction.page}
-        pageSize={endpointProviderAction.pageSize}
-        pageSizes={[10, 20, 50]}
-        onChange={({ page, pageSize }) => {
-          endpointProviderAction.setPage(page);
-          if (pageSize !== endpointProviderAction.pageSize)
-            endpointProviderAction.setPageSize(pageSize);
+                  <Button
+                    hasIconOnly
+                    renderIcon={Renew}
+                    iconDescription="Refresh"
+                    kind="ghost"
+                    onClick={fetchVersions}
+                    tooltipPosition="bottom"
+                  />
+                </TableToolbarContent>
+              </TableToolbar>
+
+              <div className="min-h-0 flex-1 overflow-auto">
+                <Table {...getTableProps()}>
+                  <TableHead>
+                    <TableRow>
+                      <TableHeader className="!w-12" />
+                      {tableHeaders.map(header => (
+                        <TableHeader
+                          {...getHeaderProps({ header })}
+                          key={header.key}
+                        >
+                          {header.header}
+                        </TableHeader>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {rows.map(tableRow => {
+                      const version = versions.find(
+                        candidate => candidate.getId() === tableRow.id,
+                      );
+                      if (!version) return null;
+
+                      const isDeployed = Boolean(tableRow.disabled);
+
+                      return (
+                        <TableRow
+                          {...getRowProps({ row: tableRow })}
+                          key={tableRow.id}
+                        >
+                          <TableSelectRow
+                            {...getSelectionProps({ row: tableRow })}
+                          />
+                          <TableCell className="text-sm">
+                            {version.getDescription() ||
+                              'Initial endpoint version'}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <VersionId id={version.getId()} />
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {isDeployed ? (
+                              <IconIndicator
+                                kind="succeeded"
+                                label="In use"
+                                size={16}
+                              />
+                            ) : (
+                              <IconIndicator
+                                kind="incomplete"
+                                label="Available"
+                                size={16}
+                              />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {auditActorLabel(createdAuditActor(version))}
+                          </TableCell>
+                          <TableCell className="text-[13px] whitespace-nowrap">
+                            {version.getCreateddate()
+                              ? toHumanReadableDateTime(
+                                  version.getCreateddate()!,
+                                )
+                              : '—'}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <Pagination
+                className="shrink-0"
+                totalItems={endpointProviderAction.totalCount}
+                page={endpointProviderAction.page}
+                pageSize={endpointProviderAction.pageSize}
+                pageSizes={[10, 20, 50]}
+                onChange={({ page, pageSize }) => {
+                  endpointProviderAction.setPage(page);
+                  if (pageSize !== endpointProviderAction.pageSize)
+                    endpointProviderAction.setPageSize(pageSize);
+                }}
+              />
+
+              <ConfirmDialog
+                showing={pendingDeploymentId !== null}
+                type="info"
+                title="Deploy version?"
+                content={
+                  pendingDeploymentId
+                    ? `Deploying vrsn_${pendingDeploymentId} will replace the version currently in use.`
+                    : ''
+                }
+                confirmText="Deploy"
+                cancelText="Cancel"
+                onConfirm={() => {
+                  if (!pendingDeploymentId) return;
+                  const versionId = pendingDeploymentId;
+                  setPendingDeploymentId(null);
+                  batchActionProps.onCancel();
+                  deployRevision(versionId);
+                }}
+                onCancel={() => setPendingDeploymentId(null)}
+                onClose={() => setPendingDeploymentId(null)}
+              />
+            </>
+          );
         }}
-      />
+      </DataTable>
     </TableSection>
   );
 }

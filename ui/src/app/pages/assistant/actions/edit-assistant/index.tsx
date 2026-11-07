@@ -187,7 +187,7 @@ export const EditAssistant: FC<{ assistantId: string }> = ({ assistantId }) => {
             id="assistant-id"
             className="inline-flex max-w-full items-center gap-1"
           >
-            <span className="min-w-0 max-w-[32rem] truncate font-mono text-sm text-gray-700 dark:text-gray-200">
+            <span className="min-w-0 max-w-[32rem] truncate font-mono text-sm text-muted ">
               {assistantId}
             </span>
             <CopyButton className="h-6 w-6 shrink-0">{assistantId}</CopyButton>
@@ -253,20 +253,17 @@ export const EditAssistant: FC<{ assistantId: string }> = ({ assistantId }) => {
 
         {/* ── Danger Zone ── */}
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--cds-support-error)] mb-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-support-error mb-4">
             Danger Zone
           </h2>
           <div>
             <div className="flex items-start justify-between gap-6">
               <div className="flex flex-col gap-1">
                 <p className="text-sm font-semibold flex items-center gap-2">
-                  <WarningAlt
-                    size={16}
-                    className="text-[var(--cds-support-error)]"
-                  />
+                  <WarningAlt size={16} className="text-support-error" />
                   Delete this assistant
                 </p>
-                <p className="text-xs leading-relaxed text-[var(--cds-text-secondary)]">
+                <p className="text-xs leading-relaxed text-muted">
                   Once deleted, all active connections will be terminated
                   immediately and data will be permanently removed. This action
                   cannot be undone.

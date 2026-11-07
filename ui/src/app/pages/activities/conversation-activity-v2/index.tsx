@@ -395,13 +395,15 @@ const LogRecordList = ({
 }) => (
   <div className="min-h-0 flex-1 overflow-auto">
     {records.map(record => (
-      <button
+      <Button
         key={record.id}
+        kind="ghost"
+        size="sm"
         type="button"
         className={[
-          'w-full border-t border-gray-100 bg-white px-4 py-3 text-left first:border-t-0 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900',
+          'block! h-auto! w-full max-w-none! border-t border-border-subtle bg-surface px-4! py-3! text-left first:border-t-0 hover:bg-layer ',
           record.id === selectedDocumentId
-            ? 'outline outline-2 -outline-offset-2 outline-[var(--cds-border-interactive)]'
+            ? 'outline outline-2 -outline-offset-2 outline-primary'
             : '',
         ].join(' ')}
         onClick={() => onSelectDocument(record)}
@@ -410,7 +412,7 @@ const LogRecordList = ({
           document={record}
           occurredAtLabel={formatTime(record.occurredAt)}
         />
-      </button>
+      </Button>
     ))}
   </div>
 );
@@ -426,13 +428,15 @@ const EventRecordList = ({
 }) => (
   <div className="min-h-0 flex-1 overflow-auto">
     {records.map(record => (
-      <button
+      <Button
         key={record.id}
+        kind="ghost"
+        size="sm"
         type="button"
         className={[
-          'w-full border-t border-gray-100 bg-white px-4 py-3 text-left first:border-t-0 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900',
+          'block! h-auto! w-full max-w-none! border-t border-border-subtle bg-surface px-4! py-3! text-left first:border-t-0 hover:bg-layer ',
           record.id === selectedDocumentId
-            ? 'outline outline-2 -outline-offset-2 outline-[var(--cds-border-interactive)]'
+            ? 'outline outline-2 -outline-offset-2 outline-primary'
             : '',
         ].join(' ')}
         onClick={() => onSelectDocument(record)}
@@ -441,7 +445,7 @@ const EventRecordList = ({
           document={record}
           occurredAtLabel={formatTime(record.occurredAt)}
         />
-      </button>
+      </Button>
     ))}
   </div>
 );
@@ -451,7 +455,7 @@ const MetricTrendChart = ({ records }: { records: TimelineDocument[] }) => {
 
   if (chartData.length === 0) {
     return (
-      <div className="flex h-full min-h-[180px] items-center justify-center px-4 text-sm text-gray-500 dark:text-gray-400">
+      <div className="flex h-full min-h-[180px] items-center justify-center px-4 text-sm text-muted ">
         No numeric metric values recorded for this selection.
       </div>
     );
@@ -474,26 +478,26 @@ const MetricTrendChart = ({ records }: { records: TimelineDocument[] }) => {
             >
               <stop
                 offset="0%"
-                stopColor="var(--cds-interactive, #0f62fe)"
+                stopColor="var(--color-primary)"
                 stopOpacity={0.28}
               />
               <stop
                 offset="100%"
-                stopColor="var(--cds-interactive, #0f62fe)"
+                stopColor="var(--color-primary)"
                 stopOpacity={0.02}
               />
             </linearGradient>
           </defs>
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 11, fill: '#9ca3af' }}
+            tick={{ fontSize: 11, fill: 'var(--color-muted)' }}
             tickLine={false}
             axisLine={false}
             interval="preserveStartEnd"
             minTickGap={24}
           />
           <YAxis
-            tick={{ fontSize: 11, fill: '#9ca3af' }}
+            tick={{ fontSize: 11, fill: 'var(--color-muted)' }}
             tickLine={false}
             axisLine={false}
             width={44}
@@ -502,20 +506,13 @@ const MetricTrendChart = ({ records }: { records: TimelineDocument[] }) => {
             content={({ active, payload }) => {
               if (!active || !payload?.length) return null;
               return (
-                <div className="min-w-[140px] border border-gray-200 bg-white px-3 py-2 text-sm shadow-lg dark:border-gray-800 dark:bg-gray-900">
-                  <p className="mb-1.5 text-xs text-gray-400">
+                <div className="min-w-[140px] border border-border-subtle bg-surface px-3 py-2 text-sm shadow-lg ">
+                  <p className="mb-1.5 text-xs text-muted">
                     {payload[0]?.payload?.label}
                   </p>
                   <div className="flex items-center gap-2">
-                    <div
-                      className="h-2 w-2"
-                      style={{
-                        backgroundColor: 'var(--cds-interactive, #0f62fe)',
-                      }}
-                    />
-                    <span className="text-xs uppercase text-gray-600 dark:text-gray-300">
-                      Value
-                    </span>
+                    <div className="h-2 w-2 bg-primary" />
+                    <span className="text-xs uppercase text-muted ">Value</span>
                     <span className="ml-auto font-semibold tabular-nums">
                       {payload[0]?.value}
                     </span>
@@ -527,7 +524,7 @@ const MetricTrendChart = ({ records }: { records: TimelineDocument[] }) => {
           <Area
             type="monotone"
             dataKey="value"
-            stroke="var(--cds-interactive, #0f62fe)"
+            stroke="var(--color-primary)"
             strokeWidth={1.5}
             fill="url(#metricTrendGradient)"
             dot={false}
@@ -555,14 +552,14 @@ const InspectorPrimaryPanel = ({
   const relatedRecords = getRelatedRecords(document, records);
 
   return (
-    <div className="flex min-w-0 min-h-0 flex-col border-r border-gray-200 dark:border-gray-800">
-      <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2 dark:border-gray-800 dark:bg-gray-900">
+    <div className="flex min-w-0 min-h-0 flex-col border-r border-border-subtle ">
+      <div className="flex items-center justify-between border-b border-border-subtle bg-layer px-4 py-2 ">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          <p className="text-sm font-medium text-foreground ">
             {getLeftPanelTitle(document)}
           </p>
           {document.kind === 'event' && !isLoading && (
-            <p className="mt-1 truncate font-mono text-xs text-gray-500">
+            <p className="mt-1 truncate font-mono text-xs text-muted">
               {getEventInspectorScopeLabel(document)} ·{' '}
               {getTimeWindowLabel(relatedRecords)}
             </p>
@@ -625,7 +622,7 @@ const TelemetryStreamTable = ({
             className={[
               'cursor-pointer',
               document.id === selectedDocumentId
-                ? 'outline outline-2 -outline-offset-2 outline-[var(--cds-border-interactive)]'
+                ? 'outline outline-2 -outline-offset-2 outline-primary'
                 : '',
             ].join(' ')}
             tabIndex={0}
@@ -634,7 +631,7 @@ const TelemetryStreamTable = ({
               if (event.key === 'Enter') onSelectRecord(document);
             }}
           >
-            <TableCell className="max-w-[220px] truncate font-mono text-sm text-blue-600">
+            <TableCell className="max-w-[220px] truncate font-mono text-sm text-support-info">
               {document.id}
             </TableCell>
             <TableCell className="max-w-[260px]">
@@ -665,7 +662,7 @@ const TelemetryStreamTable = ({
                 {document.kind === 'metric' ? (
                   <p className="truncate font-mono text-[13px]">
                     [{document.name}] {getMetricSummary(document)?.value}
-                    <span className="text-gray-500">
+                    <span className="text-muted">
                       {' '}
                       {getMetricSummary(document)?.description}
                     </span>
@@ -713,7 +710,7 @@ const TraceInspectorPanel = ({
   if (!document) return null;
 
   return (
-    <aside className="flex max-h-[48vh] min-h-[320px] shrink-0 border-t border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950">
+    <aside className="flex max-h-[48vh] min-h-[320px] shrink-0 border-t border-border-subtle bg-surface shadow-xl ">
       <section className="relative flex min-h-0 flex-1 flex-col">
         <Button
           hasIconOnly
@@ -722,10 +719,10 @@ const TraceInspectorPanel = ({
           renderIcon={Close}
           iconDescription="Close"
           tooltipPosition="left"
-          className="!absolute !right-0 !top-0 !z-10 !h-12 !min-h-12 !w-12 !min-w-12 !p-0 border-l border-gray-200 dark:border-gray-800"
+          className="!absolute !right-0 !top-0 !z-10 !h-12 !min-h-12 !w-12 !min-w-12 !p-0 border-l border-border-subtle "
           onClick={onClose}
         />
-        <div className="border-b border-gray-200 px-4 py-3 pr-14 dark:border-gray-800">
+        <div className="border-b border-border-subtle px-4 py-3 pr-14 ">
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <Tag type={document.outcome === 'failure' ? 'red' : 'green'}>
@@ -734,10 +731,10 @@ const TraceInspectorPanel = ({
               <Tag type="cool-gray">{document.kind}</Tag>
               <Tag type="blue">{document.scope}</Tag>
             </div>
-            <h2 className="truncate text-base font-medium text-gray-900 dark:text-gray-100">
+            <h2 className="truncate text-base font-medium text-foreground ">
               {document.title || document.name}
             </h2>
-            <p className="mt-1 font-mono text-xs text-gray-500">
+            <p className="mt-1 font-mono text-xs text-muted">
               contextId:{selectedContextId || '-'} · {recordCount} records
             </p>
           </div>
@@ -753,33 +750,33 @@ const TraceInspectorPanel = ({
           <div className="min-h-0 overflow-auto p-4">
             <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
               <div>
-                <p className="text-xs uppercase text-gray-500">Occurred</p>
+                <p className="text-xs uppercase text-muted">Occurred</p>
                 <p className="font-mono text-xs">
                   {formatTime(document.occurredAt)}
                 </p>
               </div>
               <div>
-                <p className="text-xs uppercase text-gray-500">Duration</p>
+                <p className="text-xs uppercase text-muted">Duration</p>
                 <p className="font-mono text-xs">
                   {formatDurationMs(document.durationMs)}
                 </p>
               </div>
               <div>
-                <p className="text-xs uppercase text-gray-500">Category</p>
+                <p className="text-xs uppercase text-muted">Category</p>
                 <p className="font-mono text-xs">{document.category || '-'}</p>
               </div>
               <div>
-                <p className="text-xs uppercase text-gray-500">Role</p>
+                <p className="text-xs uppercase text-muted">Role</p>
                 <p className="font-mono text-xs">
                   {document.messageRole || '-'}
                 </p>
               </div>
               <div className="col-span-2">
-                <p className="text-xs uppercase text-gray-500">Record ID</p>
+                <p className="text-xs uppercase text-muted">Record ID</p>
                 <p className="break-all font-mono text-xs">{document.id}</p>
               </div>
               <div className="col-span-2">
-                <p className="text-xs uppercase text-gray-500">traceID</p>
+                <p className="text-xs uppercase text-muted">traceID</p>
                 <div className="flex min-w-0 items-center gap-1">
                   <p className="break-all font-mono text-xs">
                     {document.traceId || '-'}
@@ -792,13 +789,13 @@ const TraceInspectorPanel = ({
                 </div>
               </div>
               <div>
-                <p className="text-xs uppercase text-gray-500">Context</p>
+                <p className="text-xs uppercase text-muted">Context</p>
                 <p className="break-all font-mono text-xs">
                   {document.contextId || '-'}
                 </p>
               </div>
               <div>
-                <p className="text-xs uppercase text-gray-500">Message</p>
+                <p className="text-xs uppercase text-muted">Message</p>
                 <p className="break-all font-mono text-xs">
                   {document.messageId || '-'}
                 </p>
@@ -806,7 +803,7 @@ const TraceInspectorPanel = ({
             </div>
             <div className="space-y-4">
               <div className="min-w-0">
-                <p className="mb-2 text-xs font-medium uppercase text-gray-500">
+                <p className="mb-2 text-xs font-medium uppercase text-muted">
                   Attributes
                 </p>
                 <CodeSnippet type="multi" feedback="Copied">
@@ -814,7 +811,7 @@ const TraceInspectorPanel = ({
                 </CodeSnippet>
               </div>
               <div className="min-w-0">
-                <p className="mb-2 text-xs font-medium uppercase text-gray-500">
+                <p className="mb-2 text-xs font-medium uppercase text-muted">
                   Data
                 </p>
                 <CodeSnippet type="multi" feedback="Copied">
@@ -1215,7 +1212,7 @@ export const ListingPage = () => {
                 />
 
                 <Pagination
-                  className="shrink-0 border-t border-gray-200 dark:border-gray-800"
+                  className="shrink-0 border-t border-border-subtle "
                   totalItems={totalItem}
                   page={page}
                   pageSize={pageSize}

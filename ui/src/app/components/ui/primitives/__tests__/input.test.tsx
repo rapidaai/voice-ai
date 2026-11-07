@@ -106,8 +106,6 @@ describe('InputHelper', () => {
   it('uses the Carbon secondary text token for readable helper copy', () => {
     render(<InputHelper>Helpful context</InputHelper>);
 
-    expect(screen.getByText('Helpful context')).toHaveClass(
-      'text-[var(--cds-text-secondary)]',
-    );
+    expect(screen.getByText('Helpful context')).toHaveClass('text-muted');
   });
 });

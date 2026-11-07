@@ -109,8 +109,8 @@ jest.mock('@/app/components/domain/providers/text-to-speech/provider', () => ({
   ValidateTextToSpeechIfInvalid: () => undefined,
 }));
 jest.mock('@/app/components/ui/composites', () => ({
-  TabForm: ({ activeTab, form, errorMessage }: any) => {
-    const active = form.find((item: any) => item.code === activeTab);
+  CreateFullPageWithHeader: ({ activeStep, steps, errorMessage }: any) => {
+    const active = steps.find((item: any) => item.code === activeStep);
     return (
       <>
         {errorMessage && <div role="alert">{errorMessage}</div>}

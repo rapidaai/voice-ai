@@ -75,14 +75,14 @@ const KeyPicker = ({ fields, onSelect, selectedField }: KeyPickerProps) => {
     <span className="relative inline-flex">
       <button
         type="button"
-        className="whitespace-nowrap bg-transparent text-[var(--cds-link-primary)] outline-none hover:underline"
+        className="whitespace-nowrap bg-transparent text-link outline-none hover:underline"
         onClick={() => setIsOpen(open => !open)}
       >
         {selectedField.text}
       </button>
       {isOpen && (
         <div
-          className="absolute left-0 top-[calc(100%+0.25rem)] z-50 max-h-[320px] w-[min(320px,calc(100vw-2rem))] overflow-auto border border-gray-200 bg-white py-2 shadow-xl dark:border-gray-800 dark:bg-gray-950"
+          className="absolute left-0 top-[calc(100%+0.25rem)] z-50 max-h-[320px] w-[min(320px,calc(100vw-2rem))] overflow-auto border border-border-subtle bg-surface py-2 shadow-xl "
           onMouseDown={event => event.preventDefault()}
         >
           {fields.map(field => (
@@ -90,10 +90,10 @@ const KeyPicker = ({ fields, onSelect, selectedField }: KeyPickerProps) => {
               key={field.queryKey}
               type="button"
               className={[
-                'grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-900',
+                'grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-2 text-left text-sm hover:bg-layer ',
                 field.queryKey === selectedField.queryKey
-                  ? 'text-[var(--cds-link-primary)]'
-                  : 'text-[var(--cds-text-primary)]',
+                  ? 'text-link'
+                  : 'text-foreground',
               ].join(' ')}
               onClick={() => {
                 onSelect(field);
@@ -101,7 +101,7 @@ const KeyPicker = ({ fields, onSelect, selectedField }: KeyPickerProps) => {
               }}
             >
               <span className="truncate font-mono">{field.text}</span>
-              <span className="text-gray-500">{field.logicLabel || 'is'}</span>
+              <span className="text-muted">{field.logicLabel || 'is'}</span>
             </button>
           ))}
         </div>
@@ -129,14 +129,14 @@ const LogicPicker = ({ field, onSelect, selectedLogic }: LogicPickerProps) => {
     <span className="relative inline-flex">
       <button
         type="button"
-        className="whitespace-nowrap bg-transparent text-gray-500 outline-none hover:text-[var(--cds-text-primary)]"
+        className="whitespace-nowrap bg-transparent text-muted outline-none hover:text-foreground"
         onClick={() => setIsOpen(open => !open)}
       >
         {selectedLogic?.label || options[0].label}
       </button>
       {isOpen && options.length > 1 && (
         <div
-          className="absolute left-0 top-[calc(100%+0.25rem)] z-50 min-w-32 overflow-hidden border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950"
+          className="absolute left-0 top-[calc(100%+0.25rem)] z-50 min-w-32 overflow-hidden border border-border-subtle bg-surface shadow-xl "
           onMouseDown={event => event.preventDefault()}
         >
           {options.map(option => (
@@ -144,10 +144,10 @@ const LogicPicker = ({ field, onSelect, selectedLogic }: LogicPickerProps) => {
               key={option.logic}
               type="button"
               className={[
-                'block w-full whitespace-nowrap px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-900',
+                'block w-full whitespace-nowrap px-3 py-2 text-left text-sm hover:bg-layer ',
                 option.logic === selectedLogic?.logic
-                  ? 'text-[var(--cds-link-primary)]'
-                  : 'text-[var(--cds-text-primary)]',
+                  ? 'text-link'
+                  : 'text-foreground',
               ].join(' ')}
               onClick={() => {
                 onSelect(option.logic);
@@ -208,7 +208,7 @@ const TextFilterValueEditor = ({
     <>
       <input
         ref={inputRef}
-        className="bg-transparent text-[var(--cds-link-primary)] outline-none placeholder:text-gray-400"
+        className="bg-transparent text-link outline-none placeholder:text-muted"
         type="text"
         style={{ width: getTextInputWidth(value) }}
         value={value}
@@ -219,7 +219,7 @@ const TextFilterValueEditor = ({
       />
       {isOpen && hasValueOptions && (
         <div
-          className="absolute left-0 top-[calc(100%+0.25rem)] z-40 w-[min(360px,calc(100vw-2rem))] overflow-hidden border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950"
+          className="absolute left-0 top-[calc(100%+0.25rem)] z-40 w-[min(360px,calc(100vw-2rem))] overflow-hidden border border-border-subtle bg-surface shadow-xl "
           onMouseDown={event => event.preventDefault()}
         >
           <div className="max-h-[320px] overflow-auto py-2">
@@ -227,13 +227,11 @@ const TextFilterValueEditor = ({
               <button
                 key={option.id}
                 type="button"
-                className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-900"
+                className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-2 text-left text-sm hover:bg-layer "
                 onClick={() => onSelectValue(field, option)}
               >
                 <span className="truncate font-mono">{option.text}</span>
-                <span className="text-[var(--cds-link-primary)]">
-                  {field.type}
-                </span>
+                <span className="text-link">{field.type}</span>
               </button>
             ))}
           </div>
@@ -285,7 +283,7 @@ const MultiSelectFilterValueEditor = ({
     <>
       <input
         ref={inputRef}
-        className="bg-transparent text-[var(--cds-link-primary)] outline-none placeholder:text-[var(--cds-link-primary)]"
+        className="bg-transparent text-link outline-none placeholder:text-link"
         type="text"
         style={{
           width: getTextInputWidth(searchText || selectedText, 14, 48),
@@ -298,7 +296,7 @@ const MultiSelectFilterValueEditor = ({
       />
       {isOpen && (
         <div
-          className="absolute left-0 top-[calc(100%+0.25rem)] z-40 w-[min(360px,calc(100vw-2rem))] overflow-hidden border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950"
+          className="absolute left-0 top-[calc(100%+0.25rem)] z-40 w-[min(360px,calc(100vw-2rem))] overflow-hidden border border-border-subtle bg-surface shadow-xl "
           onMouseDown={event => event.preventDefault()}
         >
           <div className="max-h-[320px] overflow-auto py-2">
@@ -306,9 +304,9 @@ const MultiSelectFilterValueEditor = ({
               options.map(option => (
                 <div
                   key={option.id}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-900"
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-2 hover:bg-layer "
                 >
-                  <span className="truncate font-mono text-sm text-[var(--cds-text-primary)]">
+                  <span className="truncate font-mono text-sm text-foreground">
                     {option.text}
                   </span>
                   <Checkbox
@@ -321,7 +319,7 @@ const MultiSelectFilterValueEditor = ({
                 </div>
               ))
             ) : (
-              <p className="px-4 py-3 text-sm text-gray-500">No values found</p>
+              <p className="px-4 py-3 text-sm text-muted">No values found</p>
             )}
           </div>
         </div>
@@ -378,7 +376,7 @@ const DateFilterValueEditor = ({
     <>
       <input
         ref={inputRef}
-        className="bg-transparent text-[var(--cds-link-primary)] outline-none placeholder:text-gray-400"
+        className="bg-transparent text-link outline-none placeholder:text-muted"
         type="text"
         style={{ width: getTextInputWidth(displayValue, 10, 28) }}
         value={displayValue}
@@ -389,7 +387,7 @@ const DateFilterValueEditor = ({
       />
       {isOpen && (
         <div
-          className="query-search-date-calendar absolute left-0 top-[calc(100%+0.25rem)] z-40 w-[min(300px,calc(100vw-2rem))] overflow-hidden border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950"
+          className="query-search-date-calendar absolute left-0 top-[calc(100%+0.25rem)] z-40 w-[min(300px,calc(100vw-2rem))] overflow-hidden border border-border-subtle bg-surface shadow-xl "
           onMouseDown={event => {
             const target = event.target as HTMLElement;
             if (target.closest('.query-search-date-time')) return;
@@ -401,7 +399,7 @@ const DateFilterValueEditor = ({
               <button
                 type="button"
                 aria-label={labels.previousMonth}
-                className="flex h-6 w-6 items-center justify-center text-[var(--cds-icon-primary)] hover:bg-gray-100 dark:hover:bg-gray-900"
+                className="flex h-6 w-6 items-center justify-center text-icon-primary hover:bg-layer "
                 onClick={() =>
                   setCalendarMonth(
                     new Date(
@@ -414,14 +412,14 @@ const DateFilterValueEditor = ({
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </button>
-              <div className="flex items-center gap-4 text-sm text-[var(--cds-text-primary)]">
+              <div className="flex items-center gap-4 text-sm text-foreground">
                 <span>{MONTH_NAMES[calendarMonth.getMonth()]}</span>
                 <span>{calendarMonth.getFullYear()}</span>
               </div>
               <button
                 type="button"
                 aria-label={labels.nextMonth}
-                className="flex h-6 w-6 items-center justify-center text-[var(--cds-icon-primary)] hover:bg-gray-100 dark:hover:bg-gray-900"
+                className="flex h-6 w-6 items-center justify-center text-icon-primary hover:bg-layer "
                 onClick={() =>
                   setCalendarMonth(
                     new Date(
@@ -453,10 +451,10 @@ const DateFilterValueEditor = ({
                     key={dateValue}
                     type="button"
                     className={[
-                      'mx-auto flex h-7 w-7 items-center justify-center text-xs hover:bg-gray-100 dark:hover:bg-gray-900',
+                      'mx-auto flex h-7 w-7 items-center justify-center text-xs hover:bg-layer ',
                       isSelected
-                        ? 'bg-[var(--cds-layer-selected)] outline outline-2 -outline-offset-2 outline-[var(--cds-border-interactive)] text-[var(--cds-link-primary)]'
-                        : 'text-[var(--cds-text-primary)]',
+                        ? 'bg-layer-selected outline outline-2 -outline-offset-2 outline-primary text-link'
+                        : 'text-foreground',
                     ].join(' ')}
                     onClick={() => setDraftDateValue(dateValue)}
                   >
@@ -466,7 +464,7 @@ const DateFilterValueEditor = ({
               })}
             </div>
           </div>
-          <div className="query-search-date-time border-t border-gray-200 px-3 py-2 dark:border-gray-800">
+          <div className="query-search-date-time border-t border-border-subtle px-3 py-2 ">
             <div className="query-search-date-form-row">
               <FormLabel
                 id={`query-search-include-time-label-${field.queryKey}`}
@@ -597,7 +595,7 @@ const FilterPill = ({
   const displayValue = formatFilterDisplayValue(field, value, dateTimeMode);
 
   return (
-    <span className="relative inline-flex w-fit shrink-0 items-center gap-2 border border-gray-200 bg-gray-50 px-2 py-1 font-mono text-sm dark:border-gray-800 dark:bg-gray-900">
+    <span className="relative inline-flex w-fit shrink-0 items-center gap-2 border border-border-subtle bg-layer px-2 py-1 font-mono text-sm ">
       <KeyPicker
         fields={fields}
         selectedField={field}
@@ -630,7 +628,7 @@ const FilterPill = ({
       ) : (
         <button
           type="button"
-          className="min-w-4 whitespace-nowrap bg-transparent text-left text-[var(--cds-link-primary)] outline-none hover:underline"
+          className="min-w-4 whitespace-nowrap bg-transparent text-left text-link outline-none hover:underline"
           onClick={onEditValue}
         >
           {displayValue}
@@ -639,7 +637,7 @@ const FilterPill = ({
       <button
         type="button"
         aria-label={`Remove ${field.text} filter`}
-        className="ml-1 flex h-4 w-4 cursor-pointer items-center justify-center text-gray-500 hover:text-gray-900 dark:hover:text-gray-100"
+        className="ml-1 flex h-4 w-4 cursor-pointer items-center justify-center text-muted hover:text-foreground "
         onClick={onRemove}
       >
         <Close className="h-3.5 w-3.5" />
@@ -944,13 +942,11 @@ export const QuerySearch = ({
     <button
       key={field.queryKey}
       type="button"
-      className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-900"
+      className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-2 text-left text-sm hover:bg-layer "
       onClick={() => selectField(field)}
     >
       <span className="truncate font-mono">{field.text}</span>
-      <span className="text-[var(--cds-link-primary)]">
-        {field.logicLabel || field.type}
-      </span>
+      <span className="text-link">{field.logicLabel || field.type}</span>
     </button>
   ));
 
@@ -996,13 +992,13 @@ export const QuerySearch = ({
     >
       <div
         className={[
-          'flex h-12 min-w-0 items-center gap-2 border-0 bg-transparent px-3 text-sm text-[var(--cds-text-primary)] transition-colors hover:bg-[var(--cds-field)]',
+          'flex h-12 min-w-0 items-center gap-2 border-0 bg-transparent px-3 text-sm text-foreground transition-colors hover:bg-field',
           isOpen
-            ? 'bg-[var(--cds-field)] outline outline-2 -outline-offset-2 outline-[var(--cds-focus)]'
+            ? 'bg-field outline outline-2 -outline-offset-2 outline-primary'
             : '',
         ].join(' ')}
       >
-        <Search className="h-4 w-4 shrink-0 text-gray-500" />
+        <Search className="h-4 w-4 shrink-0 text-muted" />
         {chipTokens.map((chip, index) => {
           const chipField = getFieldByKey(fields, chip.key);
           if (!chipField) return null;
@@ -1075,7 +1071,7 @@ export const QuerySearch = ({
         ) : (
           <input
             ref={inputRef}
-            className="min-w-[180px] flex-1 bg-transparent font-mono text-sm outline-none placeholder:font-sans placeholder:text-gray-500"
+            className="min-w-[180px] flex-1 bg-transparent font-mono text-sm outline-none placeholder:font-sans placeholder:text-muted"
             placeholder={hasSearchValue ? '' : placeholder}
             value={draftValue}
             onBlur={closeWhenFocusLeaves}
@@ -1115,11 +1111,11 @@ export const QuerySearch = ({
 
       {isOpen && !isValueMode && editingChipIndex === null && (
         <div
-          className="absolute left-0 top-[calc(100%+0.125rem)] z-40 w-[min(760px,calc(100vw-2rem))] overflow-hidden border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950"
+          className="absolute left-0 top-[calc(100%+0.125rem)] z-40 w-[min(760px,calc(100vw-2rem))] overflow-hidden border border-border-subtle bg-surface shadow-xl "
           onMouseDown={event => event.preventDefault()}
         >
           {!isValueMode && (
-            <div className="flex border-b border-gray-200 px-2 pt-2 dark:border-gray-800">
+            <div className="flex border-b border-border-subtle px-2 pt-2 ">
               {resolvedTabs.map(tab => (
                 <button
                   key={tab.id}
@@ -1127,8 +1123,8 @@ export const QuerySearch = ({
                   className={[
                     'px-3 py-2 text-sm',
                     activeTab === tab.id
-                      ? 'border-b-2 border-[var(--cds-border-interactive)] text-[var(--cds-text-primary)]'
-                      : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200',
+                      ? 'border-b-2 border-primary text-foreground'
+                      : 'text-muted hover:text-foreground ',
                   ].join(' ')}
                   onClick={() => setActiveTab(tab.id)}
                 >

@@ -30,22 +30,20 @@ export function EmptyState({
     <div
       aria-labelledby={headingId}
       className={cn(
-        'flex flex-1 flex-col items-center justify-center px-8 py-12 text-center text-[var(--cds-text-primary)]',
+        'flex flex-1 flex-col items-center justify-center px-8 py-12 text-center text-foreground',
         className,
       )}
     >
       {Icon && (
-        <div className="mb-5 flex h-16 w-16 items-center justify-center bg-[var(--cds-layer-accent-01)]">
-          <Icon size={32} className="text-[var(--cds-icon-secondary)]" />
+        <div className="mb-5 flex h-16 w-16 items-center justify-center bg-layer-accent">
+          <Icon size={32} className="text-icon-secondary" />
         </div>
       )}
       <h3 id={headingId} className="mb-2 text-base font-semibold">
         {title}
       </h3>
       {subtitle && (
-        <p className="mb-5 max-w-md text-sm leading-5 text-[var(--cds-text-secondary)]">
-          {subtitle}
-        </p>
+        <p className="mb-5 max-w-md text-sm leading-5 text-muted">{subtitle}</p>
       )}
       {actionComponent}
       {action && onAction && (

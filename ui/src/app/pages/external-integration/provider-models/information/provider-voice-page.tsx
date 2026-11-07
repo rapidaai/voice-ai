@@ -52,7 +52,7 @@ export function ProviderVoicePage(props: {
       <Helmet title={`${provider.name} voices`} />
       <PageHeaderBlock className="min-h-24 shrink-0">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center border border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)]">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center border border-border-subtle bg-layer">
             {provider.image && !imageFailed ? (
               <img
                 src={provider.image}
@@ -75,7 +75,7 @@ export function ProviderVoicePage(props: {
                 {connected ? 'Connected' : 'Setup required'}
               </Tag>
             </div>
-            <p className="mt-1 line-clamp-2 max-w-3xl text-sm text-[var(--cds-text-secondary)]">
+            <p className="mt-1 line-clamp-2 max-w-3xl text-sm text-muted">
               {provider.description}
             </p>
           </PageTitleBlock>

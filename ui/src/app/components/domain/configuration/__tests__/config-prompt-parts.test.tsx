@@ -263,13 +263,16 @@ describe('configuration prompt subcomponents', () => {
     expect(roleSelector.parentElement).toHaveClass('flex-1', 'min-w-0');
     expect(roleSelector.parentElement?.parentElement).toHaveClass(
       'h-10',
-      'bg-[var(--cds-field)]',
+      'bg-field',
     );
     expect(roleSelector.parentElement?.nextElementSibling).toHaveClass(
       'flex',
       'shrink-0',
       'items-stretch',
     );
+    const promptEditor = screen.getByLabelText('Prompt editor');
+    expect(promptEditor.parentElement).toHaveClass('bg-field');
+    expect(promptEditor.parentElement).not.toHaveClass('bg-surface');
 
     await user.selectOptions(
       screen.getByLabelText('Select a role'),

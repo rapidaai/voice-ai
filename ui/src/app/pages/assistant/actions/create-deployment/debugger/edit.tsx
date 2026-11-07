@@ -324,7 +324,7 @@ const EditAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
   return (
     <>
       <ConfirmDialogComponent />
-      <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-900">
+      <div className="flex flex-col flex-1 min-h-0 bg-surface ">
         <DeploymentEditHeader
           eyebrow="Debugger deployment"
           title="Edit debugger deployment"

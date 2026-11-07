@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import developmentConfig from '@/configs/config.development.json';
 import productionConfig from '@/configs/config.production.json';
 import { getConfig, withConfigDefaults } from '@/configs';
-import { normalizeThemeManifest } from '@/theme/theme-config';
+import { parseThemeManifest } from '@/theme/theme-config';
 
 const dockerConfigs = [
   'config.community.json',
@@ -12,8 +12,29 @@ const dockerConfigs = [
   'config.local-knowledge.json',
 ];
 
+const readDockerConfig = (configFile: string) =>
+  JSON.parse(
+    readFileSync(resolve(process.cwd(), '../docker/ui', configFile), 'utf8'),
+  );
+
+const luminance = (hex: string) => {
+  const channels = hex
+    .slice(1)
+    .match(/.{2}/g)!
+    .map(channel => parseInt(channel, 16) / 255)
+    .map(channel =>
+      channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
+    );
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+};
+
+const contrast = (left: string, right: string) => {
+  const values = [luminance(left), luminance(right)].sort((a, b) => b - a);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+};
+
 describe('UI theme configuration', () => {
-  it('selects and normalizes each environment theme', () => {
+  it('selects and parses each environment theme', () => {
     expect(getConfig('development')).toEqual(developmentConfig);
     expect(getConfig('test')).toEqual(developmentConfig);
     expect(getConfig('production')).toEqual(productionConfig);
@@ -23,12 +44,12 @@ describe('UI theme configuration', () => {
     expect(getConfig('production').deployment.webWidgetScriptUrl).toContain(
       '/public/scripts/app.min.js',
     );
-    expect(normalizeThemeManifest(developmentConfig.theme)).toEqual(
-      developmentConfig.theme,
-    );
-    expect(normalizeThemeManifest(productionConfig.theme)).toEqual(
-      productionConfig.theme,
-    );
+    expect(parseThemeManifest(developmentConfig.theme)).toMatchObject({
+      ok: true,
+    });
+    expect(parseThemeManifest(productionConfig.theme)).toMatchObject({
+      ok: true,
+    });
   });
 
   it('uses the app mode when NODE_ENV stays production', () => {
@@ -81,21 +102,43 @@ describe('UI theme configuration', () => {
     );
   });
 
-  it.each(dockerConfigs)('%s contains a normalizable theme', configFile => {
-    const config = JSON.parse(
-      readFileSync(resolve(process.cwd(), '../docker/ui', configFile), 'utf8'),
-    );
+  it.each(dockerConfigs)('%s contains a valid theme', configFile => {
+    const config = readDockerConfig(configFile);
 
-    expect(normalizeThemeManifest(config.theme)).toEqual(config.theme);
+    expect(parseThemeManifest(config.theme)).toMatchObject({ ok: true });
   });
 
   it.each(dockerConfigs)('%s contains deployment config', configFile => {
-    const config = JSON.parse(
-      readFileSync(resolve(process.cwd(), '../docker/ui', configFile), 'utf8'),
-    );
+    const config = readDockerConfig(configFile);
 
     expect(config.deployment.webWidgetScriptUrl).toContain(
       '/public/scripts/app.min.js',
     );
+  });
+
+  it.each([
+    ['development', developmentConfig],
+    ['production', productionConfig],
+    ...dockerConfigs.map(configFile => [
+      configFile,
+      readDockerConfig(configFile),
+    ]),
+  ])('%s primary pairs meet WCAG AA contrast', (_name, config) => {
+    for (const colors of Object.values(config.theme.colors) as Array<{
+      primary: string;
+      primaryHover: string;
+      primaryActive: string;
+      onPrimary: string;
+    }>) {
+      expect(contrast(colors.onPrimary, colors.primary)).toBeGreaterThanOrEqual(
+        4.5,
+      );
+      expect(
+        contrast(colors.onPrimary, colors.primaryHover),
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrast(colors.onPrimary, colors.primaryActive),
+      ).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });

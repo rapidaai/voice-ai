@@ -29,22 +29,22 @@ export const TextImage = memo(
 
     const randomBgColor = () => {
       return [
-        'bg-rose-800 dark:bg-rose-400 text-rose-100 dark:text-rose-900',
-        'bg-red-800 dark:bg-red-400 text-red-100 dark:text-red-900',
-        'bg-green-800 dark:bg-green-400 text-green-100 dark:text-green-900',
-        'bg-sky-800 dark:bg-sky-400 text-sky-100 dark:text-sky-900',
-        'bg-indigo-800 dark:bg-indigo-400 text-indigo-100 dark:text-indigo-900',
-        'bg-orange-800 dark:bg-orange-400 text-orange-100 dark:text-orange-900',
-        'bg-amber-800 dark:bg-amber-400 text-amber-100 dark:text-amber-900',
-        'bg-yellow-800 dark:bg-yellow-400 text-yellow-100 dark:text-yellow-900',
-        'bg-lime-800 dark:bg-lime-400 text-lime-100 dark:text-lime-900',
-        'bg-teal-800 dark:bg-teal-400 text-teal-100 dark:text-teal-900',
-        'bg-emerald-800 dark:bg-emerald-400 text-emerald-100 dark:text-emerald-900',
-        'bg-cyan-800 dark:bg-cyan-400 text-cyan-100 dark:text-cyan-900',
-        'bg-violet-800 dark:bg-violet-400 text-violet-100 dark:text-violet-900',
-        'bg-purple-800 dark:bg-purple-400 text-purple-100 dark:text-purple-900',
-        'bg-fuchsia-800 dark:bg-fuchsia-400 text-fuchsia-100 dark:text-fuchsia-900',
-        'bg-pink-800 dark:bg-pink-400 text-pink-100 dark:text-pink-900',
+        'bg-support-error text-support-error ',
+        'bg-support-error text-support-error ',
+        'bg-support-success text-support-success ',
+        'bg-support-info text-support-info ',
+        'bg-data-1 text-data-1 ',
+        'bg-support-warning text-support-warning ',
+        'bg-support-warning text-support-warning ',
+        'bg-support-warning text-support-warning ',
+        'bg-support-success text-support-success ',
+        'bg-support-info text-support-info ',
+        'bg-support-success text-support-success ',
+        'bg-support-info text-support-info ',
+        'bg-data-1 text-data-1 ',
+        'bg-data-1 text-data-1 ',
+        'bg-data-5 text-data-5 ',
+        'bg-data-5 text-data-5 ',
       ].find((_, i, ar) => Math.random() < 1 / (ar.length - i));
     };
 

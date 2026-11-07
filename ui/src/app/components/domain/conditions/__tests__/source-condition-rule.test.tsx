@@ -125,7 +125,7 @@ describe('SourceConditionRule', () => {
       'ghost',
     );
     expect(screen.getByRole('button', { name: 'Remove' })).toHaveClass(
-      '!text-[var(--cds-support-error)]',
+      '!text-support-error',
     );
 
     await user.click(screen.getByRole('button', { name: 'Add rule' }));

@@ -1,9 +1,11 @@
 import { FC, useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast/headless';
 import { Helmet } from '@/app/components/app-shell/helmet';
-import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
-import { ButtonSet } from '@carbon/react';
-import { TabForm } from '@/app/components/ui/composites';
+import { SourceControl } from '@carbon/icons-react';
+import {
+  CreateFullPageStep,
+  CreateFullPageWithGlobalHeader,
+} from '@/app/components/ui/composites';
 import { ConfirmDialog } from '@/app/components/dialogs/shared';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useRapidaStore } from '@/stores/app';
@@ -28,7 +30,6 @@ import { randomString } from '@/utils';
 import { FieldSet } from '@/app/components/ui/primitives';
 import { FormLabel } from '@/app/components/ui/primitives';
 import { Textarea } from '@/app/components/ui/primitives';
-import { DocNoticeBlock } from '@/app/components/layout/container/message/notice-block/doc-notice-block';
 import { InputHelper } from '@/app/components/ui/primitives';
 import {
   createEndpointProviderModel as createEndpointProviderModelRequest,
@@ -47,11 +48,6 @@ export const CreateNewVersionEndpointPage: FC = () => {
   const { authId, token, projectId } = useCurrentCredential();
 
   /**
-   * mutli step form
-   */
-  const [activeTab, setActiveTab] = useState('choose-model');
-
-  /**
    * Global navigator
    */
   const navigator = useNavigate();
@@ -60,11 +56,12 @@ export const CreateNewVersionEndpointPage: FC = () => {
    * error message
    */
   const [errorMessage, setErrorMessage] = useState('');
+  const [versionNoteError, setVersionNoteError] = useState('');
 
   /**
    * global loading
    */
-  const { loading, showLoader, hideLoader } = useRapidaStore();
+  const { showLoader, hideLoader } = useRapidaStore();
   const { providerCredentials } = useAllProviderCredentials();
 
   /**
@@ -80,6 +77,7 @@ export const CreateNewVersionEndpointPage: FC = () => {
     prompt: [],
     variables: [],
   });
+  const [promptInstanceId] = useState(() => randomString(10));
   const [textProviderModel, setTextProviderModel] = useState<{
     provider: string;
     parameters: Metadata[];
@@ -137,7 +135,7 @@ export const CreateNewVersionEndpointPage: FC = () => {
    *
    */
 
-  const onvalidateEndpointInstruction = () => {
+  const validateEndpointInstruction = (): boolean => {
     const error = ValidateTextProviderDefaultOptions(
       textProviderModel.provider,
       textProviderModel.parameters,
@@ -147,12 +145,12 @@ export const CreateNewVersionEndpointPage: FC = () => {
     );
     if (error) {
       setErrorMessage(error);
-      return;
+      return false;
     }
 
     if (promptConfig.variables.length === 0) {
       setErrorMessage('Please define at least one variable.');
-      return;
+      return false;
     }
 
     // Check if the content is not empty
@@ -161,43 +159,48 @@ export const CreateNewVersionEndpointPage: FC = () => {
     );
     if (!hasNonEmptyContent) {
       setErrorMessage('Please provide content for at least one prompt item.');
-      return;
+      return false;
     }
 
     // If all validations pass, proceed to the next tab
     setErrorMessage('');
-    setActiveTab('commit-endpoint');
+    return true;
   };
 
-  const createEndpointProviderModel = () => {
-    if (commitMessage.trim() === '') {
-      setErrorMessage(
-        'Please a valid name for endpoint, that can help you indentify the endpoint',
+  const createEndpointProviderModel = () =>
+    new Promise<void>(resolve => {
+      if (commitMessage.trim() === '') {
+        setVersionNoteError('Enter a version note.');
+        resolve();
+        return;
+      }
+      setErrorMessage('');
+      showLoader('overlay');
+      const endpointProviderModelAttr = new EndpointProviderModelAttribute();
+      endpointProviderModelAttr.setModelprovidername(
+        textProviderModel.provider,
       );
-      return;
-    }
-    setErrorMessage('');
-    showLoader('overlay');
-    const endpointProviderModelAttr = new EndpointProviderModelAttribute();
-    endpointProviderModelAttr.setModelprovidername(textProviderModel.provider);
-    endpointProviderModelAttr.setEndpointmodeloptionsList(
-      textProviderModel.parameters,
-    );
-    endpointProviderModelAttr.setDescription(commitMessage);
-    endpointProviderModelAttr.setChatcompleteprompt(
-      ChatCompletePrompt(promptConfig),
-    );
-    createEndpointProviderModelRequest({
-      endpointId: endpointId!,
-      endpointProviderModel: endpointProviderModelAttr,
-      auth: {
-        userId: authId,
-        token,
-        projectId,
-      },
-      callback: afterCreateEndpointProviderModel,
+      endpointProviderModelAttr.setEndpointmodeloptionsList(
+        textProviderModel.parameters,
+      );
+      endpointProviderModelAttr.setDescription(commitMessage);
+      endpointProviderModelAttr.setChatcompleteprompt(
+        ChatCompletePrompt(promptConfig),
+      );
+      createEndpointProviderModelRequest({
+        endpointId: endpointId!,
+        endpointProviderModel: endpointProviderModelAttr,
+        auth: {
+          userId: authId,
+          token,
+          projectId,
+        },
+        callback: (error, response) => {
+          afterCreateEndpointProviderModel(error, response);
+          resolve();
+        },
+      });
     });
-  };
 
   useEffect(() => {
     showLoader('block');
@@ -259,7 +262,7 @@ export const CreateNewVersionEndpointPage: FC = () => {
   const [isShow, setIsShow] = useState(false);
   return (
     <>
-      <Helmet title="Create new version"></Helmet>
+      <Helmet title="Create endpoint version"></Helmet>
       <ConfirmDialog
         showing={isShow}
         type="warning"
@@ -280,110 +283,77 @@ export const CreateNewVersionEndpointPage: FC = () => {
         }}
       />
 
-      <TabForm
-        activeTab={activeTab}
-        onChangeActiveTab={() => {}}
-        formHeading="Create a new version of this endpoint."
+      <CreateFullPageWithGlobalHeader
+        title="Create endpoint version"
+        description="Update the endpoint configuration, then add a version note describing what changed. New versions are not deployed automatically."
         errorMessage={errorMessage}
-        form={[
-          {
-            name: 'Configure model',
-            description:
-              'Modify the model, parameters, and prompt template for this endpoint.',
-            code: 'choose-model',
-            body: (
-              <>
-                <DocNoticeBlock
-                  docPath="/endpoint/create-new-version"
-                  linkText="Read docs"
-                >
-                  New versions of the endpoint will not be deployed
-                  automatically. You must promote them manually.
-                </DocNoticeBlock>
-                <div className="px-8 pt-6 pb-8 max-w-4xl flex flex-col gap-8">
-                  {/* Model configuration section */}
-                  <div className="flex flex-col gap-6">
-                    <TextProvider
-                      onChangeProvider={onChangeTextProvider}
-                      parameters={textProviderModel.parameters}
-                      provider={textProviderModel.provider}
-                      onChangeParameter={onChangeTextProviderParameter}
-                    />
-                  </div>
+        eyebrow="Endpoint version"
+        headerIcon={SourceControl}
+        nextButtonText="Continue"
+        onCancel={() => setIsShow(true)}
+        onRequestSubmit={createEndpointProviderModel}
+        submitButtonText="Create"
+      >
+        <CreateFullPageStep
+          title="Update Endpoint"
+          description="Update the model, parameters, and prompt template for this endpoint."
+          hideHeader
+          onNext={validateEndpointInstruction}
+        >
+          <div className="flex max-w-4xl flex-col gap-8 px-8 pb-8 pt-6">
+            <div className="flex flex-col gap-6">
+              <TextProvider
+                onChangeProvider={onChangeTextProvider}
+                parameters={textProviderModel.parameters}
+                provider={textProviderModel.provider}
+                onChangeParameter={onChangeTextProviderParameter}
+              />
+            </div>
 
-                  {/* Prompt template section */}
-                  <div className="flex flex-col gap-6">
-                    <ConfigPrompt
-                      instanceId={randomString(10)}
-                      existingPrompt={promptConfig}
-                      onChange={prompt => {
-                        setPromptConfig(prompt);
-                      }}
-                    />
-                  </div>
-                </div>
-              </>
-            ),
-            actions: [
-              <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg" onClick={() => setIsShow(true)}>
-                  Cancel
-                </SecondaryButton>
-                <PrimaryButton
-                  size="lg"
-                  isLoading={loading}
-                  onClick={onvalidateEndpointInstruction}
-                >
-                  Configure instruction
-                </PrimaryButton>
-              </ButtonSet>,
-            ],
-          },
+            <div className="flex flex-col gap-6">
+              <ConfigPrompt
+                instanceId={promptInstanceId}
+                existingPrompt={promptConfig}
+                onChange={prompt => setPromptConfig(prompt)}
+              />
+            </div>
+          </div>
+        </CreateFullPageStep>
 
-          {
-            code: 'commit-endpoint',
-            name: 'Version note',
-            description:
-              'Write a brief note describing what changed in this version.',
-            actions: [
-              <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg" onClick={() => setIsShow(true)}>
-                  Cancel
-                </SecondaryButton>
-                <PrimaryButton
-                  size="lg"
-                  isLoading={loading}
-                  onClick={() => {
-                    createEndpointProviderModel();
+        <CreateFullPageStep
+          title="Version Note"
+          description="Write a brief note describing what changed in this version."
+          hideHeader
+        >
+          <div className="flex max-w-2xl flex-col gap-10 px-8 pb-8 pt-8">
+            <div className="flex flex-col gap-6">
+              <FieldSet>
+                <FormLabel htmlFor="endpoint-version-note">
+                  Version note
+                </FormLabel>
+                <Textarea
+                  id="endpoint-version-note"
+                  invalid={Boolean(versionNoteError)}
+                  invalidText={versionNoteError}
+                  row={5}
+                  value={commitMessage}
+                  placeholder="Provide a clear and detailed explanation of the purpose and modifications made to the endpoint."
+                  onChange={event => {
+                    setCommitMessage(event.target.value);
+                    if (versionNoteError) {
+                      setVersionNoteError('');
+                    }
                   }}
-                >
-                  Create new version
-                </PrimaryButton>
-              </ButtonSet>,
-            ],
-            body: (
-              <div className="px-8 pt-8 pb-8 max-w-2xl flex flex-col gap-10">
-                <div className="flex flex-col gap-6">
-                  <FieldSet>
-                    <FormLabel>Version note</FormLabel>
-                    <Textarea
-                      row={5}
-                      value={commitMessage}
-                      placeholder="Provide a clear and detailed explanation of the purpose and modifications made to the endpoint."
-                      onChange={t => setCommitMessage(t.target.value)}
-                    />
-                    <InputHelper>
-                      Summarize the changes made to the endpoint, highlight key
-                      updates, and specify why these modifications are
-                      necessary.
-                    </InputHelper>
-                  </FieldSet>
-                </div>
-              </div>
-            ),
-          },
-        ]}
-      />
+                />
+                <InputHelper>
+                  Summarize the changes made to the endpoint, highlight key
+                  updates, and specify why these modifications are necessary.
+                </InputHelper>
+              </FieldSet>
+            </div>
+          </div>
+        </CreateFullPageStep>
+      </CreateFullPageWithGlobalHeader>
     </>
   );
 };

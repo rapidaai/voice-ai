@@ -9,11 +9,11 @@ export const PlaygroundHeader: FC<{
 }> = ({ loading, disabled = false }) => {
   return (
     <header
-      className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer)]"
+      className="flex h-12 shrink-0 items-center justify-between border-b border-border-subtle bg-layer"
       data-testid="endpoint-page-header"
     >
       <div className="min-w-0 pl-4">
-        <h1 className="truncate text-sm font-semibold text-[var(--cds-text-primary)]">
+        <h1 className="truncate text-sm font-semibold text-foreground">
           Playground
         </h1>
       </div>

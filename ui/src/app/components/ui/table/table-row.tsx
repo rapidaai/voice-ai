@@ -1,15 +1,17 @@
 import { cn } from '@/utils';
+import { TableRow as CarbonTableRow } from '@carbon/react';
+import type { ComponentProps } from 'react';
 
-export function TableRow(props: React.HTMLAttributes<HTMLTableRowElement>) {
+export function TableRow(props: ComponentProps<typeof CarbonTableRow>) {
   return (
-    <tr
+    <CarbonTableRow
       {...props}
       className={cn(
-        'dark:divide-gray-800 divide-gray-200 dark:border-gray-800 border-gray-200 border-b-[0.5px] divide-x hover:bg-gray-50 dark:hover:bg-gray-950/20 text-sm/6 text-pretty hover:dark:text-gray-400',
+        'divide-border-subtle border-border-subtle border-b-[0.5px] divide-x hover:bg-layer text-sm/6 text-pretty hover:text-muted',
         props.className,
       )}
     >
       {props.children}
-    </tr>
+    </CarbonTableRow>
   );
 }

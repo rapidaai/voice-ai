@@ -39,8 +39,14 @@ jest.mock('@/app/components/ui/feedback/loaders/section-loader', () => ({
 }));
 
 jest.mock('@/app/components/layout/sections/table-section', () => ({
-  TableSection: ({ children }: any) => <div>{children}</div>,
-  ScrollableTableSection: ({ children }: any) => <div>{children}</div>,
+  TableSection: ({ children, className = '', ...props }: any) => (
+    <div {...props} className={`flex flex-1 flex-col ${className}`}>
+      {children}
+    </div>
+  ),
+  ScrollableTableSection: ({ children, ...props }: any) => (
+    <div {...props}>{children}</div>
+  ),
 }));
 
 jest.mock('@/app/components/ui/feedback/empty-state', () => ({
@@ -60,8 +66,8 @@ jest.mock('@/app/components/ui/primitives/button', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives/pagination', () => ({
-  Pagination: ({ onChange, pageSize }: any) => (
-    <div>
+  Pagination: ({ onChange, pageSize, className }: any) => (
+    <div className={className} data-testid="pagination">
       <button
         data-testid="change-page"
         onClick={() => onChange({ page: 2, pageSize })}
@@ -81,6 +87,24 @@ jest.mock('@/app/components/ui/primitives/pagination', () => ({
 jest.mock('@carbon/react', () => {
   const React = require('react');
   const Div = ({ children }: any) => React.createElement('div', null, children);
+  const DataTable = ({ children, rows, headers }: any) => {
+    const [selectedRows, setSelectedRows] = React.useState([]);
+    return children({
+      rows,
+      headers,
+      selectedRows,
+      getBatchActionProps: () => ({ onCancel: () => setSelectedRows([]) }),
+      getHeaderProps: () => ({}),
+      getRowProps: () => ({}),
+      getSelectionProps: ({ row }: any) => ({
+        checked: selectedRows.some((selected: any) => selected.id === row.id),
+        onSelect: () => setSelectedRows([row]),
+      }),
+      getTableProps: () => ({}),
+      getToolbarProps: () => ({}),
+      onInputChange: jest.fn(),
+    });
+  };
   return {
     Header: ({ children, ...props }: any) =>
       React.createElement('header', props, children),
@@ -91,6 +115,9 @@ jest.mock('@carbon/react', () => {
     HeaderGlobalAction: ({ children, ...props }: any) =>
       React.createElement('button', props, children),
     Table: Div,
+    DataTable,
+    DataTableSkeleton: () =>
+      React.createElement('div', { 'data-testid': 'webhook-skeleton' }),
     TableHead: Div,
     TableRow: Div,
     TableHeader: Div,
@@ -115,18 +142,12 @@ jest.mock('@carbon/react', () => {
     TableBatchActions: Div,
     TableBatchAction: ({ children, ...props }: any) =>
       React.createElement('button', props, children || 'action'),
-    RadioButton: ({
-      onChange,
-      checked,
-      labelText: _labelText,
-      hideLabel: _hideLabel,
-      ...props
-    }: any) =>
+    TableSelectRow: ({ onSelect, checked }: any) =>
       React.createElement('input', {
-        ...props,
         type: 'radio',
+        'aria-label': 'Select row',
         checked,
-        onChange,
+        onChange: onSelect,
       }),
     Breadcrumb: Div,
     BreadcrumbItem: ({ children, ...props }: any) =>
@@ -177,6 +198,10 @@ const makeWebhook = (id: string) =>
 describe('ConfigureAssistantWebhookPage listing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetAssistantWebhook.mockImplementation(
+      (_assistantId, _projectId, _token, _authId, _onError, onSuccess) =>
+        onSuccess([makeWebhook('w-1')]),
+    );
     useAssistantWebhookPageStore.setState({
       webhooks: [makeWebhook('w-1')],
       page: 1,
@@ -227,6 +252,7 @@ describe('ConfigureAssistantWebhookPage listing', () => {
     await waitFor(() =>
       expect(mockGetAssistantWebhook).toHaveBeenCalledTimes(1),
     );
+    await user.click(screen.getByRole('radio', { name: 'Select row' }));
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(screen.getByRole('dialog')).toHaveTextContent('Delete webhook?');
@@ -247,5 +273,29 @@ describe('ConfigureAssistantWebhookPage listing', () => {
       expect.any(Function),
       expect.any(Function),
     );
+  });
+
+  it('keeps the skeleton in the table region while webhooks load', async () => {
+    mockGetAssistantWebhook.mockImplementation(() => undefined);
+
+    const { container } = render(<ConfigureAssistantWebhookPage />);
+
+    await waitFor(() => expect(mockGetAssistantWebhook).toHaveBeenCalled());
+    expect(screen.getByTestId('webhook-skeleton')).toBeInTheDocument();
+    expect(container.querySelector('.overflow-hidden')).toHaveClass(
+      'flex-1',
+      'flex-col',
+    );
+  });
+
+  it('uses a Carbon-selected row and bottom pagination', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    render(<ConfigureAssistantWebhookPage />);
+
+    await user.click(await screen.findByRole('radio', { name: 'Select row' }));
+
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Disable' })).toBeInTheDocument();
+    expect(screen.getByTestId('pagination')).toHaveClass('shrink-0');
   });
 });

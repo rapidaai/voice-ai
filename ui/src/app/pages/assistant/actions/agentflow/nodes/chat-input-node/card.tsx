@@ -31,7 +31,7 @@ export function ChatInputNodeCard({
       {toolbar}
       {handles}
       <Tile className={cardClass} style={{ width }}>
-        <div className="flex h-12 items-center gap-3 border-b border-gray-200 px-4 text-gray-900 dark:border-gray-800 dark:text-white">
+        <div className="flex h-12 items-center gap-3 border-b border-border-subtle px-4 text-foreground ">
           <Icon size={18} className="shrink-0" />
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="min-w-0 truncate text-base font-semibold">
@@ -42,8 +42,8 @@ export function ChatInputNodeCard({
         </div>
         {inputArguments.length > 0 && (
           <>
-            <div className="flex h-12 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-800">
-              <div className="flex items-center gap-1 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
+            <div className="flex h-12 items-center justify-between border-b border-border-subtle px-4 ">
+              <div className="flex items-center gap-1 text-xs font-semibold uppercase text-muted ">
                 Arguments
                 <Toggletip align="right">
                   <ToggletipButton label="Show information">
@@ -70,12 +70,12 @@ export function ChatInputNodeCard({
                     >
                       <StructuredListCell
                         noWrap
-                        className="!flex !h-9 !items-center !justify-between !gap-3 !px-7 !py-0 text-sm text-gray-800 dark:text-gray-100"
+                        className="!flex !h-9 !items-center !justify-between !gap-3 !px-7 !py-0 text-sm text-foreground "
                       >
                         <span className="min-w-0 truncate">
                           {argument.name || 'Unnamed argument'}
                         </span>
-                        <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                        <span className="shrink-0 text-xs text-muted ">
                           {argument.type || 'string'}
                         </span>
                       </StructuredListCell>

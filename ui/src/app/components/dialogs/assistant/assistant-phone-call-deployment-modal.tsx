@@ -141,7 +141,7 @@ function PhoneSetup({
         title={instructionTitle}
         description="Apply the connection values below in your telephony provider or PBX."
       >
-        <div className="-mx-4 -mb-5 divide-y divide-gray-200 dark:divide-gray-800">
+        <div className="-mx-4 -mb-5 divide-y divide-border-subtle ">
           {providerName === 'sip' && (
             <SipIntegrationInstructions
               sipHost={sipHost}
@@ -163,7 +163,7 @@ function PhoneSetup({
                 <InputHelper>
                   You can add additional assistant arguments as query
                   parameters, for example{' '}
-                  <code className="text-red-600">?name=your-name</code>.
+                  <code className="text-support-error">?name=your-name</code>.
                 </InputHelper>
               </CodeRow>
               <CodeRow label="Call status event URL" value={eventUrl} />
@@ -203,7 +203,7 @@ function TelephonyConfig({
       {options.length > 0 ? (
         options.map((detail, index) => (
           <Row key={`phone-option-${index}`} label={detail.getKey()}>
-            <span className="text-sm font-mono text-gray-900 dark:text-gray-100 truncate max-w-[200px] text-right">
+            <span className="text-sm font-mono text-foreground truncate max-w-[200px] text-right">
               {detail.getValue()}
             </span>
             <CopyButton className="h-6 w-6 shrink-0">
@@ -236,10 +236,10 @@ function CodeRow({
       <SectionHeader label={label} />
       <div className="px-4 py-3 space-y-2">
         <div className="flex items-center gap-2">
-          <code className="flex-1 dark:bg-gray-950 bg-gray-100 px-3 py-2 font-mono text-xs min-w-0 overflow-hidden break-all">
+          <code className="flex-1 bg-surface px-3 py-2 font-mono text-xs min-w-0 overflow-hidden break-all">
             {value}
           </code>
-          <CopyButton className="h-7 w-7 shrink-0 border border-gray-200 dark:border-gray-800">
+          <CopyButton className="h-7 w-7 shrink-0 border border-border-subtle ">
             {value}
           </CopyButton>
         </div>
@@ -263,13 +263,11 @@ function CodeBlock({
       <SectionHeader label={label} />
       <div className="px-4 py-3 space-y-2">
         <div className="relative">
-          <pre className="dark:bg-gray-950 bg-gray-100 px-3 py-2 font-mono text-xs overflow-auto">
+          <pre className="bg-surface px-3 py-2 font-mono text-xs overflow-auto">
             {code}
           </pre>
           <div className="absolute top-1 right-1">
-            <CopyButton className="h-6 w-6 bg-gray-200 dark:bg-gray-800">
-              {code}
-            </CopyButton>
+            <CopyButton className="h-6 w-6 bg-layer ">{code}</CopyButton>
           </div>
         </div>
         {helper}
@@ -289,16 +287,14 @@ function SipRouteRow({
 }) {
   return (
     <div className="grid grid-cols-[150px_minmax(0,1fr)_auto] gap-2 px-4 py-3 items-start">
-      <span className="font-mono text-xs text-gray-700 dark:text-gray-300 pt-2">
-        {route}
-      </span>
+      <span className="font-mono text-xs text-muted pt-2">{route}</span>
       <div className="min-w-0 space-y-1">
-        <code className="block dark:bg-gray-950 bg-gray-100 px-3 py-2 font-mono text-xs break-all">
+        <code className="block bg-surface px-3 py-2 font-mono text-xs break-all">
           {uri}
         </code>
         <InputHelper>{description}</InputHelper>
       </div>
-      <CopyButton className="h-7 w-7 shrink-0 border border-gray-200 dark:border-gray-800">
+      <CopyButton className="h-7 w-7 shrink-0 border border-border-subtle ">
         {uri}
       </CopyButton>
     </div>
@@ -363,29 +359,23 @@ function SipIntegrationInstructions({
 
       <SectionHeader label="SIP Configuration" />
       <Row label="Transport">
-        <span className="text-sm text-gray-900 dark:text-gray-100">
-          UDP, TCP, or TLS
-        </span>
+        <span className="text-sm text-foreground ">UDP, TCP, or TLS</span>
       </Row>
       <Row label="Port">
-        <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
-          {sipPort}
-        </span>
+        <span className="text-sm font-mono text-foreground ">{sipPort}</span>
       </Row>
       <Row label="Codec">
-        <span className="text-sm text-gray-900 dark:text-gray-100 text-right">
+        <span className="text-sm text-foreground text-right">
           G.711 μ-law / A-law + DTMF
         </span>
       </Row>
       <Row label="Routing">
-        <span className="text-sm text-gray-900 dark:text-gray-100 text-right">
+        <span className="text-sm text-foreground text-right">
           {'Route user: agent-{assistantID}, did-{did}, or raw DID'}
         </span>
       </Row>
       <Row label="Media">
-        <span className="text-sm text-gray-900 dark:text-gray-100">
-          RTP (direct)
-        </span>
+        <span className="text-sm text-foreground ">RTP (direct)</span>
       </Row>
 
       <CodeBlock

@@ -53,7 +53,7 @@ function ProviderCardComponent({ provider, className }: ProviderCardProps) {
       />
       <BaseCard className={cn('p-4 md:p-5', className)} data-id={provider.code}>
         <header className="flex items-start justify-between">
-          <div className="flex items-center justify-center shrink-0 h-10 w-10 border border-gray-200 dark:border-gray-700 dark:bg-gray-600">
+          <div className="flex items-center justify-center shrink-0 h-10 w-10 border border-border-subtle bg-layer">
             <img
               src={provider.image}
               alt={provider.name}

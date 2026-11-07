@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { InviteOrganizationUserDialog } from '@/app/components/dialogs/workspace';
 import { InviteProjectUserDialog } from '@/app/components/dialogs/workspace';
@@ -8,7 +8,6 @@ import toast from 'react-hot-toast/headless';
 import { useRapidaStore } from '@/stores/app';
 import { useUserPageStore } from '@/stores/user';
 import { SingleUser } from '@/app/pages/workspace/user/single-user';
-import { PrimaryButton } from '@/app/components/ui/primitives';
 import { Pagination } from '@/app/components/ui/primitives';
 import {
   Add,
@@ -29,6 +28,9 @@ import {
   TableToolbarContent,
   TableToolbarSearch,
   Button,
+  DataTable,
+  DataTableSkeleton,
+  TableSelectRow,
 } from '@carbon/react';
 import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
 import { PageTitleWithCount } from '@/app/components/layout/blocks/page-title-with-count';
@@ -46,46 +48,39 @@ const headers = [
   { key: 'status', header: 'Status' },
 ];
 
+const skeletonHeaders = [{ key: 'select', header: '' }, ...headers];
+
 const fallbackErrorMessage =
   'Unable to process your request. please try again later.';
 
 export function UserPage() {
-  const { loading, showLoader, hideLoader } = useRapidaStore();
+  const { showLoader, hideLoader } = useRapidaStore();
   const [inviteOrganizationModalOpen, setInviteOrganizationModalOpen] =
     useState(false);
-  const [inviteProjectModalOpen, setInviteProjectModalOpen] = useState(false);
+  const [userPendingProjectInvite, setUserPendingProjectInvite] =
+    useState<User | null>(null);
   const [userPendingDelete, setUserPendingDelete] = useState<User | null>(null);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [isFetching, setIsFetching] = useState(true);
   const { projectId, authId, token } = useCurrentCredential();
   const userActions = useUserPageStore();
-  const selectedUser = userActions.users.find(
-    user => user.getId() === selectedUserId,
-  );
-  const selectedOrganizationRole = selectedUser?.getRole()?.toLowerCase();
-  const nextOrganizationRole =
-    selectedOrganizationRole === 'member'
-      ? 'admin'
-      : selectedOrganizationRole === 'admin'
-        ? 'member'
-        : null;
 
   const onError = useCallback((err: string) => {
-    hideLoader();
+    setIsFetching(false);
     toast.error(err);
   }, []);
 
-  const onSuccess = useCallback((data: User[]) => {
-    hideLoader();
+  const onSuccess = useCallback(() => {
+    setIsFetching(false);
   }, []);
 
-  const getUsers = useCallback((token, userId, projectId) => {
-    showLoader();
-    userActions.getAllUser(token, userId, projectId, onError, onSuccess);
-  }, []);
+  const getUsers = useCallback(() => {
+    setIsFetching(true);
+    userActions.getAllUser(token, authId, projectId, onError, onSuccess);
+  }, [authId, onError, onSuccess, projectId, token, userActions.getAllUser]);
 
   useEffect(() => {
-    getUsers(token, authId, projectId);
-  }, [userActions.page, userActions.pageSize, userActions.criteria]);
+    getUsers();
+  }, [getUsers, userActions.page, userActions.pageSize, userActions.criteria]);
 
   const onDeleteOrganizationUser = async (user: User) => {
     showLoader('overlay');
@@ -102,9 +97,8 @@ export function UserPage() {
 
       if (response.getSuccess()) {
         setUserPendingDelete(null);
-        setSelectedUserId(null);
         toast.success('The user was deleted from the organization.');
-        getUsers(token, authId, projectId);
+        getUsers();
         return;
       }
 
@@ -133,13 +127,12 @@ export function UserPage() {
       const message = responseError?.getHumanmessage() || fallbackErrorMessage;
 
       if (response.getSuccess()) {
-        setSelectedUserId(null);
         toast.success(
           organizationRole === 'admin'
             ? 'The user was promoted to admin.'
             : 'The user was changed to member.',
         );
-        getUsers(token, authId, projectId);
+        getUsers();
         return;
       }
 
@@ -150,8 +143,17 @@ export function UserPage() {
     }
   };
 
+  const tableRows = userActions.users.map(user => ({
+    id: user.getId(),
+    name: user.getName(),
+    email: user.getEmail(),
+    role: user.getRole(),
+    createdDate: user.getCreateddate()?.toString() || '',
+    status: user.getStatus?.() || '',
+  }));
+
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-surface">
       <Helmet title="User and Teams" />
       <PageHeaderBlock>
         <PageTitleWithCount
@@ -161,136 +163,213 @@ export function UserPage() {
           Users
         </PageTitleWithCount>
       </PageHeaderBlock>
-      <TableToolbar>
-        <TableBatchActions
-          shouldShowBatchActions={Boolean(selectedUser)}
-          totalSelected={selectedUser ? 1 : 0}
-          onCancel={() => setSelectedUserId(null)}
-          totalCount={userActions.users.length}
-        >
-          <TableBatchAction
-            renderIcon={Add}
-            onClick={() => {
-              if (selectedUser) {
-                setInviteProjectModalOpen(true);
-              }
-            }}
-          >
-            Invite to project
-          </TableBatchAction>
-          {nextOrganizationRole && (
-            <TableBatchAction
-              renderIcon={UserAdmin}
-              onClick={() => {
-                if (selectedUser) {
-                  onUpdateOrganizationRole(selectedUser, nextOrganizationRole);
-                }
-              }}
-            >
-              {nextOrganizationRole === 'admin' ? 'Make admin' : 'Make member'}
-            </TableBatchAction>
-          )}
-          <TableBatchAction
-            className="cds--btn--danger"
-            renderIcon={TrashCan}
-            onClick={() => {
-              if (selectedUser) {
-                setUserPendingDelete(selectedUser);
-              }
-            }}
-          >
-            Delete
-          </TableBatchAction>
-        </TableBatchActions>
-        <TableToolbarContent>
-          <TableToolbarSearch placeholder="Search users..." />
-          <Button
-            hasIconOnly
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            kind="ghost"
-            onClick={() => getUsers(token, authId, projectId)}
-            tooltipPosition="bottom"
+      {isFetching ? (
+        <TableSection className="min-h-0 overflow-hidden bg-surface">
+          <DataTableSkeleton
+            headers={skeletonHeaders}
+            columnCount={skeletonHeaders.length}
+            rowCount={5}
+            showHeader={false}
+            showToolbar
+            size="lg"
+            className="w-full"
           />
-          <PrimaryButton
-            size="md"
-            renderIcon={Add}
-            isLoading={loading}
-            onClick={() => setInviteOrganizationModalOpen(true)}
-          >
-            Invite user
-          </PrimaryButton>
-        </TableToolbarContent>
-      </TableToolbar>
-      {!loading && userActions.users.length === 0 ? (
-        <EmptyState
-          icon={UserMultiple}
-          title="No organization users"
-          subtitle="Invite teammates to collaborate on projects and manage organization access."
-          action="Invite user"
-          actionIcon={Add}
-          onAction={() => setInviteOrganizationModalOpen(true)}
-        />
+        </TableSection>
       ) : (
-        <TableSection>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeader className="!w-12" />
-                {headers.map(h => (
-                  <TableHeader key={h.key}>{h.header}</TableHeader>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {userActions.users.map((usr, idx) => (
-                <SingleUser
-                  key={idx}
-                  user={usr}
-                  selected={selectedUserId === usr.getId()}
-                  onSelect={() =>
-                    setSelectedUserId(
-                      selectedUserId === usr.getId() ? null : usr.getId(),
-                    )
-                  }
-                />
-              ))}
-            </TableBody>
-          </Table>
-          <Pagination
-            totalItems={userActions.totalCount}
-            page={userActions.page}
-            pageSize={userActions.pageSize}
-            pageSizes={[10, 20, 50]}
-            onChange={({ page, pageSize }) => {
-              if (pageSize !== userActions.pageSize) {
-                userActions.setPageSize(pageSize);
-              } else {
-                userActions.setPage(page);
-              }
+        <TableSection className="min-h-0 bg-surface">
+          <DataTable rows={tableRows} headers={headers} radio>
+            {({
+              rows,
+              headers: tableHeaders,
+              selectedRows,
+              getBatchActionProps,
+              getHeaderProps,
+              getRowProps,
+              getSelectionProps,
+              getTableProps,
+              getToolbarProps,
+              onInputChange,
+            }) => {
+              const batchActionProps = getBatchActionProps();
+              const selectedUser = selectedRows[0]
+                ? userActions.users.find(
+                    user => user.getId() === selectedRows[0].id,
+                  )
+                : undefined;
+              const selectedOrganizationRole = selectedUser
+                ?.getRole()
+                ?.toLowerCase();
+              const nextOrganizationRole =
+                selectedOrganizationRole === 'member'
+                  ? 'admin'
+                  : selectedOrganizationRole === 'admin'
+                    ? 'member'
+                    : null;
+
+              return (
+                <>
+                  <TableToolbar {...getToolbarProps()}>
+                    {selectedUser && (
+                      <TableBatchActions
+                        {...batchActionProps}
+                        shouldShowBatchActions
+                      >
+                        <TableBatchAction
+                          renderIcon={Add}
+                          iconDescription="Invite to project"
+                          onClick={() => {
+                            setUserPendingProjectInvite(selectedUser);
+                            batchActionProps.onCancel();
+                          }}
+                        >
+                          Invite to project
+                        </TableBatchAction>
+                        {nextOrganizationRole && (
+                          <TableBatchAction
+                            renderIcon={UserAdmin}
+                            iconDescription={
+                              nextOrganizationRole === 'admin'
+                                ? 'Make admin'
+                                : 'Make member'
+                            }
+                            onClick={() => {
+                              onUpdateOrganizationRole(
+                                selectedUser,
+                                nextOrganizationRole,
+                              );
+                              batchActionProps.onCancel();
+                            }}
+                          >
+                            {nextOrganizationRole === 'admin'
+                              ? 'Make admin'
+                              : 'Make member'}
+                          </TableBatchAction>
+                        )}
+                        <TableBatchAction
+                          renderIcon={TrashCan}
+                          iconDescription="Delete"
+                          onClick={() => {
+                            setUserPendingDelete(selectedUser);
+                            batchActionProps.onCancel();
+                          }}
+                        >
+                          Delete
+                        </TableBatchAction>
+                      </TableBatchActions>
+                    )}
+                    <TableToolbarContent>
+                      <TableToolbarSearch
+                        placeholder="Search users..."
+                        onChange={onInputChange}
+                      />
+                      <Button
+                        hasIconOnly
+                        renderIcon={Renew}
+                        iconDescription="Refresh"
+                        kind="ghost"
+                        onClick={getUsers}
+                        tooltipPosition="bottom"
+                      />
+                      <Button
+                        size="md"
+                        renderIcon={Add}
+                        onClick={() => setInviteOrganizationModalOpen(true)}
+                      >
+                        Invite user
+                      </Button>
+                    </TableToolbarContent>
+                  </TableToolbar>
+
+                  {userActions.users.length > 0 ? (
+                    <>
+                      <div className="min-h-0 flex-1 overflow-auto">
+                        <Table {...getTableProps()} className="min-w-max">
+                          <TableHead>
+                            <TableRow>
+                              <TableHeader className="!w-12" />
+                              {tableHeaders.map(header => (
+                                <TableHeader
+                                  {...getHeaderProps({ header })}
+                                  key={header.key}
+                                >
+                                  {header.header}
+                                </TableHeader>
+                              ))}
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {rows.map(tableRow => {
+                              const user = userActions.users.find(
+                                candidate => candidate.getId() === tableRow.id,
+                              );
+                              if (!user) return null;
+
+                              return (
+                                <TableRow
+                                  {...getRowProps({ row: tableRow })}
+                                  key={tableRow.id}
+                                >
+                                  <TableSelectRow
+                                    {...getSelectionProps({ row: tableRow })}
+                                  />
+                                  <SingleUser user={user} />
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      <Pagination
+                        className="shrink-0"
+                        totalItems={userActions.totalCount}
+                        page={userActions.page}
+                        pageSize={userActions.pageSize}
+                        pageSizes={[10, 20, 50]}
+                        onChange={({ page, pageSize }) => {
+                          if (pageSize !== userActions.pageSize) {
+                            userActions.setPageSize(pageSize);
+                          } else {
+                            userActions.setPage(page);
+                          }
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <div className="flex flex-1 items-center justify-center">
+                      <EmptyState
+                        icon={UserMultiple}
+                        title="No organization users"
+                        subtitle="Invite teammates to collaborate on projects and manage organization access."
+                        action="Invite user"
+                        actionIcon={Add}
+                        onAction={() => setInviteOrganizationModalOpen(true)}
+                      />
+                    </div>
+                  )}
+                </>
+              );
             }}
-          />
+          </DataTable>
         </TableSection>
       )}
       <InviteOrganizationUserDialog
         modalOpen={inviteOrganizationModalOpen}
         setModalOpen={setInviteOrganizationModalOpen}
         onSuccess={() => {
-          getUsers(token, authId, projectId);
+          getUsers();
         }}
       />
       <InviteProjectUserDialog
-        modalOpen={inviteProjectModalOpen}
+        modalOpen={Boolean(userPendingProjectInvite)}
         setModalOpen={open => {
-          setInviteProjectModalOpen(open);
           if (!open) {
-            setSelectedUserId(null);
+            setUserPendingProjectInvite(null);
           }
         }}
-        user={selectedUser || null}
+        user={userPendingProjectInvite}
         onSuccess={() => {
-          setSelectedUserId(null);
-          getUsers(token, authId, projectId);
+          setUserPendingProjectInvite(null);
+          getUsers();
         }}
       />
       <ConfirmDeleteDialog
@@ -310,13 +389,11 @@ export function UserPage() {
         }}
         onCancel={() => {
           setUserPendingDelete(null);
-          setSelectedUserId(null);
         }}
         onClose={() => {
           setUserPendingDelete(null);
-          setSelectedUserId(null);
         }}
       />
-    </>
+    </div>
   );
 }

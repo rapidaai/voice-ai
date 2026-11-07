@@ -124,9 +124,7 @@ describe('CreateOrganizationPage', () => {
       await screen.findByText('Enter an organization name.'),
     ).toBeInTheDocument();
     expect(industry).toBeInvalid();
-    expect(
-      await screen.findByText('Enter an industry.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Enter an industry.')).toBeInTheDocument();
     expect(CreateOrganization).not.toHaveBeenCalled();
   });
 

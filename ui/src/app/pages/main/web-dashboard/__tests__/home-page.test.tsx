@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
 
@@ -18,8 +18,30 @@ import {
 } from '@/app/pages/main/web-dashboard';
 import { getProjectDashboardRange } from '@/clients/dashboard.client';
 
+const mockLineChart = jest.fn(
+  ({ options }: { options: { accessibility?: { svgAriaLabel?: string } } }) => (
+    <div
+      data-testid="carbon-line-chart"
+      role="img"
+      aria-label={options.accessibility?.svgAriaLabel}
+    />
+  ),
+);
+
+jest.mock('@carbon/charts-react', () => ({
+  Alignments: { RIGHT: 'right' },
+  ChartTheme: { G100: 'g100', WHITE: 'white' },
+  LegendPositions: { TOP: 'top' },
+  LineChart: (properties: unknown) => mockLineChart(properties as never),
+  ScaleTypes: { LABELS: 'labels', LINEAR: 'linear' },
+}));
+
 jest.mock('@/clients/dashboard.client', () => ({
   getProjectDashboardRange: jest.fn(),
+}));
+
+jest.mock('@/theme/theme-provider', () => ({
+  useTheme: () => ({ resolvedMode: 'light' }),
 }));
 
 let mockCurrentCredential: {
@@ -42,6 +64,8 @@ const mockGetProjectDashboardRange =
   getProjectDashboardRange as jest.MockedFunction<
     typeof getProjectDashboardRange
   >;
+
+let pageHeaderIntersectionCallback: IntersectionObserverCallback;
 
 const timestamp = (value: string) => ({
   toDate: () => new Date(value),
@@ -185,6 +209,18 @@ describe('Dashboard HomePage', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    window.IntersectionObserver = jest.fn(callback => {
+      pageHeaderIntersectionCallback = callback;
+      return {
+        disconnect: jest.fn(),
+        observe: jest.fn(),
+        root: null,
+        rootMargin: '0px',
+        takeRecords: jest.fn(() => []),
+        thresholds: [0],
+        unobserve: jest.fn(),
+      };
+    }) as unknown as typeof IntersectionObserver;
     mockCurrentCredential = {
       authId: 'user-1',
       projectId: 'project-1',
@@ -201,12 +237,40 @@ describe('Dashboard HomePage', () => {
     expect(screen.queryByText('Project overview')).not.toBeInTheDocument();
     expect(await screen.findByText('12,486')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Dashboard', level: 1 }),
+      screen.getByRole('heading', { name: 'Workspace Overview', level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Dashboard')).toHaveClass('text-primary');
+    expect(screen.getByText('Dashboard').closest('.cds--tag')).toBeNull();
+    expect(container.querySelector('[data-page-header-icon]')).toBeNull();
+    expect(screen.getByRole('combobox', { name: 'Time range' })).toHaveValue(
+      '30d',
+    );
+    expect(screen.queryByText('Project performance')).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Monitor workspace performance, conversation activity, assistant health, and component usage across the selected time range.',
+      ),
+    ).toBeInTheDocument();
+    expect(container.querySelector('[data-page-header]')).toHaveClass(
+      'border-b',
+      'border-border-subtle',
+      'bg-layer',
+      'px-5',
+      'py-6',
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Success Rate', level: 2 }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Average Latency', level: 2 }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Failed Sessions', level: 2 }),
     ).toBeInTheDocument();
     expect(screen.getByText('94.8%')).toBeInTheDocument();
-    expect(screen.getByText('Component usage')).toBeInTheDocument();
-    expect(screen.getByText('Recent failures')).toBeInTheDocument();
-    expect(screen.getByText('Top assistants')).toBeInTheDocument();
+    expect(screen.getByText('Component Usage')).toBeInTheDocument();
+    expect(screen.getByText('Recent Failures')).toBeInTheDocument();
+    expect(screen.getByText('Top Assistants')).toBeInTheDocument();
     expect(screen.getByText('Healthy')).toBeInTheDocument();
     const supportLinks = screen.getAllByRole('link', { name: 'Support bot' });
     expect(supportLinks.map(link => link.getAttribute('href'))).toEqual(
@@ -231,30 +295,35 @@ describe('Dashboard HomePage', () => {
     );
   });
 
-  it('uses the assistant dashboard surface and bordered card layout', async () => {
+  it('uses bordered KPI and detail surfaces', async () => {
     const { container } = render(<HomePage />);
 
     expect(await screen.findByText('12,486')).toBeInTheDocument();
     expect(container.querySelector('[data-dashboard-page]')).toHaveClass(
-      'bg-gray-100',
-      'dark:bg-[#161616]',
+      'bg-layer',
     );
     expect(container.querySelector('[data-dashboard-kpi-strip]')).toHaveClass(
       'gap-4',
     );
 
-    const cards = container.querySelectorAll(
-      '[data-dashboard-kpi], [data-dashboard-panel]',
-    );
-    expect(cards).toHaveLength(6);
-    cards.forEach(card => {
+    const kpis = container.querySelectorAll('[data-dashboard-kpi]');
+    expect(kpis).toHaveLength(4);
+    kpis.forEach(card => {
       expect(card).toHaveClass(
         'border',
-        'border-gray-200',
-        'bg-white',
-        'dark:border-gray-800',
-        'dark:bg-[#262626]',
+        'border-border-subtle',
+        'bg-surface',
+        'p-5',
       );
+    });
+    expect(container.querySelector('[data-dashboard-grid]')).toHaveClass(
+      'gap-4',
+    );
+    const cards = container.querySelectorAll('[data-dashboard-card]');
+    expect(cards).toHaveLength(5);
+    cards.forEach(card => {
+      expect(card).toHaveClass('border', 'border-border-subtle', 'bg-surface');
+      expect(card.querySelector('header')).toHaveClass('px-6', 'py-4');
     });
   });
 
@@ -269,22 +338,21 @@ describe('Dashboard HomePage', () => {
       'tabular-nums',
     );
     expect(screen.queryByText('Project overview')).not.toBeInTheDocument();
+    expect(screen.queryByText('Project performance')).not.toBeInTheDocument();
     expect(
-      screen.queryByText(
-        'Monitor sessions, reliability, latency, and assistant health.',
+      screen.getByText(
+        'Monitor workspace performance, conversation activity, assistant health, and component usage across the selected time range.',
       ),
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Conversation activity' }),
+      screen.getByRole('heading', { name: 'Conversation Activity' }),
     ).toHaveClass(
       'text-[1rem]',
       'font-[600]',
       'leading-[1.5rem]',
       'tracking-[0]',
     );
-    expect(
-      screen.getByText('Sessions and failures from the last 30 days'),
-    ).toHaveClass(
+    expect(screen.getByText('Sessions and failures over time')).toHaveClass(
       'text-[0.875rem]',
       'font-normal',
       'leading-[1.125rem]',
@@ -302,6 +370,13 @@ describe('Dashboard HomePage', () => {
       'leading-[1.125rem]',
       'tracking-[0.16px]',
     );
+    document.querySelectorAll('[data-dashboard-card]').forEach(card => {
+      expect(
+        within(card as HTMLElement).queryByText(
+          /Last (24 hours|7 days|30 days)/i,
+        ),
+      ).not.toBeInTheDocument();
+    });
     screen.getAllByRole('link', { name: 'Support bot' }).forEach(link => {
       expect(link.firstElementChild).toHaveClass(
         'text-[0.875rem]',
@@ -320,10 +395,79 @@ describe('Dashboard HomePage', () => {
     expect(
       screen.getByRole('status', { name: 'Loading project dashboard' }),
     ).toBeInTheDocument();
-    expect(screen.queryByText('Top assistants')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Workspace Overview', level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Time range' })).toHaveValue(
+      '30d',
+    );
+    expect(screen.queryByText('Top Assistants')).not.toBeInTheDocument();
     expect(
       container.querySelectorAll('[data-dashboard-loading-card]'),
     ).toHaveLength(8);
+  });
+
+  it('keeps the selected time range visible and requests that duration', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+
+    render(<HomePage />);
+    await screen.findByText('12,486');
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Time range' }),
+      '7d',
+    );
+
+    await waitFor(() =>
+      expect(mockGetProjectDashboardRange).toHaveBeenCalledTimes(2),
+    );
+    const request = mockGetProjectDashboardRange.mock.calls[1][0];
+    expect(request.toDate.getSeconds() - request.fromDate.getSeconds()).toBe(
+      7 * 24 * 60 * 60,
+    );
+    expect(screen.getByRole('combobox', { name: 'Time range' })).toHaveValue(
+      '7d',
+    );
+    document.querySelectorAll('[data-dashboard-card]').forEach(card => {
+      expect(
+        within(card as HTMLElement).queryByText(/Last 7 days/i),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('moves the time range into the compact sticky header after the title scrolls away', async () => {
+    const { container } = render(<HomePage />);
+    await screen.findByText('12,486');
+
+    act(() => {
+      pageHeaderIntersectionCallback(
+        [{ isIntersecting: false } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      );
+    });
+
+    const stickyHeader = container.querySelector('[data-page-header-sticky]');
+    expect(stickyHeader).toHaveAttribute('data-stuck', 'true');
+    expect(stickyHeader).toHaveClass('sticky', 'top-0');
+    expect(
+      stickyHeader?.querySelector('[data-page-header-sticky-content]'),
+    ).toHaveClass(
+      'h-10',
+      'duration-[240ms]',
+      'ease-[cubic-bezier(0.2,0,0.38,0.9)]',
+    );
+    const stickyTimeRange = within(stickyHeader as HTMLElement).getByRole(
+      'combobox',
+      { name: 'Time range' },
+    );
+    expect(stickyTimeRange).toHaveValue('30d');
+    expect(stickyTimeRange.closest('.cds--select')).toHaveClass(
+      'cds--select--md',
+      'cds--layout--size-md',
+    );
+    expect(
+      screen.getAllByRole('combobox', { name: 'Time range' }),
+    ).toHaveLength(1);
   });
 
   it('shows a retry action when the initial request fails', async () => {
@@ -338,6 +482,9 @@ describe('Dashboard HomePage', () => {
       await screen.findByRole('heading', {
         name: 'Project dashboard is unavailable',
       }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Workspace Overview', level: 1 }),
     ).toBeInTheDocument();
     expect(
       screen.getByText('Check your connection and try again.'),
@@ -359,7 +506,7 @@ describe('Dashboard HomePage', () => {
 
     render(<HomePage />);
 
-    expect(await screen.findByText('Component usage')).toBeInTheDocument();
+    expect(await screen.findByText('Component Usage')).toBeInTheDocument();
     expect(screen.getByText('Analytics are unavailable')).toBeInTheDocument();
     expect(screen.getByText('Partial data')).toBeInTheDocument();
   });
@@ -376,9 +523,9 @@ describe('Dashboard HomePage', () => {
 
     expect(await screen.findByText('12,486')).toBeInTheDocument();
     expect(
-      screen.getByText('Component usage is unavailable'),
+      screen.getByText('Component Usage is unavailable'),
     ).toBeInTheDocument();
-    expect(screen.getByText('Top assistants')).toBeInTheDocument();
+    expect(screen.getByText('Top Assistants')).toBeInTheDocument();
   });
 
   it('renders a simple assistant CTA when the dashboard has no activity', async () => {
@@ -394,12 +541,12 @@ describe('Dashboard HomePage', () => {
     expect(
       await screen.findByRole('heading', {
         name: 'Your dashboard is not ready yet',
-        level: 1,
+        level: 2,
       }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'Dashboard', level: 1 }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('heading', { name: 'Workspace Overview', level: 1 }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Getting started')).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -470,7 +617,7 @@ describe('Dashboard HomePage', () => {
     render(<HomePage />);
 
     expect(await screen.findByText('No analytics yet')).toBeInTheDocument();
-    expect(screen.getByText('Component usage')).toBeInTheDocument();
+    expect(screen.getByText('Component Usage')).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', {
         name: 'Your dashboard is not ready yet',
@@ -558,14 +705,23 @@ describe('Dashboard HomePage', () => {
 
     expect(
       await screen.findByRole('img', {
-        name: 'Conversation activity showing 12,486 sessions and 649 failures over Last 30 days',
+        name: 'Conversation Activity showing 12,486 sessions and 649 failures for the selected time range',
       }),
     ).toBeInTheDocument();
+    expect(screen.getByTestId('carbon-line-chart')).toBeInTheDocument();
+    expect(mockLineChart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          { group: 'Sessions', key: expect.any(String), value: 428 },
+          { group: 'Failed', key: expect.any(String), value: 18 },
+        ]),
+      }),
+    );
     expect(
-      screen.getByRole('table', { name: 'Recent failures' }),
+      screen.getByRole('table', { name: 'Recent Failures' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('table', { name: 'Top assistants' }),
+      screen.getByRole('table', { name: 'Top Assistants' }),
     ).toBeInTheDocument();
   });
 });

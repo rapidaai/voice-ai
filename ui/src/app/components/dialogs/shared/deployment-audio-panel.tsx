@@ -48,9 +48,7 @@ function AudioProviderRows({
   if (!deployment) {
     return (
       <DeploymentRow label={`${direction} provider`}>
-        <span className="text-sm text-gray-500 dark:text-gray-400">
-          Disabled
-        </span>
+        <span className="text-sm text-muted ">Disabled</span>
       </DeploymentRow>
     );
   }
@@ -69,7 +67,7 @@ function AudioProviderRows({
               optionPrefix,
             )}`}
           >
-            <span className="max-w-[200px] truncate text-right font-mono text-sm text-gray-900 dark:text-gray-100">
+            <span className="max-w-[200px] truncate text-right font-mono text-sm text-foreground ">
               {option.getValue()}
             </span>
             <CopyButton className="h-6 w-6 shrink-0">
@@ -79,9 +77,7 @@ function AudioProviderRows({
         ))
       ) : (
         <DeploymentRow label={`${direction} options`}>
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            Not configured
-          </span>
+          <span className="text-sm text-muted ">Not configured</span>
         </DeploymentRow>
       )}
     </>
