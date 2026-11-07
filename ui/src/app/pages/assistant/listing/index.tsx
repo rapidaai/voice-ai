@@ -30,9 +30,11 @@ import {
   SkeletonPlaceholder,
   SkeletonText,
 } from '@carbon/react';
-import { PrimaryButton } from '@/app/components/ui/primitives';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
-import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
+import { PrimaryButton, Text } from '@/app/components/ui/primitives';
+import {
+  PageHeader,
+  PageHeaderStickyToolbar,
+} from '@/app/components/layout/page-header';
 import { Modal, ModalBody, ModalHeader } from '@/app/components/ui/primitives';
 import {
   AssistantQuerySearch,
@@ -137,40 +139,54 @@ export function AssistantPage() {
   ]);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div
+      data-assistant-list-page
+      className="flex h-full flex-col overflow-x-hidden overflow-y-auto"
+    >
       <Helmet title="Assistant" />
-      <PageHeaderBlock>
-        <div className="flex items-center gap-3">
-          <PageTitleBlock>Assistants</PageTitleBlock>
-          <span className="text-xs text-muted tabular-nums">
-            {assistantAction.assistants.length}/{assistantAction.totalCount}
-          </span>
-        </div>
-      </PageHeaderBlock>
-      <TableToolbar>
-        <TableToolbarContent>
-          <AssistantQuerySearch
-            value={querySearchValue}
-            onChange={setQuerySearchValue}
-            onApply={criteria => assistantAction.setCriterias(criteria)}
-          />
-          <Button
-            hasIconOnly
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            kind="ghost"
-            onClick={() => getAssistants(projectId, token, userId)}
-            tooltipPosition="bottom"
-          />
+      <PageHeader
+        eyebrow={
+          <Text variant="label-01" className="text-primary">
+            Deployment
+          </Text>
+        }
+        title="Assistants"
+        description="Create and manage assistants, versions, deployments, and connected experiences across your workspace."
+        contextualActions={
+          <Text variant="label-01" className="text-muted tabular-nums">
+            {assistantAction.assistants.length} of {assistantAction.totalCount}
+          </Text>
+        }
+        pageActions={
           <PrimaryButton
+            className="w-full md:w-auto"
             size="md"
             renderIcon={Add}
             onClick={() => setCreateAssistantModalOpen(true)}
           >
             {CREATE_ASSISTANT_LABEL}
           </PrimaryButton>
-        </TableToolbarContent>
-      </TableToolbar>
+        }
+      />
+      <PageHeaderStickyToolbar>
+        <TableToolbar>
+          <TableToolbarContent>
+            <AssistantQuerySearch
+              value={querySearchValue}
+              onChange={setQuerySearchValue}
+              onApply={criteria => assistantAction.setCriterias(criteria)}
+            />
+            <Button
+              hasIconOnly
+              renderIcon={Renew}
+              iconDescription="Refresh"
+              kind="ghost"
+              onClick={() => getAssistants(projectId, token, userId)}
+              tooltipPosition="bottom"
+            />
+          </TableToolbarContent>
+        </TableToolbar>
+      </PageHeaderStickyToolbar>
 
       {/* Content */}
       {loading ? (
@@ -179,29 +195,31 @@ export function AssistantPage() {
         />
       ) : assistantAction.assistants &&
         assistantAction.assistants.length > 0 ? (
-        <div className="no-scrollbar overflow-auto flex-1">
-          <Table>
-            <TableHead>
-              <TableRow>
-                {assistantColumns.map(col => (
-                  <TableHeader
-                    key={col.key}
-                    className={assistantColumnClassName[col.key]}
-                  >
-                    {col.name}
-                  </TableHeader>
+        <div className="flex-1">
+          <div className="no-scrollbar overflow-x-auto">
+            <Table>
+              <TableHead>
+                <TableRow>
+                  {assistantColumns.map(col => (
+                    <TableHeader
+                      key={col.key}
+                      className={assistantColumnClassName[col.key]}
+                    >
+                      {col.name}
+                    </TableHeader>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {assistantAction.assistants.map(ast => (
+                  <SingleAssistant
+                    key={`assistant_row_${ast.getId()}`}
+                    assistant={ast}
+                  />
                 ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {assistantAction.assistants.map(ast => (
-                <SingleAssistant
-                  key={`assistant_row_${ast.getId()}`}
-                  assistant={ast}
-                />
-              ))}
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          </div>
         </div>
       ) : assistantAction.criteria.length > 0 ? (
         <div className="h-full flex justify-center items-center">

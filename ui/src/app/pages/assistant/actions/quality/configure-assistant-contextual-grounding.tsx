@@ -1,5 +1,5 @@
 import { PageActionButtonBlock } from '@/app/components/layout/blocks/page-action-button-block';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
+import { CompactPageHeader } from '@/app/components/layout/compact-page-header';
 import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
 import { FormLabel } from '@/app/components/ui/primitives';
 import {
@@ -33,9 +33,9 @@ export const ConfigureAssistantContextualGroundingPage = () => {
 
   return (
     <div className="relative flex flex-col flex-1">
-      <PageHeaderBlock>
+      <CompactPageHeader>
         <PageTitleBlock>Contextual grounding</PageTitleBlock>
-      </PageHeaderBlock>
+      </CompactPageHeader>
 
       <div className="overflow-auto flex flex-col flex-1 pb-20">
         <div className=" bg-surface ">

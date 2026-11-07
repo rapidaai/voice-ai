@@ -7,13 +7,18 @@ import {
   formatNanoToReadableMilli,
   toHumanReadableDateTime,
 } from '@/utils/date';
-import { PageTitleWithCount } from '@/app/components/layout/blocks/page-title-with-count';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
+import {
+  PageHeader,
+  PageHeaderStickyToolbar,
+} from '@/app/components/layout/page-header';
 import { useToolActivityLogPage } from '@/stores/activity/tool-activity-log.store';
 import { ToolLogDialog } from '@/app/components/dialogs/activity';
 import { CarbonStatusIndicator } from '@/app/components/ui/feedback';
-import { Pagination } from '@/app/components/ui/primitives';
-import { IconOnlyButton } from '@/app/components/ui/primitives';
+import {
+  IconOnlyButton,
+  Pagination,
+  Text,
+} from '@/app/components/ui/primitives';
 
 import {
   Table,
@@ -29,7 +34,6 @@ import {
 } from '@carbon/react';
 import { Renew, View, Launch, ToolKit } from '@carbon/icons-react';
 import { EmptyState } from '@/app/components/ui/feedback';
-import { ScrollableTableSection } from '@/app/components/layout/sections/table-section';
 import { ToolLogQuerySearch } from './tool-query-search';
 
 export function ListingPage() {
@@ -85,37 +89,51 @@ export function ListingPage() {
         />
       )}
 
-      <div className="h-full flex flex-col overflow-hidden">
+      <div
+        data-page-scroll
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+      >
         <Helmet title="Tool Logs" />
-        <PageHeaderBlock>
-          <PageTitleWithCount count={activities.length} total={totalCount}>
-            Tool Logs
-          </PageTitleWithCount>
-        </PageHeaderBlock>
+        <PageHeader
+          eyebrow={
+            <Text variant="label-01" className="text-primary">
+              Observability
+            </Text>
+          }
+          title="Tool Logs"
+          description="Monitor tool executions, inputs, outputs, latency, and failures across assistant sessions."
+          contextualActions={
+            <Text variant="label-01" className="text-muted tabular-nums">
+              {activities.length} of {totalCount}
+            </Text>
+          }
+        />
 
-        <TableToolbar>
-          <TableToolbarContent>
-            <ToolLogQuerySearch
-              value={querySearchValue}
-              onChange={setQuerySearchValue}
-              onApply={setCriterias}
-            />
-            <IconOnlyButton
-              kind="ghost"
-              size="lg"
-              renderIcon={Renew}
-              iconDescription="Refresh"
-              onClick={() => onGetActivities()}
-            />
-          </TableToolbarContent>
-        </TableToolbar>
+        <PageHeaderStickyToolbar>
+          <TableToolbar>
+            <TableToolbarContent>
+              <ToolLogQuerySearch
+                value={querySearchValue}
+                onChange={setQuerySearchValue}
+                onApply={setCriterias}
+              />
+              <IconOnlyButton
+                kind="ghost"
+                size="lg"
+                renderIcon={Renew}
+                iconDescription="Refresh"
+                onClick={() => onGetActivities()}
+              />
+            </TableToolbarContent>
+          </TableToolbar>
+        </PageHeaderStickyToolbar>
 
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loading withOverlay={false} small />
           </div>
         ) : activities.length > 0 ? (
-          <ScrollableTableSection>
+          <div className="shrink-0 overflow-x-auto">
             <Table className="min-w-max">
               <TableHead>
                 <TableRow>
@@ -204,7 +222,7 @@ export function ListingPage() {
                 ))}
               </TableBody>
             </Table>
-          </ScrollableTableSection>
+          </div>
         ) : (
           <EmptyState
             icon={ToolKit}
@@ -215,6 +233,7 @@ export function ListingPage() {
 
         {activities.length > 0 && (
           <Pagination
+            className="mt-auto shrink-0"
             totalItems={totalCount}
             page={page}
             pageSize={pageSize}

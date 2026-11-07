@@ -9,13 +9,18 @@ import {
   toDateString,
   toHumanReadableDateTime,
 } from '@/utils/date';
-import { PageTitleWithCount } from '@/app/components/layout/blocks/page-title-with-count';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
+import {
+  PageHeader,
+  PageHeaderStickyToolbar,
+} from '@/app/components/layout/page-header';
 import { useKnowledgeActivityLogPage } from '@/stores/knowledge/knowledge-activity-log.store';
 import { KnowledgeLogDialog } from '@/app/components/dialogs/activity';
 import { CarbonStatusIndicator } from '@/app/components/ui/feedback';
-import { Pagination } from '@/app/components/ui/primitives';
-import { IconOnlyButton } from '@/app/components/ui/primitives';
+import {
+  IconOnlyButton,
+  Pagination,
+  Text,
+} from '@/app/components/ui/primitives';
 import { Renew, View, DataBase } from '@carbon/icons-react';
 import { EmptyState } from '@/app/components/ui/feedback';
 
@@ -93,120 +98,137 @@ export function ListingPage() {
         />
       )}
 
-      <Helmet title="Knowledge Logs" />
-      <PageHeaderBlock>
-        <PageTitleWithCount count={activities.length} total={totalCount}>
-          Knowledge Logs
-        </PageTitleWithCount>
-      </PageHeaderBlock>
+      <div
+        data-page-scroll
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+      >
+        <Helmet title="Knowledge Logs" />
+        <PageHeader
+          eyebrow={
+            <Text variant="label-01" className="text-primary">
+              Observability
+            </Text>
+          }
+          title="Knowledge Logs"
+          description="Inspect knowledge retrieval activity, sources, latency, and results across assistant sessions."
+          contextualActions={
+            <Text variant="label-01" className="text-muted tabular-nums">
+              {activities.length} of {totalCount}
+            </Text>
+          }
+        />
 
-      <TableToolbar>
-        <TableToolbarContent>
-          <TableToolbarSearch placeholder="Search knowledge logs" />
-          <DateFilter
-            onApply={(from, to) => onDateSelect(to, from)}
-            onReset={() => addCriterias([])}
-          />
-          <IconOnlyButton
-            kind="ghost"
-            size="lg"
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            onClick={() => onGetAcitvities()}
-          />
-        </TableToolbarContent>
-      </TableToolbar>
+        <PageHeaderStickyToolbar>
+          <TableToolbar>
+            <TableToolbarContent>
+              <TableToolbarSearch placeholder="Search knowledge logs" />
+              <DateFilter
+                onApply={(from, to) => onDateSelect(to, from)}
+                onReset={() => addCriterias([])}
+              />
+              <IconOnlyButton
+                kind="ghost"
+                size="lg"
+                renderIcon={Renew}
+                iconDescription="Refresh"
+                onClick={() => onGetAcitvities()}
+              />
+            </TableToolbarContent>
+          </TableToolbar>
+        </PageHeaderStickyToolbar>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loading withOverlay={false} small />
-        </div>
-      ) : activities.length > 0 ? (
-        <div className="overflow-auto flex-1">
-          <Table>
-            <TableHead>
-              <TableRow>
-                {visibleColumns.map(col => (
-                  <TableHeader key={col.key}>{col.name}</TableHeader>
-                ))}
-                <TableHeader>Actions</TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {activities.map((at, idx) => (
-                <TableRow key={idx}>
-                  {visibleColumn('knowledge_id') && (
-                    <TableCell>
-                      <TableLink href={`/knowledge/${at.getKnowledgeid()}`}>
-                        {at.getKnowledgeid()}
-                      </TableLink>
-                    </TableCell>
-                  )}
-                  {visibleColumn('retrieval_method') && (
-                    <TableCell>{at.getRetrievalmethod()}</TableCell>
-                  )}
-                  {visibleColumn('top_k') && (
-                    <TableCell>{at.getTopk()}</TableCell>
-                  )}
-                  {visibleColumn('score_threshold') && (
-                    <TableCell>{at.getScorethreshold()}</TableCell>
-                  )}
-                  {visibleColumn('document_count') && (
-                    <TableCell>{at.getDocumentcount()}</TableCell>
-                  )}
-                  {visibleColumn('time_taken') && (
-                    <TableCell className="!font-mono !text-xs">
-                      {formatNanoToReadableMilli(at.getTimetaken())}
-                    </TableCell>
-                  )}
-                  {visibleColumn('status') && (
-                    <TableCell>
-                      <CarbonStatusIndicator state={at.getStatus()} />
-                    </TableCell>
-                  )}
-                  {visibleColumn('created_date') && (
-                    <TableCell className="!text-xs whitespace-nowrap">
-                      {at.getCreateddate() &&
-                        toHumanReadableDateTime(at.getCreateddate()!)}
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <IconOnlyButton
-                      kind="ghost"
-                      size="md"
-                      renderIcon={View}
-                      iconDescription="View detail"
-                      onClick={() => {
-                        setCurrentActivityId(at.getId());
-                        setShowLogModal(true);
-                      }}
-                    />
-                  </TableCell>
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loading withOverlay={false} small />
+          </div>
+        ) : activities.length > 0 ? (
+          <div className="shrink-0 overflow-x-auto">
+            <Table>
+              <TableHead>
+                <TableRow>
+                  {visibleColumns.map(col => (
+                    <TableHeader key={col.key}>{col.name}</TableHeader>
+                  ))}
+                  <TableHeader>Actions</TableHeader>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
-        <EmptyState
-          icon={DataBase}
-          title="No knowledge activities found"
-          subtitle="Knowledge base retrieval activities will appear here once your assistants query connected knowledge sources."
-        />
-      )}
+              </TableHead>
+              <TableBody>
+                {activities.map((at, idx) => (
+                  <TableRow key={idx}>
+                    {visibleColumn('knowledge_id') && (
+                      <TableCell>
+                        <TableLink href={`/knowledge/${at.getKnowledgeid()}`}>
+                          {at.getKnowledgeid()}
+                        </TableLink>
+                      </TableCell>
+                    )}
+                    {visibleColumn('retrieval_method') && (
+                      <TableCell>{at.getRetrievalmethod()}</TableCell>
+                    )}
+                    {visibleColumn('top_k') && (
+                      <TableCell>{at.getTopk()}</TableCell>
+                    )}
+                    {visibleColumn('score_threshold') && (
+                      <TableCell>{at.getScorethreshold()}</TableCell>
+                    )}
+                    {visibleColumn('document_count') && (
+                      <TableCell>{at.getDocumentcount()}</TableCell>
+                    )}
+                    {visibleColumn('time_taken') && (
+                      <TableCell className="!font-mono !text-xs">
+                        {formatNanoToReadableMilli(at.getTimetaken())}
+                      </TableCell>
+                    )}
+                    {visibleColumn('status') && (
+                      <TableCell>
+                        <CarbonStatusIndicator state={at.getStatus()} />
+                      </TableCell>
+                    )}
+                    {visibleColumn('created_date') && (
+                      <TableCell className="!text-xs whitespace-nowrap">
+                        {at.getCreateddate() &&
+                          toHumanReadableDateTime(at.getCreateddate()!)}
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <IconOnlyButton
+                        kind="ghost"
+                        size="md"
+                        renderIcon={View}
+                        iconDescription="View detail"
+                        onClick={() => {
+                          setCurrentActivityId(at.getId());
+                          setShowLogModal(true);
+                        }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <EmptyState
+            icon={DataBase}
+            title="No knowledge activities found"
+            subtitle="Knowledge base retrieval activities will appear here once your assistants query connected knowledge sources."
+          />
+        )}
 
-      {activities.length > 0 && (
-        <Pagination
-          totalItems={totalCount}
-          page={page}
-          pageSize={pageSize}
-          pageSizes={[10, 20, 25, 50, 100]}
-          onChange={({ page: p, pageSize: ps }) => {
-            if (ps !== pageSize) setPageSize(ps);
-            else setPage(p);
-          }}
-        />
-      )}
+        {activities.length > 0 && (
+          <Pagination
+            className="mt-auto shrink-0"
+            totalItems={totalCount}
+            page={page}
+            pageSize={pageSize}
+            pageSizes={[10, 20, 25, 50, 100]}
+            onChange={({ page: p, pageSize: ps }) => {
+              if (ps !== pageSize) setPageSize(ps);
+              else setPage(p);
+            }}
+          />
+        )}
+      </div>
     </>
   );
 }

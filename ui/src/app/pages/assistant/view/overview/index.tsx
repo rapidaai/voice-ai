@@ -5,13 +5,8 @@ import { useRapidaStore } from '@/stores/app';
 import { FC } from 'react';
 import { ActionNotification } from '@/app/components/ui/feedback';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  Button,
-  HeaderGlobalBar,
-} from '@carbon/react';
 import { SourceControl } from '@carbon/icons-react';
+import { ResourceDetailHeader } from '@/app/components/layout/resource-detail-header';
 
 export const Overview: FC<{ currentAssistant: Assistant }> = ({
   currentAssistant,
@@ -29,37 +24,18 @@ export const Overview: FC<{ currentAssistant: Assistant }> = ({
 
   return (
     <div className="flex flex-col flex-1 grow">
-      <header className="flex h-12 shrink-0 items-center justify-between bg-surface border-b border-border-subtle ">
-        <div className="min-w-0 pl-4">
-          <Breadcrumb noTrailingSlash>
-            <BreadcrumbItem href="/deployment/assistant">
-              Assistants
-            </BreadcrumbItem>
-            <BreadcrumbItem isCurrentPage>
-              <span className="block max-w-[42vw] truncate">
-                {currentAssistant.getName()}
-              </span>
-            </BreadcrumbItem>
-          </Breadcrumb>
-        </div>
-        <HeaderGlobalBar
-          aria-label="Assistant overview header actions"
-          className="h-full items-center"
-        >
-          <Button
-            aria-label="Create new version"
-            kind="primary"
-            size="lg"
-            renderIcon={SourceControl}
-            className="h-full! min-h-full! items-center justify-center whitespace-nowrap"
-            onClick={() =>
-              navigation.goToCreateAssistantVersion(currentAssistant.getId())
-            }
-          >
-            Create new version
-          </Button>
-        </HeaderGlobalBar>
-      </header>
+      <ResourceDetailHeader
+        collectionHref="/deployment/assistant"
+        collectionLabel="Assistants"
+        resourceName={currentAssistant.getName()}
+        actionsLabel="Assistant overview header actions"
+        primaryAction={{
+          label: 'Create new version',
+          icon: SourceControl,
+          onClick: () =>
+            navigation.goToCreateAssistantVersion(currentAssistant.getId()),
+        }}
+      />
 
       {/* ── Notifications ── */}
       {!currentAssistant.getApideployment() &&

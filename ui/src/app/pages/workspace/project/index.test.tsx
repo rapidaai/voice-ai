@@ -146,16 +146,17 @@ describe('ProjectPage', () => {
     const { container } = renderPage();
 
     await waitFor(() => expect(mockListWorkspaceProjects).toHaveBeenCalled());
-    expect(screen.getByText('Projects')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Projects' }),
+    ).toBeInTheDocument();
 
     const skeleton = container.querySelector(
       '.cds--data-table-container.cds--skeleton',
     );
     expect(skeleton).toBeInTheDocument();
-    expect(skeleton?.parentElement).toHaveClass(
-      'flex-1',
-      'flex-col',
-      'overflow-hidden',
+    expect(container.querySelector('[data-page-scroll]')).toHaveClass(
+      'overflow-y-auto',
+      'overflow-x-hidden',
     );
     expect(skeleton?.parentElement).not.toHaveClass(
       'items-center',
@@ -163,16 +164,21 @@ describe('ProjectPage', () => {
     );
   });
 
-  it('keeps pagination below the scrollable table region', async () => {
+  it('uses page scrolling while keeping horizontal table overflow local', async () => {
     const { container } = renderPage();
 
     await screen.findByText('Customer support');
     const pagination = container.querySelector('.cds--pagination');
-    expect(pagination).toHaveClass('shrink-0');
+    expect(
+      container
+        .querySelector('.cds--table-toolbar')
+        ?.closest('[data-page-header-sticky-toolbar]'),
+    ).toHaveClass('sticky', 'top-10', 'z-10');
+    expect(pagination).toHaveClass('mt-auto', 'shrink-0');
     expect(pagination?.previousElementSibling).toHaveClass(
-      'min-h-0',
-      'flex-1',
-      'overflow-auto',
+      'shrink-0',
+      'overflow-x-auto',
     );
+    expect(pagination?.previousElementSibling).not.toHaveClass('flex-1');
   });
 });

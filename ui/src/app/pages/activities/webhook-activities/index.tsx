@@ -8,10 +8,12 @@ import {
   toHumanReadableDateTime,
 } from '@/utils/date';
 import { HttpStatusSpanIndicator } from '@/app/components/domain/indicators/http-status';
-import { PageTitleWithCount } from '@/app/components/layout/blocks/page-title-with-count';
+import {
+  PageHeader,
+  PageHeaderStickyToolbar,
+} from '@/app/components/layout/page-header';
 import { useWebhookLogPage } from '@/stores/activity/webhook-log.store';
 import { RequestLogDialog } from '@/app/components/dialogs/activity';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
 import { useConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-confirmation';
 import { retryWebhookActivityLog } from '@/clients';
 
@@ -28,12 +30,14 @@ import {
   Tag,
   Link,
 } from '@carbon/react';
-import { Pagination } from '@/app/components/ui/primitives';
-import { IconOnlyButton } from '@/app/components/ui/primitives';
+import {
+  IconOnlyButton,
+  Pagination,
+  Text,
+} from '@/app/components/ui/primitives';
 import { UrlTableCell } from '@/app/components/ui/table';
 import { Renew, View, EventSchedule, Launch } from '@carbon/icons-react';
 import { EmptyState } from '@/app/components/ui/feedback';
-import { ScrollableTableSection } from '@/app/components/layout/sections/table-section';
 import { RequestLogQuerySearch } from './request-query-search';
 
 export function ListingPage() {
@@ -122,37 +126,51 @@ export function ListingPage() {
         />
       )}
 
-      <div className="h-full flex flex-col overflow-hidden">
+      <div
+        data-page-scroll
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+      >
         <Helmet title="Request Logs" />
-        <PageHeaderBlock>
-          <PageTitleWithCount count={webhookLogs.length} total={totalCount}>
-            Request Logs
-          </PageTitleWithCount>
-        </PageHeaderBlock>
+        <PageHeader
+          eyebrow={
+            <Text variant="label-01" className="text-primary">
+              Observability
+            </Text>
+          }
+          title="Request Logs"
+          description="Monitor HTTP request activity, responses, latency, retries, and failures across your workspace."
+          contextualActions={
+            <Text variant="label-01" className="text-muted tabular-nums">
+              {webhookLogs.length} of {totalCount}
+            </Text>
+          }
+        />
 
-        <TableToolbar>
-          <TableToolbarContent>
-            <RequestLogQuerySearch
-              value={querySearchValue}
-              onChange={setQuerySearchValue}
-              onApply={setCriterias}
-            />
-            <IconOnlyButton
-              kind="ghost"
-              size="lg"
-              renderIcon={Renew}
-              iconDescription="Refresh"
-              onClick={() => onGetActivities()}
-            />
-          </TableToolbarContent>
-        </TableToolbar>
+        <PageHeaderStickyToolbar>
+          <TableToolbar>
+            <TableToolbarContent>
+              <RequestLogQuerySearch
+                value={querySearchValue}
+                onChange={setQuerySearchValue}
+                onApply={setCriterias}
+              />
+              <IconOnlyButton
+                kind="ghost"
+                size="lg"
+                renderIcon={Renew}
+                iconDescription="Refresh"
+                onClick={() => onGetActivities()}
+              />
+            </TableToolbarContent>
+          </TableToolbar>
+        </PageHeaderStickyToolbar>
 
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loading withOverlay={false} small />
           </div>
         ) : webhookLogs.length > 0 ? (
-          <ScrollableTableSection>
+          <div className="shrink-0 overflow-x-auto">
             <Table className="min-w-max">
               <TableHead>
                 <TableRow>
@@ -250,7 +268,7 @@ export function ListingPage() {
                 ))}
               </TableBody>
             </Table>
-          </ScrollableTableSection>
+          </div>
         ) : (
           <EmptyState
             icon={EventSchedule}
@@ -261,6 +279,7 @@ export function ListingPage() {
 
         {webhookLogs.length > 0 && (
           <Pagination
+            className="mt-auto shrink-0"
             totalItems={totalCount}
             page={page}
             pageSize={pageSize}

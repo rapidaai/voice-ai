@@ -71,7 +71,7 @@ import {
   PrimaryButton,
   Text,
 } from '@/app/components/ui/primitives';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
+import { CompactPageHeader } from '@/app/components/layout/compact-page-header';
 import { ConfirmDialog } from '@/app/components/dialogs/shared';
 import { createVoiceAgentDebuggerConnection } from '@/clients/runtime.client';
 import { useCurrentCredential } from '@/hooks/use-credential';
@@ -1030,7 +1030,7 @@ function PreviewVoiceAgentV2Workspace({
   };
 
   const conversationToolbar = (
-    <PageHeaderBlock
+    <CompactPageHeader
       role="toolbar"
       aria-label="Conversation toolbar"
       className="w-full"
@@ -1081,7 +1081,7 @@ function PreviewVoiceAgentV2Workspace({
           <Model size={16} />
         </HeaderGlobalAction>
       </HeaderGlobalBar>
-    </PageHeaderBlock>
+    </CompactPageHeader>
   );
 
   const chatSlots = useMemo(

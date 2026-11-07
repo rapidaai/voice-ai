@@ -63,7 +63,7 @@ for (const colorMode of ['light', 'dark']) {
     await page.goto(projectsPath);
 
     await expect(
-      page.getByRole('main').locator('.text-base', { hasText: 'Projects' }),
+      page.getByRole('heading', { level: 1, name: 'Projects' }),
     ).toBeVisible();
     await expect(
       page.locator('.cds--data-table-container.cds--skeleton'),

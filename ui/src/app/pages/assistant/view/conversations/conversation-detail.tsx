@@ -18,7 +18,7 @@ import {
 } from '@carbon/icons-react';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { GhostButton } from '@/app/components/ui/primitives';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
+import { CompactPageHeader } from '@/app/components/layout/compact-page-header';
 import { cn } from '@/utils';
 import { CarbonStatusIndicator } from '@/app/components/ui/feedback';
 import { getStatusMetric } from '@/utils/metadata';
@@ -345,7 +345,7 @@ export function ConversationDetailPage() {
   return (
     <>
       {/* ── Page header: breadcrumb + status + refresh ── */}
-      <PageHeaderBlock>
+      <CompactPageHeader>
         <div className="flex items-center gap-1.5 min-w-0">
           <GhostButton
             size="sm"
@@ -373,7 +373,7 @@ export function ConversationDetailPage() {
             onClick={get}
           />
         </div>
-      </PageHeaderBlock>
+      </CompactPageHeader>
 
       <Tabs
         tabs={TABS.map(({ label }) => label)}

@@ -9,7 +9,7 @@ import {
 import { CreateProjectDialog } from '@/app/components/dialogs/workspace';
 import { useCredential } from '@/hooks/use-credential';
 import toast from 'react-hot-toast/headless';
-import { Pagination } from '@/app/components/ui/primitives';
+import { Pagination, Text } from '@/app/components/ui/primitives';
 import { Add, Edit, Folders, Renew, TrashCan } from '@carbon/icons-react';
 import {
   DataTable,
@@ -31,8 +31,10 @@ import {
 import { ProjectUserGroupAvatar } from '@/app/components/domain/avatar/project-user-group-avatar';
 import { toHumanReadableDate } from '@/utils/date';
 import { RoleIndicator } from '@/app/components/domain/indicators/role';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
-import { PageTitleWithCount } from '@/app/components/layout/blocks/page-title-with-count';
+import {
+  PageHeader,
+  PageHeaderStickyToolbar,
+} from '@/app/components/layout/page-header';
 import { TableSection } from '@/app/components/layout/sections/table-section';
 import { ConfirmDeleteDialog } from '@/app/components/dialogs/shared';
 import { AuthContext } from '@/context/auth-context';
@@ -149,13 +151,35 @@ export function ProjectPage() {
   }));
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col bg-surface">
+    <div
+      data-page-scroll
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-surface"
+    >
       <Helmet title="Projects" />
-      <PageHeaderBlock>
-        <PageTitleWithCount count={projects.length} total={totalCount}>
-          Projects
-        </PageTitleWithCount>
-      </PageHeaderBlock>
+      <PageHeader
+        eyebrow={
+          <Text variant="label-01" className="text-primary">
+            Organization
+          </Text>
+        }
+        title="Projects"
+        description="Organize assistants, endpoints, credentials, and collaborators across your workspace."
+        contextualActions={
+          <Text variant="label-01" className="text-muted tabular-nums">
+            {projects.length} of {totalCount}
+          </Text>
+        }
+        pageActions={
+          <Button
+            className="w-full md:w-auto"
+            size="md"
+            renderIcon={Add}
+            onClick={() => setCreateProjectModalOpen(true)}
+          >
+            Create new project
+          </Button>
+        }
+      />
       {isFetching ? (
         <TableSection className="min-h-0 overflow-hidden bg-surface">
           <DataTableSkeleton
@@ -192,60 +216,57 @@ export function ProjectPage() {
 
               return (
                 <>
-                  <TableToolbar {...getToolbarProps()}>
-                    {selectedProject && (
-                      <TableBatchActions
-                        {...batchActionProps}
-                        shouldShowBatchActions
-                      >
-                        <TableBatchAction
-                          renderIcon={Edit}
-                          iconDescription="Edit"
-                          onClick={() => {
-                            setProjectPendingUpdate(selectedProject);
-                            batchActionProps.onCancel();
-                          }}
+                  <PageHeaderStickyToolbar>
+                    <TableToolbar {...getToolbarProps()}>
+                      {selectedProject && (
+                        <TableBatchActions
+                          {...batchActionProps}
+                          shouldShowBatchActions
                         >
-                          Edit
-                        </TableBatchAction>
-                        <TableBatchAction
-                          renderIcon={TrashCan}
-                          iconDescription="Delete"
-                          onClick={() => {
-                            setProjectPendingDelete(selectedProject);
-                            batchActionProps.onCancel();
-                          }}
-                        >
-                          Delete
-                        </TableBatchAction>
-                      </TableBatchActions>
-                    )}
-                    <TableToolbarContent>
-                      <TableToolbarSearch
-                        placeholder="Search projects..."
-                        onChange={onInputChange}
-                      />
-                      <Button
-                        hasIconOnly
-                        renderIcon={Renew}
-                        iconDescription="Refresh"
-                        kind="ghost"
-                        onClick={() => getAllProject(page, pageSize, criteria)}
-                        tooltipPosition="bottom"
-                      />
-                      <Button
-                        size="md"
-                        renderIcon={Add}
-                        onClick={() => setCreateProjectModalOpen(true)}
-                      >
-                        Create new project
-                      </Button>
-                    </TableToolbarContent>
-                  </TableToolbar>
+                          <TableBatchAction
+                            renderIcon={Edit}
+                            iconDescription="Edit"
+                            onClick={() => {
+                              setProjectPendingUpdate(selectedProject);
+                              batchActionProps.onCancel();
+                            }}
+                          >
+                            Edit
+                          </TableBatchAction>
+                          <TableBatchAction
+                            renderIcon={TrashCan}
+                            iconDescription="Delete"
+                            onClick={() => {
+                              setProjectPendingDelete(selectedProject);
+                              batchActionProps.onCancel();
+                            }}
+                          >
+                            Delete
+                          </TableBatchAction>
+                        </TableBatchActions>
+                      )}
+                      <TableToolbarContent>
+                        <TableToolbarSearch
+                          placeholder="Search projects..."
+                          onChange={onInputChange}
+                        />
+                        <Button
+                          hasIconOnly
+                          renderIcon={Renew}
+                          iconDescription="Refresh"
+                          kind="ghost"
+                          onClick={() =>
+                            getAllProject(page, pageSize, criteria)
+                          }
+                          tooltipPosition="bottom"
+                        />
+                      </TableToolbarContent>
+                    </TableToolbar>
+                  </PageHeaderStickyToolbar>
 
                   {projects.length > 0 ? (
                     <>
-                      <div className="min-h-0 flex-1 overflow-auto">
+                      <div className="shrink-0 overflow-x-auto">
                         <Table {...getTableProps()} className="min-w-max">
                           <TableHead>
                             <TableRow>
@@ -314,7 +335,7 @@ export function ProjectPage() {
                         </Table>
                       </div>
                       <Pagination
-                        className="shrink-0"
+                        className="mt-auto shrink-0"
                         totalItems={totalCount}
                         page={page}
                         pageSize={pageSize}

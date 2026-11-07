@@ -12,15 +12,19 @@ import {
 import { getMetadataValue, getMetricValueOrDefault } from '@/utils/metadata';
 import { LLMLogDialog } from '@/app/components/dialogs/activity';
 import { HttpStatusSpanIndicator } from '@/app/components/domain/indicators/http-status';
-import { PageTitleWithCount } from '@/app/components/layout/blocks/page-title-with-count';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
+import {
+  PageHeader,
+  PageHeaderStickyToolbar,
+} from '@/app/components/layout/page-header';
 import { CarbonStatusIndicator } from '@/app/components/ui/feedback';
-import { Pagination } from '@/app/components/ui/primitives';
-import { IconOnlyButton } from '@/app/components/ui/primitives';
+import {
+  IconOnlyButton,
+  Pagination,
+  Text,
+} from '@/app/components/ui/primitives';
 import { Renew, View, Launch, Ai } from '@carbon/icons-react';
 import { ProviderTag } from '@/app/components/domain/provider-tag';
 import { EmptyState } from '@/app/components/ui/feedback';
-import { ScrollableTableSection } from '@/app/components/layout/sections/table-section';
 import { LLMLogQuerySearch } from './llm-query-search';
 import {
   Table,
@@ -88,37 +92,51 @@ export function ListingPage() {
         />
       )}
 
-      <div className="h-full flex flex-col overflow-hidden">
+      <div
+        data-page-scroll
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+      >
         <Helmet title="LLM Logs" />
-        <PageHeaderBlock>
-          <PageTitleWithCount count={activities.length} total={totalCount}>
-            LLM Logs
-          </PageTitleWithCount>
-        </PageHeaderBlock>
+        <PageHeader
+          eyebrow={
+            <Text variant="label-01" className="text-primary">
+              Observability
+            </Text>
+          }
+          title="LLM Logs"
+          description="Inspect language model requests, responses, latency, usage, and failures across your workspace."
+          contextualActions={
+            <Text variant="label-01" className="text-muted tabular-nums">
+              {activities.length} of {totalCount}
+            </Text>
+          }
+        />
 
-        <TableToolbar>
-          <TableToolbarContent>
-            <LLMLogQuerySearch
-              value={querySearchValue}
-              onChange={setQuerySearchValue}
-              onApply={setCriterias}
-            />
-            <IconOnlyButton
-              kind="ghost"
-              size="lg"
-              renderIcon={Renew}
-              iconDescription="Refresh"
-              onClick={() => onGetAcitvities()}
-            />
-          </TableToolbarContent>
-        </TableToolbar>
+        <PageHeaderStickyToolbar>
+          <TableToolbar>
+            <TableToolbarContent>
+              <LLMLogQuerySearch
+                value={querySearchValue}
+                onChange={setQuerySearchValue}
+                onApply={setCriterias}
+              />
+              <IconOnlyButton
+                kind="ghost"
+                size="lg"
+                renderIcon={Renew}
+                iconDescription="Refresh"
+                onClick={() => onGetAcitvities()}
+              />
+            </TableToolbarContent>
+          </TableToolbar>
+        </PageHeaderStickyToolbar>
 
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loading withOverlay={false} small />
           </div>
         ) : activities.length > 0 ? (
-          <ScrollableTableSection>
+          <div className="shrink-0 overflow-x-auto">
             <Table className="min-w-max">
               <TableHead>
                 <TableRow>
@@ -222,7 +240,7 @@ export function ListingPage() {
                 ))}
               </TableBody>
             </Table>
-          </ScrollableTableSection>
+          </div>
         ) : (
           <EmptyState
             icon={Ai}
@@ -233,6 +251,7 @@ export function ListingPage() {
 
         {activities.length > 0 && (
           <Pagination
+            className="mt-auto shrink-0"
             totalItems={totalCount}
             page={page}
             pageSize={pageSize}

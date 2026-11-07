@@ -8,6 +8,36 @@ const azureJourney = routeJourneys.find(
   journey => journey.id === 'integration.azureSpeechService',
 );
 
+test('provider page scrolling collapses the descriptive header', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await gotoJourney(page, googleJourney);
+
+  const pageScroll = page.locator('[data-page-scroll]');
+  await expect(pageScroll).toBeVisible();
+  expect(
+    await pageScroll.evaluate(
+      element => element.scrollHeight > element.clientHeight,
+    ),
+  ).toBe(true);
+
+  await pageScroll.evaluate(element => element.scrollTo({ top: 240 }));
+  const stickyHeader = page.locator('[data-page-header-sticky]');
+  const toolbar = page.locator('.cds--table-toolbar');
+  await expect(stickyHeader).toHaveAttribute('data-stuck', 'true');
+  await expect
+    .poll(async () => {
+      const [headerBox, toolbarBox] = await Promise.all([
+        stickyHeader.locator('[data-page-header-sticky-content]').boundingBox(),
+        toolbar.boundingBox(),
+      ]);
+      if (!headerBox || !toolbarBox) return null;
+      return Math.round(toolbarBox.y - (headerBox.y + headerBox.height));
+    })
+    .toBe(0);
+});
+
 test('provider catalog uses the platform table toolbar and pagination', async ({
   page,
 }) => {

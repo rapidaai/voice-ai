@@ -51,7 +51,7 @@ for (const colorMode of ['light', 'dark']) {
     await page.goto(usersPath);
 
     await expect(
-      page.getByRole('main').locator('.text-base', { hasText: 'Users' }),
+      page.getByRole('heading', { level: 1, name: 'Users' }),
     ).toBeVisible();
     await expect(
       page.locator('.cds--data-table-container.cds--skeleton'),

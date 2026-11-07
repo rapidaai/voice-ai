@@ -8,7 +8,7 @@ import toast from 'react-hot-toast/headless';
 import { useRapidaStore } from '@/stores/app';
 import { useUserPageStore } from '@/stores/user';
 import { SingleUser } from '@/app/pages/workspace/user/single-user';
-import { Pagination } from '@/app/components/ui/primitives';
+import { Pagination, Text } from '@/app/components/ui/primitives';
 import {
   Add,
   Renew,
@@ -32,8 +32,10 @@ import {
   DataTableSkeleton,
   TableSelectRow,
 } from '@carbon/react';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
-import { PageTitleWithCount } from '@/app/components/layout/blocks/page-title-with-count';
+import {
+  PageHeader,
+  PageHeaderStickyToolbar,
+} from '@/app/components/layout/page-header';
 import { TableSection } from '@/app/components/layout/sections/table-section';
 import { ConfirmDeleteDialog } from '@/app/components/dialogs/shared';
 import { deleteOrganizationUser, updateOrganizationUserRole } from '@/clients';
@@ -153,16 +155,35 @@ export function UserPage() {
   }));
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col bg-surface">
+    <div
+      data-page-scroll
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-surface"
+    >
       <Helmet title="User and Teams" />
-      <PageHeaderBlock>
-        <PageTitleWithCount
-          count={userActions.users.length}
-          total={userActions.totalCount}
-        >
-          Users
-        </PageTitleWithCount>
-      </PageHeaderBlock>
+      <PageHeader
+        eyebrow={
+          <Text variant="label-01" className="text-primary">
+            Organization
+          </Text>
+        }
+        title="Users"
+        description="Manage organization access, roles, and project collaboration for your team."
+        contextualActions={
+          <Text variant="label-01" className="text-muted tabular-nums">
+            {userActions.users.length} of {userActions.totalCount}
+          </Text>
+        }
+        pageActions={
+          <Button
+            className="w-full md:w-auto"
+            size="md"
+            renderIcon={Add}
+            onClick={() => setInviteOrganizationModalOpen(true)}
+          >
+            Invite user
+          </Button>
+        }
+      />
       {isFetching ? (
         <TableSection className="min-h-0 overflow-hidden bg-surface">
           <DataTableSkeleton
@@ -208,81 +229,76 @@ export function UserPage() {
 
               return (
                 <>
-                  <TableToolbar {...getToolbarProps()}>
-                    {selectedUser && (
-                      <TableBatchActions
-                        {...batchActionProps}
-                        shouldShowBatchActions
-                      >
-                        <TableBatchAction
-                          renderIcon={Add}
-                          iconDescription="Invite to project"
-                          onClick={() => {
-                            setUserPendingProjectInvite(selectedUser);
-                            batchActionProps.onCancel();
-                          }}
+                  <PageHeaderStickyToolbar>
+                    <TableToolbar {...getToolbarProps()}>
+                      {selectedUser && (
+                        <TableBatchActions
+                          {...batchActionProps}
+                          shouldShowBatchActions
                         >
-                          Invite to project
-                        </TableBatchAction>
-                        {nextOrganizationRole && (
                           <TableBatchAction
-                            renderIcon={UserAdmin}
-                            iconDescription={
-                              nextOrganizationRole === 'admin'
-                                ? 'Make admin'
-                                : 'Make member'
-                            }
+                            renderIcon={Add}
+                            iconDescription="Invite to project"
                             onClick={() => {
-                              onUpdateOrganizationRole(
-                                selectedUser,
-                                nextOrganizationRole,
-                              );
+                              setUserPendingProjectInvite(selectedUser);
                               batchActionProps.onCancel();
                             }}
                           >
-                            {nextOrganizationRole === 'admin'
-                              ? 'Make admin'
-                              : 'Make member'}
+                            Invite to project
                           </TableBatchAction>
-                        )}
-                        <TableBatchAction
-                          renderIcon={TrashCan}
-                          iconDescription="Delete"
-                          onClick={() => {
-                            setUserPendingDelete(selectedUser);
-                            batchActionProps.onCancel();
-                          }}
-                        >
-                          Delete
-                        </TableBatchAction>
-                      </TableBatchActions>
-                    )}
-                    <TableToolbarContent>
-                      <TableToolbarSearch
-                        placeholder="Search users..."
-                        onChange={onInputChange}
-                      />
-                      <Button
-                        hasIconOnly
-                        renderIcon={Renew}
-                        iconDescription="Refresh"
-                        kind="ghost"
-                        onClick={getUsers}
-                        tooltipPosition="bottom"
-                      />
-                      <Button
-                        size="md"
-                        renderIcon={Add}
-                        onClick={() => setInviteOrganizationModalOpen(true)}
-                      >
-                        Invite user
-                      </Button>
-                    </TableToolbarContent>
-                  </TableToolbar>
+                          {nextOrganizationRole && (
+                            <TableBatchAction
+                              renderIcon={UserAdmin}
+                              iconDescription={
+                                nextOrganizationRole === 'admin'
+                                  ? 'Make admin'
+                                  : 'Make member'
+                              }
+                              onClick={() => {
+                                onUpdateOrganizationRole(
+                                  selectedUser,
+                                  nextOrganizationRole,
+                                );
+                                batchActionProps.onCancel();
+                              }}
+                            >
+                              {nextOrganizationRole === 'admin'
+                                ? 'Make admin'
+                                : 'Make member'}
+                            </TableBatchAction>
+                          )}
+                          <TableBatchAction
+                            renderIcon={TrashCan}
+                            iconDescription="Delete"
+                            onClick={() => {
+                              setUserPendingDelete(selectedUser);
+                              batchActionProps.onCancel();
+                            }}
+                          >
+                            Delete
+                          </TableBatchAction>
+                        </TableBatchActions>
+                      )}
+                      <TableToolbarContent>
+                        <TableToolbarSearch
+                          placeholder="Search users..."
+                          onChange={onInputChange}
+                        />
+                        <Button
+                          hasIconOnly
+                          renderIcon={Renew}
+                          iconDescription="Refresh"
+                          kind="ghost"
+                          onClick={getUsers}
+                          tooltipPosition="bottom"
+                        />
+                      </TableToolbarContent>
+                    </TableToolbar>
+                  </PageHeaderStickyToolbar>
 
                   {userActions.users.length > 0 ? (
                     <>
-                      <div className="min-h-0 flex-1 overflow-auto">
+                      <div className="shrink-0 overflow-x-auto">
                         <Table {...getTableProps()} className="min-w-max">
                           <TableHead>
                             <TableRow>
@@ -320,7 +336,7 @@ export function UserPage() {
                         </Table>
                       </div>
                       <Pagination
-                        className="shrink-0"
+                        className="mt-auto shrink-0"
                         totalItems={userActions.totalCount}
                         page={userActions.page}
                         pageSize={userActions.pageSize}

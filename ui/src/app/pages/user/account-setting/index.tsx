@@ -1,4 +1,4 @@
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
+import { CompactPageHeader } from '@/app/components/layout/compact-page-header';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { GhostButton, Tab } from '@/app/components/ui/primitives';
 import { AccountSetting } from '@/app/pages/user/account-setting/account-setting';
@@ -11,7 +11,7 @@ export const AccountSettingPage = () => {
   return (
     <div className="flex flex-col flex-1 bg-surface h-full">
       <Helmet title="Account settings" />
-      <PageHeaderBlock>
+      <CompactPageHeader>
         <div className="flex items-center gap-1.5 min-w-0">
           <GhostButton
             size="sm"
@@ -23,7 +23,7 @@ export const AccountSettingPage = () => {
             Dashboard
           </GhostButton>
         </div>
-      </PageHeaderBlock>
+      </CompactPageHeader>
       <div className="flex min-h-0 flex-1 flex-col">
         <Tab
           strict={false}

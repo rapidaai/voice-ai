@@ -424,8 +424,8 @@ jest.mock('@/app/components/ui/primitives/overflow-menu', () => ({
 }));
 
 jest.mock('@/app/components/app-shell/helmet', () => ({ Helmet: () => null }));
-jest.mock('@/app/components/layout/blocks/page-header-block', () => ({
-  PageHeaderBlock: ({ children }: any) => <div>{children}</div>,
+jest.mock('@/app/components/layout/compact-page-header', () => ({
+  CompactPageHeader: ({ children }: any) => <div>{children}</div>,
 }));
 jest.mock('@/app/components/layout/blocks/page-title-block', () => ({
   PageTitleBlock: ({ children }: any) => <h2>{children}</h2>,

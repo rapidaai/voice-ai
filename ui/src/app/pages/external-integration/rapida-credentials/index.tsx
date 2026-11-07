@@ -9,9 +9,7 @@ import toast from 'react-hot-toast/headless';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { EmptyState } from '@/app/components/ui/feedback';
 import { AuthContext } from '@/context/auth-context';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
-import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
-import { PageTitleWithCount } from '@/app/components/layout/blocks/page-title-with-count';
+import { PageHeader } from '@/app/components/layout/page-header';
 import {
   Add,
   Renew,
@@ -29,6 +27,7 @@ import { GhostButton } from '@/app/components/ui/primitives';
 import { IconOnlyButton } from '@/app/components/ui/primitives';
 import { BaseCard } from '@/app/components/ui/primitives';
 import { PrimaryButton } from '@/app/components/ui/primitives';
+import { Text } from '@/app/components/ui/primitives';
 import {
   createProjectPublishableCredential,
   listProjectCredentials,
@@ -131,32 +130,46 @@ export function ProjectCredentialPage() {
    *
    */
   return (
-    <>
+    <div
+      data-page-scroll
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+    >
       <Helmet title="Providers and Models" />
-      <PageHeaderBlock className="border-b">
-        <PageTitleWithCount count={ourKeys.length} total={ourKeys.length}>
-          Project Developer Keys
-        </PageTitleWithCount>
-        <div className="flex items-stretch h-12 border-l border-border-subtle ">
-          <IconOnlyButton
-            kind="ghost"
-            size="md"
-            renderIcon={Renew}
-            iconDescription="Refresh credentials"
-            onClick={shouldReload}
-            className="h-full"
-          />
-          <PrimaryButton
-            size="md"
-            type="button"
-            onClick={onCreateProjectCredential}
-            className="h-full whitespace-nowrap"
-            renderIcon={Add}
-          >
-            Create credential
-          </PrimaryButton>
-        </div>
-      </PageHeaderBlock>
+      <PageHeader
+        eyebrow={
+          <Text variant="label-01" className="text-primary">
+            Integrations
+          </Text>
+        }
+        title="Project Developer Keys"
+        description="Create and manage project-scoped keys used to authenticate platform service requests."
+        contextualActions={
+          <Text variant="label-01" className="text-muted tabular-nums">
+            {ourKeys.length}
+          </Text>
+        }
+        pageActions={
+          <div className="flex w-full items-stretch md:w-auto">
+            <IconOnlyButton
+              kind="ghost"
+              size="md"
+              renderIcon={Renew}
+              iconDescription="Refresh credentials"
+              onClick={shouldReload}
+              className="h-full"
+            />
+            <PrimaryButton
+              size="md"
+              type="button"
+              onClick={onCreateProjectCredential}
+              className="h-full whitespace-nowrap"
+              renderIcon={Add}
+            >
+              Create credential
+            </PrimaryButton>
+          </div>
+        }
+      />
       <DocNoticeBlock docPath="/integrations/rapida-credentials">
         These are project-specific keys. They are used to authenticate and
         interact with the platform service for this particular project.
@@ -177,7 +190,7 @@ export function ProjectCredentialPage() {
           />
         </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -273,13 +286,20 @@ export function PersonalCredentialPage() {
    *
    */
   return (
-    <>
+    <div
+      data-page-scroll
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+    >
       <Helmet title="Providers and Models" />
-      <PageHeaderBlock className="border-b">
-        <div className="flex items-center gap-3">
-          <PageTitleBlock>Personal Tokens</PageTitleBlock>
-        </div>
-      </PageHeaderBlock>
+      <PageHeader
+        eyebrow={
+          <Text variant="label-01" className="text-primary">
+            Integrations
+          </Text>
+        }
+        title="Personal Tokens"
+        description="Use your personal access token to authenticate platform service requests across projects."
+      />
       <DocNoticeBlock docPath="/integrations/rapida-credentials">
         These are your personal access tokens. They are used to authenticate and
         interact with the platform service across all your projects.
@@ -344,6 +364,6 @@ export function PersonalCredentialPage() {
           </div>
         </BaseCard>
       </section>
-    </>
+    </div>
   );
 }

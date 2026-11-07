@@ -1,9 +1,34 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type HTMLAttributes,
+  type ReactNode,
+} from 'react';
 import { Text } from '@/app/components/ui/primitives';
 
 type PageHeaderState = {
   isCollapsed: boolean;
 };
+
+const PAGE_HEADER_STICKY_TOOLBAR_CLASS_NAME =
+  'sticky top-10 z-10 shrink-0 bg-layer';
+
+export function PageHeaderStickyToolbar({
+  children,
+  className,
+  ...attributes
+}: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      {...attributes}
+      data-page-header-sticky-toolbar
+      className={`${PAGE_HEADER_STICKY_TOOLBAR_CLASS_NAME} ${className || ''}`}
+    >
+      {children}
+    </div>
+  );
+}
 
 interface PageHeaderProps {
   title: string;
@@ -52,9 +77,9 @@ export function PageHeader({
             {eyebrow && <div className="mb-2">{eyebrow}</div>}
             <div className="flex flex-wrap items-center gap-2 text-foreground">
               {titleStart && (
-                <span data-page-header-icon className="shrink-0 pt-0.5">
+                <div data-page-header-icon className="shrink-0 pt-0.5">
                   {titleStart}
-                </span>
+                </div>
               )}
               <Text
                 as="h1"
@@ -101,11 +126,13 @@ export function PageHeader({
               : 'invisible pointer-events-none -translate-y-4 opacity-0'
           }`}
         >
-          <div className="hidden min-w-0 items-center gap-2 text-foreground md:flex">
+          <div
+            className={`${currentPageActions ? 'hidden md:flex' : 'flex'} min-w-0 items-center gap-2 text-foreground`}
+          >
             {titleStart && (
-              <span className="shrink-0 [&_svg]:h-5 [&_svg]:w-5">
+              <div className="shrink-0 [&_svg]:h-5 [&_svg]:w-5">
                 {titleStart}
-              </span>
+              </div>
             )}
             <Text variant="heading-compact-01" className="truncate">
               {title}

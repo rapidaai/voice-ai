@@ -26,8 +26,11 @@ import { Activity, Close, Renew, WarningAlt } from '@carbon/icons-react';
 import toast from 'react-hot-toast/headless';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { EmptyState } from '@/app/components/ui/feedback';
-import { Pagination } from '@/app/components/ui/primitives';
-import { ScrollableTableSection } from '@/app/components/layout/sections/table-section';
+import { Pagination, Text } from '@/app/components/ui/primitives';
+import {
+  PageHeader,
+  PageHeaderStickyToolbar,
+} from '@/app/components/layout/page-header';
 import { CopyButton } from '@/app/components/ui/primitives';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { listTelemetry, TelemetryCriteriaInput } from '@/clients';
@@ -603,7 +606,7 @@ const TelemetryStreamTable = ({
   records: TimelineDocument[];
   onSelectRecord: (document: TimelineDocument) => void;
 }) => (
-  <ScrollableTableSection>
+  <div className="shrink-0 overflow-x-auto">
     <Table className="min-w-[1040px]">
       <TableHead>
         <TableRow>
@@ -685,7 +688,7 @@ const TelemetryStreamTable = ({
         ))}
       </TableBody>
     </Table>
-  </ScrollableTableSection>
+  </div>
 );
 
 const TraceInspectorPanel = ({
@@ -710,7 +713,7 @@ const TraceInspectorPanel = ({
   if (!document) return null;
 
   return (
-    <aside className="flex max-h-[48vh] min-h-[320px] shrink-0 border-t border-border-subtle bg-surface shadow-xl ">
+    <aside className="sticky bottom-0 z-10 flex max-h-[48vh] min-h-[320px] shrink-0 border-t border-border-subtle bg-surface shadow-xl">
       <section className="relative flex min-h-0 flex-1 flex-col">
         <Button
           hasIconOnly
@@ -1169,10 +1172,27 @@ export const ListingPage = () => {
   };
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div
+      data-page-scroll
+      className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+    >
       <Helmet title="Trace" />
 
-      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+      <PageHeader
+        eyebrow={
+          <Text variant="label-01" className="text-primary">
+            Observability
+          </Text>
+        }
+        title="Traces"
+        description="Explore telemetry records across assistant, conversation, message, and component scopes."
+        contextualActions={
+          <Text variant="label-01" className="text-muted tabular-nums">
+            {filteredDocuments.length} of {totalItem}
+          </Text>
+        }
+      />
+      <PageHeaderStickyToolbar>
         <TableToolbar>
           <TableToolbarContent>
             <TraceQuerySearch
@@ -1190,56 +1210,56 @@ export const ListingPage = () => {
             />
           </TableToolbarContent>
         </TableToolbar>
+      </PageHeaderStickyToolbar>
 
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex min-h-0 min-w-0 flex-1">
-            {isLoading ? (
-              <div className="flex flex-1 items-center justify-center">
-                <Loading withOverlay={false} small />
-              </div>
-            ) : filteredDocuments.length === 0 ? (
-              <EmptyState
-                icon={appliedFilters.searchText ? WarningAlt : Activity}
-                title="No traces found"
-                subtitle="Adjust search, scope, component, event, or date filters."
+      <div className="flex flex-1 flex-col">
+        <div className="flex min-w-0 flex-1">
+          {isLoading ? (
+            <div className="flex flex-1 items-center justify-center">
+              <Loading withOverlay={false} small />
+            </div>
+          ) : filteredDocuments.length === 0 ? (
+            <EmptyState
+              icon={appliedFilters.searchText ? WarningAlt : Activity}
+              title="No traces found"
+              subtitle="Adjust search, scope, component, event, or date filters."
+            />
+          ) : (
+            <div className="flex min-w-0 flex-1 flex-col">
+              <TelemetryStreamTable
+                selectedDocumentId={selectedDocument?.id}
+                records={filteredDocuments}
+                onSelectRecord={selectRecord}
               />
-            ) : (
-              <div className="flex min-w-0 flex-1 flex-col">
-                <TelemetryStreamTable
-                  selectedDocumentId={selectedDocument?.id}
-                  records={filteredDocuments}
-                  onSelectRecord={selectRecord}
-                />
 
-                <Pagination
-                  className="shrink-0 border-t border-border-subtle "
-                  totalItems={totalItem}
-                  page={page}
-                  pageSize={pageSize}
-                  pageSizes={[25, 50, 100]}
-                  onChange={({ page: nextPage, pageSize: nextPageSize }) => {
-                    if (nextPageSize !== pageSize) {
-                      setPageSize(nextPageSize);
-                      setPage(1);
-                      return;
-                    }
-                    setPage(nextPage);
-                  }}
-                />
-              </div>
-            )}
-          </div>
-          <TraceInspectorPanel
-            document={selectedDocument}
-            isLoading={isInspectorLoading}
-            records={visibleInspectorDocuments}
-            recordCount={visibleInspectorDocuments.length}
-            selectedContextId={selectedContextId}
-            selectedDocumentId={selectedDocument?.id}
-            onSelectDocument={setSelectedDocument}
-            onClose={() => setSelectedDocument(null)}
-          />
+              <Pagination
+                className="mt-auto shrink-0 border-t border-border-subtle"
+                totalItems={totalItem}
+                page={page}
+                pageSize={pageSize}
+                pageSizes={[25, 50, 100]}
+                onChange={({ page: nextPage, pageSize: nextPageSize }) => {
+                  if (nextPageSize !== pageSize) {
+                    setPageSize(nextPageSize);
+                    setPage(1);
+                    return;
+                  }
+                  setPage(nextPage);
+                }}
+              />
+            </div>
+          )}
         </div>
+        <TraceInspectorPanel
+          document={selectedDocument}
+          isLoading={isInspectorLoading}
+          records={visibleInspectorDocuments}
+          recordCount={visibleInspectorDocuments.length}
+          selectedContextId={selectedContextId}
+          selectedDocumentId={selectedDocument?.id}
+          onSelectDocument={setSelectedDocument}
+          onClose={() => setSelectedDocument(null)}
+        />
       </div>
     </div>
   );

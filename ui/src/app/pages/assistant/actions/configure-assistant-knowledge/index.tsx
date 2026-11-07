@@ -7,7 +7,7 @@ import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { EmptyState } from '@/app/components/ui/feedback';
 import { SelectKnowledgeCard } from '@/app/components/domain/cards/knowledge-card';
 import { Add, Information, Launch } from '@carbon/icons-react';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
+import { CompactPageHeader } from '@/app/components/layout/compact-page-header';
 import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useAssistantKnowledgePageStore } from '@/stores/assistant/actions';
@@ -104,7 +104,7 @@ const ConfigureAssistantKnowledge: FC<{ assistantId: string }> = ({
   return (
     <div className="relative flex flex-col flex-1">
       <ConfirmDialogComponent />
-      <PageHeaderBlock>
+      <CompactPageHeader>
         <PageTitleBlock>Configure Knowledge</PageTitleBlock>
         <div className="flex items-stretch h-12 border-l border-border-subtle ">
           <TablePagination
@@ -135,7 +135,7 @@ const ConfigureAssistantKnowledge: FC<{ assistantId: string }> = ({
             Connect knowledge
           </PrimaryButton>
         </div>
-      </PageHeaderBlock>
+      </CompactPageHeader>
       <div
         className="flex items-center p-2 px-4 text-support-info border-l-4 border-support-info bg-support-info/10 "
         role="alert"

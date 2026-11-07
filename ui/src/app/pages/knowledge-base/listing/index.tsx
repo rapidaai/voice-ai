@@ -13,10 +13,16 @@ import { ClickableKnowledgeCard } from '@/app/components/domain/cards/knowledge-
 import { EmptyState } from '@/app/components/ui/feedback';
 import { HowKnowledgeWorksDialog } from '@/app/components/dialogs/knowledge';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
-import { GhostButton, PrimaryButton } from '@/app/components/ui/primitives';
+import {
+  GhostButton,
+  PrimaryButton,
+  Text,
+} from '@/app/components/ui/primitives';
 import { Add, Renew } from '@carbon/icons-react';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
-import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
+import {
+  PageHeader,
+  PageHeaderStickyToolbar,
+} from '@/app/components/layout/page-header';
 import { cn } from '@/utils';
 import { PaginationButtonBlock } from '@/app/components/layout/blocks/pagination-button-block';
 
@@ -68,56 +74,66 @@ export function KnowledgePage() {
     <div className={cn('flex flex-col h-full flex-1 overflow-auto')}>
       <Helmet title="Knowledge" />
       <HowKnowledgeWorksDialog setModalOpen={sethiw} modalOpen={hiw} />
-      <PageHeaderBlock>
-        <div className="flex items-center gap-3">
-          <PageTitleBlock>Knowledge bases</PageTitleBlock>
-          <div className="text-xs opacity-75">
-            {`${knowledgeActions.knowledgeBases.length}/${knowledgeActions.totalCount}`}
+      <PageHeader
+        eyebrow={
+          <Text variant="label-01" className="text-primary">
+            Knowledge
+          </Text>
+        }
+        title="Knowledge Bases"
+        description="Create and manage reusable knowledge sources that ground assistant responses."
+        contextualActions={
+          <Text variant="label-01" className="text-muted tabular-nums">
+            {knowledgeActions.knowledgeBases.length} of{' '}
+            {knowledgeActions.totalCount}
+          </Text>
+        }
+        pageActions={
+          <div className="flex w-full items-stretch md:w-auto">
+            <GhostButton
+              size="md"
+              type="button"
+              onClick={() => sethiw(!hiw)}
+              className="whitespace-nowrap border-r border-border-subtle"
+            >
+              How it works
+            </GhostButton>
+            <PrimaryButton
+              size="md"
+              type="button"
+              onClick={() => goToCreateKnowledge()}
+              className="whitespace-nowrap"
+              renderIcon={Add}
+            >
+              Add new knowledge
+            </PrimaryButton>
           </div>
-        </div>
-        {/* Carbon UI Shell toolbar pattern */}
-        <div className="flex items-stretch h-12 border-l border-border-subtle ">
-          <GhostButton
-            size="md"
-            type="button"
-            onClick={() => sethiw(!hiw)}
-            className="h-full whitespace-nowrap border-r border-border-subtle"
-          >
-            How it works?
-          </GhostButton>
-          <PrimaryButton
-            size="md"
-            type="button"
-            onClick={() => goToCreateKnowledge()}
-            className="h-full whitespace-nowrap"
-            renderIcon={Add}
-          >
-            Add new knowledge
-          </PrimaryButton>
-        </div>
-      </PageHeaderBlock>
+        }
+      />
 
-      <BluredWrapper className="p-0">
-        <SearchIconInput className="bg-light-background" />
-        <PaginationButtonBlock>
-          <TablePagination
-            currentPage={knowledgeActions.page}
-            onChangeCurrentPage={knowledgeActions.setPage}
-            totalItem={knowledgeActions.totalCount}
-            pageSize={knowledgeActions.pageSize}
-            onChangePageSize={knowledgeActions.setPageSize}
-          />
-          <GhostButton
-            size="md"
-            hasIconOnly
-            iconDescription="Refresh knowledge bases"
-            renderIcon={Renew}
-            onClick={() => {
-              getKnowledges(projectId, token, userId);
-            }}
-          />
-        </PaginationButtonBlock>
-      </BluredWrapper>
+      <PageHeaderStickyToolbar>
+        <BluredWrapper className="p-0">
+          <SearchIconInput className="bg-light-background" />
+          <PaginationButtonBlock>
+            <TablePagination
+              currentPage={knowledgeActions.page}
+              onChangeCurrentPage={knowledgeActions.setPage}
+              totalItem={knowledgeActions.totalCount}
+              pageSize={knowledgeActions.pageSize}
+              onChangePageSize={knowledgeActions.setPageSize}
+            />
+            <GhostButton
+              size="md"
+              hasIconOnly
+              iconDescription="Refresh knowledge bases"
+              renderIcon={Renew}
+              onClick={() => {
+                getKnowledges(projectId, token, userId);
+              }}
+            />
+          </PaginationButtonBlock>
+        </BluredWrapper>
+      </PageHeaderStickyToolbar>
 
       {loading ? (
         <PageLoading className="h-full" />

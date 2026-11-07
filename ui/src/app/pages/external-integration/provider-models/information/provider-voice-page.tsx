@@ -1,9 +1,12 @@
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { CreateProviderCredentialDialog } from '@/app/components/dialogs/provider';
 import { ViewProviderCredentialDialog } from '@/app/components/dialogs/provider';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
-import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
-import { GhostButton, PrimaryButton } from '@/app/components/ui/primitives';
+import { PageHeader } from '@/app/components/layout/page-header';
+import {
+  GhostButton,
+  PrimaryButton,
+  Text,
+} from '@/app/components/ui/primitives';
 import {
   VoiceCatalog,
   VoiceCatalogItem,
@@ -34,7 +37,10 @@ export function ProviderVoicePage(props: {
   if (!provider) return null;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div
+      data-page-scroll
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+    >
       <CreateProviderCredentialDialog
         modalOpen={createProviderModalOpen}
         setModalOpen={setCreateProviderModalOpen}
@@ -50,8 +56,15 @@ export function ProviderVoicePage(props: {
         }}
       />
       <Helmet title={`${provider.name} voices`} />
-      <PageHeaderBlock className="min-h-24 shrink-0">
-        <div className="flex min-w-0 items-center gap-3">
+      <PageHeader
+        eyebrow={
+          <Text variant="label-01" className="text-primary">
+            Integrations
+          </Text>
+        }
+        title={provider.name}
+        description={provider.description}
+        titleStart={
           <div className="flex h-12 w-12 shrink-0 items-center justify-center border border-border-subtle bg-layer">
             {provider.image && !imageFailed ? (
               <img
@@ -68,19 +81,13 @@ export function ProviderVoicePage(props: {
               />
             )}
           </div>
-          <PageTitleBlock className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span>{provider.name}</span>
-              <Tag type={connected ? 'green' : 'gray'} size="sm">
-                {connected ? 'Connected' : 'Setup required'}
-              </Tag>
-            </div>
-            <p className="mt-1 line-clamp-2 max-w-3xl text-sm text-muted">
-              {provider.description}
-            </p>
-          </PageTitleBlock>
-        </div>
-      </PageHeaderBlock>
+        }
+        contextualActions={
+          <Tag type={connected ? 'green' : 'gray'} size="sm">
+            {connected ? 'Connected' : 'Setup required'}
+          </Tag>
+        }
+      />
       <VoiceCatalog
         voices={voices}
         actions={

@@ -50,12 +50,15 @@ jest.mock('@/app/components/domain/cards/knowledge-card', () => ({
   ),
 }));
 
-jest.mock('@/app/components/layout/blocks/page-header-block', () => ({
-  PageHeaderBlock: ({ children }: any) => <header>{children}</header>,
-}));
-
-jest.mock('@/app/components/layout/blocks/page-title-block', () => ({
-  PageTitleBlock: ({ children }: any) => <h1>{children}</h1>,
+jest.mock('@/app/components/layout/page-header', () => ({
+  PageHeader: ({ title, contextualActions, pageActions }: any) => (
+    <header>
+      <h1>{title}</h1>
+      {contextualActions}
+      {pageActions}
+    </header>
+  ),
+  PageHeaderStickyToolbar: ({ children }: any) => <div>{children}</div>,
 }));
 
 jest.mock('@/app/components/layout/blocks/pagination-button-block', () => ({

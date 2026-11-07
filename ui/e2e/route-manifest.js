@@ -444,7 +444,8 @@ const routeJourneys = [
     id: 'logs.traces',
     path: '/logs/traces',
     auth: true,
-    expectText: 'No traces found',
+    expectText: 'Traces',
+    readyText: 'No traces found',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {

@@ -1,4 +1,5 @@
 import { EmptyState } from '@/app/components/ui/feedback';
+import { PageHeaderStickyToolbar } from '@/app/components/layout/page-header';
 import { Pagination } from '@/app/components/ui/primitives';
 import { Pause, Play, Search } from '@carbon/icons-react';
 import {
@@ -183,10 +184,7 @@ export function VoiceCatalog(props: {
   };
 
   return (
-    <section
-      aria-label="Voice catalog"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden"
-    >
+    <section aria-label="Voice catalog" className="flex flex-1 flex-col">
       <DataTable rows={tableRows} headers={VOICE_TABLE_HEADERS}>
         {({
           rows,
@@ -197,23 +195,25 @@ export function VoiceCatalog(props: {
           getRowProps,
           getTableProps,
         }) => (
-          <TableContainer className="flex min-h-0 flex-1 flex-col">
-            <TableToolbar>
-              <TableToolbarContent>
-                <TableToolbarSearch
-                  key={queryFromUrl}
-                  defaultValue={queryFromUrl}
-                  labelText="Search voices"
-                  placeholder="Search by voice, language, or use case"
-                  onChange={onSearch}
-                  onClear={() => onSearch('', '')}
-                />
-                {actions}
-              </TableToolbarContent>
-            </TableToolbar>
+          <TableContainer className="flex flex-1 flex-col">
+            <PageHeaderStickyToolbar>
+              <TableToolbar>
+                <TableToolbarContent>
+                  <TableToolbarSearch
+                    key={queryFromUrl}
+                    defaultValue={queryFromUrl}
+                    labelText="Search voices"
+                    placeholder="Search by voice, language, or use case"
+                    onChange={onSearch}
+                    onClear={() => onSearch('', '')}
+                  />
+                  {actions}
+                </TableToolbarContent>
+              </TableToolbar>
+            </PageHeaderStickyToolbar>
 
             {rows.length > 0 ? (
-              <div className="min-h-0 flex-1 overflow-auto">
+              <div className="shrink-0 overflow-x-auto">
                 <Table
                   {...getTableProps()}
                   aria-label="Provider voices"

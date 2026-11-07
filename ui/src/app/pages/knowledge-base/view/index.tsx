@@ -2,7 +2,7 @@ import { Helmet } from '@/app/components/app-shell/helmet';
 import { useCredential } from '@/hooks/use-credential';
 import { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { PrimaryButton, Tab } from '@/app/components/ui/primitives';
+import { Tab, Text } from '@/app/components/ui/primitives';
 import { Documents } from './documents';
 import { cn } from '@/utils';
 import { toHumanReadableRelativeTime } from '@/utils/date';
@@ -11,8 +11,7 @@ import { CreateTagDialog } from '@/app/components/dialogs/shared/create-tag-moda
 import { UpdateDescriptionDialog } from '@/app/components/dialogs/shared';
 import { Tag } from '@rapidaai/react';
 import { DocumentSegments } from '@/app/pages/knowledge-base/view/document-segments';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
-import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
+import { ResourceDetailHeader } from '@/app/components/layout/resource-detail-header';
 import { CreateKnowledgeDocumentDialog } from '@/app/components/dialogs/knowledge';
 import { Add } from '@carbon/icons-react';
 import type { KnowledgeViewOutletContext } from './knowledge-view.layout';
@@ -92,31 +91,27 @@ export function ViewKnowledgePage() {
       />
       <div className={cn('flex flex-col h-full relative overflow-auto')}>
         <Helmet title="Knowledge" />
-        <PageHeaderBlock>
-          <div className="flex items-center gap-3">
-            <PageTitleBlock>{currentKnowledge?.getName()}</PageTitleBlock>
-            <div className="text-xs text-muted ">
+        <ResourceDetailHeader
+          collectionHref="/knowledge"
+          collectionLabel="Knowledge bases"
+          resourceName={currentKnowledge?.getName() || 'Knowledge base'}
+          actionsLabel="Knowledge base header actions"
+          resourceMetadata={
+            <Text variant="label-01" className="shrink-0 text-muted">
               {currentKnowledge?.getCreateddate() &&
                 toHumanReadableRelativeTime(
                   currentKnowledge?.getCreateddate()!,
                 )}
-            </div>
-          </div>
-          {/* Carbon UI Shell toolbar pattern */}
-          <div className="flex items-stretch h-12 border-l border-border-subtle ">
-            <PrimaryButton
-              size="md"
-              type="button"
-              onClick={() => {
-                if (currentKnowledge) setCreateKnowledgeOpen(true);
-              }}
-              className="h-full whitespace-nowrap"
-              renderIcon={Add}
-            >
-              Add new document
-            </PrimaryButton>
-          </div>
-        </PageHeaderBlock>
+            </Text>
+          }
+          primaryAction={{
+            label: 'Add new document',
+            icon: Add,
+            onClick: () => {
+              if (currentKnowledge) setCreateKnowledgeOpen(true);
+            },
+          }}
+        />
 
         {/*  */}
         <CreateKnowledgeDocumentDialog
