@@ -33,7 +33,7 @@ import {
   ValidateTextToSpeechIfInvalid,
 } from '@/app/components/domain/providers/text-to-speech/provider';
 import { useConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-confirmation';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -368,12 +368,14 @@ const ConfigureAssistantApiDeployment: FC<{ assistantId: string }> = ({
     <>
       <ConfirmDialogComponent />
       <div className="flex flex-col flex-1 min-h-0 bg-surface ">
-        <TabForm
-          formHeading="Complete all steps to configure your SDK / API deployment."
-          activeTab={activeTab}
-          onChangeActiveTab={handleTabChange}
+        <CreateFullPageWithHeader
+          title="Deploy API"
+          eyebrow="Deployment"
+          description="Complete all steps to configure your SDK / API deployment."
+          activeStep={activeTab}
+          onChangeStep={handleTabChange}
           errorMessage={errorMessage}
-          form={[
+          steps={[
             {
               code: 'experience',
               name: 'General Experience',

@@ -5,7 +5,7 @@ import { useParams } from 'react-router-dom';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
 import { ButtonSet } from '@carbon/react';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import { FieldSet } from '@/app/components/ui/primitives';
 import { useConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-confirmation';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
@@ -204,13 +204,14 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
     <>
       <ConfirmDialogComponent />
       <Helmet title="Connect new websocket"></Helmet>
-      <TabForm
-        className="bg-linear-to-r from-surface hover:shadow-alternate to-data-1/5 via-surface/10 "
-        formHeading="Complete all steps to connect your WebSocket."
-        activeTab={activeTab}
-        onChangeActiveTab={() => {}}
+      <CreateFullPageWithHeader
+        title="Create WebSocket version"
+        eyebrow="Assistant"
+        description="Complete all steps to connect your WebSocket."
+        activeStep={activeTab}
+        onChangeStep={() => {}}
         errorMessage={errorMessage}
-        form={[
+        steps={[
           {
             code: 'change-assistant',
             name: 'Configure Connection',
@@ -281,7 +282,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
           },
           {
             code: 'commit-assistant',
-            name: 'Change definition',
+            name: 'Change Definition',
             description:
               'Provide a clear description of the changes made in this version to help others understand what has been updated.',
             actions: [

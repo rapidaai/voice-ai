@@ -10,7 +10,7 @@ import { EndpointDropdown } from '@/app/components/domain/dropdowns/endpoint-dro
 import { Endpoint, Metadata } from '@rapidaai/react';
 import { useParams } from 'react-router-dom';
 import toast from 'react-hot-toast/headless';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import {
   ASSISTANT_CONDITION_KEY_OPTIONS,
   ASSISTANT_CONDITION_OPERATOR_OPTIONS,
@@ -282,12 +282,14 @@ export const UpdateAssistantAnalysis: FC<{ assistantId: string }> = ({
   return (
     <>
       <ConfirmDialogComponent />
-      <TabForm
-        formHeading="Update all steps to reconfigure your analysis."
-        activeTab={activeTab}
-        onChangeActiveTab={() => {}}
+      <CreateFullPageWithHeader
+        title="Update analysis"
+        eyebrow="Assistant"
+        description="Update all steps to reconfigure your analysis."
+        activeStep={activeTab}
+        onChangeStep={() => {}}
         errorMessage={errorMessage}
-        form={[
+        steps={[
           {
             code: 'configure',
             name: 'Configure',

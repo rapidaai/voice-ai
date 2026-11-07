@@ -34,7 +34,7 @@ import {
 } from '@/app/components/domain/providers/text-to-speech/provider';
 import { useConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-confirmation';
 import { DebuggerDeploymentSuccessDialog } from '@/app/components/dialogs/assistant';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -575,12 +575,14 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
             </div>
           </div>
         ) : (
-          <TabForm
-            formHeading="Complete all steps to configure your debugger deployment."
-            activeTab={activeTab}
-            onChangeActiveTab={handleTabChange}
+          <CreateFullPageWithHeader
+            title="Deploy debugger"
+            eyebrow="Deployment"
+            description="Complete all steps to configure your debugger deployment."
+            activeStep={activeTab}
+            onChangeStep={handleTabChange}
             errorMessage={errorMessage}
-            form={[
+            steps={[
               {
                 code: 'experience',
                 name: 'General Experience',

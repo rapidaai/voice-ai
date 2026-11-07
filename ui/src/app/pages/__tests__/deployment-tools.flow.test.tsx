@@ -210,12 +210,17 @@ jest.mock('@/app/pages/assistant/actions/hooks/use-confirmation', () => ({
   }),
 }));
 
-jest.mock('@/app/components/ui/composites/tab-form', () => ({
-  TabForm: ({ activeTab, errorMessage, form, formHeading }: any) => {
-    const active = form.find((f: any) => f.code === activeTab) || form[0];
+jest.mock('@/app/components/ui/composites/create-full-page', () => ({
+  CreateFullPageWithHeader: ({
+    activeStep,
+    description,
+    errorMessage,
+    steps,
+  }: any) => {
+    const active = steps.find((f: any) => f.code === activeStep) || steps[0];
     return (
       <div>
-        <h1>{formHeading}</h1>
+        <h1>{description}</h1>
         {errorMessage ? <div>{errorMessage}</div> : null}
         <div>{active.body}</div>
         <div>

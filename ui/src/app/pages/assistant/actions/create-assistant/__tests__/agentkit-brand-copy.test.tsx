@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { CreateAgentKit } from '../create-agentkit';
@@ -141,12 +142,19 @@ jest.mock('@/app/pages/assistant/actions/hooks/use-confirmation', () => ({
   }),
 }));
 
-jest.mock('@/app/components/ui/composites/tab-form', () => ({
-  TabForm: ({ activeTab, errorMessage, form, formHeading }: any) => {
-    const active = form.find((item: any) => item.code === activeTab) ?? form[0];
+jest.mock('@/app/components/ui/composites/create-full-page', () => ({
+  ...jest.requireActual('@/app/components/ui/composites/create-full-page'),
+  CreateFullPageWithHeader: ({
+    activeStep,
+    description,
+    errorMessage,
+    steps,
+  }: any) => {
+    const active =
+      steps.find((item: any) => item.code === activeStep) ?? steps[0];
     return (
       <div>
-        <h1>{formHeading}</h1>
+        <h1>{description}</h1>
         {errorMessage ? <div>{errorMessage}</div> : null}
         <p>{active.description}</p>
         <div>{active.body}</div>
@@ -177,7 +185,23 @@ jest.mock('@/app/components/ui/primitives/button', () => ({
 }));
 
 jest.mock('@carbon/react', () => ({
+  Button: ({ children, kind: _kind, size: _size, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
   ButtonSet: ({ children }: any) => <div>{children}</div>,
+  Form: ({ children, ...props }: any) => <form {...props}>{children}</form>,
+  InlineNotification: ({ subtitle, title }: any) => (
+    <div role="alert">
+      {title} {subtitle}
+    </div>
+  ),
+  ProgressIndicator: ({ children }: any) => <ol>{children}</ol>,
+  ProgressStep: ({ label, secondaryLabel }: any) => (
+    <li>
+      <span>{label}</span>
+      <span>{secondaryLabel}</span>
+    </li>
+  ),
   Slider: ({ id, labelText }: any) => (
     <input aria-label={labelText} id={id} readOnly />
   ),
@@ -206,6 +230,7 @@ jest.mock('@carbon/icons-react', () => {
     ChevronDown: Icon('chevron-down-icon'),
     ChevronRight: Icon('chevron-right-icon'),
     Code: Icon('code-icon'),
+    ConnectionSignal: Icon('connection-signal-icon'),
     Debug: Icon('debug-icon'),
     Globe: Icon('globe-icon'),
     Information: Icon('information-icon'),
@@ -219,7 +244,9 @@ jest.mock('@/app/components/ui/primitives/fieldset', () => ({
   FieldSet: ({ children }: any) => <div>{children}</div>,
 }));
 jest.mock('@/app/components/ui/primitives/form-label', () => ({
-  FormLabel: ({ children }: any) => <label>{children}</label>,
+  FormLabel: ({ children, ...props }: any) => (
+    <label {...props}>{children}</label>
+  ),
 }));
 jest.mock('@/app/components/ui/primitives/input', () => ({
   Input: (props: any) => <input {...props} />,
@@ -274,6 +301,7 @@ jest.mock('@/app/components/ui/feedback/error-container', () => ({
   ),
 }));
 jest.mock('@/utils', () => ({
+  ...jest.requireActual('@/utils'),
   randomMeaningfullName: () => 'assistant-default',
 }));
 jest.mock('react-hot-toast/headless', () => ({
@@ -355,7 +383,7 @@ describe('AgentKit brand copy', () => {
     renderWithTheme(<CreateAgentKit />);
 
     expect(document.body).toHaveTextContent(
-      'with the Acme Voice orchestration engine',
+      'Connect an AgentKit endpoint, define its assistant profile, then choose how to deploy it.',
     );
     expect(document.body).toHaveTextContent(
       'where your Acme Voice AgentKit is running',
@@ -369,6 +397,45 @@ describe('AgentKit brand copy', () => {
       'data-stroke-width',
     );
     expect(document.body).not.toHaveTextContent('Rapida AgentKit');
+  });
+
+  it('keeps the connection step active until the endpoint is valid', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    renderWithTheme(<CreateAgentKit />);
+
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Enter a valid AgentKit endpoint in host:port format.',
+    );
+    expect(
+      screen.getByPlaceholderText('agent.your-domain.com:5051'),
+    ).toBeVisible();
+
+    await user.type(
+      screen.getByPlaceholderText('agent.your-domain.com:5051'),
+      'agent.example.com:5051',
+    );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('moves to the profile step after a valid endpoint is entered', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    renderWithTheme(<CreateAgentKit />);
+
+    await user.type(
+      screen.getByPlaceholderText('agent.your-domain.com:5051'),
+      'agent.example.com:5051',
+    );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(
+      screen.getByPlaceholderText('e.g. customer-support-assistant'),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Create and continue' }),
+    ).toBeVisible();
   });
 
   it('renders the create WebSocket page with the configured brand', () => {

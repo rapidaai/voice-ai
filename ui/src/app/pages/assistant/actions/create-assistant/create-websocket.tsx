@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { useRapidaStore } from '@/stores/app';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
 import { ButtonSet } from '@carbon/react';
 import {
@@ -180,12 +180,14 @@ export function CreateWebsocket() {
       <Helmet title="Create an assistant"></Helmet>
       <ConfirmDialogComponent />
 
-      <TabForm
-        formHeading="Complete all steps to connect with a websocket"
-        activeTab={activeTab}
-        onChangeActiveTab={() => {}}
+      <CreateFullPageWithHeader
+        title="Connect WebSocket"
+        eyebrow="Assistant"
+        description="Complete all steps to connect with a WebSocket."
+        activeStep={activeTab}
+        onChangeStep={() => {}}
         errorMessage={errorMessage}
-        form={[
+        steps={[
           {
             name: 'Configuration',
             description: 'Configure and connect the agent using a websocket',

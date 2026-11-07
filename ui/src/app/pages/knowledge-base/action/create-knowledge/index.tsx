@@ -9,7 +9,7 @@ import { useRapidaStore } from '@/stores/app';
 import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
 import { ButtonSet } from '@carbon/react';
 import { KnowledgeDocument } from '@rapidaai/react';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import { useCreateKnowledgeDocumentPageStore } from '@/stores/knowledge/create-knowledge-document.store';
 import { Knowledge } from '@rapidaai/react';
 import { KnowledgeTags } from '@/app/components/domain/tags/knowledge-tags';
@@ -129,12 +129,14 @@ export function CreateKnowledgePage() {
         onClose={() => setIsShow(false)}
       />
 
-      <TabForm
-        activeTab={activeTab}
-        formHeading="Complete all steps to create a knowledge base."
-        onChangeActiveTab={() => {}}
+      <CreateFullPageWithHeader
+        title="Create knowledge base"
+        eyebrow="Knowledge"
+        activeStep={activeTab}
+        description="Complete all steps to create a knowledge base."
+        onChangeStep={() => {}}
         errorMessage={errorMessage}
-        form={[
+        steps={[
           {
             name: 'Configure Embedding',
             description:

@@ -10,6 +10,9 @@ const {
   ASSISTANT_CONVERSATION_DETAIL_PATH,
   mockPopulatedAssistantDeployments,
 } = require('../../mocks/clients/assistant');
+const {
+  mockOrganizationCredentials,
+} = require('../../mocks/clients/credential');
 const { routeJourneys } = require('../../route-manifest');
 
 const journey = id => routeJourneys.find(candidate => candidate.id === id);
@@ -31,6 +34,55 @@ const deploymentDetailScreenshots = [
     folder: 'phone-details',
   },
 ];
+
+for (const colorMode of ['light', 'dark']) {
+  test(`create version loads both steps in ${colorMode} mode`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setColorMode(page, colorMode);
+    await mockOrganizationCredentials(page);
+    await gotoJourney(page, journey('deployment.assistantCreateVersion'));
+
+    await expect(
+      page.getByText(
+        'Unable to get latest assistant provider. Please try again later.',
+      ),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('combobox', { name: 'Model provider' }),
+    ).toContainText('OpenAI');
+    await expect(page.getByText('gpt-4.1-mini', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('You are a helpful customer support assistant.', {
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(
+      page.getByText(
+        'Write a brief note describing what changed in this version.',
+      ).first(),
+    ).toBeVisible();
+    const versionNote = page.locator('#model-version-note');
+    await expect(versionNote).toBeVisible();
+    await versionNote.fill('Updated the assistant instructions.');
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.mouse.move(0, 0);
+    await page.evaluate(() => document.fonts.ready);
+    await expect(page).toHaveScreenshot(
+      ['assistant', 'create-version-note', 'success', `lg-${colorMode}.png`],
+      { fullPage: true, maxDiffPixelRatio: 0.01 },
+    );
+
+    await versionNote.fill('');
+    await page.getByRole('button', { name: 'Create' }).click();
+
+    await expect(versionNote).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByText('Enter a version note.').first()).toBeVisible();
+  });
+}
 
 for (const colorMode of ['light', 'dark']) {
   test(`debugger deployment uses one Carbon detail surface in ${colorMode} mode`, async ({

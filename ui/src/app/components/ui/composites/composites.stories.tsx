@@ -5,7 +5,7 @@ import { DateFilter } from './date-filter';
 import { SearchIconInput } from './icon-input';
 import { CardOptionMenu, OptionMenu, OptionMenuItem } from './menu';
 import { QuerySearch, type QuerySearchField } from './query-search';
-import { TabForm } from './tab-form';
+import { CreateFullPageWithHeader } from './create-full-page';
 import { TableToolbarFilter } from './table-toolbar-filter';
 import { TagInput } from './tag-input';
 
@@ -128,11 +128,13 @@ export const Steps: Story = {
 
     return (
       <div className="h-[520px] border border-border-subtle">
-        <TabForm
-          activeTab={activeTab}
-          onChangeActiveTab={setActiveTab}
-          formHeading="Configure a reusable assistant workflow."
-          form={[
+        <CreateFullPageWithHeader
+          title="Configure assistant"
+          eyebrow="Assistant"
+          activeStep={activeTab}
+          onChangeStep={setActiveTab}
+          description="Configure a reusable assistant workflow."
+          steps={[
             {
               code: 'profile',
               name: 'Profile',

@@ -119,13 +119,18 @@ jest.mock('@/app/components/domain/dropdowns/endpoint-dropdown', () => ({
   ),
 }));
 
-jest.mock('@/app/components/ui/composites/tab-form', () => ({
-  TabForm: ({ form, activeTab, errorMessage, formHeading }: any) => {
+jest.mock('@/app/components/ui/composites/create-full-page', () => ({
+  CreateFullPageWithHeader: ({
+    steps,
+    activeStep,
+    errorMessage,
+    description,
+  }: any) => {
     const React = require('react');
-    const active = form.find((f: any) => f.code === activeTab) || form[0];
+    const active = steps.find((f: any) => f.code === activeStep) || steps[0];
     return (
       <div>
-        <h1>{formHeading}</h1>
+        <h1>{description}</h1>
         {errorMessage ? <div>{errorMessage}</div> : null}
         <div>{active.body}</div>
         <div>

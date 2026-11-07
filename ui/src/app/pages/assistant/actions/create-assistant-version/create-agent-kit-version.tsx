@@ -16,7 +16,7 @@ import {
   ToggletipContent,
 } from '@carbon/react';
 import { ChevronDown, Information } from '@carbon/icons-react';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import { FieldSet } from '@/app/components/ui/primitives';
 import { useConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-confirmation';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
@@ -384,15 +384,17 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
     <>
       <ConfirmDialogComponent />
       <Helmet title="Connect AgentKit"></Helmet>
-      <TabForm
-        formHeading="Create a new version of this AgentKit connection."
-        activeTab={activeTab}
-        onChangeActiveTab={() => {}}
+      <CreateFullPageWithHeader
+        title="Create AgentKit version"
+        eyebrow="Assistant"
+        description="Create a new version of this AgentKit connection."
+        activeStep={activeTab}
+        onChangeStep={() => {}}
         errorMessage={errorMessage}
-        form={[
+        steps={[
           {
             code: 'change-assistant',
-            name: 'Connect configuration',
+            name: 'Connect Configuration',
             description: `Provide the connection configuration for your ${theme.brand.name} AgentKit setup.`,
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
@@ -644,7 +646,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
           },
           {
             code: 'commit-assistant',
-            name: 'Version note',
+            name: 'Version Note',
             description:
               'Write a brief note describing what changed in this version.',
             actions: [
