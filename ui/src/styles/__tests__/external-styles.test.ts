@@ -8,12 +8,21 @@ describe('external style adapters', () => {
   it('loads only the registered third-party adapters', () => {
     const imports = readStyles('global-styles.ts');
 
-    expect(imports).toContain("import '@carbon/charts-react/styles.css'");
+    expect(imports).not.toContain("import '@carbon/charts-react/styles.css'");
     expect(imports).toContain("import './externals/editors.css'");
     expect(imports).toContain("import './externals/flatpickr.css'");
     expect(imports).toContain("import './externals/voice-visualizer.css'");
     expect(imports).not.toContain('custom.css');
     expect(existsSync(stylePath('custom.css'))).toBe(false);
+  });
+
+  it('keeps Carbon Charts styles scoped to the dashboard route', () => {
+    const dashboard = readFileSync(
+      resolve(process.cwd(), 'src/app/pages/main/web-dashboard/index.tsx'),
+      'utf8',
+    );
+
+    expect(dashboard).toContain("import '@carbon/charts-react/styles.css'");
   });
 
   it('uses Carbon roles instead of independent adapter colors', () => {

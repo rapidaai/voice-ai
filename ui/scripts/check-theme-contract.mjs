@@ -412,6 +412,13 @@ export const THEME_STYLE_EXCEPTIONS = Object.freeze({
       }),
     }),
   'ui/src/app/pages/main/web-dashboard/index.tsx': Object.freeze({
+    'component-stylesheet': Object.freeze({
+      matches: Object.freeze([
+        "import '@carbon/charts-react/styles.css'",
+      ]),
+      reason:
+        'Carbon Charts requires its package stylesheet, scoped to the dashboard route to preserve the initial CSS budget',
+    }),
     'inline-color': Object.freeze({
       matches: Object.freeze([
         "background: 'var(--color-layer)'",

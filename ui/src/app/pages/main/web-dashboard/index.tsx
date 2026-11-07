@@ -31,6 +31,7 @@ import {
   type ChartTabularData,
   type LineChartOptions,
 } from '@carbon/charts-react';
+import '@carbon/charts-react/styles.css';
 import {
   DashboardAssistantHealth,
   DashboardFailureCode,
