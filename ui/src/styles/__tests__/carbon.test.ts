@@ -47,8 +47,11 @@ describe('Carbon theme adapters', () => {
 
     expect(version2).not.toContain('--cds-text-on-color:');
     expect(version2).not.toContain('--cds-icon-on-color:');
+    expect(styles).toContain(
+      '.cds--btn--primary:not(:disabled):not(.cds--modal-close)',
+    );
     expect(styles).toMatch(
-      /:root\[data-theme-schema='2'\] \.cds--btn--primary[^{]*{[\s\S]*?--cds-text-on-color: var\(--brand-on-primary\)/,
+      /:root\[data-theme-schema='2'\]\s+\.cds--btn--primary[^{]*{[\s\S]*?--cds-text-on-color: var\(--brand-on-primary\)/,
     );
     expect(styles).not.toMatch(
       /\.cds--btn--danger[^{]*{[\s\S]*?--brand-on-primary/,

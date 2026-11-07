@@ -192,7 +192,8 @@
   --cds-link-primary-hover: var(--brand-primary-hover);
 }
 
-:root[data-theme-schema='2'] .cds--btn--primary:not(:disabled),
+:root[data-theme-schema='2']
+  .cds--btn--primary:not(:disabled):not(.cds--modal-close),
 :root[data-theme-schema='2'] .cds--btn--tertiary:not(:disabled):hover,
 :root[data-theme-schema='2'] .cds--btn--tertiary:not(:disabled):active {
   --cds-text-on-color: var(--brand-on-primary);
