@@ -8,21 +8,36 @@ import {
   SourceControl,
 } from '@carbon/icons-react';
 import {
+  Button,
   SideNav,
   SideNavItems,
   SideNavLink,
   SideNavMenu,
   SideNavMenuItem,
 } from '@carbon/react';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { cn } from '@/utils';
-import { GhostButton } from '@/app/components/ui/primitives';
 
 export function EndpointSideNav(props: { endpointId: string }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(
+    () => !window.matchMedia?.('(max-width: 767px)').matches,
+  );
   const { pathname } = useLocation();
   const basePath = `/deployment/endpoint/${props.endpointId}`;
+
+  useEffect(() => {
+    const media = window.matchMedia?.('(max-width: 767px)');
+    if (!media) return undefined;
+
+    const collapseOnMobile = (event: MediaQueryListEvent) => {
+      if (event.matches) setExpanded(false);
+    };
+
+    if (media.matches) setExpanded(false);
+    media.addEventListener('change', collapseOnMobile);
+    return () => media.removeEventListener('change', collapseOnMobile);
+  }, []);
 
   const isActive = (path: string) => {
     if (path === 'versions' && pathname.endsWith('/create-endpoint-version')) {
@@ -34,17 +49,19 @@ export function EndpointSideNav(props: { endpointId: string }) {
   return (
     <div
       className={cn(
-        'relative flex h-full shrink-0 flex-col',
-        'border-r border-border-subtle bg-surface ',
-        'transition-all duration-200',
-        expanded ? 'w-56' : 'w-12',
+        'relative shrink-0 flex flex-col h-full',
+        'bg-shell text-foreground',
+        'border-r border-border-subtle',
+        'transition-[width] duration-200 ease-in-out',
+        expanded ? 'w-64' : 'w-12',
       )}
     >
       <SideNav
         aria-label="Endpoint actions"
         expanded={expanded}
+        isFixedNav
         isRail={!expanded}
-        className="relative! inset-auto! z-0! h-auto! w-full! flex-1 border-none!"
+        className="relative! inset-auto! h-auto! flex-1 w-full! transform-none! border-none! bg-transparent! z-0!"
       >
         <SideNavItems>
           <SideNavLink
@@ -121,21 +138,40 @@ export function EndpointSideNav(props: { endpointId: string }) {
         </SideNavItems>
       </SideNav>
 
-      <div className="shrink-0 border-t border-border-subtle ">
-        <GhostButton
-          size="sm"
+      <div className="shrink-0 border-t border-border-subtle">
+        <Button
           type="button"
+          kind="ghost"
+          size="sm"
           onClick={() => setExpanded(current => !current)}
-          renderIcon={expanded ? SidePanelClose : SidePanelOpen}
-          hasIconOnly={!expanded}
-          iconDescription={expanded ? 'Collapse nav' : 'Expand nav'}
+          aria-label={
+            expanded
+              ? 'Collapse endpoint navigation'
+              : 'Expand endpoint navigation'
+          }
           className={cn(
-            'h-10 w-full max-w-none!',
-            !expanded && 'justify-center',
+            '!flex !h-10 !w-full !max-w-none !items-center !justify-start !px-4',
+            '!text-muted',
+            'hover:!bg-layer-hover hover:!text-foreground',
+            '!transition-colors !duration-100',
           )}
         >
-          {expanded ? 'Collapse' : null}
-        </GhostButton>
+          <span className="shrink-0">
+            {expanded ? (
+              <SidePanelClose size={16} />
+            ) : (
+              <SidePanelOpen size={16} />
+            )}
+          </span>
+          <span
+            className={cn(
+              'text-xs truncate transition-all duration-200 ml-3',
+              expanded ? 'opacity-100' : 'opacity-0 w-0 ml-0 overflow-hidden',
+            )}
+          >
+            {expanded ? 'Collapse' : 'Expand'}
+          </span>
+        </Button>
       </div>
     </div>
   );

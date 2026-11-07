@@ -315,10 +315,12 @@ describe('Endpoint detail layout', () => {
       within(endpointNav).getByRole('link', { name: 'Open playground' }),
     ).toHaveAttribute('href', '/deployment/endpoint/endpoint-1/playground');
 
-    await user.click(screen.getByRole('button', { name: 'Collapse nav' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Collapse endpoint navigation' }),
+    );
     expect(endpointNav).toHaveAttribute('data-expanded', 'false');
     expect(
-      screen.getByRole('button', { name: 'Expand nav' }),
+      screen.getByRole('button', { name: 'Expand endpoint navigation' }),
     ).toBeInTheDocument();
 
     overviewRender.unmount();
