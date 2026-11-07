@@ -66,3 +66,7 @@ not rewrite the decision. Create and approve a new RFC for a material change, se
 | [0004](0004-consolidate-authentication-middleware.md) | Separate Authentication Middleware by Credential Class | Accepted |
 | [0005](0005-refine-authentication-middleware-contracts.md) | Refine Authentication Middleware Contracts | Accepted |
 | [0006](0006-remove-audit-backfill-id-validation.md) | Simplify Audit Actor Migrations | Accepted |
+| [0022](0022-role-permission-persistence-migration.md) | Role Catalog Persistence | Accepted |
+| [0026](0026-access-policy-v1.md) | Access Policy Version 1 | Superseded |
+| [0027](0027-recovery-approver-separation.md) | Recovery Approver Separation | Superseded |
+| [0028](0028-token-strict-subset-reduction.md) | Token Reduction and Recovery Separation | Accepted |
