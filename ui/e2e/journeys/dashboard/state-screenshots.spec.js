@@ -45,16 +45,16 @@ const dashboardStates = [
   },
   {
     name: 'success',
-    expectText: 'Top assistants',
+    expectText: 'Top Assistants',
     async install() {
       return async () => {};
     },
     async assert(page) {
       await expect(
-        page.getByText('Top assistants', { exact: true }),
+        page.getByText('Top Assistants', { exact: true }),
       ).toBeVisible();
       await expect(
-        page.getByText('Recent failures', { exact: true }),
+        page.getByText('Recent Failures', { exact: true }),
       ).toBeVisible();
     },
   },

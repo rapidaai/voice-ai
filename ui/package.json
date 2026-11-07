@@ -77,6 +77,7 @@
   },
   "dependencies": {
     "@carbon/ai-chat": "1.22.0",
+    "@carbon/charts-react": "1.27.27",
     "@carbon/grid": "11.64.0",
     "@carbon/ibm-products": "2.102.0",
     "@carbon/layout": "11.63.0",
