@@ -1,10 +1,9 @@
-import React, { FC, useEffect, useState } from 'react';
+import { FC, useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { toHumanReadableDateTime } from '@/utils/date';
-import { Activity, Edit, TrashCan } from '@carbon/icons-react';
+import { Activity, Edit, Power, TrashCan } from '@carbon/icons-react';
 import { useCurrentCredential } from '@/hooks/use-credential';
-import { SectionLoader } from '@/app/components/ui/feedback';
 import toast from 'react-hot-toast/headless';
 import { EmptyState } from '@/app/components/ui/feedback';
 import { CreateAssistantTelemetry } from './create-assistant-telemetry';
@@ -18,22 +17,25 @@ import {
   ModalBody,
   ModalFooter,
   ModalHeader,
+  DataTable,
+  DataTableSkeleton,
   Table,
+  TableBatchAction,
+  TableBatchActions,
   TableHead,
   TableRow,
   TableHeader,
   TableBody,
   TableCell,
-  OverflowMenu,
-  OverflowMenuItem,
+  TableSelectRow,
+  TableToolbar,
+  TableToolbarContent,
+  TableToolbarSearch,
   Tag,
 } from '@carbon/react';
 import { AssistantConfiguration, Metadata } from '@rapidaai/react';
 import { Pagination } from '@/app/components/ui/primitives';
-import {
-  ScrollableTableSection,
-  TableSection,
-} from '@/app/components/layout/sections/table-section';
+import { TableSection } from '@/app/components/layout/sections/table-section';
 import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
 
 export function ConfigureAssistantTelemetryPage() {
@@ -70,6 +72,16 @@ const getTelemetryTarget = (telemetry: AssistantConfiguration) => {
   return getOptionValue(telemetry.getOptionsList(), 'endpoint') || '-';
 };
 
+const headers = [
+  { key: 'provider', header: 'Provider' },
+  { key: 'type', header: 'Type' },
+  { key: 'target', header: 'Target' },
+  { key: 'status', header: 'Status' },
+  { key: 'created', header: 'Created' },
+];
+
+const skeletonHeaders = [{ key: 'select', header: '' }, ...headers];
+
 type TelemetryAction = {
   kind: 'enable' | 'disable' | 'delete';
   telemetry: AssistantConfiguration;
@@ -81,16 +93,12 @@ const ConfigureAssistantTelemetry: FC<{ assistantId: string }> = ({
   const navigation = useGlobalNavigation();
   const action = useAssistantTelemetryPageStore();
   const { authId, token, projectId } = useCurrentCredential();
-  const [loading, setLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(true);
   const [pendingTelemetryAction, setPendingTelemetryAction] =
     useState<TelemetryAction | null>(null);
 
-  useEffect(() => {
-    get();
-  }, [assistantId, projectId, token, authId, action.page, action.pageSize]);
-
-  const get = () => {
-    setLoading(true);
+  const get = useCallback(() => {
+    setIsFetching(true);
     action.getAssistantTelemetry(
       assistantId,
       projectId,
@@ -98,16 +106,20 @@ const ConfigureAssistantTelemetry: FC<{ assistantId: string }> = ({
       authId,
       e => {
         toast.error(e);
-        setLoading(false);
+        setIsFetching(false);
       },
       () => {
-        setLoading(false);
+        setIsFetching(false);
       },
     );
-  };
+  }, [assistantId, projectId, token, authId, action.getAssistantTelemetry]);
+
+  useEffect(() => {
+    get();
+  }, [get, action.page, action.pageSize]);
 
   const deleteTelemetry = (telemetryId: string) => {
-    setLoading(true);
+    setIsFetching(true);
     action.deleteAssistantTelemetry(
       assistantId,
       telemetryId,
@@ -116,7 +128,7 @@ const ConfigureAssistantTelemetry: FC<{ assistantId: string }> = ({
       authId,
       e => {
         toast.error(e);
-        setLoading(false);
+        setIsFetching(false);
       },
       () => {
         toast.success('Telemetry provider deleted successfully');
@@ -130,7 +142,7 @@ const ConfigureAssistantTelemetry: FC<{ assistantId: string }> = ({
     telemetry: AssistantConfiguration,
     enabled: boolean,
   ) => {
-    setLoading(true);
+    setIsFetching(true);
     action.updateAssistantTelemetryEnabled(
       assistantId,
       telemetry,
@@ -140,7 +152,7 @@ const ConfigureAssistantTelemetry: FC<{ assistantId: string }> = ({
       authId,
       e => {
         toast.error(e);
-        setLoading(false);
+        setIsFetching(false);
       },
       () => {
         toast.success(
@@ -171,8 +183,20 @@ const ConfigureAssistantTelemetry: FC<{ assistantId: string }> = ({
         ? 'Disable'
         : 'Delete';
 
+  const tableRows = action.telemetries.map(telemetry => {
+    const provider = telemetry.getProvider();
+    return {
+      id: telemetry.getId(),
+      provider: providerNameByCode.get(provider) || provider,
+      type: telemetry.getConfigurationtype() || 'telemetry',
+      target: getTelemetryTarget(telemetry),
+      status: telemetry.getEnabled() ? 'Enabled' : 'Disabled',
+      created: telemetry.getCreateddate()?.toString() || '',
+    };
+  });
+
   return (
-    <div className="flex h-full flex-1 flex-col bg-surface">
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-surface">
       <ComposedModal
         open={Boolean(pendingTelemetryAction)}
         onClose={() => setPendingTelemetryAction(null)}
@@ -224,123 +248,204 @@ const ConfigureAssistantTelemetry: FC<{ assistantId: string }> = ({
         }}
       />
 
-      <TableSection>
-        {loading ? (
-          <div className="flex flex-col flex-1 items-center justify-center">
-            <SectionLoader />
-          </div>
-        ) : action.telemetries.length > 0 ? (
-          <>
-            <ScrollableTableSection>
-              <Table className="min-w-max">
-                <TableHead>
-                  <TableRow>
-                    <TableHeader>Provider</TableHeader>
-                    <TableHeader>Type</TableHeader>
-                    <TableHeader>Target</TableHeader>
-                    <TableHeader>Status</TableHeader>
-                    <TableHeader>Created</TableHeader>
-                    <TableHeader>Actions</TableHeader>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {action.telemetries.map(row => {
-                    const provider = row.getProvider();
-                    const providerName =
-                      providerNameByCode.get(provider) || provider;
-                    return (
-                      <TableRow key={row.getId()}>
-                        <TableCell className="text-sm">
-                          {providerName}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          <Tag type="blue" size="sm">
-                            {row.getConfigurationtype() || 'telemetry'}
-                          </Tag>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {getTelemetryTarget(row)}
-                        </TableCell>
-                        <TableCell className="text-sm whitespace-nowrap">
-                          <CarbonShapeIndicator
-                            kind={row.getEnabled() ? 'stable' : 'draft'}
-                            label={row.getEnabled() ? 'Enabled' : 'Disabled'}
-                            textSize={14}
-                          />
-                        </TableCell>
-                        <TableCell className="text-[13px] whitespace-nowrap">
-                          {row.getCreateddate()
-                            ? toHumanReadableDateTime(row.getCreateddate()!)
-                            : '-'}
-                        </TableCell>
-                        <TableCell
-                          className="text-sm"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <OverflowMenu
-                            size="sm"
-                            flipped
-                            aria-label="Telemetry actions"
-                          >
-                            <OverflowMenuItem
-                              itemText="Edit"
-                              onClick={() =>
-                                navigation.goToEditAssistantTelemetry(
-                                  assistantId,
-                                  row.getId(),
-                                )
-                              }
-                            />
-                            <OverflowMenuItem
-                              itemText={row.getEnabled() ? 'Disable' : 'Enable'}
-                              onClick={() =>
-                                setPendingTelemetryAction({
-                                  kind: row.getEnabled() ? 'disable' : 'enable',
-                                  telemetry: row,
-                                })
-                              }
-                            />
-                            <OverflowMenuItem
-                              itemText="Delete"
-                              isDelete
-                              onClick={() =>
-                                setPendingTelemetryAction({
-                                  kind: 'delete',
-                                  telemetry: row,
-                                })
-                              }
-                            />
-                          </OverflowMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </ScrollableTableSection>
-            <Pagination
-              totalItems={action.totalCount}
-              page={action.page}
-              pageSize={action.pageSize}
-              pageSizes={[10, 20, 50]}
-              onChange={({ page: newPage, pageSize: newSize }) => {
-                if (newSize !== action.pageSize) {
-                  action.setPageSize(newSize);
-                  return;
-                }
-                action.setPage(newPage);
-              }}
-            />
-          </>
-        ) : (
-          <EmptyState
+      {isFetching ? (
+        <TableSection className="min-h-0 overflow-hidden bg-surface">
+          <DataTableSkeleton
+            headers={skeletonHeaders}
+            columnCount={skeletonHeaders.length}
+            rowCount={5}
+            showHeader={false}
+            showToolbar
+            size="lg"
             className="w-full"
+          />
+        </TableSection>
+      ) : action.telemetries.length > 0 ? (
+        <TableSection className="min-h-0 bg-surface">
+          <DataTable rows={tableRows} headers={headers} radio>
+            {({
+              rows,
+              headers: tableHeaders,
+              selectedRows,
+              getBatchActionProps,
+              getHeaderProps,
+              getRowProps,
+              getSelectionProps,
+              getTableProps,
+              getToolbarProps,
+              onInputChange,
+            }) => {
+              const batchActionProps = getBatchActionProps();
+              const selectedTelemetry = selectedRows[0]
+                ? action.telemetries.find(
+                    telemetry => telemetry.getId() === selectedRows[0].id,
+                  )
+                : undefined;
+
+              return (
+                <>
+                  <TableToolbar {...getToolbarProps()}>
+                    {selectedTelemetry && (
+                      <TableBatchActions
+                        {...batchActionProps}
+                        shouldShowBatchActions
+                      >
+                        <TableBatchAction
+                          renderIcon={Edit}
+                          iconDescription="Edit"
+                          onClick={() => {
+                            navigation.goToEditAssistantTelemetry(
+                              assistantId,
+                              selectedTelemetry.getId(),
+                            );
+                            batchActionProps.onCancel();
+                          }}
+                        >
+                          Edit
+                        </TableBatchAction>
+                        <TableBatchAction
+                          renderIcon={Power}
+                          iconDescription={
+                            selectedTelemetry.getEnabled()
+                              ? 'Disable'
+                              : 'Enable'
+                          }
+                          onClick={() => {
+                            setPendingTelemetryAction({
+                              kind: selectedTelemetry.getEnabled()
+                                ? 'disable'
+                                : 'enable',
+                              telemetry: selectedTelemetry,
+                            });
+                            batchActionProps.onCancel();
+                          }}
+                        >
+                          {selectedTelemetry.getEnabled()
+                            ? 'Disable'
+                            : 'Enable'}
+                        </TableBatchAction>
+                        <TableBatchAction
+                          renderIcon={TrashCan}
+                          iconDescription="Delete"
+                          onClick={() => {
+                            setPendingTelemetryAction({
+                              kind: 'delete',
+                              telemetry: selectedTelemetry,
+                            });
+                            batchActionProps.onCancel();
+                          }}
+                        >
+                          Delete
+                        </TableBatchAction>
+                      </TableBatchActions>
+                    )}
+                    <TableToolbarContent>
+                      <TableToolbarSearch
+                        placeholder="Search telemetry..."
+                        onChange={onInputChange}
+                      />
+                    </TableToolbarContent>
+                  </TableToolbar>
+                  <div className="min-h-0 flex-1 overflow-auto">
+                    <Table {...getTableProps()} className="min-w-max">
+                      <TableHead>
+                        <TableRow>
+                          <TableHeader className="!w-12" />
+                          {tableHeaders.map(header => (
+                            <TableHeader
+                              {...getHeaderProps({ header })}
+                              key={header.key}
+                            >
+                              {header.header}
+                            </TableHeader>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {rows.map(tableRow => {
+                          const telemetry = action.telemetries.find(
+                            candidate => candidate.getId() === tableRow.id,
+                          );
+                          if (!telemetry) return null;
+
+                          const provider = telemetry.getProvider();
+                          const providerName =
+                            providerNameByCode.get(provider) || provider;
+
+                          return (
+                            <TableRow
+                              {...getRowProps({ row: tableRow })}
+                              key={tableRow.id}
+                            >
+                              <TableSelectRow
+                                {...getSelectionProps({ row: tableRow })}
+                              />
+                              <TableCell className="text-sm">
+                                {providerName}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                <Tag type="blue" size="sm">
+                                  {telemetry.getConfigurationtype() ||
+                                    'telemetry'}
+                                </Tag>
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {getTelemetryTarget(telemetry)}
+                              </TableCell>
+                              <TableCell className="text-sm whitespace-nowrap">
+                                <CarbonShapeIndicator
+                                  kind={
+                                    telemetry.getEnabled() ? 'stable' : 'draft'
+                                  }
+                                  label={
+                                    telemetry.getEnabled()
+                                      ? 'Enabled'
+                                      : 'Disabled'
+                                  }
+                                  textSize={14}
+                                />
+                              </TableCell>
+                              <TableCell className="text-[13px] whitespace-nowrap">
+                                {telemetry.getCreateddate()
+                                  ? toHumanReadableDateTime(
+                                      telemetry.getCreateddate()!,
+                                    )
+                                  : '-'}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <Pagination
+                    className="shrink-0"
+                    totalItems={action.totalCount}
+                    page={action.page}
+                    pageSize={action.pageSize}
+                    pageSizes={[10, 20, 50]}
+                    onChange={({ page: newPage, pageSize: newSize }) => {
+                      if (newSize !== action.pageSize) {
+                        action.setPageSize(newSize);
+                        return;
+                      }
+                      action.setPage(newPage);
+                    }}
+                  />
+                </>
+              );
+            }}
+          </DataTable>
+        </TableSection>
+      ) : (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState
             icon={Activity}
             title="No telemetry providers"
             subtitle="Any telemetry providers you add will be listed here."
           />
-        )}
-      </TableSection>
+        </div>
+      )}
     </div>
   );
 };

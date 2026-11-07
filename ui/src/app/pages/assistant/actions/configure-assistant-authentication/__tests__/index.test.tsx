@@ -198,7 +198,14 @@ jest.mock('@/app/components/ui/feedback/loaders/section-loader', () => ({
 }));
 
 jest.mock('@/app/components/layout/sections/table-section', () => ({
-  TableSection: ({ children }: any) => <div>{children}</div>,
+  TableSection: ({ children, className = '', ...props }: any) => (
+    <div {...props} className={`flex flex-1 flex-col ${className}`}>
+      {children}
+    </div>
+  ),
+  ScrollableTableSection: ({ children, ...props }: any) => (
+    <div {...props}>{children}</div>
+  ),
 }));
 
 jest.mock('@/app/components/ui/primitives/form', () => ({
@@ -273,6 +280,7 @@ jest.mock('@carbon/react', () => ({
   ButtonSet: ({ children }: any) => <div>{children}</div>,
   ComposedModal: ({ children, open }: any) =>
     open ? <div role="dialog">{children}</div> : null,
+  DataTableSkeleton: () => <div data-testid="authentication-skeleton" />,
   ModalBody: ({ children }: any) => <div>{children}</div>,
   ModalFooter: ({ children }: any) => <div>{children}</div>,
   ModalHeader: ({ title }: any) => <div>{title}</div>,
@@ -737,6 +745,21 @@ describe('CreateAssistantAuthenticationPage', () => {
       screen.getByText('Please provide a server URL for authentication.'),
     ).toBeInTheDocument();
     expect(CreateAssistantConfiguration).not.toHaveBeenCalled();
+  });
+
+  it('keeps an in-place table skeleton while authentication loads', () => {
+    (GetAllAssistantConfiguration as jest.Mock).mockReturnValueOnce(
+      new Promise(() => undefined),
+    );
+
+    const { container } = render(<ConfigureAssistantAuthenticationPage />);
+
+    expect(screen.getByText('Authentication')).toBeInTheDocument();
+    expect(screen.getByTestId('authentication-skeleton')).toBeInTheDocument();
+    expect(container.querySelector('.overflow-hidden')).toHaveClass(
+      'flex-1',
+      'flex-col',
+    );
   });
 
   it('disables authentication from the list after confirmation', async () => {
