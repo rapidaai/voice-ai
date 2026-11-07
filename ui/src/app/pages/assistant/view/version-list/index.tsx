@@ -135,7 +135,7 @@ export function Version(props: VersionProps) {
 
   if (isFetching) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-surface">
+      <TableSection className="min-h-0 overflow-hidden bg-surface">
         <DataTableSkeleton
           headers={skeletonHeaders}
           columnCount={skeletonHeaders.length}
@@ -145,7 +145,7 @@ export function Version(props: VersionProps) {
           size="lg"
           className="w-full"
         />
-      </div>
+      </TableSection>
     );
   }
 

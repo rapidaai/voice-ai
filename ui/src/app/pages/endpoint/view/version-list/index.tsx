@@ -13,6 +13,7 @@ import { auditActorLabel, createdAuditActor } from '@/utils/audit-actor';
 import {
   Button,
   DataTable,
+  DataTableSkeleton,
   Table,
   TableHead,
   TableRow,
@@ -36,6 +37,8 @@ const headers = [
   { key: 'createdBy', header: 'Created By' },
   { key: 'createdDate', header: 'Date' },
 ];
+
+const skeletonHeaders = [{ key: 'select', header: '' }, ...headers];
 
 function VersionId({ id }: { id: string }) {
   const [copied, setCopied] = useState(false);
@@ -68,12 +71,13 @@ export function Version(props: {
   const { authId, token, projectId } = useCurrentCredential();
   const rapidaContext = useRapidaStore();
   const endpointProviderAction = useEndpointProviderModelPageStore();
+  const [isFetching, setIsFetching] = useState(true);
   const [pendingDeploymentId, setPendingDeploymentId] = useState<string | null>(
     null,
   );
 
   const fetchVersions = () => {
-    rapidaContext.showLoader();
+    setIsFetching(true);
     endpointProviderAction.onChangeCurrentEndpoint(props.currentEndpoint);
     endpointProviderAction.getEndpointProviderModels(
       props.currentEndpoint.getId(),
@@ -81,11 +85,11 @@ export function Version(props: {
       token,
       authId,
       (err: string) => {
-        rapidaContext.hideLoader();
+        setIsFetching(false);
         toast.error(err);
       },
       (_data: EndpointProviderModel[]) => {
-        rapidaContext.hideLoader();
+        setIsFetching(false);
       },
     );
   };
@@ -124,7 +128,23 @@ export function Version(props: {
 
   const versions = endpointProviderAction.endpointProviderModels;
 
-  if (versions.length === 0 && !rapidaContext.loading) {
+  if (isFetching) {
+    return (
+      <TableSection className="min-h-0 overflow-hidden bg-surface">
+        <DataTableSkeleton
+          headers={skeletonHeaders}
+          columnCount={skeletonHeaders.length}
+          rowCount={5}
+          showHeader={false}
+          showToolbar
+          size="lg"
+          className="w-full"
+        />
+      </TableSection>
+    );
+  }
+
+  if (versions.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <EmptyState

@@ -186,7 +186,7 @@ describe('Version list', () => {
     );
   });
 
-  it('centers a Carbon table skeleton within the page while loading', () => {
+  it('keeps the Carbon table skeleton at the table origin while loading', () => {
     mockGetAssistantProviders.mockImplementation(() => undefined);
 
     const { container } = render(
@@ -199,6 +199,10 @@ describe('Version list', () => {
     expect(skeleton).toBeInTheDocument();
     expect(skeleton?.parentElement).toHaveClass(
       'flex-1',
+      'flex-col',
+      'overflow-hidden',
+    );
+    expect(skeleton?.parentElement).not.toHaveClass(
       'items-center',
       'justify-center',
     );

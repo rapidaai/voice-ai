@@ -182,6 +182,29 @@ describe('Endpoint version list', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps the Carbon table skeleton at the table origin while loading', () => {
+    mockGetEndpointProviderModels.mockImplementation(() => undefined);
+
+    const { container } = render(
+      <Version currentEndpoint={endpoint} onReload={jest.fn()} />,
+    );
+
+    const skeleton = container.querySelector(
+      '.cds--data-table-container.cds--skeleton',
+    );
+    expect(skeleton).toBeInTheDocument();
+    expect(skeleton?.parentElement).toHaveClass(
+      'flex-1',
+      'flex-col',
+      'overflow-hidden',
+    );
+    expect(skeleton?.parentElement).not.toHaveClass(
+      'items-center',
+      'justify-center',
+    );
+    expect(mockShowLoader).not.toHaveBeenCalled();
+  });
+
   it('keeps pagination below the scrollable table region', async () => {
     const { container } = render(
       <Version currentEndpoint={endpoint} onReload={jest.fn()} />,
