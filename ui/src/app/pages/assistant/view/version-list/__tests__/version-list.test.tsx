@@ -143,7 +143,7 @@ describe('Version list', () => {
 
     await user.click(
       within(batchActions as HTMLElement).getByRole('button', {
-        name: 'Deploy version',
+        name: 'Deploy Version',
       }),
     );
 
@@ -166,7 +166,7 @@ describe('Version list', () => {
 
     await user.click(
       within(batchActions as HTMLElement).getByRole('button', {
-        name: 'Deploy version',
+        name: 'Deploy Version',
       }),
     );
     await user.click(

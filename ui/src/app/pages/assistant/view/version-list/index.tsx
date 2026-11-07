@@ -305,7 +305,7 @@ export function Version(props: VersionProps) {
                   >
                     <TableBatchAction
                       renderIcon={Rocket}
-                      iconDescription="Deploy version"
+                      iconDescription="Deploy Version"
                       onClick={() => {
                         setPendingDeployment({
                           assistantProvider: selectedVersion.data.deployType,
@@ -313,7 +313,7 @@ export function Version(props: VersionProps) {
                         });
                       }}
                     >
-                      Deploy version
+                      Deploy Version
                     </TableBatchAction>
                   </TableBatchActions>
                 )}
