@@ -71,4 +71,10 @@ describe('Carbon theme adapters', () => {
     );
     expect(styles).toContain('@utility text-on-primary');
   });
+
+  it('loads Carbon user avatar styles', () => {
+    expect(readStyles('carbon.scss')).toContain(
+      "@use '@carbon/styles/scss/components/user-avatar'",
+    );
+  });
 });

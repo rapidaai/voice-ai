@@ -261,7 +261,7 @@ export function ProjectPage() {
                       members={project
                         .getMembersList()
                         .map(m => ({ name: m.getName() }))}
-                      size={7}
+                      size="sm"
                     />
                   </TableCell>
                   <TableCell>

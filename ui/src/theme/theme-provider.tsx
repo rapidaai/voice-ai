@@ -45,6 +45,11 @@ const getStoredMode = (theme: ThemeManifest): ThemeMode => {
 const isThemeMode = (value: string | null): value is ThemeMode =>
   value === 'light' || value === 'dark' || value === 'system';
 
+const carbonThemeClasses = [
+  ...Object.keys(themeContract.carbonThemes.light),
+  ...Object.keys(themeContract.carbonThemes.dark),
+].map(theme => `cds--${theme}`);
+
 export const resolveThemeMode = (
   mode: ThemeMode,
   systemMode: ResolvedThemeMode,
@@ -63,6 +68,8 @@ export const applyThemeToDocument = (
     themeContract.documentAttributes.carbonTheme,
     colors.carbonTheme,
   );
+  root.classList.remove(...carbonThemeClasses);
+  root.classList.add(`cds--${colors.carbonTheme}`);
   root.setAttribute(themeContract.documentAttributes.themeReady, 'true');
   root.setAttribute(
     themeContract.documentAttributes.themeSchema,

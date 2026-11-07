@@ -93,7 +93,8 @@ placeholder at container startup. It does not change branding or theme values.
 - A locked `system` mode continues to follow operating-system mode changes.
 - User preference is stored under `ui-theme-mode`.
 - The resolved mode is exposed through `data-color-mode` on `<html>`.
-- The selected Carbon preset is exposed through `data-carbon-theme` on `<html>`.
+- The selected Carbon preset is exposed through `data-carbon-theme` and the
+  matching `cds--<preset>` class on `<html>`.
 - The active schema is exposed through `data-theme-schema` on `<html>`.
 - The active tenant identifier is exposed through `data-brand` on `<html>`.
 

@@ -41,6 +41,7 @@ describe('ThemeProvider', () => {
     document.documentElement.removeAttribute('data-color-mode');
     document.documentElement.removeAttribute('data-theme-ready');
     document.documentElement.removeAttribute('data-theme-schema');
+    document.documentElement.removeAttribute('class');
     document.documentElement.removeAttribute('style');
     document.querySelector("meta[name='theme-color']")?.remove();
     document
@@ -50,6 +51,7 @@ describe('ThemeProvider', () => {
 
   it('applies brand tokens and toggles the resolved color mode', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
+    document.documentElement.classList.add('application-root');
     render(
       <ThemeProvider theme={configuredTheme}>
         <ThemeConsumer />
@@ -69,6 +71,10 @@ describe('ThemeProvider', () => {
     expect(document.documentElement).toHaveAttribute(
       'data-carbon-theme',
       configuredTheme.colors.light.carbonTheme,
+    );
+    expect(document.documentElement).toHaveClass(
+      'application-root',
+      `cds--${configuredTheme.colors.light.carbonTheme}`,
     );
     expect(document.documentElement).toHaveAttribute('data-theme-schema', '2');
     for (const [field, { property }] of Object.entries(
@@ -92,6 +98,13 @@ describe('ThemeProvider', () => {
     expect(document.documentElement).toHaveAttribute(
       'data-carbon-theme',
       configuredTheme.colors.dark.carbonTheme,
+    );
+    expect(document.documentElement).toHaveClass(
+      'application-root',
+      `cds--${configuredTheme.colors.dark.carbonTheme}`,
+    );
+    expect(document.documentElement).not.toHaveClass(
+      `cds--${configuredTheme.colors.light.carbonTheme}`,
     );
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
     expect(

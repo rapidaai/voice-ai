@@ -1,5 +1,5 @@
 import React from 'react';
-import { TextImage } from '@/app/components/ui/primitives';
+import { UserAvatar } from '@/app/components/ui/primitives';
 import { User } from '@rapidaai/react';
 import { OrganizationRoleIndicator } from '@/app/components/domain/indicators/organization-role';
 import { toHumanReadableDate } from '@/utils/date';
@@ -31,7 +31,12 @@ export function SingleUser(props: {
       <TableCell>{props.user.getId()}</TableCell>
       <TableCell>
         <div className="flex items-center gap-3">
-          <TextImage size={7} name={props.user.getName()} />
+          <UserAvatar
+            aria-label={props.user.getName().trim() || 'User'}
+            name={props.user.getName().trim()}
+            role="img"
+            size="sm"
+          />
           <span>{props.user.getName()}</span>
         </div>
       </TableCell>

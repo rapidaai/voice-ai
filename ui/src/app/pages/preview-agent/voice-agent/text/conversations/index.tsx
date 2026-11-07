@@ -1,5 +1,5 @@
 import { BrandedLogo } from '@/app/components/layout/brand/branded-logo';
-import { IconOnlyButton, TextImage } from '@/app/components/ui/primitives';
+import { IconOnlyButton, UserAvatar } from '@/app/components/ui/primitives';
 import { toHumanReadableRelativeTimeFromDate } from '@/utils/date';
 import {
   Feedback,
@@ -25,6 +25,7 @@ export const ConversationMessages: FC<{ vag: VoiceAgent }> = ({ vag }) => {
   const { user } = useCurrentCredential();
   const { theme } = useTheme();
   const queryName = searchParams.get('name');
+  const userName = (user?.name || queryName || 'user').trim() || 'user';
   const ctrRef = useRef<HTMLDivElement>(null);
   /**
    *
@@ -70,7 +71,12 @@ export const ConversationMessages: FC<{ vag: VoiceAgent }> = ({ vag }) => {
           >
             <div className="row-span-2 min-w-(--space-9)">
               {isUser ? (
-                <TextImage name={user?.name || queryName || 'user'} size={10} />
+                <UserAvatar
+                  aria-label={userName}
+                  name={userName}
+                  role="img"
+                  size="lg"
+                />
               ) : (
                 <div className="bg-primary text-on-primary w-10 h-10 flex items-center justify-center rounded-xs">
                   <BrandedLogo
