@@ -14,7 +14,8 @@ export FLOW_ORGANIZATION='CI Create Provider React Organization'
 export FLOW_PROJECT='CI Create Provider React Project'
 export FLOW_ASSISTANT='CI React Provider Assistant'
 
-trap cleanup_project_fixture EXIT HUP INT TERM
+trap cleanup_project_fixture EXIT
+trap 'exit 1' HUP INT TERM
 seed_project_fixture
 seed_project_api_key_fixture
 

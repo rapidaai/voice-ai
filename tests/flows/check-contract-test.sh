@@ -23,7 +23,8 @@ write_client() {
     "export FLOW_FIXTURE_ID='$fixture_id'" \
     "export FLOW_EMAIL='$email'" \
     'cleanup() { :; }' \
-    'trap cleanup EXIT HUP INT TERM' \
+    'trap cleanup EXIT' \
+    "trap 'exit 1' HUP INT TERM" \
     'seed_project_fixture' \
     'timeout 1s node "$script_directory/flow.js"' \
     'verify_assistant_fixture' \
@@ -106,6 +107,62 @@ remove_react_coverage() {
   rm "$1/alpha/run.sh.bak"
 }
 
+remove_signal_exit() {
+  sed -i.bak "/trap 'exit 1' HUP INT TERM/d" "$1/alpha/nodejs/run.sh"
+  rm "$1/alpha/nodejs/run.sh.bak"
+}
+
+use_zero_sdk_timeout() {
+  sed -i.bak 's/timeout 1s node/timeout 0s node/' "$1/alpha/nodejs/run.sh"
+  rm "$1/alpha/nodejs/run.sh.bak"
+}
+
+add_unbounded_sdk_operation() {
+  # shellcheck disable=SC2016 # The inserted command must retain the fixture variable.
+  sed -i.bak '/timeout 1s node/a\
+node "$script_directory/flow.js"' "$1/alpha/nodejs/run.sh"
+  rm "$1/alpha/nodejs/run.sh.bak"
+}
+
+add_rest_client() {
+  local root=$1
+  local max_time=$2
+  local extra_operation=${3:-}
+  local client_directory="$root/alpha/rest"
+  sed -i.bak 's/ nodejs react$/ nodejs react rest/' "$root/alpha/run.sh"
+  rm "$root/alpha/run.sh.bak"
+  mkdir -p "$client_directory"
+  # shellcheck disable=SC2016 # These literals belong to the generated fixture.
+  printf '%s\n' \
+    '#!/bin/sh' \
+    'set -eu' \
+    '' \
+    'script_directory=$(cd "$(dirname "$0")" && pwd)' \
+    '. "$script_directory/../../project-fixture.sh"' \
+    "export FLOW_FIXTURE_ID='9300001'" \
+    "export FLOW_EMAIL='rest-alpha@example.invalid'" \
+    'cleanup() { :; }' \
+    'run_flow() {' \
+    "  curl --silent --max-time $max_time http://example.invalid" \
+    "$extra_operation" \
+    '}' \
+    'trap cleanup EXIT' \
+    "trap 'exit 1' HUP INT TERM" \
+    'seed_project_fixture' \
+    'run_flow' \
+    'verify_assistant_fixture' \
+    > "$client_directory/run.sh"
+  chmod +x "$client_directory/run.sh"
+}
+
+use_zero_rest_timeout() {
+  add_rest_client "$1" 0
+}
+
+add_unbounded_rest_operation() {
+  add_rest_client "$1" 1 '  curl --silent http://example.invalid'
+}
+
 valid_root="$temporary_directory/valid"
 write_fixture "$valid_root"
 "$script_directory/check-contract.sh" "$valid_root" >/dev/null
@@ -115,5 +172,10 @@ expect_failure duplicate-id 'fixture identifier 9100001 is reused' reuse_fixture
 expect_failure invalid-email 'must use a reserved .invalid email address' use_real_email_domain
 expect_failure wrong-order 'must verify persistent state after exercising the public client' verify_before_operation
 expect_failure missing-react 'must declare react coverage' remove_react_coverage
+expect_failure missing-signal-exit 'must exit on termination signals' remove_signal_exit
+expect_failure zero-sdk-timeout 'must bound SDK calls with a positive timeout' use_zero_sdk_timeout
+expect_failure unbounded-sdk-operation 'must bound SDK calls with a positive timeout' add_unbounded_sdk_operation
+expect_failure zero-rest-timeout 'must bound REST calls with a positive --max-time' use_zero_rest_timeout
+expect_failure unbounded-rest-operation 'must bound REST calls with a positive --max-time' add_unbounded_rest_operation
 
 printf 'Flow contract regression tests passed\n'

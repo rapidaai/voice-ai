@@ -68,7 +68,7 @@ failed_flows=''
 selected_journeys=0
 executed_journeys=0
 
-while IFS= read -r flow; do
+while IFS= read -r flow || [ -n "$flow" ]; do
   if ! journey_requested "$flow" "$@"; then
     continue
   fi

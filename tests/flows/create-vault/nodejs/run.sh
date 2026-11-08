@@ -13,7 +13,8 @@ export FLOW_ORGANIZATION='CI Create Vault Node Organization'
 export FLOW_PROJECT='CI Create Vault Node Project'
 export FLOW_VAULT_NAME='CI Node SDK OpenAI Key'
 
-trap cleanup_project_fixture EXIT HUP INT TERM
+trap cleanup_project_fixture EXIT
+trap 'exit 1' HUP INT TERM
 seed_project_fixture
 
 timeout 30s node "$script_directory/create-vault.js"

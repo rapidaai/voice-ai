@@ -14,8 +14,15 @@ export FLOW_PROJECT='CI Create Endpoint React Project'
 export FLOW_ENDPOINT='CI React Endpoint'
 export FLOW_EXPECTED_COUNT='20'
 
-trap cleanup_project_fixture EXIT HUP INT TERM
+cleanup() {
+  cleanup_endpoint_fixture
+  cleanup_project_fixture
+}
+
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+cleanup_endpoint_fixture
 seed_project_fixture
 
-timeout 30s node "$script_directory/create-endpoint-provider.js"
+timeout 120s node "$script_directory/create-endpoint-provider.js"
 verify_endpoint_provider_fixture

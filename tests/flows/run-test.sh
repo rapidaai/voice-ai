@@ -61,4 +61,9 @@ if FLOW_REPORT_DIRECTORY="$report_directory" \
 fi
 grep -Fq 'unknown flow journey: unknown' "$temporary_directory/unknown.log"
 
+printf 'alpha\nbeta\ngamma\ndelta' > "$framework_directory/manifest.txt"
+FLOW_REPORT_DIRECTORY="$report_directory" \
+  "$framework_directory/run.sh" nodejs delta >/dev/null
+grep -Eq '^Delta[[:space:]]+nodejs[[:space:]]+passed[[:space:]]+[0-9]+$' "$report_directory/flows.tsv"
+
 printf 'Flow runner regression tests passed\n'

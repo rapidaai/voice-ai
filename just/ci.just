@@ -38,6 +38,8 @@ ci-check:
 ci-flow-contract:
     bash tests/flows/check-contract.sh
     bash tests/flows/check-contract-test.sh
+    bash tests/flows/project-fixture-test.sh
+    bash tests/flows/run-local-test.sh
     bash tests/flows/run-test.sh
     bash tests/flows/summarize-results-test.sh
 

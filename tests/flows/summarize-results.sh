@@ -12,19 +12,39 @@ combined_results="$temporary_directory/flows.tsv"
 expected_results="$temporary_directory/flows-expected.tsv"
 merged_results="$temporary_directory/flows-merged.tsv"
 result_files="$temporary_directory/result-files"
+all_result_files="$temporary_directory/all-result-files"
+artifact_candidates="$temporary_directory/artifact-candidates"
 status=0
 
 if [[ -d "$results_root" ]]; then
-  find "$results_root" -type f -name flows.tsv -print0 | sort -z > "$result_files"
+  find "$results_root" -type f -name flows.tsv -print0 | sort -z > "$all_result_files"
 else
-  : > "$result_files"
+  : > "$all_result_files"
 fi
+: > "$result_files"
+: > "$artifact_candidates"
+while IFS= read -r -d '' result_file; do
+  relative_path=${result_file#"$results_root"/}
+  artifact_name=${relative_path%%/*}
+  if [[ "$artifact_name" =~ ^flow-results-(node|react|rest)-([0-9]+)-([0-9]+)-([0-9]+)$ ]]; then
+    printf '%s-%s\t%s\t%s\n' \
+      "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[4]}" "$result_file" \
+      >> "$artifact_candidates"
+  else
+    printf '%s\n' "$result_file" >> "$result_files"
+  fi
+done < "$all_result_files"
+if [[ -s "$artifact_candidates" ]]; then
+  sort -t $'\t' -k1,1 -k2,2nr "$artifact_candidates" | \
+    awk -F '\t' '!selected[$1]++ {print $3}' >> "$result_files"
+fi
+sort -o "$result_files" "$result_files"
 while IFS= read -r -d '' result_file; do
   cat "$result_file" >> "$combined_results"
-done < "$result_files"
+done < <(while IFS= read -r result_file; do printf '%s\0' "$result_file"; done < "$result_files")
 touch "$combined_results"
 
-while IFS= read -r journey; do
+while IFS= read -r journey || [[ -n "$journey" ]]; do
   declaration=$(grep -E "^run_flow_clients \"\\\$script_directory\" '[^']+'( (nodejs|react|rest))+$" \
     "$flow_definition_root/$journey/run.sh")
   flow_name=$(sed -E "s/^run_flow_clients \"\\\$script_directory\" '([^']+)'.*/\1/" <<< "$declaration")

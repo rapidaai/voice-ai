@@ -9,7 +9,7 @@ Flows are grouped first by user journey and then by public client. Every client 
 Use this order in every client runner:
 
 1. Export deterministic fixture values and configurable service or database hosts.
-2. Register cleanup for `EXIT`, `HUP`, `INT`, and `TERM`.
+2. Register cleanup for `EXIT`, then make `HUP`, `INT`, and `TERM` exit nonzero.
 3. Clean stale fixture state, then seed prerequisites.
 4. Exercise the public SDK or REST surface with a bounded timeout.
 5. Assert the public response in the client implementation.
@@ -83,14 +83,16 @@ just test-integration-react assistant-components
 
 Local SDK dependencies are atomically installed and cached by the flow lockfile
 checksum in a private per-user cache. Set `FLOW_DEPENDENCY_CACHE_DIR` to choose
-a different private cache directory. React SDK request and response logging is disabled by default;
-set `FLOW_SDK_DEBUG=true` only when the full trace is required. The Node SDK's
-similarly named constructor flag selects insecure local gRPC transport and must
-remain enabled for the plaintext development ports.
+a different private cache directory. Abandoned installation locks are reclaimed
+after their owning process exits. React SDK request and response logging is
+disabled by default; set `FLOW_SDK_DEBUG=true` only when the full trace is
+required. The Node SDK's similarly named constructor flag selects insecure
+local gRPC transport and must remain enabled for the plaintext development ports.
 
 Set `FLOW_POSTGRES_HOST`, `WEB_API_ENDPOINT`, `ASSISTANT_API_ENDPOINT`,
 `WEB_API_REACT_ENDPOINT`, and `ASSISTANT_API_REACT_ENDPOINT` to override the
-localhost defaults provided by these recipes.
+localhost defaults provided by these recipes. When the assistant API runs in a
+container, set `FLOW_ARI_HOST` to a host address that the container can reach.
 
 CI runs each client independently with:
 

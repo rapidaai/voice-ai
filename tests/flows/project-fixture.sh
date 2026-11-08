@@ -1,6 +1,6 @@
 #!/bin/sh
 
-cleanup_project_fixture() {
+cleanup_endpoint_fixture() {
   psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d endpoint_db \
     -v project_id="$FLOW_PROJECT_ID" >/dev/null <<'SQL'
 CREATE TEMP TABLE flow_endpoints AS
@@ -19,7 +19,9 @@ DELETE FROM endpoint_cachings WHERE endpoint_id IN (SELECT id FROM flow_endpoint
 DELETE FROM endpoint_tags WHERE endpoint_id IN (SELECT id FROM flow_endpoints);
 DELETE FROM endpoints WHERE id IN (SELECT id FROM flow_endpoints);
 SQL
+}
 
+cleanup_project_fixture() {
   psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d assistant_db \
     -v project_id="$FLOW_PROJECT_ID" >/dev/null <<'SQL'
 CREATE TEMP TABLE flow_assistants AS
@@ -115,6 +117,14 @@ DELETE FROM projects WHERE id = :'project_id';
 DELETE FROM organizations WHERE id = :'fixture_id';
 DELETE FROM user_auths WHERE id = :'fixture_id';
 SQL
+}
+
+format_flow_ari_host() {
+  case "$1" in
+    \[*\]) printf '%s' "$1" ;;
+    *:*) printf '[%s]' "$1" ;;
+    *) printf '%s' "$1" ;;
+  esac
 }
 
 seed_project_api_key_fixture() {

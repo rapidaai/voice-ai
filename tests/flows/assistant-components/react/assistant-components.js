@@ -161,12 +161,17 @@ function assertTool(tool, expected) {
   }
   if (
     optionValue(tool.getExecutionoptionsList(), "tool.endpoint_id") !==
-    expected.endpointID
+      expected.endpointID ||
+    optionValue(tool.getExecutionoptionsList(), "tool.parameters") !==
+      '{"tool.query":"query"}'
   ) {
     throw new Error(`${expected.action} returned unexpected tool options`);
   }
   const fields = tool.getFields()?.toJavaScript();
-  if (fields?.type !== "object") {
+  if (
+    fields?.type !== "object" ||
+    fields?.properties?.query?.type !== "string"
+  ) {
     throw new Error(`${expected.action} returned unexpected tool fields`);
   }
 }

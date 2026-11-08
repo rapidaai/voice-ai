@@ -24,7 +24,8 @@ cleanup() {
   cleanup_security_data
 }
 
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
 cleanup_security_data
 seed_project_fixture
 seed_security_fixtures

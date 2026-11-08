@@ -16,7 +16,8 @@ DELETE FROM user_auths WHERE email = :'flow_email';
 SQL
 }
 
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
 cleanup
 
 psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \

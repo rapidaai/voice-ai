@@ -14,7 +14,8 @@ export FLOW_ORGANIZATION='CI Create Assistant React Organization'
 export FLOW_PROJECT='CI Create Assistant React Project'
 export FLOW_ASSISTANT='CI React SDK Assistant'
 
-trap cleanup_project_fixture EXIT HUP INT TERM
+trap cleanup_project_fixture EXIT
+trap 'exit 1' HUP INT TERM
 seed_project_fixture
 seed_project_api_key_fixture
 

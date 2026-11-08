@@ -17,7 +17,8 @@ export FLOW_EXPECTED_ASSISTANTS='2'
 export FLOW_EXPECTED_TOOLS='2'
 export FLOW_EXPECTED_CONFIGURATIONS='5'
 
-trap cleanup_project_fixture EXIT HUP INT TERM
+trap cleanup_project_fixture EXIT
+trap 'exit 1' HUP INT TERM
 seed_project_fixture
 seed_project_api_key_fixture
 

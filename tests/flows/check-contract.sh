@@ -50,12 +50,30 @@ while IFS= read -r journey || [[ -n "$journey" ]]; do
     client_runner="$journey_directory/$client/run.sh"
     [[ -x "$client_runner" ]] || fail "client runner is missing or not executable: $journey/$client/run.sh"
     grep -Fqx 'set -eu' "$client_runner" || fail "$journey/$client/run.sh must use set -eu"
-    grep -Eq '^trap .+ EXIT HUP INT TERM$' "$client_runner" || fail "$journey/$client/run.sh must clean up on EXIT HUP INT TERM"
+    grep -Eq '^trap .+ EXIT$' "$client_runner" || \
+      fail "$journey/$client/run.sh must clean up on EXIT"
+    grep -Fqx "trap 'exit 1' HUP INT TERM" "$client_runner" || \
+      fail "$journey/$client/run.sh must exit on termination signals"
 
     if [[ "$client" == 'rest' ]]; then
-      grep -Eq -- '--max-time [0-9]+' "$client_runner" || fail "$journey/$client/run.sh must bound REST calls with --max-time"
+      operation_count=0
+      while IFS=: read -r operation_line operation; do
+        operation_count=$((operation_count + 1))
+        [[ "$operation" =~ --max-time[[:space:]]+0*[1-9][0-9]*([[:space:]]|\\|$) ]] || \
+          fail "$journey/$client/run.sh:$operation_line must bound REST calls with a positive --max-time"
+      done < <(grep -En '(^|[^[:alnum:]_])curl([[:space:]]|$)' "$client_runner" || true)
+      [[ "$operation_count" -gt 0 ]] || fail "$journey/$client/run.sh must contain a REST operation"
     else
-      grep -Eq 'timeout [0-9]+s node ' "$client_runner" || fail "$journey/$client/run.sh must bound SDK calls with timeout"
+      operation_count=0
+      while IFS=: read -r operation_line operation; do
+        if [[ "$operation" =~ \&[[:space:]]*$ ]]; then
+          continue
+        fi
+        operation_count=$((operation_count + 1))
+        [[ "$operation" =~ timeout[[:space:]]+0*[1-9][0-9]*s[[:space:]]+node[[:space:]] ]] || \
+          fail "$journey/$client/run.sh:$operation_line must bound SDK calls with a positive timeout"
+      done < <(grep -En '(^|[^[:alnum:]_])node([[:space:]]|$)' "$client_runner" || true)
+      [[ "$operation_count" -gt 0 ]] || fail "$journey/$client/run.sh must contain an SDK operation"
     fi
 
     if grep -qE '(^|[[:space:]])psql[[:space:]]' "$client_runner"; then

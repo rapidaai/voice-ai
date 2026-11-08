@@ -65,7 +65,8 @@ run_flow() {
   printf 'REST create assistant flow passed with %s\n' "$auth_name"
 }
 
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
 seed_project_fixture
 seed_project_api_key_fixture
 

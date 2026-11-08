@@ -9,8 +9,9 @@ export FLOW_FIXTURE_ID='8100403'
 export FLOW_PROJECT_ID='8101403'
 export FLOW_VAULT_ID='8102403'
 export FLOW_ARI_PORT='18103'
-FLOW_ARI_HOST=$(hostname -i | awk '{print $1}')
-export FLOW_ARI_URL="http://$FLOW_ARI_HOST:$FLOW_ARI_PORT"
+FLOW_ARI_HOST=${FLOW_ARI_HOST:-$(hostname -i | awk '{print $1}')}
+FLOW_ARI_AUTHORITY=$(format_flow_ari_host "$FLOW_ARI_HOST")
+export FLOW_ARI_URL="http://$FLOW_ARI_AUTHORITY:$FLOW_ARI_PORT"
 export FLOW_EMAIL='ci-flow-phone-call-rest@example.invalid'
 export FLOW_TOKEN='ci-flow-phone-call-rest-token'
 export FLOW_API_KEY='ci-flow-phone-call-rest-api-key'
@@ -110,7 +111,8 @@ run_flow() {
   printf 'REST assistant deployment phone call flow passed with %s\n' "$auth_name"
 }
 
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
 seed_project_fixture
 seed_project_api_key_fixture
 seed_asterisk_vault_fixture

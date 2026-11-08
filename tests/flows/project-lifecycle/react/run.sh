@@ -117,7 +117,8 @@ export FLOW_PROJECT="$flow_project"
 export FLOW_UPDATED_PROJECT="$flow_updated_project"
 export FLOW_MEMBER_EMAIL="$flow_member_email"
 
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
 seed
 timeout 30s node "$script_directory/project-lifecycle.js"
 verify

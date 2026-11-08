@@ -14,7 +14,8 @@ export FLOW_PROJECT='CI Assistant Lifecycle React Project'
 export FLOW_ASSISTANT='CI React Lifecycle Assistant'
 export FLOW_EXPECTED_COUNT='1'
 
-trap cleanup_project_fixture EXIT HUP INT TERM
+trap cleanup_project_fixture EXIT
+trap 'exit 1' HUP INT TERM
 seed_project_fixture
 
 timeout 30s node "$script_directory/assistant-lifecycle.js"

@@ -268,18 +268,25 @@ jobs:
         run: |
           marker='<!-- rapida-e2e-flow-results -->'
           body_file=$(mktemp)
-          trap 'rm -f "$body_file"' EXIT
+          comments_file=$(mktemp)
+          trap 'rm -f "$body_file" "$comments_file"' EXIT
           {
             printf '%s\n\n' "$marker"
             cat combined-flow-results.md
           } > "$body_file"
 
-          comment_id=$(gh api --paginate --slurp \
+          gh api --paginate --slurp \
             "repos/$GH_REPO/issues/$PR_NUMBER/comments?per_page=100" \
-            --jq '[.[][] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- rapida-e2e-flow-results -->")))] | first | .id // empty')
-          if [[ -n "$comment_id" ]]; then
-            gh api --method PATCH "repos/$GH_REPO/issues/comments/$comment_id" \
+            --jq '.[][] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- rapida-e2e-flow-results -->"))) | .id' \
+            > "$comments_file"
+          mapfile -t comment_ids < "$comments_file"
+          if [[ "${#comment_ids[@]}" -gt 0 ]]; then
+            gh api --method PATCH "repos/$GH_REPO/issues/comments/${comment_ids[0]}" \
               -F body="@$body_file" >/dev/null
+            for duplicate_comment_id in "${comment_ids[@]:1}"; do
+              gh api --method DELETE \
+                "repos/$GH_REPO/issues/comments/$duplicate_comment_id" >/dev/null
+            done
           else
             gh api --method POST "repos/$GH_REPO/issues/$PR_NUMBER/comments" \
               -F body="@$body_file" >/dev/null

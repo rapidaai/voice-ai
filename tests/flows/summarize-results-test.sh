@@ -9,7 +9,7 @@ definition_directory="$temporary_directory/definitions"
 manifest_file="$definition_directory/manifest.txt"
 summary_file="$temporary_directory/summary.md"
 mkdir -p "$results_directory" "$definition_directory/alpha" "$definition_directory/beta"
-printf '%s\n' alpha beta > "$manifest_file"
+printf 'alpha\nbeta' > "$manifest_file"
 printf '%s\n' "run_flow_clients \"\$script_directory\" 'Alpha' nodejs react rest" \
   > "$definition_directory/alpha/run.sh"
 printf '%s\n' "run_flow_clients \"\$script_directory\" 'Beta' nodejs react rest" \
@@ -68,5 +68,25 @@ fi
 grep -Fq '| Alpha | nodejs | ⚠️ Not run | - |' "$summary_file"
 grep -Fq '| Beta | rest | ⚠️ Not run | - |' "$summary_file"
 grep -Fq 'Passed: 0, failed: 0, not supported: 0, not run: 6.' "$summary_file"
+
+rerun_results_directory="$temporary_directory/rerun-results"
+write_rerun_result() {
+  local artifact=$1
+  shift
+  mkdir -p "$rerun_results_directory/$artifact"
+  printf '%s\n' "$@" > "$rerun_results_directory/$artifact/flows.tsv"
+}
+write_rerun_result flow-results-node-1-42-1 \
+  $'Alpha\tnodejs\tfailed\t1'
+write_rerun_result flow-results-node-1-42-2 \
+  $'Alpha\tnodejs\tpassed\t2' $'Beta\tnodejs\tpassed\t2'
+write_rerun_result flow-results-react-1-42-1 \
+  $'Alpha\treact\tpassed\t1' $'Beta\treact\tpassed\t1'
+write_rerun_result flow-results-rest-1-42-1 \
+  $'Alpha\trest\tpassed\t1' $'Beta\trest\tpassed\t1'
+FLOW_MANIFEST_FILE="$manifest_file" \
+  "$script_directory/summarize-results.sh" "$rerun_results_directory" "$summary_file"
+grep -Fq '| Alpha | nodejs | ✅ Passed | 2s |' "$summary_file"
+grep -Fq 'Passed: 6, failed: 0, not supported: 0, not run: 0.' "$summary_file"
 
 printf 'Flow summary regression tests passed\n'

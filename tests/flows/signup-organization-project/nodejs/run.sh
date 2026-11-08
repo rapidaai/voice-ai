@@ -40,7 +40,8 @@ DELETE FROM user_auths WHERE id IN (SELECT id FROM flow_users);
 SQL
 }
 
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
 cleanup
 
 FLOW_EMAIL="$flow_email" \
