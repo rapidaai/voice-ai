@@ -281,6 +281,16 @@ test('populated assistant journeys expose overview, sessions, versions, and sett
   await expect(
     page.getByRole('heading', { name: 'Assistant activity' }),
   ).toBeVisible();
+  const deploymentChecklist = page.getByLabel('Assistant deployment checklist');
+  await expect(deploymentChecklist).toBeVisible();
+  await expect(deploymentChecklist).toHaveClass(/fixed/);
+  const checklistToggle = deploymentChecklist.locator(
+    'button[aria-label="Toggle assistant deployment checklist"]',
+  );
+  await checklistToggle.click();
+  await expect(checklistToggle).toHaveAttribute('aria-expanded', 'false');
+  await checklistToggle.click();
+  await expect(checklistToggle).toHaveAttribute('aria-expanded', 'true');
 
   await page.getByRole('link', { name: 'Sessions', exact: true }).click();
   await expect(page.getByText('customer@example.test')).toBeVisible();
@@ -293,6 +303,20 @@ test('populated assistant journeys expose overview, sessions, versions, and sett
   await expect(
     page.getByRole('heading', { name: 'General Settings' }),
   ).toBeVisible();
+});
+
+test('assistant overview hides deployment onboarding after a deployment is enabled', async ({
+  page,
+}) => {
+  await mockPopulatedAssistantDeployments(page);
+  await gotoJourney(page, journey('deployment.assistantOverview'));
+
+  await expect(
+    page.getByRole('heading', { name: 'Assistant activity' }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Assistant deployment checklist')).toHaveCount(
+    0,
+  );
 });
 
 test('assistant internal pages share the shell header styling and requested headings', async ({

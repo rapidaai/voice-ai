@@ -80,4 +80,15 @@ describe('Carbon theme adapters', () => {
       "@use '@carbon/styles/scss/components/user-avatar'",
     );
   });
+
+  it('uses the configured brand contrast for onboarding checklists', () => {
+    const styles = readStyles('carbon.scss');
+
+    expect(styles).toMatch(
+      /:root\[data-theme-schema='1'\]\s+\.app-onboarding-checklist\s*{[^}]*--app-checklist-foreground: var\(--brand-on-primary\)/,
+    );
+    expect(styles).toMatch(
+      /:root\[data-theme-schema='2'\]\s+\.app-onboarding-checklist\s*{[^}]*--app-checklist-foreground: var\(--brand-on-primary\)/,
+    );
+  });
 });
