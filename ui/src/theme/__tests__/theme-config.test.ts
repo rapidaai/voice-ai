@@ -198,4 +198,28 @@ describe('theme config', () => {
       issues: expect.arrayContaining([issue]),
     });
   });
+
+  it.each(['constructor', 'toString'])(
+    'rejects inherited Carbon preset name %s',
+    carbonTheme => {
+      const result = parseThemeManifest({
+        ...developmentConfig.theme,
+        schemaVersion: 2,
+        colors: {
+          ...developmentConfig.theme.colors,
+          light: {
+            ...developmentConfig.theme.colors.light,
+            carbonTheme,
+          },
+        },
+      });
+
+      expect(result).toMatchObject({
+        ok: false,
+        issues: expect.arrayContaining([
+          { path: 'colors.light.carbonTheme', code: 'unsupported' },
+        ]),
+      });
+    },
+  );
 });

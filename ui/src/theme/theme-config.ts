@@ -224,7 +224,9 @@ const requireCarbonTheme = <T extends string>(
   path: string,
   issues: ThemeConfigIssue[],
 ): T => {
-  if (typeof value === 'string' && value in allowed) return value as T;
+  if (typeof value === 'string' && Object.hasOwn(allowed, value)) {
+    return value as T;
+  }
   issues.push({
     path,
     code: value === undefined || value === null ? 'required' : 'unsupported',

@@ -329,6 +329,7 @@ function CreateFullPageContent({
             )}
             {currentStep > 1 && !currentStepData?.hideBackButton && (
               <Button
+                disabled={isSubmitting}
                 kind="secondary"
                 onClick={() => {
                   setFlowError('');

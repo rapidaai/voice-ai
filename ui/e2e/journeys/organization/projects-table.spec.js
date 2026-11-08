@@ -25,31 +25,72 @@ function timestamp(value) {
   return result;
 }
 
-function buildProjectListResponse() {
+function buildProjectListResponse(itemCount = 1) {
   const member = new User();
   member.setId('101');
   member.setName('E2E User');
   member.setEmail('e2e@example.test');
 
-  const project = new Project();
-  project.setId('302');
-  project.setName('Customer support');
-  project.setDescription('Customer support automation workspace.');
-  project.setMembersList([member]);
-  project.setStatus('ACTIVE');
-  project.setCreateddate(timestamp('2026-10-17T08:28:00Z'));
+  const projects = Array.from({ length: itemCount }, (_, index) => {
+    const project = new Project();
+    project.setId(String(302 + index));
+    project.setName(index === 0 ? 'Customer support' : `Project ${index + 1}`);
+    project.setDescription('Customer support automation workspace.');
+    project.setMembersList([member]);
+    project.setStatus('ACTIVE');
+    project.setCreateddate(timestamp('2026-10-17T08:28:00Z'));
+    return project;
+  });
 
   const paginated = new Paginated();
   paginated.setCurrentpage(1);
-  paginated.setTotalitem(1);
+  paginated.setTotalitem(itemCount);
 
   const response = new GetAllProjectResponse();
   response.setCode(200);
   response.setSuccess(true);
-  response.setDataList([project]);
+  response.setDataList(projects);
   response.setPaginated(paginated);
   return Buffer.from(response.serializeBinary());
 }
+
+test('organization projects keep table controls sticky through long results', async ({
+  page,
+}) => {
+  await page.setViewportSize(viewport);
+  await authenticatePage(page);
+  await page.route(PROJECT_LIST_PATH, route =>
+    fulfillGrpcWeb(route, buildProjectListResponse(25)),
+  );
+
+  await page.goto(projectsPath);
+
+  await expect(page.getByText('Project 25', { exact: true })).toBeVisible();
+  const pageScroll = page.locator('[data-page-scroll]');
+  await pageScroll.evaluate(element => {
+    element.scrollTop = element.scrollHeight;
+  });
+  const scrollPosition = await pageScroll.evaluate(element => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    scrollTop: element.scrollTop,
+  }));
+  expect(scrollPosition.scrollHeight).toBeGreaterThan(
+    scrollPosition.clientHeight,
+  );
+  expect(scrollPosition.scrollTop).toBeGreaterThan(0);
+
+  const toolbar = page.locator('[data-page-header-sticky-toolbar]');
+  await expect(toolbar).toBeVisible();
+  await expect
+    .poll(async () => {
+      const pageScrollBox = await pageScroll.boundingBox();
+      const toolbarBox = await toolbar.boundingBox();
+      if (!pageScrollBox || !toolbarBox) return Number.MAX_SAFE_INTEGER;
+      return Math.abs(toolbarBox.y - (pageScrollBox.y + 40));
+    })
+    .toBeLessThanOrEqual(1);
+});
 
 for (const colorMode of ['light', 'dark']) {
   test(`organization projects loading in ${colorMode} mode`, async ({

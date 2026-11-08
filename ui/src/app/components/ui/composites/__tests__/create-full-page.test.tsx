@@ -333,6 +333,57 @@ describe('CreateFullPageWithGlobalHeader', () => {
     await waitFor(() => expect(submitButton).toBeEnabled());
   });
 
+  it('disables backward navigation while a step action is pending', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    let resolveNext: (() => void) | undefined;
+    const onNext = jest.fn(
+      () =>
+        new Promise<void>(resolve => {
+          resolveNext = resolve;
+        }),
+    );
+
+    render(
+      <CreateFullPageWithGlobalHeader
+        title="Create resource"
+        description="Create a new resource in three steps."
+        eyebrow="Resource"
+        onCancel={jest.fn()}
+        onRequestSubmit={jest.fn()}
+        submitButtonText="Finish"
+      >
+        <CreateFullPageStep title="Configure" description="Configure it.">
+          <div>Configuration fields</div>
+        </CreateFullPageStep>
+        <CreateFullPageStep
+          title="Create"
+          description="Create the resource."
+          nextButtonText="Create and continue"
+          onNext={onNext}
+        >
+          <div>Creation fields</div>
+        </CreateFullPageStep>
+        <CreateFullPageStep title="Finish" description="Finish setup.">
+          <div>Finish fields</div>
+        </CreateFullPageStep>
+      </CreateFullPageWithGlobalHeader>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    const backButton = screen.getByRole('button', { name: 'Back' });
+    await user.click(
+      screen.getByRole('button', { name: 'Create and continue' }),
+    );
+
+    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(backButton).toBeDisabled();
+
+    resolveNext?.();
+    await waitFor(() =>
+      expect(screen.getByText('Finish fields')).toBeInTheDocument(),
+    );
+  });
+
   it('uses step-specific navigation actions after an irreversible step', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
 
