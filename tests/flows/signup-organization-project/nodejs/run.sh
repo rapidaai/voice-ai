@@ -7,9 +7,11 @@ readonly flow_name='CI Signup Flow'
 readonly flow_organization='CI Node SDK Organization'
 readonly flow_project='CI Node SDK Project'
 script_directory=$(cd "$(dirname "$0")" && pwd)
+# shellcheck disable=SC1091
+. "$script_directory/../../process-lifecycle.sh"
 
 cleanup() {
-  psql -v ON_ERROR_STOP=1 -h postgres -U rapida_user -d web_db \
+  psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
     -v flow_email="$flow_email" \
     -v flow_organization="$flow_organization" >/dev/null <<'SQL'
 CREATE TEMP TABLE flow_users AS
@@ -40,7 +42,7 @@ DELETE FROM user_auths WHERE id IN (SELECT id FROM flow_users);
 SQL
 }
 
-trap cleanup EXIT HUP INT TERM
+register_flow_cleanup cleanup
 cleanup
 
 FLOW_EMAIL="$flow_email" \
@@ -48,4 +50,4 @@ FLOW_PASSWORD="$flow_password" \
 FLOW_NAME="$flow_name" \
 FLOW_ORGANIZATION="$flow_organization" \
 FLOW_PROJECT="$flow_project" \
-  timeout 30s node "$script_directory/signup-organization-project.js"
+  run_flow_process timeout 30s node "$script_directory/signup-organization-project.js"

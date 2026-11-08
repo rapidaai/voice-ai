@@ -3,6 +3,8 @@ set -eu
 
 script_directory=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
+. "$script_directory/../../process-lifecycle.sh"
+# shellcheck disable=SC1091
 . "$script_directory/../../project-fixture.sh"
 
 export FLOW_FIXTURE_ID='8100103'
@@ -15,12 +17,17 @@ export FLOW_PROJECT='CI Create Assistant REST Project'
 export FLOW_ASSISTANT='CI REST Assistant'
 
 assistant_endpoint=${ASSISTANT_API_REST_ENDPOINT:-http://assistant-api:9007}
-temporary_directory=$(mktemp -d)
+temporary_directory=''
 
 cleanup() {
   cleanup_project_fixture
-  rm -rf "$temporary_directory"
+  if [ -n "$temporary_directory" ]; then
+    rm -rf "$temporary_directory"
+  fi
 }
+
+register_flow_cleanup cleanup
+temporary_directory=$(mktemp -d)
 
 request() {
   auth_mode=$1
@@ -65,7 +72,6 @@ run_flow() {
   printf 'REST create assistant flow passed with %s\n' "$auth_name"
 }
 
-trap cleanup EXIT HUP INT TERM
 seed_project_fixture
 seed_project_api_key_fixture
 

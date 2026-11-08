@@ -1,15 +1,19 @@
 #!/bin/sh
 set -eu
 
+script_directory=$(cd "$(dirname "$0")" && pwd)
+# shellcheck disable=SC1091
+. "$script_directory/../../process-lifecycle.sh"
+
 readonly flow_email='ci-flow-signin-rest@example.invalid'
 readonly flow_password='ci-flow-signin-password'
 readonly flow_token='ci-flow-signin-rest-token'
 readonly flow_id='8100003'
 readonly web_endpoint="${WEB_API_REST_ENDPOINT:-http://web-api:9001}"
-temporary_directory=$(mktemp -d)
+temporary_directory=''
 
 cleanup_data() {
-  psql -v ON_ERROR_STOP=1 -h postgres -U rapida_user -d web_db \
+  psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
     -v flow_email="$flow_email" >/dev/null <<'SQL'
 DELETE FROM user_auth_tokens
 WHERE user_auth_id IN (SELECT id FROM user_auths WHERE email = :'flow_email');
@@ -19,13 +23,16 @@ SQL
 
 cleanup() {
   cleanup_data
-  rm -rf "$temporary_directory"
+  if [ -n "$temporary_directory" ]; then
+    rm -rf "$temporary_directory"
+  fi
 }
 
-trap cleanup EXIT HUP INT TERM
+register_flow_cleanup cleanup
+temporary_directory=$(mktemp -d)
 cleanup_data
 
-psql -v ON_ERROR_STOP=1 -h postgres -U rapida_user -d web_db \
+psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
   -v flow_email="$flow_email" \
   -v flow_password="$flow_password" \
   -v flow_token="$flow_token" \

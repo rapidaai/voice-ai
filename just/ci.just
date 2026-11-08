@@ -26,12 +26,24 @@ ci-check:
     go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
     bash -n just/*.sh scripts/contracts/*.sh
     bash just/shellcheck.sh
+    just ci-flow-contract
     bash just/ci-github-actions.sh
     bash just/ci-service-boundaries.sh
     ./bin/check-go-version-consistency
     bash just/ci-python.sh openapi/scripts/generate_assistant_postman_collection.py --check
     CI_STACK_CACHE_SCOPE=local CI_STACK_AUTH_TOKEN=local CI_STACK_PROJECT_API_KEY=local CI_STACK_REPORTS_DIR="${PWD}/smoke-reports" docker compose -f docker-compose.yml -f docker-compose.ci.yml config --quiet
     PATH="$(bash just/ci-python.sh --bin-dir):$PATH" just validate-development-toolkit
+
+# Reject user-flow structure and runner contract drift.
+ci-flow-contract:
+    bash tests/flows/check-contract.sh
+    bash tests/flows/check-contract-test.sh
+    bash tests/flows/project-fixture-test.sh
+    bash tests/flows/project-lifecycle-fixture-test.sh
+    bash tests/flows/run-local-test.sh
+    bash tests/flows/signal-lifecycle-test.sh
+    bash tests/flows/run-test.sh
+    bash tests/flows/summarize-results-test.sh
 
 # Run repository policy, commit-message, and filesystem security checks.
 ci-repository: ci-license ci-commitlint ci-security
@@ -138,6 +150,18 @@ flows:
 
 # Run complete user workflows in CI.
 ci-flows: flows
+
+# Run Node.js SDK user workflows in CI.
+ci-flows-node:
+    bash just/ci-stack.sh flows-nodejs
+
+# Run React SDK user workflows in CI.
+ci-flows-react:
+    bash just/ci-stack.sh flows-react
+
+# Run REST user workflows in CI.
+ci-flows-rest:
+    bash just/ci-stack.sh flows-rest
 
 # Run provider callback integration tests against the complete service stack.
 ci-telephony-callbacks:
