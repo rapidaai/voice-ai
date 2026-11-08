@@ -2,6 +2,7 @@ import {
   ArrowRight,
   Bot,
   CheckmarkFilled,
+  Information,
   Renew,
   WarningAltFilled,
 } from '@carbon/icons-react';
@@ -21,6 +22,9 @@ import {
   TableHeader,
   TableRow,
   Tag,
+  Toggletip,
+  ToggletipButton,
+  ToggletipContent,
 } from '@carbon/react';
 import {
   Alignments,
@@ -68,6 +72,7 @@ type DashboardRange = '30d' | '7d' | '24h';
 
 type DashboardMetric = {
   label: string;
+  description: string;
   value: string;
   unit?: string;
   comparison: string;
@@ -322,9 +327,12 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
   return (
     <article
       data-dashboard-kpi
-      className="flex min-h-[144px] flex-col border border-border-subtle bg-surface p-5"
+      className="flex h-[156px] flex-col border border-border-subtle bg-surface"
     >
-      <div>
+      <header
+        data-dashboard-kpi-header
+        className="flex h-10 shrink-0 items-center justify-between border-b border-border-subtle px-4"
+      >
         <Text
           as="h2"
           variant="heading-compact-01"
@@ -332,30 +340,45 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
         >
           {metric.label}
         </Text>
+        <Toggletip align="bottom-end">
+          <ToggletipButton label={`${metric.label} information`}>
+            <Information aria-hidden="true" className="text-muted" size={16} />
+          </ToggletipButton>
+          <ToggletipContent>
+            <Text as="p" variant="body-compact-01">
+              {metric.description}
+            </Text>
+          </ToggletipContent>
+        </Toggletip>
+      </header>
+      <div
+        data-dashboard-kpi-body
+        className="flex h-[116px] flex-col justify-between p-4"
+      >
+        <Text
+          as="p"
+          variant="heading-05"
+          className="tabular-nums text-foreground"
+        >
+          {metric.value}
+          {metric.unit && (
+            <Text variant="body-compact-02" className="ml-1 text-muted">
+              {metric.unit}
+            </Text>
+          )}
+        </Text>
+        <Text
+          as="p"
+          variant="label-01"
+          className={
+            metric.comparisonTone === 'danger'
+              ? 'text-support-error'
+              : 'text-muted'
+          }
+        >
+          {metric.comparison}
+        </Text>
       </div>
-      <Text
-        as="p"
-        variant="heading-05"
-        className="mt-4 tabular-nums text-foreground"
-      >
-        {metric.value}
-        {metric.unit && (
-          <Text variant="body-compact-02" className="ml-1 text-muted">
-            {metric.unit}
-          </Text>
-        )}
-      </Text>
-      <Text
-        as="p"
-        variant="label-01"
-        className={`mt-auto pt-3 ${
-          metric.comparisonTone === 'danger'
-            ? 'text-support-error'
-            : 'text-muted'
-        }`}
-      >
-        {metric.comparison}
-      </Text>
     </article>
   );
 }
@@ -839,13 +862,24 @@ function DashboardLoading() {
         {[0, 1, 2, 3].map(item => (
           <div
             data-dashboard-loading-card
-            className="h-[156px] border border-border-subtle bg-surface p-4 "
+            data-dashboard-loading-kpi
+            className="flex h-[156px] flex-col border border-border-subtle bg-surface"
             key={item}
             aria-hidden="true"
           >
-            <SkeletonText width="45%" />
-            <SkeletonText className="mt-6" width="70%" heading />
-            <SkeletonText className="mt-6" width="80%" />
+            <div
+              data-dashboard-kpi-header
+              className="flex h-10 shrink-0 items-center border-b border-border-subtle px-4"
+            >
+              <SkeletonText className="!mb-0" width="45%" />
+            </div>
+            <div
+              data-dashboard-kpi-body
+              className="flex h-[116px] flex-col justify-between p-4"
+            >
+              <SkeletonText className="!mb-0" width="70%" heading />
+              <SkeletonText className="!mb-0" width="80%" />
+            </div>
           </div>
         ))}
       </div>
@@ -916,11 +950,15 @@ function buildMetrics(analytics: ProjectDashboardAnalytics) {
   return [
     {
       label: 'Sessions',
+      description:
+        'Total conversation sessions handled during the selected time range.',
       value: numberFormatter.format(sessions?.getValue() || 0),
       comparison: sessionComparison,
     },
     {
       label: 'Success Rate',
+      description:
+        'Percentage of project sessions completed successfully during the selected time range.',
       value: successRate?.hasValuepercent()
         ? `${successRate.getValuepercent().toFixed(1)}%`
         : 'Not available',
@@ -928,6 +966,8 @@ function buildMetrics(analytics: ProjectDashboardAnalytics) {
     },
     {
       label: 'Average Latency',
+      description:
+        'Average end-to-end response latency across project sessions during the selected time range.',
       value: latency?.hasValuems()
         ? numberFormatter.format(latency.getValuems())
         : 'Not available',
@@ -936,6 +976,8 @@ function buildMetrics(analytics: ProjectDashboardAnalytics) {
     },
     {
       label: 'Failed Sessions',
+      description:
+        'Project sessions that failed during the selected time range.',
       value: numberFormatter.format(failed?.getValue() || 0),
       comparison: failureComparison,
       comparisonTone: 'danger' as const,

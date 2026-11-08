@@ -310,10 +310,17 @@ describe('Dashboard HomePage', () => {
     expect(kpis).toHaveLength(4);
     kpis.forEach(card => {
       expect(card).toHaveClass(
+        'h-[156px]',
         'border',
         'border-border-subtle',
         'bg-surface',
-        'p-5',
+      );
+      expect(
+        card.querySelector('[data-dashboard-kpi-header]'),
+      ).toHaveClass('h-10', 'border-b', 'border-border-subtle', 'px-4');
+      expect(card.querySelector('[data-dashboard-kpi-body]')).toHaveClass(
+        'h-[116px]',
+        'p-4',
       );
     });
     expect(container.querySelector('[data-dashboard-grid]')).toHaveClass(
@@ -325,6 +332,29 @@ describe('Dashboard HomePage', () => {
       expect(card).toHaveClass('border', 'border-border-subtle', 'bg-surface');
       expect(card.querySelector('header')).toHaveClass('px-6', 'py-4');
     });
+  });
+
+  it('explains each important KPI with an accessible toggletip', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    render(<HomePage />);
+
+    await screen.findByText('12,486');
+
+    const informationButtons = [
+      'Sessions information',
+      'Success Rate information',
+      'Average Latency information',
+      'Failed Sessions information',
+    ].map(name => screen.getByRole('button', { name }));
+
+    expect(informationButtons).toHaveLength(4);
+
+    await user.click(informationButtons[0]);
+    expect(
+      await screen.findByText(
+        'Total conversation sessions handled during the selected time range.',
+      ),
+    ).toBeVisible();
   });
 
   it('uses canonical Carbon typography across dashboard content', async () => {
@@ -405,6 +435,22 @@ describe('Dashboard HomePage', () => {
     expect(
       container.querySelectorAll('[data-dashboard-loading-card]'),
     ).toHaveLength(8);
+    const loadingKpis = container.querySelectorAll(
+      '[data-dashboard-loading-kpi]',
+    );
+    expect(loadingKpis).toHaveLength(4);
+    loadingKpis.forEach(card => {
+      expect(card.querySelector('[data-dashboard-kpi-header]')).toHaveClass(
+        'h-10',
+        'border-b',
+        'border-border-subtle',
+        'px-4',
+      );
+      expect(card.querySelector('[data-dashboard-kpi-body]')).toHaveClass(
+        'h-[116px]',
+        'p-4',
+      );
+    });
   });
 
   it('keeps the selected time range visible and requests that duration', async () => {
