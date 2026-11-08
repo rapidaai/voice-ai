@@ -79,7 +79,14 @@ describe('Assistant overview header', () => {
 
   it('shows the Carbon-style overview header with a flush full-height primary create version action', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
-    render(<Overview currentAssistant={makeAssistant()} />);
+    const { container } = render(
+      <Overview currentAssistant={makeAssistant()} />,
+    );
+
+    const resourceHeader = container.querySelector(
+      '[data-resource-detail-header]',
+    );
+    expect(resourceHeader).toHaveClass('h-12', 'bg-shell');
 
     expect(screen.getByText('Assistants')).toHaveAttribute(
       'href',

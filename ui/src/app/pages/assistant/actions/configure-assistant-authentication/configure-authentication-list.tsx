@@ -6,6 +6,7 @@ import {
   ModalFooter,
   ModalHeader,
   ComposedModal,
+  DataTableSkeleton,
   Table,
   TableBody,
   TableCell,
@@ -21,8 +22,10 @@ import toast from 'react-hot-toast/headless';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { UrlTableCell } from '@/app/components/ui/table';
-import { SectionLoader } from '@/app/components/ui/feedback';
-import { TableSection } from '@/app/components/layout/sections/table-section';
+import {
+  ScrollableTableSection,
+  TableSection,
+} from '@/app/components/layout/sections/table-section';
 import { EmptyState } from '@/app/components/ui/feedback';
 import { RecordStatusIndicator } from '@/app/components/ui/feedback';
 import { toHumanReadableDateTime } from '@/utils/date';
@@ -40,6 +43,15 @@ import {
 import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
 
 const authenticationConfigurationType = 'authentication';
+
+const skeletonHeaders = [
+  { key: 'provider', header: 'Provider Type' },
+  { key: 'method', header: 'Method' },
+  { key: 'url', header: 'URL' },
+  { key: 'status', header: 'Status' },
+  { key: 'date', header: 'Date' },
+  { key: 'actions', header: 'Actions' },
+];
 
 type AuthenticationAction = 'enable' | 'disable' | 'delete';
 
@@ -203,16 +215,8 @@ export const ConfigureAuthenticationList: FC<
         ? 'Disable'
         : 'Delete';
 
-  if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center">
-        <SectionLoader />
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-full flex-1 flex-col bg-surface">
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-surface">
       <ComposedModal
         open={Boolean(pendingAction)}
         onClose={closeActionModal}
@@ -253,77 +257,93 @@ export const ConfigureAuthenticationList: FC<
         }}
       />
 
-      <TableSection>
-        {authentication ? (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeader>Provider Type</TableHeader>
-                <TableHeader>Method</TableHeader>
-                <TableHeader>URL</TableHeader>
-                <TableHeader>Status</TableHeader>
-                <TableHeader>Date</TableHeader>
-                <TableHeader>Actions</TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              <TableRow>
-                <TableCell className="text-sm whitespace-nowrap">
-                  {authentication.getProvider() || 'http'}
-                </TableCell>
-                <TableCell className="text-sm whitespace-nowrap">
-                  {optionMap[AUTH_OPTION_METHOD] || '-'}
-                </TableCell>
-                <UrlTableCell url={optionMap[AUTH_OPTION_ENDPOINT]} />
-                <TableCell className="text-sm whitespace-nowrap">
-                  <RecordStatusIndicator
-                    state={authentication.getStatus()}
-                    textSize={14}
-                  />
-                </TableCell>
-                <TableCell className="text-[13px] whitespace-nowrap">
-                  {authentication.getCreateddate() &&
-                    toHumanReadableDateTime(authentication.getCreateddate()!)}
-                </TableCell>
-                <TableCell
-                  className="text-sm whitespace-nowrap"
-                  onClick={e => e.stopPropagation()}
-                >
-                  <OverflowMenu
-                    size="sm"
-                    flipped
-                    aria-label="Authentication actions"
+      {loading ? (
+        <TableSection className="min-h-0 overflow-hidden bg-surface">
+          <DataTableSkeleton
+            headers={skeletonHeaders}
+            columnCount={skeletonHeaders.length}
+            rowCount={1}
+            showHeader={false}
+            showToolbar={false}
+            size="lg"
+            className="w-full"
+          />
+        </TableSection>
+      ) : authentication ? (
+        <TableSection className="min-h-0 bg-surface">
+          <ScrollableTableSection>
+            <Table className="min-w-max">
+              <TableHead>
+                <TableRow>
+                  <TableHeader>Provider Type</TableHeader>
+                  <TableHeader>Method</TableHeader>
+                  <TableHeader>URL</TableHeader>
+                  <TableHeader>Status</TableHeader>
+                  <TableHeader>Date</TableHeader>
+                  <TableHeader>Actions</TableHeader>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="text-sm whitespace-nowrap">
+                    {authentication.getProvider() || 'http'}
+                  </TableCell>
+                  <TableCell className="text-sm whitespace-nowrap">
+                    {optionMap[AUTH_OPTION_METHOD] || '-'}
+                  </TableCell>
+                  <UrlTableCell url={optionMap[AUTH_OPTION_ENDPOINT]} />
+                  <TableCell className="text-sm whitespace-nowrap">
+                    <RecordStatusIndicator
+                      state={authentication.getStatus()}
+                      textSize={14}
+                    />
+                  </TableCell>
+                  <TableCell className="text-[13px] whitespace-nowrap">
+                    {authentication.getCreateddate() &&
+                      toHumanReadableDateTime(authentication.getCreateddate()!)}
+                  </TableCell>
+                  <TableCell
+                    className="text-sm whitespace-nowrap"
+                    onClick={e => e.stopPropagation()}
                   >
-                    <OverflowMenuItem
-                      itemText="Edit"
-                      onClick={() => navigator.goTo(configureRoute)}
-                    />
-                    <OverflowMenuItem
-                      itemText={authenticationEnabled ? 'Disable' : 'Enable'}
-                      onClick={() =>
-                        setPendingAction(
-                          authenticationEnabled ? 'disable' : 'enable',
-                        )
-                      }
-                    />
-                    <OverflowMenuItem
-                      itemText="Delete"
-                      isDelete
-                      onClick={() => setPendingAction('delete')}
-                    />
-                  </OverflowMenu>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        ) : (
+                    <OverflowMenu
+                      size="sm"
+                      flipped
+                      aria-label="Authentication actions"
+                    >
+                      <OverflowMenuItem
+                        itemText="Edit"
+                        onClick={() => navigator.goTo(configureRoute)}
+                      />
+                      <OverflowMenuItem
+                        itemText={authenticationEnabled ? 'Disable' : 'Enable'}
+                        onClick={() =>
+                          setPendingAction(
+                            authenticationEnabled ? 'disable' : 'enable',
+                          )
+                        }
+                      />
+                      <OverflowMenuItem
+                        itemText="Delete"
+                        isDelete
+                        onClick={() => setPendingAction('delete')}
+                      />
+                    </OverflowMenu>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </ScrollableTableSection>
+        </TableSection>
+      ) : (
+        <div className="flex flex-1 items-center justify-center">
           <EmptyState
             icon={Add}
             title="No authentication configured"
             subtitle="Create authentication to verify sessions before initialization."
           />
-        )}
-      </TableSection>
+        </div>
+      )}
     </div>
   );
 };

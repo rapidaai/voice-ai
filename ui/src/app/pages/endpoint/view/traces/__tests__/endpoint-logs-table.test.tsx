@@ -107,7 +107,11 @@ jest.mock('@/app/components/domain/indicators/source', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives/pagination', () => ({
-  Pagination: () => <div>pagination</div>,
+  Pagination: ({ sticky }: any) => (
+    <div data-sticky={sticky} data-testid="pagination">
+      pagination
+    </div>
+  ),
 }));
 
 jest.mock('@/app/components/ui/feedback/empty-state', () => ({
@@ -227,6 +231,10 @@ describe('Endpoint logs table', () => {
     expect(screen.getByText('5.00 ms')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('May 10, 2026')).toBeInTheDocument();
+    expect(screen.getByTestId('pagination')).toHaveAttribute(
+      'data-sticky',
+      'true',
+    );
   });
 
   it('uses flat row actions to open endpoint log detail', async () => {

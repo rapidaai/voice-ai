@@ -58,19 +58,14 @@ export const OutputMessage: FC<{
   }, [callerResponse]);
 
   return (
-    <div
-      className={cn(
-        'flex min-h-0 flex-col bg-[var(--cds-layer-01)]',
-        className,
-      )}
-    >
-      <div className="border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)] px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--cds-text-secondary)]">
+    <div className={cn('flex min-h-0 flex-col bg-layer', className)}>
+      <div className="border-b border-border-subtle bg-layer px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted">
           Response
         </p>
       </div>
       <ExecuteMessage
-        className="border-[var(--cds-border-subtle-01)]"
+        className="border-border-subtle"
         apiError={error}
         loading={loading}
         metrics={endpointMetrics}
@@ -78,19 +73,19 @@ export const OutputMessage: FC<{
       />
       <Tab
         active="output"
-        className={cn('min-h-0 flex-1 bg-[var(--cds-layer-01)] text-sm/6')}
+        className={cn('min-h-0 flex-1 bg-layer text-sm/6')}
         tabs={[
           {
             label: 'output',
             element: (
-              <div className="flex-1 bg-[var(--cds-layer-01)]">
+              <div className="flex-1 bg-layer">
                 <div className="flex min-h-[16rem] flex-col items-start justify-start overflow-auto">
                   {outputs ? (
                     outputs.map((out, i) => {
                       return <MarkdownViewer text={out.content} key={i} />;
                     })
                   ) : (
-                    <div className="w-full p-4 text-sm text-[var(--cds-text-secondary)]">
+                    <div className="w-full p-4 text-sm text-muted">
                       Output will appear after execution.
                     </div>
                   )}
@@ -101,14 +96,14 @@ export const OutputMessage: FC<{
           {
             label: 'metadata',
             element: (
-              <div className="flex-1 bg-[var(--cds-layer-01)]">
+              <div className="flex-1 bg-layer">
                 {callerResponse ? (
                   <CodeHighlighting
                     className="max-w-full h-full"
                     code={JSON.stringify(callerResponse.getMeta(), null, 2)}
                   />
                 ) : (
-                  <div className="w-full p-4 text-sm text-[var(--cds-text-secondary)]">
+                  <div className="w-full p-4 text-sm text-muted">
                     Metadata will appear after execution.
                   </div>
                 )}
@@ -118,7 +113,7 @@ export const OutputMessage: FC<{
           {
             label: 'metrics',
             element: (
-              <div className="flex-1 bg-[var(--cds-layer-01)]">
+              <div className="flex-1 bg-layer">
                 {callerResponse ? (
                   <CodeHighlighting
                     className="max-w-full h-full"
@@ -129,7 +124,7 @@ export const OutputMessage: FC<{
                     )}
                   />
                 ) : (
-                  <div className="w-full p-4 text-sm text-[var(--cds-text-secondary)]">
+                  <div className="w-full p-4 text-sm text-muted">
                     Metrics will appear after execution.
                   </div>
                 )}

@@ -41,19 +41,23 @@ describe('layout notice blocks', () => {
 
     expect(screen.getByTestId('info')).toHaveClass(
       'info-extra',
-      'border-l-blue-600',
+      'border-l-support-info',
       'text-foreground',
     );
     expect(screen.getByTestId('info')).toHaveAttribute('role', 'status');
-    expect(screen.getByTestId('success')).toHaveClass('border-l-green-600');
-    expect(screen.getByTestId('warning')).toHaveClass('border-l-yellow-500');
+    expect(screen.getByTestId('success')).toHaveClass(
+      'border-l-support-success',
+    );
+    expect(screen.getByTestId('warning')).toHaveClass(
+      'border-l-support-warning',
+    );
   });
 
   it('renders error notices as alerts', () => {
     render(<RedNoticeBlock data-testid="error">Fix settings</RedNoticeBlock>);
 
     expect(screen.getByRole('alert')).toHaveTextContent('Fix settings');
-    expect(screen.getByTestId('error')).toHaveClass('border-l-red-600');
+    expect(screen.getByTestId('error')).toHaveClass('border-l-support-error');
   });
 
   it('renders documentation links from theme paths or explicit URLs', () => {

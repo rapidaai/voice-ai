@@ -24,12 +24,14 @@ const theme: ThemeManifest = {
   allowModeSelection: false,
   colors: {
     light: {
+      carbonTheme: 'white',
       primary: '#111111',
       primaryHover: '#222222',
       primaryActive: '#333333',
       onPrimary: '#ffffff',
     },
     dark: {
+      carbonTheme: 'g100',
       primary: '#eeeeee',
       primaryHover: '#dddddd',
       primaryActive: '#cccccc',

@@ -18,7 +18,7 @@ import {
 } from '@carbon/icons-react';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { GhostButton } from '@/app/components/ui/primitives';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
+import { CompactPageHeader } from '@/app/components/layout/compact-page-header';
 import { cn } from '@/utils';
 import { CarbonStatusIndicator } from '@/app/components/ui/feedback';
 import { getStatusMetric } from '@/utils/metadata';
@@ -135,13 +135,10 @@ export function ConversationDetailPage() {
             className="h-full"
           />
         ) : (
-          <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+          <div className="flex flex-col divide-y divide-border-subtle ">
             {items.map((x, idx) => (
-              <div
-                key={idx}
-                className="px-6 py-4 space-y-3 bg-white dark:bg-gray-900"
-              >
-                <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--cds-text-secondary)]">
+              <div key={idx} className="px-6 py-4 space-y-3 bg-surface ">
+                <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted">
                   {x.getKey().replace('.', ' › ')}
                 </p>
                 <JsonViewer data={x.getValue()} />
@@ -161,7 +158,7 @@ export function ConversationDetailPage() {
             className="h-full"
           />
         ) : (
-          <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+          <div className="flex flex-col divide-y divide-border-subtle ">
             {contexts.map((x, idx) => (
               <div key={idx} className="px-6 py-5 space-y-4">
                 <DataField
@@ -348,7 +345,7 @@ export function ConversationDetailPage() {
   return (
     <>
       {/* ── Page header: breadcrumb + status + refresh ── */}
-      <PageHeaderBlock>
+      <CompactPageHeader>
         <div className="flex items-center gap-1.5 min-w-0">
           <GhostButton
             size="sm"
@@ -357,11 +354,9 @@ export function ConversationDetailPage() {
             iconDescription="Back to sessions"
             onClick={() => navigator.goToAssistantSessionList(assistantId!)}
           />
-          <span className="text-sm font-medium text-[var(--cds-text-secondary)]">
-            Sessions
-          </span>
-          <span className="text-gray-300 dark:text-gray-600">/</span>
-          <span className="text-sm font-medium text-gray-900 dark:text-gray-100 font-mono truncate">
+          <span className="text-sm font-medium text-muted">Sessions</span>
+          <span className="text-muted ">/</span>
+          <span className="text-sm font-medium text-foreground font-mono truncate">
             {sessionId}
           </span>
         </div>
@@ -369,7 +364,7 @@ export function ConversationDetailPage() {
           <CarbonStatusIndicator
             state={getStatusMetric(currentConversation.getMetricsList())}
           />
-          <div className="w-px h-4 bg-gray-200 dark:bg-gray-700" />
+          <div className="w-px h-4 bg-layer " />
           <GhostButton
             size="sm"
             hasIconOnly
@@ -378,7 +373,7 @@ export function ConversationDetailPage() {
             onClick={get}
           />
         </div>
-      </PageHeaderBlock>
+      </CompactPageHeader>
 
       <Tabs
         tabs={TABS.map(({ label }) => label)}
@@ -414,12 +409,12 @@ const DataField = ({
   mono?: boolean;
 }) => (
   <div>
-    <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--cds-text-secondary)] mb-1">
+    <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted mb-1">
       {label}
     </p>
     <p
       className={cn(
-        'text-sm text-gray-900 dark:text-gray-100 leading-relaxed',
+        'text-sm text-foreground leading-relaxed',
         mono && 'font-mono',
       )}
     >
@@ -488,7 +483,7 @@ const JsonViewer = ({ data, preview = false }: JsonViewerProps) => {
 
   if (isSimpleResult) {
     return (
-      <p className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed">
+      <p className="text-sm text-foreground leading-relaxed">
         {parsedData.result}
       </p>
     );
@@ -501,10 +496,10 @@ const JsonViewer = ({ data, preview = false }: JsonViewerProps) => {
           key={index}
           className="border-l-2 border-primary bg-primary/5 pl-4 py-2"
         >
-          <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--cds-text-secondary)] mb-1 capitalize">
+          <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted mb-1 capitalize">
             {insight.key}
           </p>
-          <p className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed">
+          <p className="text-sm text-foreground leading-relaxed">
             {formatValue(insight.value, insight.type)}
           </p>
         </div>

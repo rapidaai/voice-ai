@@ -32,6 +32,7 @@ const {
   Metric,
   Paginated,
   TextChatCompletePrompt,
+  TextPrompt,
   Variable,
 } = require('@rapidaai/react');
 if (previousWindow === undefined) delete global.window;
@@ -98,7 +99,18 @@ function buildAssistant() {
   const provider = new AssistantProviderModel();
   provider.setId(ASSISTANT_VERSION_ID);
   provider.setAssistantid(ASSISTANT_ID);
-  provider.setModelprovidername('OpenAI');
+  provider.setModelprovidername('openai');
+  provider.setAssistantmodeloptionsList([
+    metadata('model.id', 'openai/gpt-4.1-mini'),
+    metadata('model.name', 'gpt-4.1-mini'),
+    metadata('rapida.credential_id', '2301664620831572200'),
+  ]);
+  const systemPrompt = new TextPrompt();
+  systemPrompt.setRole('system');
+  systemPrompt.setContent('You are a helpful customer support assistant.');
+  const prompt = new TextChatCompletePrompt();
+  prompt.addPrompt(systemPrompt);
+  provider.setTemplate(prompt);
   provider.setDescription('Production support assistant');
   provider.setStatus('active');
   provider.setCreateddate(timestamp('2026-10-01T09:00:00Z'));

@@ -155,8 +155,9 @@ jest.mock('@/app/components/layout/blocks/page-title-with-count', () => ({
   PageTitleWithCount: ({ children }: any) => <div>{children}</div>,
 }));
 
-jest.mock('@/app/components/layout/blocks/page-header-block', () => ({
-  PageHeaderBlock: ({ children }: any) => <div>{children}</div>,
+jest.mock('@/app/components/layout/page-header', () => ({
+  ...jest.requireActual('@/app/components/layout/page-header'),
+  PageHeader: ({ title }: any) => <div>{title}</div>,
 }));
 
 jest.mock('@/app/components/ui/table/table-link', () => ({
@@ -164,7 +165,11 @@ jest.mock('@/app/components/ui/table/table-link', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives/pagination', () => ({
-  Pagination: () => <div>pagination</div>,
+  Pagination: ({ sticky }: any) => (
+    <div data-sticky={sticky} data-testid="pagination">
+      pagination
+    </div>
+  ),
 }));
 
 jest.mock('@/app/components/ui/feedback/empty-state', () => ({
@@ -196,7 +201,8 @@ jest.mock('@/app/components/domain/indicators/http-status', () => ({
 
 jest.mock('@carbon/react', () => {
   const React = require('react');
-  const Div = ({ children }: any) => React.createElement('div', null, children);
+  const Div = ({ children, ...props }: any) =>
+    React.createElement('div', props, children);
   return {
     Table: Div,
     TableHead: Div,
@@ -234,7 +240,7 @@ describe('Request logs listing', () => {
   });
 
   it('renders request log data using HTTP log fields', async () => {
-    render(<ListingPage />);
+    const { container } = render(<ListingPage />);
 
     await waitFor(() => expect(mockGetActivities).toHaveBeenCalledTimes(1));
     expect(screen.getByText('Request Logs')).toBeInTheDocument();
@@ -245,6 +251,17 @@ describe('Request logs listing', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('req-123')).toBeInTheDocument();
     expect(screen.getByText('conversation.begin')).toBeInTheDocument();
+    expect(container.querySelector('[data-page-scroll]')).toHaveClass(
+      'overflow-y-auto',
+      'overflow-x-hidden',
+    );
+    expect(
+      container.querySelector('[data-page-header-sticky-toolbar]'),
+    ).toHaveClass('sticky', 'top-10', 'z-10');
+    expect(screen.getByTestId('pagination')).toHaveAttribute(
+      'data-sticky',
+      'true',
+    );
   });
 
   it('retries request only after confirm dialog acceptance', async () => {

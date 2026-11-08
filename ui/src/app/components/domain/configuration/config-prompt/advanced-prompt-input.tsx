@@ -62,10 +62,10 @@ function AdvancedPromptInput({
       <div
         ref={ref}
         className={cn(
-          'border-b border-gray-300 dark:border-gray-700',
+          'border-b border-border-subtle ',
           'transition-colors duration-100',
           'relative',
-          'bg-light-background dark:bg-gray-950',
+          'bg-field',
           isFocus && 'border-primary',
           'after:content-[""] after:absolute after:inset-0 after:pointer-events-none after:z-[1]',
           'after:outline-solid after:outline-2 after:outline-transparent after:outline-offset-[-2px]',
@@ -77,8 +77,8 @@ function AdvancedPromptInput({
       >
         <div
           className={cn(
-            'flex h-10 items-stretch bg-[var(--cds-field)]',
-            'border-b border-[var(--cds-border-strong)]',
+            'flex h-10 items-stretch bg-field',
+            'border-b border-border-strong',
           )}
         >
           <div className="min-w-0 flex-1">
@@ -92,9 +92,9 @@ function AdvancedPromptInput({
                 size="md"
                 onClick={onDelete}
                 tabIndex={-1}
-                className="hover:border-red-600  dark:hover:border-red-600 transition-colors border border-transparent border-l-gray-300 dark:border-l-gray-700"
+                className="border border-l-border-subtle border-transparent transition-colors hover:border-support-error"
               >
-                <TrashCan size={16} className="text-red-600" />
+                <TrashCan size={16} className="text-support-error" />
               </GhostButton>
             )}
             <GhostButton
@@ -105,10 +105,10 @@ function AdvancedPromptInput({
               onClick={() => {
                 copyItem(value);
               }}
-              className="hover:border-blue-600  dark:hover:border-blue-600  transition-colors border border-transparent border-l-gray-300 dark:border-l-gray-700"
+              className="border border-l-border-subtle border-transparent transition-colors hover:border-support-info"
             >
               {isChecked ? (
-                <Checkmark size={16} className="text-green-600" />
+                <Checkmark size={16} className="text-support-success" />
               ) : (
                 <Copy size={16} />
               )}
@@ -121,7 +121,7 @@ function AdvancedPromptInput({
               onClick={() => {
                 setIsExpand(!isExpand);
               }}
-              className="hover:border-blue-600 dark:hover:border-blue-600  transition-colors border border-transparent border-l-gray-300 dark:border-l-gray-700"
+              className="border border-l-border-subtle border-transparent transition-colors hover:border-support-info"
             >
               {isExpand ? <Minimize size={16} /> : <Maximize size={16} />}
             </GhostButton>

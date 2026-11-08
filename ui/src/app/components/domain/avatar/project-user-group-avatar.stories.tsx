@@ -28,13 +28,13 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     members,
-    size: 8,
+    size: 'md',
   },
 };
 
 export const Small: Story = {
   args: {
     members,
-    size: 7,
+    size: 'sm',
   },
 };

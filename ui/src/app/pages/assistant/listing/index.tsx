@@ -30,9 +30,11 @@ import {
   SkeletonPlaceholder,
   SkeletonText,
 } from '@carbon/react';
-import { PrimaryButton } from '@/app/components/ui/primitives';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
-import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
+import { PrimaryButton, Text } from '@/app/components/ui/primitives';
+import {
+  PageHeader,
+  PageHeaderStickyToolbar,
+} from '@/app/components/layout/page-header';
 import { Modal, ModalBody, ModalHeader } from '@/app/components/ui/primitives';
 import {
   AssistantQuerySearch,
@@ -137,40 +139,54 @@ export function AssistantPage() {
   ]);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div
+      data-assistant-list-page
+      className="flex h-full flex-col overflow-x-hidden overflow-y-auto"
+    >
       <Helmet title="Assistant" />
-      <PageHeaderBlock>
-        <div className="flex items-center gap-3">
-          <PageTitleBlock>Assistants</PageTitleBlock>
-          <span className="text-xs text-[var(--cds-text-secondary)] tabular-nums">
-            {assistantAction.assistants.length}/{assistantAction.totalCount}
-          </span>
-        </div>
-      </PageHeaderBlock>
-      <TableToolbar>
-        <TableToolbarContent>
-          <AssistantQuerySearch
-            value={querySearchValue}
-            onChange={setQuerySearchValue}
-            onApply={criteria => assistantAction.setCriterias(criteria)}
-          />
-          <Button
-            hasIconOnly
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            kind="ghost"
-            onClick={() => getAssistants(projectId, token, userId)}
-            tooltipPosition="bottom"
-          />
+      <PageHeader
+        eyebrow={
+          <Text variant="label-01" className="text-primary">
+            Deployment
+          </Text>
+        }
+        title="Assistants"
+        description="Create and manage assistants, versions, deployments, and connected experiences across your workspace."
+        contextualActions={
+          <Text variant="label-01" className="text-muted tabular-nums">
+            {assistantAction.assistants.length} of {assistantAction.totalCount}
+          </Text>
+        }
+        pageActions={
           <PrimaryButton
+            className="w-full md:w-auto"
             size="md"
             renderIcon={Add}
             onClick={() => setCreateAssistantModalOpen(true)}
           >
             {CREATE_ASSISTANT_LABEL}
           </PrimaryButton>
-        </TableToolbarContent>
-      </TableToolbar>
+        }
+      />
+      <PageHeaderStickyToolbar>
+        <TableToolbar>
+          <TableToolbarContent>
+            <AssistantQuerySearch
+              value={querySearchValue}
+              onChange={setQuerySearchValue}
+              onApply={criteria => assistantAction.setCriterias(criteria)}
+            />
+            <Button
+              hasIconOnly
+              renderIcon={Renew}
+              iconDescription="Refresh"
+              kind="ghost"
+              onClick={() => getAssistants(projectId, token, userId)}
+              tooltipPosition="bottom"
+            />
+          </TableToolbarContent>
+        </TableToolbar>
+      </PageHeaderStickyToolbar>
 
       {/* Content */}
       {loading ? (
@@ -179,29 +195,31 @@ export function AssistantPage() {
         />
       ) : assistantAction.assistants &&
         assistantAction.assistants.length > 0 ? (
-        <div className="no-scrollbar overflow-auto flex-1">
-          <Table>
-            <TableHead>
-              <TableRow>
-                {assistantColumns.map(col => (
-                  <TableHeader
-                    key={col.key}
-                    className={assistantColumnClassName[col.key]}
-                  >
-                    {col.name}
-                  </TableHeader>
+        <div className="flex-1">
+          <div className="no-scrollbar overflow-x-auto">
+            <Table>
+              <TableHead>
+                <TableRow>
+                  {assistantColumns.map(col => (
+                    <TableHeader
+                      key={col.key}
+                      className={assistantColumnClassName[col.key]}
+                    >
+                      {col.name}
+                    </TableHeader>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {assistantAction.assistants.map(ast => (
+                  <SingleAssistant
+                    key={`assistant_row_${ast.getId()}`}
+                    assistant={ast}
+                  />
                 ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {assistantAction.assistants.map(ast => (
-                <SingleAssistant
-                  key={`assistant_row_${ast.getId()}`}
-                  assistant={ast}
-                />
-              ))}
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          </div>
         </div>
       ) : assistantAction.criteria.length > 0 ? (
         <div className="h-full flex justify-center items-center">
@@ -232,7 +250,7 @@ export function AssistantPage() {
         assistantAction.assistants &&
         assistantAction.assistants.length > 0 && (
           <Pagination
-            className="shrink-0"
+            sticky
             totalItems={assistantAction.totalCount}
             page={assistantAction.page}
             pageSize={assistantAction.pageSize}
@@ -402,25 +420,25 @@ function CreateAssistantDialog({
               <ClickableTile
                 key={option.title}
                 onClick={() => onSelect(option.path)}
-                className="group !flex !min-h-[220px] !flex-col !rounded-none !border !border-gray-200 !bg-gray-50 !p-0 transition-colors hover:!border-primary dark:!border-gray-700 dark:!bg-gray-800 dark:hover:!border-primary"
+                className="group !flex !min-h-[220px] !flex-col !rounded-none !border !border-border-subtle !bg-layer !p-0 transition-colors hover:!border-primary "
               >
                 <div className="flex flex-1 flex-col p-5">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-primary/10 text-primary dark:bg-primary/10">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-primary/10 text-primary ">
                       <Icon size={24} />
                     </div>
                     <ArrowRight
                       size={20}
-                      className="mt-1 shrink-0 text-gray-400 transition-transform group-hover:translate-x-1 group-hover:text-primary dark:text-gray-500"
+                      className="mt-1 shrink-0 text-muted transition-transform group-hover:translate-x-1 group-hover:text-primary "
                     />
                   </div>
-                  <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                  <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-muted ">
                     {option.eyebrow}
                   </p>
-                  <h2 className="mt-2 text-xl font-semibold leading-tight text-gray-900 dark:text-white">
+                  <h2 className="mt-2 text-xl font-semibold leading-tight text-foreground ">
                     {option.title}
                   </h2>
-                  <p className="mt-3 flex-1 text-sm leading-5 text-gray-600 dark:text-gray-300">
+                  <p className="mt-3 flex-1 text-sm leading-5 text-muted ">
                     {option.description}
                   </p>
                   <span className="mt-6 inline-flex items-center gap-1 text-sm font-medium text-primary">

@@ -17,7 +17,10 @@ export function PageActionButtonBlock({
     <div {...attributes} className={cn('w-full shrink-0', className)}>
       {errorMessage && (
         <RedNoticeBlock className="flex items-center space-x-2">
-          <WarningAlt aria-hidden="true" className="h-4 w-4 text-red-600" />
+          <WarningAlt
+            aria-hidden="true"
+            className="h-4 w-4 text-support-error"
+          />
           <span role="alert">{errorMessage}</span>
         </RedNoticeBlock>
       )}

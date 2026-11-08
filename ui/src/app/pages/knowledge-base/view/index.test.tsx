@@ -62,12 +62,25 @@ jest.mock('@/app/components/dialogs/shared/update-description-modal', () => ({
   ),
 }));
 
-jest.mock('@/app/components/layout/blocks/page-header-block', () => ({
-  PageHeaderBlock: ({ children }: any) => <header>{children}</header>,
-}));
+jest.mock('@/app/components/layout/resource-detail-header', () => ({
+  ResourceDetailHeader: ({
+    resourceName,
+    resourceMetadata,
+    primaryAction,
+  }: any) => {
+    const PrimaryActionIcon = primaryAction.icon;
 
-jest.mock('@/app/components/layout/blocks/page-title-block', () => ({
-  PageTitleBlock: ({ children }: any) => <h1>{children}</h1>,
+    return (
+      <header>
+        <h1>{resourceName}</h1>
+        {resourceMetadata}
+        <button type="button" onClick={primaryAction.onClick}>
+          {primaryAction.label}
+          <PrimaryActionIcon data-testid="add-icon" />
+        </button>
+      </header>
+    );
+  },
 }));
 
 jest.mock('@/app/components/ui/primitives/tabs', () => ({

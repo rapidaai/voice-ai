@@ -38,7 +38,7 @@
         }
     },
     "theme": {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "id": "rapida",
         "brand": {
             "name": "Rapida AI",
@@ -65,12 +65,14 @@
         "allowModeSelection": true,
         "colors": {
             "light": {
+                "carbonTheme": "white",
                 "primary": "#0353e9",
                 "primaryHover": "#002d9c",
                 "primaryActive": "#001d6c",
                 "onPrimary": "#ffffff"
             },
             "dark": {
+                "carbonTheme": "g100",
                 "primary": "#4589ff",
                 "primaryHover": "#78a9ff",
                 "primaryActive": "#a6c8ff",

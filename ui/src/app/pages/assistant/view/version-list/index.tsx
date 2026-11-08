@@ -3,8 +3,8 @@ import { useCredential } from '@/hooks/use-credential';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast/headless';
 import { Assistant, GetAllAssistantProviderResponse } from '@rapidaai/react';
-import { SectionLoader } from '@/app/components/ui/feedback';
 import { TableSection } from '@/app/components/layout/sections/table-section';
+import { ConfirmDialog } from '@/app/components/dialogs/shared';
 import { Pagination } from '@/app/components/ui/primitives';
 import { toHumanReadableDateTime } from '@/utils/date';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
@@ -12,6 +12,8 @@ import { auditActorLabel, createdAuditActor } from '@/utils/audit-actor';
 import {
   Tag,
   Button,
+  DataTable,
+  DataTableSkeleton,
   Table,
   TableHead,
   TableRow,
@@ -23,7 +25,7 @@ import {
   TableToolbarSearch,
   TableBatchActions,
   TableBatchAction,
-  RadioButton,
+  TableSelectRow,
 } from '@carbon/react';
 import { Add, Copy, Checkmark, Rocket, Renew } from '@carbon/icons-react';
 import IconIndicator from '@carbon/react/es/components/IconIndicator';
@@ -42,6 +44,8 @@ const headers = [
   { key: 'createdDate', header: 'Date' },
 ];
 
+const skeletonHeaders = [{ key: 'select', header: '' }, ...headers];
+
 function VersionId({ id }: { id: string }) {
   const [copied, setCopied] = useState(false);
   const version = `vrsn_${id}`;
@@ -51,7 +55,7 @@ function VersionId({ id }: { id: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <span className="inline-flex items-center gap-1 font-mono text-[13px] text-gray-600 dark:text-gray-400">
+    <span className="inline-flex items-center gap-1 font-mono text-[13px] text-muted ">
       {version}
       <Button
         hasIconOnly
@@ -74,10 +78,10 @@ export function Version(props: VersionProps) {
   const [deployingProviderId, setDeployingProviderId] = useState<string | null>(
     null,
   );
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(
-    null,
-  );
+  const [pendingDeployment, setPendingDeployment] = useState<{
+    assistantProvider: string;
+    assistantProviderId: string;
+  } | null>(null);
 
   useEffect(() => {
     setIsFetching(true);
@@ -131,9 +135,17 @@ export function Version(props: VersionProps) {
 
   if (isFetching) {
     return (
-      <div className="h-full flex flex-col items-center justify-center">
-        <SectionLoader />
-      </div>
+      <TableSection className="min-h-0 overflow-hidden bg-surface">
+        <DataTableSkeleton
+          headers={skeletonHeaders}
+          columnCount={skeletonHeaders.length}
+          rowCount={5}
+          showHeader={false}
+          showToolbar
+          size="lg"
+          className="w-full"
+        />
+      </TableSection>
     );
   }
 
@@ -245,154 +257,205 @@ export function Version(props: VersionProps) {
     navigation.goToCreateAssistantVersion(props.assistant.getId());
   };
 
-  const filteredRows = searchTerm
-    ? allRows.filter(
-        ({ data }) =>
-          `vrsn_${data.id}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          data.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          data.description.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-    : allRows;
+  const tableRows = allRows.map(({ data }) => {
+    const isCurrent =
+      assistantProviderAction.assistant?.getAssistantproviderid() === data.id;
+
+    return {
+      id: data.id,
+      version: `vrsn_${data.id}`,
+      type: data.type,
+      description: data.description,
+      status: isCurrent ? 'In use' : 'Available',
+      createdBy: data.createdBy,
+      createdDate: data.createdDate
+        ? toHumanReadableDateTime(data.createdDate)
+        : '—',
+      disabled: isCurrent,
+    };
+  });
 
   return (
-    <TableSection>
-      <TableToolbar>
-        {selectedVersionId && (
-          <TableBatchActions
-            shouldShowBatchActions
-            totalSelected={1}
-            onCancel={() => setSelectedVersionId(null)}
-            totalCount={filteredRows.length}
-            className="[&_[class*=divider]]:hidden [&_.cds--btn]:transition-colors [&_.cds--btn:hover]:!bg-primary [&_.cds--btn:hover]:!text-white"
-          >
-            <TableBatchAction
-              renderIcon={Rocket}
-              onClick={() => {
-                const row = filteredRows.find(
-                  r => r.data.id === selectedVersionId,
-                );
-                if (row) {
-                  deployRevision(row.data.deployType, row.data.id);
-                  setSelectedVersionId(null);
-                }
-              }}
-            >
-              Deploy version
-            </TableBatchAction>
-          </TableBatchActions>
-        )}
-        <TableToolbarContent>
-          <TableToolbarSearch
-            placeholder="Search versions..."
-            onChange={(e: any) => setSearchTerm(e.target?.value || '')}
-          />
-          <Button
-            hasIconOnly
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            kind="ghost"
-            onClick={refresh}
-            tooltipPosition="bottom"
-          />
-          <Button renderIcon={Add} onClick={goToCreateVersion}>
-            Add new version
-          </Button>
-        </TableToolbarContent>
-      </TableToolbar>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableHeader className="!w-12" />
-            {headers.map(h => (
-              <TableHeader key={h.key}>{h.header}</TableHeader>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {filteredRows.map(({ data }, idx) => {
-            const isCurrent =
-              assistantProviderAction.assistant?.getAssistantproviderid() ===
-              data.id;
-            const isDeploying = deployingProviderId === data.id;
+    <TableSection className="min-h-0 bg-surface">
+      <DataTable rows={tableRows} headers={headers} radio>
+        {({
+          rows,
+          headers: tableHeaders,
+          selectedRows,
+          getBatchActionProps,
+          getHeaderProps,
+          getRowProps,
+          getSelectionProps,
+          getTableProps,
+          getToolbarProps,
+          onInputChange,
+        }) => {
+          const batchActionProps = getBatchActionProps();
+          const selectedVersion = selectedRows[0]
+            ? allRows.find(row => row.data.id === selectedRows[0].id)
+            : undefined;
 
-            return (
-              <TableRow
-                key={idx}
-                isSelected={selectedVersionId === data.id}
-                onClick={() =>
-                  !isCurrent &&
-                  setSelectedVersionId(
-                    selectedVersionId === data.id ? null : data.id,
-                  )
-                }
-                className={!isCurrent ? 'cursor-pointer' : ''}
-              >
-                <TableCell
-                  className="!w-12 !pr-0"
-                  onClick={e => e.stopPropagation()}
-                >
-                  <RadioButton
-                    id={`version-select-${data.id}`}
-                    name="version-select"
-                    labelText={`Select version ${data.id}`}
-                    hideLabel
-                    checked={selectedVersionId === data.id}
-                    onChange={() =>
-                      setSelectedVersionId(
-                        selectedVersionId === data.id ? null : data.id,
-                      )
-                    }
-                    disabled={isCurrent}
+          return (
+            <>
+              <TableToolbar {...getToolbarProps()}>
+                {selectedVersion && (
+                  <TableBatchActions
+                    {...batchActionProps}
+                    shouldShowBatchActions
+                  >
+                    <TableBatchAction
+                      renderIcon={Rocket}
+                      iconDescription="Deploy Version"
+                      onClick={() => {
+                        setPendingDeployment({
+                          assistantProvider: selectedVersion.data.deployType,
+                          assistantProviderId: selectedVersion.data.id,
+                        });
+                      }}
+                    >
+                      Deploy Version
+                    </TableBatchAction>
+                  </TableBatchActions>
+                )}
+                <TableToolbarContent>
+                  <TableToolbarSearch
+                    placeholder="Search versions..."
+                    onChange={onInputChange}
                   />
-                </TableCell>
-                <TableCell className="text-sm">
-                  <VersionId id={data.id} />
-                </TableCell>
-                <TableCell className="text-sm">
-                  <Tag type={data.typeColor} size="sm">
-                    {data.type}
-                  </Tag>
-                </TableCell>
-                <TableCell className="text-sm">{data.description}</TableCell>
-                <TableCell className="text-sm">
-                  {isCurrent ? (
-                    <IconIndicator kind="succeeded" label="In use" size={16} />
-                  ) : isDeploying ? (
-                    <IconIndicator
-                      kind="in-progress"
-                      label="Deploying"
-                      size={16}
-                    />
-                  ) : (
-                    <IconIndicator
-                      kind="incomplete"
-                      label="Available"
-                      size={16}
-                    />
-                  )}
-                </TableCell>
-                <TableCell className="text-sm">{data.createdBy}</TableCell>
-                <TableCell className="text-[13px] whitespace-nowrap">
-                  {data.createdDate
-                    ? toHumanReadableDateTime(data.createdDate)
-                    : '—'}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-      <Pagination
-        totalItems={assistantProviderAction.totalCount}
-        page={assistantProviderAction.page}
-        pageSize={assistantProviderAction.pageSize}
-        pageSizes={[10, 20, 50]}
-        onChange={({ page, pageSize }) => {
-          assistantProviderAction.setPage(page);
-          if (pageSize !== assistantProviderAction.pageSize)
-            assistantProviderAction.setPageSize(pageSize);
+                  <Button
+                    hasIconOnly
+                    renderIcon={Renew}
+                    iconDescription="Refresh"
+                    kind="ghost"
+                    onClick={refresh}
+                    tooltipPosition="bottom"
+                  />
+                  <Button renderIcon={Add} onClick={goToCreateVersion}>
+                    Add new version
+                  </Button>
+                </TableToolbarContent>
+              </TableToolbar>
+
+              <div className="min-h-0 flex-1 overflow-auto">
+                <Table {...getTableProps()}>
+                  <TableHead>
+                    <TableRow>
+                      <TableHeader className="!w-12" />
+                      {tableHeaders.map(header => (
+                        <TableHeader
+                          {...getHeaderProps({ header })}
+                          key={header.key}
+                        >
+                          {header.header}
+                        </TableHeader>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {rows.map(tableRow => {
+                      const versionRow = allRows.find(
+                        row => row.data.id === tableRow.id,
+                      );
+                      if (!versionRow) return null;
+
+                      const { data } = versionRow;
+                      const isCurrent = Boolean(tableRow.disabled);
+                      const isDeploying = deployingProviderId === data.id;
+
+                      return (
+                        <TableRow
+                          {...getRowProps({ row: tableRow })}
+                          key={tableRow.id}
+                        >
+                          <TableSelectRow
+                            {...getSelectionProps({ row: tableRow })}
+                          />
+                          <TableCell className="text-sm">
+                            <VersionId id={data.id} />
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <Tag type={data.typeColor} size="sm">
+                              {data.type}
+                            </Tag>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {data.description}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {isCurrent ? (
+                              <IconIndicator
+                                kind="succeeded"
+                                label="In use"
+                                size={16}
+                              />
+                            ) : isDeploying ? (
+                              <IconIndicator
+                                kind="in-progress"
+                                label="Deploying"
+                                size={16}
+                              />
+                            ) : (
+                              <IconIndicator
+                                kind="incomplete"
+                                label="Available"
+                                size={16}
+                              />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {data.createdBy}
+                          </TableCell>
+                          <TableCell className="text-[13px] whitespace-nowrap">
+                            {data.createdDate
+                              ? toHumanReadableDateTime(data.createdDate)
+                              : '—'}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <Pagination
+                sticky
+                totalItems={assistantProviderAction.totalCount}
+                page={assistantProviderAction.page}
+                pageSize={assistantProviderAction.pageSize}
+                pageSizes={[10, 20, 50]}
+                onChange={({ page, pageSize }) => {
+                  assistantProviderAction.setPage(page);
+                  if (pageSize !== assistantProviderAction.pageSize)
+                    assistantProviderAction.setPageSize(pageSize);
+                }}
+              />
+
+              <ConfirmDialog
+                showing={pendingDeployment !== null}
+                type="info"
+                title="Deploy version?"
+                content={
+                  pendingDeployment
+                    ? `Deploying vrsn_${pendingDeployment.assistantProviderId} will replace the version currently in use.`
+                    : ''
+                }
+                confirmText="Deploy"
+                cancelText="Cancel"
+                onConfirm={() => {
+                  if (!pendingDeployment) return;
+                  const { assistantProvider, assistantProviderId } =
+                    pendingDeployment;
+                  setPendingDeployment(null);
+                  batchActionProps.onCancel();
+                  deployRevision(assistantProvider, assistantProviderId);
+                }}
+                onCancel={() => setPendingDeployment(null)}
+                onClose={() => setPendingDeployment(null)}
+              />
+            </>
+          );
         }}
-      />
+      </DataTable>
     </TableSection>
   );
 }

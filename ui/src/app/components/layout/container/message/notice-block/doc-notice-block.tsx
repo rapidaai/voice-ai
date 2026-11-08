@@ -25,7 +25,7 @@ export function DocNoticeBlock({
     <div
       {...attributes}
       className={cn(
-        'flex w-full items-center gap-3 border-l-[3px] border-blue-600 bg-blue-50 px-4 py-3 text-foreground dark:border-blue-400 dark:bg-blue-900/20',
+        'flex w-full items-center gap-3 border-l-[3px] border-support-info bg-support-info/10 px-4 py-3 text-foreground ',
         className,
       )}
       role="note"
@@ -33,7 +33,7 @@ export function DocNoticeBlock({
       <Information
         aria-hidden="true"
         size={20}
-        className="shrink-0 text-blue-600 dark:text-blue-400"
+        className="shrink-0 text-support-info "
       />
       <span className="flex-1 text-sm text-foreground">{children}</span>
       <Link

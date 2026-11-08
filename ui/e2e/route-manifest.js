@@ -104,8 +104,8 @@ const routeJourneys = [
     id: 'dashboard.home',
     path: '/dashboard',
     auth: true,
-    expectText: 'Top assistants',
-    readyText: 'Top assistants',
+    expectText: 'Top Assistants',
+    readyText: 'Top Assistants',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
@@ -134,28 +134,34 @@ const routeJourneys = [
     id: 'deployment.createAssistant',
     path: '/deployment/assistant/create-assistant',
     auth: true,
-    expectText: 'Select a usecase template',
+    expectText:
+      'Configure the model and instruction, optionally add tools, then define the assistant profile.',
+    readyText: 'Usecase Template',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
     id: 'deployment.createEndpoint',
     path: '/deployment/endpoint/create-endpoint',
     auth: true,
-    expectText: 'Complete all steps to create a new endpoint.',
+    expectText:
+      'Configure the model and instruction, then define how the endpoint appears in your workspace.',
+    readyText: 'Usecase Template',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
     id: 'deployment.connectWebsocket',
     path: '/deployment/assistant/connect-websocket',
     auth: true,
-    expectText: 'Complete all steps to connect with a websocket',
+    expectText: 'Complete all steps to connect with a WebSocket.',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
     id: 'deployment.connectAgentkit',
     path: '/deployment/assistant/connect-agentkit',
     auth: true,
-    expectText: 'Complete all steps to connect a new AgentKit.',
+    expectText:
+      'Connect an AgentKit endpoint, define its assistant profile, then choose how to deploy it.',
+    readyText: 'AgentKit Endpoint',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
@@ -286,7 +292,9 @@ const routeJourneys = [
     id: 'deployment.assistantCreateVersion',
     path: '/deployment/assistant/2301664620831571968/create-new-version',
     auth: true,
-    expectText: 'Create a new version of this assistant.',
+    expectText:
+      'Update the assistant configuration, then add a version note describing what changed. New versions are not deployed automatically.',
+    readyText: 'You are a helpful customer support assistant.',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
@@ -385,8 +393,9 @@ const routeJourneys = [
     id: 'deployment.createEndpointVersion',
     path: '/deployment/endpoint/2301664620831571968/create-endpoint-version',
     auth: true,
-    expectText: 'Create a new version of this endpoint.',
-    readyText: 'Configure instruction',
+    expectText:
+      'Update the endpoint configuration, then add a version note describing what changed. New versions are not deployed automatically.',
+    readyText: 'Update Endpoint',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
@@ -435,7 +444,8 @@ const routeJourneys = [
     id: 'logs.traces',
     path: '/logs/traces',
     auth: true,
-    expectText: 'No traces found',
+    expectText: 'Traces',
+    readyText: 'No traces found',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {

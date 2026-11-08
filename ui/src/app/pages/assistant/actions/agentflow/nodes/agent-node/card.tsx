@@ -40,7 +40,7 @@ export function AgentNodeCard({
       {toolbar}
       {handles}
       <Tile className={cardClass} style={{ width }}>
-        <div className="flex h-12 items-center gap-3 border-b border-gray-200 px-4 text-gray-900 dark:border-gray-800 dark:text-white">
+        <div className="flex h-12 items-center gap-3 border-b border-border-subtle px-4 text-foreground ">
           <Icon size={18} className="shrink-0" />
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="min-w-0 truncate text-base font-semibold">
@@ -58,7 +58,7 @@ export function AgentNodeCard({
           </Tag>
         </div>
         <div className="mx-4 mt-4">
-          <div className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
+          <div className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase text-muted ">
             Instruction
             <Toggletip align="right">
               <ToggletipButton label="Show information">
@@ -69,14 +69,14 @@ export function AgentNodeCard({
               </ToggletipContent>
             </Toggletip>
           </div>
-          <div className="min-h-[108px] border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950">
-            <div className="line-clamp-4 text-sm leading-5 text-gray-800 dark:text-gray-100">
+          <div className="min-h-[108px] border border-border-subtle bg-surface p-4 ">
+            <div className="line-clamp-4 text-sm leading-5 text-foreground ">
               {agentPromptPreview || 'No instruction configured'}
             </div>
           </div>
         </div>
-        <div className="flex h-12 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-800">
-          <div className="flex items-center gap-1 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
+        <div className="flex h-12 items-center justify-between border-b border-border-subtle px-4 ">
+          <div className="flex items-center gap-1 text-xs font-semibold uppercase text-muted ">
             Transitions
             <Toggletip align="right">
               <ToggletipButton label="Show information">
@@ -112,11 +112,9 @@ export function AgentNodeCard({
                 >
                   <StructuredListCell
                     noWrap
-                    className="!flex !h-10 !items-center !gap-3 !px-7 !py-0 text-sm text-gray-800 dark:text-gray-100"
+                    className="!flex !h-10 !items-center !gap-3 !px-7 !py-0 text-sm text-foreground "
                   >
-                    <span className="text-base leading-none text-gray-500">
-                      =
-                    </span>
+                    <span className="text-base leading-none text-muted">=</span>
                     <span className="min-w-0 truncate">
                       {transition.name || 'Unnamed transition'}
                     </span>

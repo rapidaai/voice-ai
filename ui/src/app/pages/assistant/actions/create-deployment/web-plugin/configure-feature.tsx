@@ -33,7 +33,7 @@ export const ConfigureFeature: React.FC<ConfigureFeatureProps> = ({
   };
 
   return (
-    <div className="border-b border-gray-200 dark:border-gray-800">
+    <div className="border-b border-border-subtle ">
       <div className="flex flex-col gap-6 max-w-4xl px-6 py-8">
         <fieldset className="flex flex-col space-y-2 min-w-0 border-0 p-0 m-0">
           <FormLabel>Sections</FormLabel>

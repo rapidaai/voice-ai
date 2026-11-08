@@ -25,16 +25,14 @@ describe('layout wrappers', () => {
 
     expect(screen.getByTestId('error')).toHaveClass(
       'bg-layer',
-      '[border-left-color:var(--cds-support-error)]',
+      'border-l-support-error',
     );
     expect(screen.getByTestId('success')).toHaveClass(
-      '[border-left-color:var(--cds-support-success)]',
+      'border-l-support-success',
     );
-    expect(screen.getByTestId('info')).toHaveClass(
-      '[border-left-color:var(--cds-support-info)]',
-    );
+    expect(screen.getByTestId('info')).toHaveClass('border-l-support-info');
     expect(screen.getByTestId('warning')).toHaveClass(
-      '[border-left-color:var(--cds-support-warning)]',
+      'border-l-support-warning',
     );
     expect(screen.getByTestId('plain')).toHaveClass(
       'border-border-subtle',

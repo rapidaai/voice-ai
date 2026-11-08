@@ -42,7 +42,7 @@ export function Tooltip({
       >
         <div
           className={cn(
-            'p-3 text-xs font-medium shadow-lg bg-white dark:bg-slate-800 border-[0.05px]',
+            'p-3 text-xs font-medium shadow-lg bg-surface border-[0.05px]',
             className,
           )}
         >

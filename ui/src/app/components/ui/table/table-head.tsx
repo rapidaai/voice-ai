@@ -1,5 +1,10 @@
 import { InputCheckbox } from '@/app/components/ui/primitives/input-checkbox';
 import { cn } from '@/utils';
+import {
+  TableHead as CarbonTableHead,
+  TableHeader as CarbonTableHeader,
+  TableRow as CarbonTableRow,
+} from '@carbon/react';
 import { memo } from 'react';
 
 interface TableHeadProps {
@@ -8,29 +13,29 @@ interface TableHeadProps {
 
 export function TableHead(props: TableHeadProps & { isActionable?: boolean }) {
   return (
-    <thead className="">
-      <tr className="bg-light-background dark:bg-gray-950 border-b">
+    <CarbonTableHead>
+      <CarbonTableRow className="bg-light-background bg-surface border-b">
         {props.columns.map((cl, idx) => {
           return (
-            <th
+            <CarbonTableHeader
               key={idx}
               className={cn(
                 'whitespace-no-wrap p-0 m-0 md:px-5 px-2 py-2 text-left uppercase text-xs/6 font-medium tracking-wider relative text-muted',
               )}
             >
               {cl.name}
-            </th>
+            </CarbonTableHeader>
           );
         })}
         {props.isActionable && (
-          <th className="whitespace-no-wrap px-2 md:px-5 py-3 w-20">
+          <CarbonTableHeader className="whitespace-no-wrap px-2 md:px-5 py-3 w-20">
             <span className="absolute w-px h-px p-0 -m-px overflow-hidden whitespace-no-wrap border-0">
               Menu
             </span>
-          </th>
+          </CarbonTableHeader>
         )}
-      </tr>
-    </thead>
+      </CarbonTableRow>
+    </CarbonTableHead>
   );
 }
 
@@ -38,9 +43,9 @@ function TableHederWithCheckboxComponent(
   props: TableHeadProps & { ontoggle: (checked: boolean) => void },
 ) {
   return (
-    <thead className="dark:bg-gray-950/30 bg-gray-100/50 border-b dark:border-gray-800">
-      <tr className="">
-        <th
+    <CarbonTableHead className="bg-surface/30 border-b border-border-subtle">
+      <CarbonTableRow>
+        <CarbonTableHeader
           className={cn(
             'whitespace-no-wrap px-2 md:px-5 py-3 w-20',
             'font-semibold text-sm text-left capitalize',
@@ -51,12 +56,12 @@ function TableHederWithCheckboxComponent(
               aria-label="Select all rows"
               onChange={event => props.ontoggle(event.currentTarget.checked)}
             />
-            <span className="w-0.5 bg-slate-300 dark:bg-gray-800 h-4"></span>
+            <span className="w-0.5 bg-layer h-4"></span>
           </div>
-        </th>
+        </CarbonTableHeader>
         {props.columns.map((cl, idx) => {
           return (
-            <th
+            <CarbonTableHeader
               key={idx}
               className={cn(
                 'whitespace-no-wrap px-2 md:px-5 py-3',
@@ -67,14 +72,14 @@ function TableHederWithCheckboxComponent(
                 {cl.name}
 
                 {idx !== props.columns.length - 1 && (
-                  <span className="w-0.5 bg-slate-300 dark:bg-gray-800 h-4"></span>
+                  <span className="w-0.5 bg-layer h-4"></span>
                 )}
               </div>
-            </th>
+            </CarbonTableHeader>
           );
         })}
-      </tr>
-    </thead>
+      </CarbonTableRow>
+    </CarbonTableHead>
   );
 }
 

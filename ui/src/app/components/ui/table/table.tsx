@@ -1,10 +1,11 @@
 import { cn } from '@/utils';
-import type { HTMLAttributes } from 'react';
+import { Table as CarbonTable } from '@carbon/react';
+import type { ComponentProps } from 'react';
 
-export function Table(props: HTMLAttributes<HTMLTableElement>) {
+export function Table(props: ComponentProps<typeof CarbonTable>) {
   return (
-    <table {...props} className={cn('text-sm', props.className)}>
+    <CarbonTable {...props} className={cn('text-sm', props.className)}>
       {props.children}
-    </table>
+    </CarbonTable>
   );
 }

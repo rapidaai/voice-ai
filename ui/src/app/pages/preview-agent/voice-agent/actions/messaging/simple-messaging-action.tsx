@@ -44,12 +44,12 @@ export const SimpleMessagingAction: FC<SimpleMessagingAcitonProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900">
+    <div className="bg-surface ">
       <form className="flex flex-col" onSubmit={handleSubmit(onSubmitForm)}>
         {/* Textarea — grows with content, no overlap with buttons */}
         <ScalableTextarea
           placeholder={placeholder}
-          wrapperClassName="bg-white dark:bg-gray-900 border-t border-l border-r border-gray-200 dark:border-gray-800 p-2"
+          wrapperClassName="bg-surface border-t border-l border-r border-border-subtle p-2"
           className="bg-transparent"
           {...register('message', {
             required: 'Please write your message.',
@@ -63,7 +63,7 @@ export const SimpleMessagingAction: FC<SimpleMessagingAcitonProps> = ({
         />
 
         {/* Action row — always below textarea, right-aligned */}
-        <div className="flex items-center justify-end px-3 pb-3 pt-1 border-t border-gray-100 dark:border-gray-800">
+        <div className="flex items-center justify-end px-3 pb-3 pt-1 border-t border-border-subtle ">
           {isValid ? (
             <PrimaryButton size="md" type="submit" renderIcon={Send}>
               Send
@@ -88,7 +88,7 @@ export const SimpleMessagingAction: FC<SimpleMessagingAcitonProps> = ({
               onClick={async () => {
                 await handleDisconnectAgent();
               }}
-              className="group h-10 px-3 flex items-center justify-center bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white transition-all duration-200 cursor-pointer"
+              className="group h-10 px-3 flex items-center justify-center bg-support-error hover:bg-support-error disabled:opacity-50 text-inverse transition-all duration-200 cursor-pointer"
             >
               <StopFilledAlt size={16} className="shrink-0" />
               <span className="max-w-0 group-hover:max-w-15 overflow-hidden transition-all duration-200 whitespace-nowrap group-hover:ml-2 text-sm font-medium">

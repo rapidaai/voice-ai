@@ -8,9 +8,41 @@ const {
   test,
 } = require('../../fixtures');
 const { routeJourneys } = require('../../route-manifest');
+const themeContract = require('../../../src/theme/theme-contract.json');
+
+const consumedCarbonProperties = [
+  ...Object.values(themeContract.carbonProperties.brandOverrides).flat(),
+  ...themeContract.carbonProperties.presetOwned,
+].sort();
 
 const authJourney = id =>
   routeJourneys.find(journey => journey.id === `auth.${id}`);
+
+const colorChannels = color =>
+  color
+    .match(/\d+(?:\.\d+)?/g)
+    .slice(0, 3)
+    .map(Number);
+
+const relativeLuminance = color => {
+  const channels = colorChannels(color).map(channel => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+};
+
+const contrastRatio = (foreground, background) => {
+  const light = Math.max(
+    relativeLuminance(foreground),
+    relativeLuminance(background),
+  );
+  const dark = Math.min(
+    relativeLuminance(foreground),
+    relativeLuminance(background),
+  );
+  return (light + 0.05) / (dark + 0.05);
+};
 
 async function submitSignIn(page) {
   await page.getByLabel('Email address').fill('user@example.test');
@@ -184,7 +216,7 @@ test('authentication shell keeps account access aligned at medium widths', async
   await expect(page.getByTestId('auth-illustration')).toHaveCount(0);
 });
 
-test('primary action uses the Carbon primary color in dark mode', async ({
+test('version 2 dark primary action uses the configured brand pair', async ({
   page,
 }) => {
   await setColorMode(page, 'dark');
@@ -210,11 +242,229 @@ test('primary action uses the Carbon primary color in dark mode', async ({
       };
     });
 
-  expect(buttonPrimary).toBe('rgb(15, 98, 254)');
+  expect(buttonPrimary).toBe('rgb(69, 137, 255)');
   expect(buttonStyles).toEqual({
     backgroundColor: buttonPrimary,
-    color: 'rgb(255, 255, 255)',
+    color: 'rgb(22, 22, 22)',
   });
+  expect(
+    contrastRatio(buttonStyles.color, buttonStyles.backgroundColor),
+  ).toBeGreaterThanOrEqual(4.5);
+});
+
+test('version 1 light computed colors retain the legacy contract', async ({
+  page,
+}) => {
+  await gotoJourney(page, authJourney('signin'));
+
+  const styles = await page.evaluate(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-theme-schema', '1');
+    root.setAttribute('data-color-mode', 'light');
+    root.setAttribute('data-carbon-theme', 'white');
+    root.style.setProperty('--brand-primary', '#123456');
+    root.style.setProperty('--brand-primary-hover', '#234567');
+    root.style.setProperty('--brand-primary-active', '#345678');
+    root.style.setProperty('--brand-on-primary', '#abcdef');
+
+    const surface = document.createElement('span');
+    const layer = document.createElement('span');
+    const action = document.createElement('span');
+    const token = document.createElement('span');
+    surface.className = 'bg-surface';
+    layer.className = 'bg-layer';
+    action.className = 'bg-primary';
+    document.body.append(surface, layer, action, token);
+
+    const readColor = property => {
+      token.style.backgroundColor = `var(${property})`;
+      return getComputedStyle(token).backgroundColor;
+    };
+    const button = document.createElement('button');
+    button.className = 'cds--btn cds--btn--primary app-primary-button';
+    button.style.position = 'fixed';
+    button.style.insetInlineStart = '-10000px';
+    document.body.append(button);
+    const values = {
+      surface: getComputedStyle(surface).backgroundColor,
+      layer: getComputedStyle(layer).backgroundColor,
+      tailwindPrimary: getComputedStyle(action).backgroundColor,
+      buttonPrimary: getComputedStyle(button).backgroundColor,
+      buttonContent: getComputedStyle(button).color,
+      onPrimary: readColor('--cds-text-on-color'),
+      link: readColor('--cds-link-primary'),
+      focus: readColor('--cds-focus'),
+      border: readColor('--cds-border-interactive'),
+      tertiary: readColor('--cds-button-tertiary'),
+    };
+
+    surface.remove();
+    layer.remove();
+    action.remove();
+    token.remove();
+    button.remove();
+    return values;
+  });
+
+  expect(styles).toEqual({
+    surface: 'rgb(255, 255, 255)',
+    layer: 'rgb(244, 244, 244)',
+    tailwindPrimary: 'rgb(18, 52, 86)',
+    buttonPrimary: 'rgb(18, 52, 86)',
+    buttonContent: 'rgb(255, 255, 255)',
+    onPrimary: 'rgb(171, 205, 239)',
+    link: 'rgb(18, 52, 86)',
+    focus: 'rgb(18, 52, 86)',
+    border: 'rgb(18, 52, 86)',
+    tertiary: 'rgb(18, 52, 86)',
+  });
+});
+
+test('version 1 dark computed colors retain the legacy contract', async ({
+  page,
+}) => {
+  await gotoJourney(page, authJourney('signin'));
+
+  const styles = await page.evaluate(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-theme-schema', '1');
+    root.setAttribute('data-color-mode', 'dark');
+    root.setAttribute('data-carbon-theme', 'g100');
+    root.style.setProperty('--brand-primary', '#123456');
+    root.style.setProperty('--brand-primary-hover', '#234567');
+    root.style.setProperty('--brand-primary-active', '#345678');
+    root.style.setProperty('--brand-on-primary', '#abcdef');
+
+    const surface = document.createElement('span');
+    const layer = document.createElement('span');
+    const action = document.createElement('span');
+    const token = document.createElement('span');
+    surface.className = 'bg-surface';
+    layer.className = 'bg-layer';
+    action.className = 'bg-primary';
+    document.body.append(surface, layer, action, token);
+
+    const readColor = property => {
+      token.style.backgroundColor = `var(${property})`;
+      return getComputedStyle(token).backgroundColor;
+    };
+    const button = document.createElement('button');
+    button.className = 'cds--btn cds--btn--primary app-primary-button';
+    button.style.position = 'fixed';
+    button.style.insetInlineStart = '-10000px';
+    document.body.append(button);
+    const values = {
+      surface: getComputedStyle(surface).backgroundColor,
+      layer: getComputedStyle(layer).backgroundColor,
+      tailwindPrimary: getComputedStyle(action).backgroundColor,
+      buttonPrimary: getComputedStyle(button).backgroundColor,
+      buttonContent: getComputedStyle(button).color,
+      onPrimary: readColor('--cds-text-on-color'),
+      link: readColor('--cds-link-primary'),
+      focus: readColor('--cds-focus'),
+      border: readColor('--cds-border-interactive'),
+      tertiary: readColor('--cds-button-tertiary'),
+    };
+
+    surface.remove();
+    layer.remove();
+    action.remove();
+    token.remove();
+    button.remove();
+    return values;
+  });
+
+  expect(styles).toEqual({
+    surface: 'rgb(10, 10, 10)',
+    layer: 'rgb(22, 22, 22)',
+    tailwindPrimary: 'rgb(18, 52, 86)',
+    buttonPrimary: 'rgb(15, 98, 254)',
+    buttonContent: 'rgb(255, 255, 255)',
+    onPrimary: 'rgb(255, 255, 255)',
+    link: 'rgb(18, 52, 86)',
+    focus: 'rgb(18, 52, 86)',
+    border: 'rgb(18, 52, 86)',
+    tertiary: 'rgb(18, 52, 86)',
+  });
+});
+
+test('Tailwind semantic utilities and Carbon properties stay aligned for every preset', async ({
+  page,
+}) => {
+  await gotoJourney(page, authJourney('signin'));
+
+  const results = await page.evaluate(properties => {
+    const root = document.documentElement;
+    const selectedPreset = root.getAttribute('data-carbon-theme');
+    const surface = document.createElement('span');
+    const action = document.createElement('span');
+    const token = document.createElement('span');
+    const prose = document.createElement('article');
+    surface.className = 'bg-surface';
+    action.className = 'bg-primary';
+    prose.className = 'prose';
+    prose.innerHTML = `
+      <p>Body</p>
+      <ul><li>Bullet</li></ul>
+      <ol><li>Counter</li></ol>
+      <pre><code>Code</code></pre>
+      <figure><figcaption>Caption</figcaption></figure>
+      <table><tbody><tr><td>Cell</td></tr></tbody></table>
+    `;
+    document.body.append(surface, action, token, prose);
+
+    const readColor = property => {
+      token.style.backgroundColor = `var(${property})`;
+      return getComputedStyle(token).backgroundColor;
+    };
+    const values = ['white', 'g10', 'g90', 'g100'].map(preset => {
+      root.setAttribute('data-carbon-theme', preset);
+      return {
+        preset,
+        carbonSurface: readColor('--cds-background'),
+        tailwindSurface: getComputedStyle(surface).backgroundColor,
+        carbonAction: readColor('--cds-button-primary'),
+        tailwindAction: getComputedStyle(action).backgroundColor,
+        proseBody: getComputedStyle(prose).color,
+        carbonBody: readColor('--cds-text-primary'),
+        proseBullet: getComputedStyle(prose.querySelector('ul li'), '::marker')
+          .color,
+        carbonBullet: readColor('--cds-icon-secondary'),
+        proseCounter: getComputedStyle(prose.querySelector('ol li'), '::marker')
+          .color,
+        carbonCounter: readColor('--cds-text-secondary'),
+        prosePre: getComputedStyle(prose.querySelector('pre')).backgroundColor,
+        carbonPre: readColor('--cds-background-inverse'),
+        prosePreCode: getComputedStyle(prose.querySelector('pre code')).color,
+        carbonPreCode: readColor('--cds-text-inverse'),
+        proseCaption: getComputedStyle(prose.querySelector('figcaption')).color,
+        carbonCaption: readColor('--cds-text-helper'),
+        unresolvedProperties: properties.filter(
+          property => readColor(property) === 'rgba(0, 0, 0, 0)',
+        ),
+      };
+    });
+
+    if (selectedPreset) root.setAttribute('data-carbon-theme', selectedPreset);
+    surface.remove();
+    action.remove();
+    token.remove();
+    prose.remove();
+    return values;
+  }, consumedCarbonProperties);
+
+  for (const result of results) {
+    expect(result.tailwindSurface, result.preset).toBe(result.carbonSurface);
+    expect(result.tailwindAction, result.preset).toBe(result.carbonAction);
+    expect(result.proseBody, result.preset).toBe(result.carbonBody);
+    expect(result.proseBullet, result.preset).toBe(result.carbonBullet);
+    expect(result.proseCounter, result.preset).toBe(result.carbonCounter);
+    expect(result.prosePre, result.preset).toBe(result.carbonPre);
+    expect(result.prosePreCode, result.preset).toBe(result.carbonPreCode);
+    expect(result.proseCaption, result.preset).toBe(result.carbonCaption);
+    expect(result.tailwindSurface, result.preset).not.toBe('rgba(0, 0, 0, 0)');
+    expect(result.unresolvedProperties, result.preset).toEqual([]);
+  }
 });
 
 for (const authForm of [
@@ -280,14 +530,11 @@ for (const authForm of [
   });
 }
 
-test('dark primary actions keep white content and accessible contrast for the fallback theme', async ({
+test('dark primary actions keep configured content and accessible contrast', async ({
   page,
 }) => {
   await setColorMode(page, 'dark');
   await gotoJourney(page, authJourney('signin'));
-  await page.evaluate(() => {
-    document.documentElement.style.setProperty('--brand-primary', '#c6c6c6');
-  });
 
   const button = page.getByRole('button', { name: 'Log in', exact: true });
   const tokenColors = await page.evaluate(() => {
@@ -302,6 +549,8 @@ test('dark primary actions keep white content and accessible contrast for the fa
       hover: resolveColor('--cds-button-primary-hover'),
       active: resolveColor('--cds-button-primary-active'),
     };
+    probe.style.color = 'var(--brand-on-primary)';
+    colors.onPrimary = getComputedStyle(probe).color;
     probe.remove();
     return colors;
   });
@@ -311,10 +560,6 @@ test('dark primary actions keep white content and accessible contrast for the fa
       const iconStyle = getComputedStyle(element.querySelector('svg'));
       return {
         backgroundColor: style.backgroundColor,
-        backgroundChannels: style.backgroundColor
-          .match(/\d+(?:\.\d+)?/g)
-          .slice(0, 3)
-          .map(Number),
         color: style.color,
         iconFill: iconStyle.fill,
       };
@@ -323,31 +568,37 @@ test('dark primary actions keep white content and accessible contrast for the fa
   const defaultColors = await buttonColors();
   expect(defaultColors).toMatchObject({
     backgroundColor: tokenColors.primary,
-    color: 'rgb(255, 255, 255)',
-    iconFill: 'rgb(255, 255, 255)',
+    color: tokenColors.onPrimary,
+    iconFill: tokenColors.onPrimary,
   });
+  expect(
+    contrastRatio(defaultColors.color, defaultColors.backgroundColor),
+  ).toBeGreaterThanOrEqual(4.5);
   await button.hover();
   await expect
     .poll(() => buttonColors().then(colors => colors.backgroundColor))
     .toBe(tokenColors.hover);
   const hoverColors = await buttonColors();
   expect(hoverColors).toMatchObject({
-    color: 'rgb(255, 255, 255)',
-    iconFill: 'rgb(255, 255, 255)',
+    color: tokenColors.onPrimary,
+    iconFill: tokenColors.onPrimary,
   });
+  expect(
+    contrastRatio(hoverColors.color, hoverColors.backgroundColor),
+  ).toBeGreaterThanOrEqual(4.5);
   await page.mouse.down();
   await expect
     .poll(() => buttonColors().then(colors => colors.backgroundColor))
     .toBe(tokenColors.active);
   const activeColors = await buttonColors();
   expect(activeColors).toMatchObject({
-    color: 'rgb(255, 255, 255)',
-    iconFill: 'rgb(255, 255, 255)',
+    color: tokenColors.onPrimary,
+    iconFill: tokenColors.onPrimary,
   });
-  const channelTotal = colors =>
-    colors.backgroundChannels.reduce((sum, channel) => sum + channel, 0);
-  expect(channelTotal(hoverColors)).toBeLessThan(channelTotal(defaultColors));
-  expect(channelTotal(activeColors)).toBeLessThan(channelTotal(hoverColors));
+  expect(
+    contrastRatio(activeColors.color, activeColors.backgroundColor),
+  ).toBeGreaterThanOrEqual(4.5);
+  await page.mouse.move(0, 0);
   await page.mouse.up();
   await checkA11y(page, authJourney('signin'));
 });

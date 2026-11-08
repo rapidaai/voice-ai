@@ -7,13 +7,18 @@ import { Helmet } from '@/app/components/app-shell/helmet';
 import { Endpoint } from '@rapidaai/react';
 import toast from 'react-hot-toast/headless';
 import { useRapidaStore } from '@/stores/app';
-import { PrimaryButton } from '@/app/components/ui/primitives';
-import { Pagination } from '@/app/components/ui/primitives';
+import {
+  Pagination,
+  PrimaryButton,
+  Text,
+} from '@/app/components/ui/primitives';
 import { EmptyState } from '@/app/components/ui/feedback';
 import { Add, Renew, Connect } from '@carbon/icons-react';
 import { PageLoading } from '@/app/components/ui/feedback';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
-import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
+import {
+  PageHeader,
+  PageHeaderStickyToolbar,
+} from '@/app/components/layout/page-header';
 import {
   Table,
   TableHead,
@@ -111,69 +116,85 @@ export function EndpointPage() {
   const visibleColumns = endpointActions.columns.filter(x => x.visible);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div
+      data-endpoint-list-page
+      className="flex h-full flex-col overflow-x-hidden overflow-y-auto"
+    >
       <Helmet title="Hosted endpoints" />
 
-      <PageHeaderBlock>
-        <div className="flex items-center gap-3">
-          <PageTitleBlock>Hosted Endpoints</PageTitleBlock>
-          <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
-            {endpointActions.endpoints.length}/{endpointActions.totalCount}
-          </span>
-        </div>
-      </PageHeaderBlock>
-
-      <TableToolbar>
-        <TableToolbarContent>
-          <EndpointQuerySearch
-            value={querySearchValue}
-            onChange={setQuerySearchValue}
-            onApply={criteria => endpointActions.setCriterias(criteria)}
-          />
-          <Button
-            hasIconOnly
-            renderIcon={Renew}
-            iconDescription="Refresh"
-            kind="ghost"
-            onClick={() => getEndpoints(projectId, token, userId)}
-            tooltipPosition="bottom"
-          />
+      <PageHeader
+        eyebrow={
+          <Text variant="label-01" className="text-primary">
+            Deployment
+          </Text>
+        }
+        title="Hosted Endpoints"
+        description="Create and manage hosted model endpoints, versions, and runtime performance across your workspace."
+        contextualActions={
+          <Text variant="label-01" className="text-muted tabular-nums">
+            {endpointActions.endpoints.length} of {endpointActions.totalCount}
+          </Text>
+        }
+        pageActions={
           <PrimaryButton
+            className="w-full md:w-auto"
             size="md"
             renderIcon={Add}
             onClick={() => navigate('/deployment/endpoint/create-endpoint')}
           >
             {CREATE_ENDPOINT_LABEL}
           </PrimaryButton>
-        </TableToolbarContent>
-      </TableToolbar>
+        }
+      />
+
+      <PageHeaderStickyToolbar>
+        <TableToolbar>
+          <TableToolbarContent>
+            <EndpointQuerySearch
+              value={querySearchValue}
+              onChange={setQuerySearchValue}
+              onApply={criteria => endpointActions.setCriterias(criteria)}
+            />
+            <Button
+              hasIconOnly
+              renderIcon={Renew}
+              iconDescription="Refresh"
+              kind="ghost"
+              onClick={() => getEndpoints(projectId, token, userId)}
+              tooltipPosition="bottom"
+            />
+          </TableToolbarContent>
+        </TableToolbar>
+      </PageHeaderStickyToolbar>
 
       {loading ? (
         <PageLoading />
       ) : endpointActions.endpoints && endpointActions.endpoints.length > 0 ? (
-        <div className="overflow-auto flex-1">
-          <Table>
-            <TableHead>
-              <TableRow>
-                {visibleColumns.map(col => (
-                  <TableHeader
-                    key={col.key}
-                    className={endpointColumnClassName[col.key]}
-                  >
-                    {col.name}
-                  </TableHeader>
+        <div className="flex-1">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHead>
+                <TableRow>
+                  {visibleColumns.map(col => (
+                    <TableHeader
+                      key={col.key}
+                      className={endpointColumnClassName[col.key]}
+                    >
+                      {col.name}
+                    </TableHeader>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {endpointActions.endpoints.map(ed => (
+                  <SingleEndpoint
+                    key={`endpoint_row_${ed.getId()}`}
+                    endpoint={ed}
+                  />
                 ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {endpointActions.endpoints.map(ed => (
-                <SingleEndpoint
-                  key={`endpoint_row_${ed.getId()}`}
-                  endpoint={ed}
-                />
-              ))}
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          </div>
         </div>
       ) : endpointActions.criteria.length > 0 ? (
         <EmptyState
@@ -197,7 +218,7 @@ export function EndpointPage() {
 
       {endpointActions.endpoints && endpointActions.endpoints.length > 0 && (
         <Pagination
-          className="shrink-0"
+          sticky
           totalItems={endpointActions.totalCount}
           page={endpointActions.page}
           pageSize={endpointActions.pageSize}

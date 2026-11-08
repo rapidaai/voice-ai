@@ -35,7 +35,7 @@ export * from './slider';
 export * from './switch';
 export * from './tabs';
 export * from './text';
-export * from './text-image';
 export * from './textarea';
 export * from './tile';
 export * from './tooltip';
+export * from './user-avatar';

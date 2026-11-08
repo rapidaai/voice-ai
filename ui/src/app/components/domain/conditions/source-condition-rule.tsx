@@ -79,7 +79,7 @@ export function SourceConditionRule<TCondition extends SourceCondition>({
 
   return (
     <>
-      <div className="mb-2 text-xs text-gray-500 flex items-center gap-1">
+      <div className="mb-2 text-xs text-muted flex items-center gap-1">
         <span>Rule</span>
         <Tooltip
           align="right"
@@ -222,7 +222,7 @@ export function SourceConditionRule<TCondition extends SourceCondition>({
                     iconDescription="Remove"
                     kind="ghost"
                     size="sm"
-                    className="!text-[var(--cds-support-error)]"
+                    className="!text-support-error"
                     disabled={rows.length <= 1}
                     onClick={() => removeRow(index)}
                   />

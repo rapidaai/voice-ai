@@ -38,7 +38,7 @@ import {
   ValidateTelephonyOptions,
 } from '@/app/components/domain/providers/telephony';
 import { useConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-confirmation';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -410,14 +410,16 @@ const ConfigureAssistantCallDeployment: FC<{ assistantId: string }> = ({
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-900">
+    <div className="flex flex-col flex-1 min-h-0 bg-surface ">
       <ConfirmDialogComponent />
-      <TabForm
-        formHeading="Complete all steps to configure your phone call deployment."
-        activeTab={activeTab}
-        onChangeActiveTab={handleTabChange}
+      <CreateFullPageWithHeader
+        title="Deploy phone"
+        eyebrow="Deployment"
+        description="Complete all steps to configure your phone call deployment."
+        activeStep={activeTab}
+        onChangeStep={handleTabChange}
         errorMessage={errorMessage}
-        form={[
+        steps={[
           {
             code: 'telephony',
             name: 'Telephony',

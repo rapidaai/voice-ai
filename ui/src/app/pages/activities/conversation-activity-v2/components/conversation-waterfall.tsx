@@ -1,5 +1,5 @@
 import { useState, type FC } from 'react';
-import { Tag } from '@carbon/react';
+import { Button, Tag } from '@carbon/react';
 import { ChevronDown, ChevronRight } from '@carbon/icons-react';
 import type { TimelineDocument, TimelineGroup, TimelineItem } from '../types';
 import {
@@ -23,9 +23,9 @@ const getOutcomeTagType = (outcome: string): 'green' | 'red' | 'gray' => {
 
 const RowBar: FC<{ item: TimelineItem }> = ({ item }) => (
   <div className="relative h-8 min-w-[420px]">
-    <div className="absolute left-0 right-0 top-1/2 h-px bg-gray-200 dark:bg-gray-800" />
+    <div className="absolute left-0 right-0 top-1/2 h-px bg-layer " />
     <div
-      className="absolute top-[7px] h-[18px] border border-white/80 shadow-sm"
+      className="absolute top-[7px] h-[18px] border border-border-subtle/80 shadow-sm"
       style={{
         left: `${item.offsetPct}%`,
         width: `${Math.min(item.widthPct, 100 - item.offsetPct)}%`,
@@ -41,13 +41,13 @@ const ComponentRow: FC<{
   onSelectDocument: (doc: TimelineDocument) => void;
   selected: boolean;
 }> = ({ item, onSelectDocument, selected }) => (
-  <button
+  <Button
+    kind="ghost"
+    size="sm"
     type="button"
     className={[
-      'grid min-w-[880px] grid-cols-[360px_120px_120px_minmax(420px,1fr)] border-t border-gray-100 bg-white text-left hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900',
-      selected
-        ? 'outline outline-2 -outline-offset-2 outline-[var(--cds-border-interactive)]'
-        : '',
+      'grid! h-auto! max-w-none! min-w-[880px] grid-cols-[360px_120px_120px_minmax(420px,1fr)] border-t border-border-subtle bg-surface p-0! text-left hover:bg-layer ',
+      selected ? 'outline outline-2 -outline-offset-2 outline-primary' : '',
     ].join(' ')}
     onClick={() => onSelectDocument(item)}
   >
@@ -57,7 +57,7 @@ const ComponentRow: FC<{
         style={{ backgroundColor: getDocumentColor(item) }}
       />
       <div className="min-w-0">
-        <p className="truncate text-sm text-gray-900 dark:text-gray-100">
+        <p className="truncate text-sm text-foreground ">
           {item.title || item.name}
         </p>
       </div>
@@ -73,7 +73,7 @@ const ComponentRow: FC<{
     <div className="px-3 py-2">
       <RowBar item={item} />
     </div>
-  </button>
+  </Button>
 );
 
 const GroupRow: FC<{
@@ -81,29 +81,31 @@ const GroupRow: FC<{
   expanded: boolean;
   onToggle: () => void;
 }> = ({ group, expanded, onToggle }) => (
-  <button
+  <Button
+    kind="ghost"
+    size="sm"
     type="button"
-    className="grid min-w-[880px] grid-cols-[360px_120px_120px_minmax(420px,1fr)] border-t border-gray-200 bg-gray-50 text-left dark:border-gray-800 dark:bg-gray-900"
+    className="grid! h-auto! max-w-none! min-w-[880px] grid-cols-[360px_120px_120px_minmax(420px,1fr)] border-t border-border-subtle bg-layer p-0! text-left"
     onClick={onToggle}
   >
     <div className="flex min-w-0 items-center gap-2 px-4 py-2">
       {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+        <p className="truncate text-sm font-medium text-foreground ">
           {group.title}
         </p>
       </div>
     </div>
-    <div className="flex items-center px-3 py-2 text-xs text-gray-500">
+    <div className="flex items-center px-3 py-2 text-xs text-muted">
       {group.items.length} records
     </div>
-    <div className="flex items-center px-3 py-2 font-mono text-xs text-gray-500">
+    <div className="flex items-center px-3 py-2 font-mono text-xs text-muted">
       {formatDurationMs(group.durationMs)}
     </div>
-    <div className="flex items-center px-3 py-2 text-xs text-gray-500">
+    <div className="flex items-center px-3 py-2 text-xs text-muted">
       {formatTime(new Date(group.startMs).toISOString())}
     </div>
-  </button>
+  </Button>
 );
 
 export const ConversationWaterfall: FC<ConversationWaterfallProps> = ({
@@ -125,7 +127,7 @@ export const ConversationWaterfall: FC<ConversationWaterfallProps> = ({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="grid min-w-[880px] grid-cols-[360px_120px_120px_minmax(420px,1fr)] bg-white text-xs font-medium uppercase text-gray-500 dark:bg-gray-950">
+      <div className="grid min-w-[880px] grid-cols-[360px_120px_120px_minmax(420px,1fr)] bg-surface text-xs font-medium uppercase text-muted ">
         <div className="px-4 py-2">Message / Component</div>
         <div className="px-3 py-2">Component</div>
         <div className="px-3 py-2">Outcome</div>

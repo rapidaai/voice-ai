@@ -293,9 +293,9 @@ describe('domain dropdowns', () => {
       .getByTestId('knowledge-dropdown')
       .closest('.domain-connected-dropdown-row');
 
-    expect(credentialRow).toHaveClass('bg-[var(--cds-field)]', 'border-b');
-    expect(endpointRow).toHaveClass('bg-[var(--cds-field)]', 'border-b');
-    expect(knowledgeRow).toHaveClass('bg-[var(--cds-field)]', 'border-b');
+    expect(credentialRow).toHaveClass('bg-field', 'border-b');
+    expect(endpointRow).toHaveClass('bg-field', 'border-b');
+    expect(knowledgeRow).toHaveClass('bg-field', 'border-b');
     expect(screen.getByText('Credential')).toHaveClass(
       'cds--label',
       'domain-connected-dropdown-label',

@@ -1,13 +1,13 @@
 import type { HTMLAttributes } from 'react';
 import { cn } from '@/utils';
 
-export function PageHeaderBlock({
+export function CompactPageHeader({
   className,
   children,
   ...attributes
-}: HTMLAttributes<HTMLDivElement>) {
+}: HTMLAttributes<HTMLElement>) {
   return (
-    <div
+    <header
       {...attributes}
       className={cn(
         'flex h-12 shrink-0 items-center justify-between border-b border-border-subtle bg-shell pl-4 pr-0',
@@ -15,6 +15,6 @@ export function PageHeaderBlock({
       )}
     >
       {children}
-    </div>
+    </header>
   );
 }

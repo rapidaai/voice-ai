@@ -34,6 +34,7 @@ import { Helmet } from '@/app/components/app-shell/helmet';
 import { ConfigPrompt } from '@/app/components/domain/configuration/config-prompt';
 import { FormLabel } from '@/app/components/ui/primitives';
 import { CornerBorderOverlay } from '@/app/components/ui/primitives';
+import { TableForm } from '@/app/components/ui/table';
 import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
 import {
   Modal,
@@ -438,19 +439,18 @@ const FUNCTION_PARAMETER_TYPE_VALUES = new Set(
 );
 const DEFAULT_AGENT_PROVIDER = 'azure-foundry';
 const NODE_TOOLBAR_CLASS =
-  'absolute z-20 flex h-8 items-center gap-0 rounded-none border border-gray-200 bg-white p-0 shadow-sm dark:border-gray-800 dark:bg-gray-900';
+  'absolute z-20 flex h-8 items-center gap-0 rounded-none border border-border-subtle bg-surface p-0 shadow-sm ';
 const NODE_TOOLBAR_BUTTON_CLASS =
-  '!inline-flex !h-7 !min-h-7 !items-center !gap-1.5 !px-2 !text-xs !font-normal !text-gray-800 hover:!bg-gray-100 hover:!text-gray-900 dark:!text-gray-100 dark:hover:!bg-gray-800 [&_svg]:!fill-current';
+  '!inline-flex !h-7 !min-h-7 !items-center !gap-1.5 !px-2 !text-xs !font-normal !text-foreground hover:!bg-layer hover:!text-foreground [&_svg]:!fill-current';
 const NODE_TOOLBAR_MENU_CLASS =
-  '!h-7 !w-7 !text-gray-800 hover:!bg-gray-100 dark:!text-gray-100 dark:hover:!bg-gray-800 [&_svg]:!fill-current';
-const NODE_TOOLBAR_MENU_ITEM_CLASS =
-  '!text-xs !text-gray-900 dark:!text-gray-100';
+  '!h-7 !w-7 !text-foreground hover:!bg-layer [&_svg]:!fill-current';
+const NODE_TOOLBAR_MENU_ITEM_CLASS = '!text-xs !text-foreground ';
 const INPUT_CONNECTOR_CLASS = 'z-20 h-2.5 w-2.5 rounded-full border-none';
 const OUTPUT_CONNECTOR_CLASS = 'z-20 h-2.5 w-2.5 rounded-full border-none';
-const INPUT_CONNECTOR_COLORS = ['#6b7280'];
-const OUTPUT_CONNECTOR_COLORS = ['#0f62fe'];
+const INPUT_CONNECTOR_COLORS = ['var(--color-muted)'];
+const OUTPUT_CONNECTOR_COLORS = ['var(--color-data-1)'];
 const EDGE_STYLE = {
-  stroke: '#6b7280',
+  stroke: 'var(--color-muted)',
   strokeWidth: 1.5,
 };
 const EDGE_INTERACTION_WIDTH = 24;
@@ -2554,7 +2554,7 @@ const renderValidationPill = (issues: string[]) => {
   return (
     <Toggletip align="right">
       <ToggletipButton label="Show validation issues">
-        <span className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold leading-none text-white">
+        <span className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-support-error px-1 text-[10px] font-semibold leading-none text-inverse">
           !
         </span>
       </ToggletipButton>
@@ -2570,12 +2570,12 @@ const renderValidationPill = (issues: string[]) => {
 };
 
 const getNodeCardClass = (selected: boolean, hasValidationError: boolean) =>
-  `!min-h-0 !border !p-0 text-left shadow-sm transition dark:!bg-gray-900 ${
+  `!min-h-0 !border !p-0 text-left shadow-sm transition !bg-surface ${
     hasValidationError
-      ? '!border-red-500 ring-2 ring-red-500/20'
+      ? '!border-support-error ring-2 ring-support-error/20'
       : selected
         ? '!border-primary ring-2 ring-primary/20'
-        : '!border-gray-200 hover:!border-gray-400 dark:!border-gray-800'
+        : '!border-border-subtle hover:!border-border-strong '
   }`;
 
 const getConnectorRingStyle = (colors: string[]): React.CSSProperties => ({
@@ -2596,7 +2596,7 @@ const AgentflowConnectionLine = ({
   <g>
     <path
       fill="none"
-      stroke="#0f62fe"
+      stroke="var(--color-data-1)"
       strokeWidth={1.5}
       d={`M${fromX},${fromY} C ${fromX} ${toY} ${fromX} ${toY} ${toX},${toY}`}
       style={connectionLineStyle}
@@ -2605,8 +2605,8 @@ const AgentflowConnectionLine = ({
       cx={toX}
       cy={toY}
       r={3}
-      fill="#fff"
-      stroke="#0f62fe"
+      fill="var(--color-inverse)"
+      stroke="var(--color-data-1)"
       strokeWidth={1.5}
     />
   </g>
@@ -4069,7 +4069,7 @@ export function AgentflowVersionBuilder({
 
     if (field.type === 'toggle') {
       return (
-        <div className="border-b border-gray-200 py-3 dark:border-gray-800">
+        <div className="border-b border-border-subtle py-3 ">
           <div className="mb-2 flex items-center gap-1">
             <FormLabel htmlFor={id}>{field.label}</FormLabel>
             <Toggletip align="right">
@@ -4201,11 +4201,11 @@ export function AgentflowVersionBuilder({
   );
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-white dark:bg-gray-950">
+    <div className="flex h-full flex-col overflow-hidden bg-surface ">
       <Helmet title={title} />
       <ConfirmDialogComponent />
       <div
-        className={`grid min-h-0 flex-1 border-t border-gray-200 dark:border-gray-800 ${
+        className={`grid min-h-0 flex-1 border-t border-border-subtle ${
           detailsOpen
             ? componentListOpen
               ? 'grid-cols-[240px_minmax(0,1fr)_680px]'
@@ -4218,19 +4218,19 @@ export function AgentflowVersionBuilder({
         <aside
           onMouseEnter={onComponentListMouseEnter}
           onMouseLeave={onComponentListMouseLeave}
-          className="flex min-h-0 flex-col border-r border-gray-200 bg-white transition-all duration-200 dark:border-gray-800 dark:bg-gray-900"
+          className="flex min-h-0 flex-col border-r border-border-subtle bg-surface transition-all duration-200 "
         >
           <div
-            className={`flex h-12 shrink-0 items-center border-b border-gray-200 dark:border-gray-800 ${
+            className={`flex h-12 shrink-0 items-center border-b border-border-subtle ${
               componentListOpen ? 'justify-between px-4' : 'justify-center'
             }`}
           >
             {componentListOpen ? (
-              <div className="text-sm font-semibold leading-none text-gray-700 dark:text-gray-100">
+              <div className="text-sm font-semibold leading-none text-muted ">
                 Components
               </div>
             ) : (
-              <ToolKit size={16} className="text-gray-500 dark:text-gray-400" />
+              <ToolKit size={16} className="text-muted " />
             )}
           </div>
           <div className="min-h-0 flex-1 overflow-auto pb-4">
@@ -4258,8 +4258,8 @@ export function AgentflowVersionBuilder({
                         }
                         className={`!flex !h-10 !w-full !items-center !border-x-0 transition-colors ${
                           templateDisabled
-                            ? 'cursor-not-allowed bg-gray-50 text-gray-400 dark:bg-gray-900 dark:text-gray-500'
-                            : 'cursor-grab bg-white text-black hover:bg-gray-50 active:cursor-grabbing dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800'
+                            ? 'cursor-not-allowed bg-layer text-muted '
+                            : 'cursor-grab bg-surface text-foreground hover:bg-layer active:cursor-grabbing '
                         }`}
                       >
                         <StructuredListCell className="!flex min-w-0 !flex-1 !items-center border-0 py-0 !pl-4 pr-6">
@@ -4268,8 +4268,8 @@ export function AgentflowVersionBuilder({
                               size={16}
                               className={`shrink-0 ${
                                 templateDisabled
-                                  ? 'text-gray-400 dark:text-gray-500'
-                                  : 'text-black dark:text-white'
+                                  ? 'text-muted '
+                                  : 'text-foreground '
                               }`}
                             />
                             <span className="truncate text-sm font-normal leading-none">
@@ -4281,10 +4281,7 @@ export function AgentflowVersionBuilder({
                           noWrap
                           className="!flex !w-12 shrink-0 !items-center !justify-center border-0 px-0 py-0"
                         >
-                          <Draggable
-                            size={16}
-                            className="text-gray-500 dark:text-gray-400"
-                          />
+                          <Draggable size={16} className="text-muted " />
                         </StructuredListCell>
                       </StructuredListRow>
                     );
@@ -4300,7 +4297,7 @@ export function AgentflowVersionBuilder({
                       key={template.type}
                       type="button"
                       onClick={() => setComponentListOpen(true)}
-                      className="flex h-10 w-full items-center justify-center text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                      className="flex h-10 w-full items-center justify-center text-muted transition-colors hover:bg-layer hover:text-foreground "
                       aria-label={template.label}
                     >
                       <Icon size={16} />
@@ -4310,7 +4307,7 @@ export function AgentflowVersionBuilder({
               </div>
             )}
           </div>
-          <div className="shrink-0 border-t border-gray-200 dark:border-gray-800">
+          <div className="shrink-0 border-t border-border-subtle ">
             <button
               type="button"
               onClick={toggleComponentListLock}
@@ -4319,7 +4316,7 @@ export function AgentflowVersionBuilder({
                   ? 'Collapse components'
                   : 'Expand components'
               }
-              className="flex h-10 w-full cursor-pointer items-center px-4 text-[var(--cds-text-secondary)] transition-colors duration-100 hover:bg-gray-100 hover:text-[var(--cds-text-primary)] dark:hover:bg-gray-800"
+              className="flex h-10 w-full cursor-pointer items-center px-4 text-muted transition-colors duration-100 hover:bg-layer hover:text-foreground "
             >
               <span className="shrink-0">
                 {componentListLocked ? (
@@ -4339,7 +4336,7 @@ export function AgentflowVersionBuilder({
 
         <main
           ref={canvasRef}
-          className="relative min-h-0 overflow-hidden bg-white dark:bg-gray-950"
+          className="relative min-h-0 overflow-hidden bg-surface "
         >
           <ReactFlow
             nodes={reactFlowNodes}
@@ -4407,25 +4404,29 @@ export function AgentflowVersionBuilder({
             proOptions={{ hideAttribution: true }}
             className="agentflow-react-flow"
           >
-            <Background gap={24} size={1} color="rgba(107,114,128,0.25)" />
+            <Background
+              gap={24}
+              size={1}
+              color="color-mix(in srgb, var(--color-muted) 25%, transparent)"
+            />
             <Panel
               position="bottom-center"
-              className="nodrag nopan nowheel !m-4 flex h-10 items-center gap-1 border border-gray-200 bg-white px-2 text-gray-500 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+              className="nodrag nopan nowheel !m-4 flex h-10 items-center gap-1 border border-border-subtle bg-surface px-2 text-muted shadow-sm "
             >
               <div className="relative">
                 {zoomMenuOpen && (
                   <div
                     role="menu"
-                    className="absolute bottom-11 left-0 w-64 overflow-hidden border border-gray-200 bg-white py-1 text-sm text-gray-700 shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200"
+                    className="absolute bottom-11 left-0 w-64 overflow-hidden border border-border-subtle bg-surface py-1 text-sm text-muted shadow-lg "
                   >
                     <button
                       type="button"
                       role="menuitem"
                       onClick={zoomIn}
-                      className="flex h-10 w-full items-center justify-between gap-4 px-4 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="flex h-10 w-full items-center justify-between gap-4 px-4 text-left hover:bg-layer "
                     >
                       <span>Zoom In</span>
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                      <span className="rounded bg-layer px-2 py-0.5 text-xs text-muted ">
                         Cmd +
                       </span>
                     </button>
@@ -4433,22 +4434,22 @@ export function AgentflowVersionBuilder({
                       type="button"
                       role="menuitem"
                       onClick={zoomOut}
-                      className="flex h-10 w-full items-center justify-between gap-4 px-4 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="flex h-10 w-full items-center justify-between gap-4 px-4 text-left hover:bg-layer "
                     >
                       <span>Zoom Out</span>
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                      <span className="rounded bg-layer px-2 py-0.5 text-xs text-muted ">
                         Cmd -
                       </span>
                     </button>
-                    <div className="my-1 border-t border-gray-200 dark:border-gray-800" />
+                    <div className="my-1 border-t border-border-subtle " />
                     <button
                       type="button"
                       role="menuitem"
                       onClick={zoomToActualSize}
-                      className="flex h-10 w-full items-center justify-between gap-4 px-4 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="flex h-10 w-full items-center justify-between gap-4 px-4 text-left hover:bg-layer "
                     >
                       <span>Zoom To 100%</span>
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                      <span className="rounded bg-layer px-2 py-0.5 text-xs text-muted ">
                         Cmd 0
                       </span>
                     </button>
@@ -4456,10 +4457,10 @@ export function AgentflowVersionBuilder({
                       type="button"
                       role="menuitem"
                       onClick={zoomToFit}
-                      className="flex h-10 w-full items-center justify-between gap-4 px-4 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="flex h-10 w-full items-center justify-between gap-4 px-4 text-left hover:bg-layer "
                     >
                       <span>Zoom To Fit</span>
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                      <span className="rounded bg-layer px-2 py-0.5 text-xs text-muted ">
                         Cmd 1
                       </span>
                     </button>
@@ -4471,7 +4472,7 @@ export function AgentflowVersionBuilder({
                   aria-haspopup="menu"
                   aria-expanded={zoomMenuOpen}
                   onClick={() => setZoomMenuOpen(current => !current)}
-                  className="flex h-8 min-w-20 items-center justify-center gap-2 px-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  className="flex h-8 min-w-20 items-center justify-center gap-2 px-2 text-sm font-medium text-muted hover:bg-layer "
                 >
                   <span>{Math.round(canvasZoom * 100)}%</span>
                   <CaretDown size={16} />
@@ -4489,7 +4490,7 @@ export function AgentflowVersionBuilder({
                     canvasLocked ? 'Unlock node dragging' : 'Lock node dragging'
                   }
                   onClick={() => setCanvasLocked(current => !current)}
-                  className="flex h-8 w-8 items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="flex h-8 w-8 items-center justify-center hover:bg-layer "
                 >
                   {canvasLocked ? <Locked size={18} /> : <Unlocked size={18} />}
                 </button>
@@ -4499,7 +4500,7 @@ export function AgentflowVersionBuilder({
                   type="button"
                   aria-label="Auto layout"
                   onClick={applyAutoLayout}
-                  className="flex h-8 w-8 items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="flex h-8 w-8 items-center justify-center hover:bg-layer "
                 >
                   <Flow size={18} />
                 </button>
@@ -4509,12 +4510,12 @@ export function AgentflowVersionBuilder({
                   type="button"
                   aria-label="Examples"
                   onClick={() => setExampleDialogOpen(true)}
-                  className="flex h-8 w-8 items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="flex h-8 w-8 items-center justify-center hover:bg-layer "
                 >
                   <Document size={18} />
                 </button>
               </Tooltip>
-              <div className="mx-1 h-5 border-l border-gray-200 dark:border-gray-800" />
+              <div className="mx-1 h-5 border-l border-border-subtle " />
               <Tooltip align="top" description="Cancel">
                 <Button
                   kind="ghost"
@@ -4523,7 +4524,7 @@ export function AgentflowVersionBuilder({
                   renderIcon={Close}
                   iconDescription="Cancel"
                   onClick={() => showDialog(goBack)}
-                  className="!h-8 !min-h-8 !w-8 !p-0 !text-[var(--cds-support-error)] hover:!bg-red-600 hover:!text-white"
+                  className="!h-8 !min-h-8 !w-8 !p-0 !text-support-error hover:!bg-support-error hover:!text-inverse"
                 />
               </Tooltip>
               <Tooltip
@@ -4544,7 +4545,7 @@ export function AgentflowVersionBuilder({
                   }
                   onClick={openSaveAgentflowDialog}
                   disabled={saveState === 'saving'}
-                  className="!h-8 !min-h-8 !w-8 !p-0 !text-primary hover:!bg-primary hover:!text-white disabled:!text-gray-400 disabled:hover:!bg-transparent dark:disabled:!text-gray-600"
+                  className="!h-8 !min-h-8 !w-8 !p-0 !text-primary hover:!bg-primary hover:!text-on-primary disabled:!text-muted disabled:hover:!bg-transparent "
                 />
               </Tooltip>
             </Panel>
@@ -4552,24 +4553,24 @@ export function AgentflowVersionBuilder({
         </main>
 
         {detailsOpen && (
-          <aside className="flex min-h-0 flex-col border-l border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
+          <aside className="flex min-h-0 flex-col border-l border-border-subtle bg-layer ">
             {selectedNode && selectedTemplate ? (
               <>
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] border-b border-border-subtle bg-surface ">
                   <div className="flex min-w-0 items-start gap-3 p-4 pr-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-layer text-muted ">
                       {SelectedIcon ? <SelectedIcon size={18} /> : null}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-2">
-                        <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                        <div className="truncate text-sm font-semibold text-foreground ">
                           {selectedNode.label}
                         </div>
                         <Tag type="gray" size="sm">
                           {selectedNode.id}
                         </Tag>
                       </div>
-                      <div className="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                      <div className="mt-2 text-xs leading-5 text-muted ">
                         {selectedTemplate.description}
                       </div>
                     </div>
@@ -4603,7 +4604,7 @@ export function AgentflowVersionBuilder({
                 </div>
 
                 <div className="overflow-auto">
-                  <div className="border-b border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950">
+                  <div className="border-b border-border-subtle bg-surface p-4 ">
                     <div className="space-y-6">
                       <div>
                         <div className="mb-2 flex items-center gap-1">
@@ -4670,17 +4671,17 @@ export function AgentflowVersionBuilder({
                               </ToggletipContent>
                             </Toggletip>
                           </div>
-                          <table className="w-full border-collapse border border-gray-200 text-sm dark:border-gray-700 [&_.cds--form-item]:!m-0 [&_.cds--select-input]:!border-none [&_.cds--select-input]:!outline-none [&_.cds--text-input]:!border-none [&_.cds--text-input]:!outline-none">
+                          <TableForm className="[&_.cds--select-input]:!outline-none">
                             <thead>
-                              <tr className="border-b border-gray-200 bg-gray-50 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-900">
-                                <th className="w-9 border-r border-gray-200 px-0 py-2 dark:border-gray-700" />
-                                <th className="w-[32%] border-r border-gray-200 px-3 py-2 text-left dark:border-gray-700">
+                              <tr className="border-b border-border-subtle bg-layer text-xs font-medium text-muted ">
+                                <th className="w-9 border-r border-border-subtle px-0 py-2 " />
+                                <th className="w-[32%] border-r border-border-subtle px-3 py-2 text-left ">
                                   Name
                                 </th>
-                                <th className="w-[24%] border-r border-gray-200 px-3 py-2 text-left dark:border-gray-700">
+                                <th className="w-[24%] border-r border-border-subtle px-3 py-2 text-left ">
                                   Type
                                 </th>
-                                <th className="border-r border-gray-200 px-3 py-2 text-left dark:border-gray-700">
+                                <th className="border-r border-border-subtle px-3 py-2 text-left ">
                                   Default value
                                 </th>
                                 <th className="w-10 px-0 py-2" />
@@ -4708,14 +4709,14 @@ export function AgentflowVersionBuilder({
                                   (argument, index) => (
                                     <tr
                                       key={argument.id}
-                                      className="border-b border-gray-200 last:border-b-0 dark:border-gray-700"
+                                      className="border-b border-border-subtle last:border-b-0 "
                                     >
-                                      <td className="w-9 border-r border-gray-200 p-0 text-center dark:border-gray-700">
-                                        <span className="argument-handle inline-flex cursor-grab items-center justify-center p-2 text-gray-400">
+                                      <td className="w-9 border-r border-border-subtle p-0 text-center ">
+                                        <span className="argument-handle inline-flex cursor-grab items-center justify-center p-2 text-muted">
                                           <Draggable size={16} />
                                         </span>
                                       </td>
-                                      <td className="border-r border-gray-200 p-0 dark:border-gray-700">
+                                      <td className="border-r border-border-subtle p-0 ">
                                         <TextInput
                                           id={`argument-name-${argument.id}`}
                                           labelText={`Argument ${
@@ -4733,7 +4734,7 @@ export function AgentflowVersionBuilder({
                                           }
                                         />
                                       </td>
-                                      <td className="border-r border-gray-200 p-0 dark:border-gray-700">
+                                      <td className="border-r border-border-subtle p-0 ">
                                         <Select
                                           id={`argument-type-${argument.id}`}
                                           labelText={`Argument ${
@@ -4760,7 +4761,7 @@ export function AgentflowVersionBuilder({
                                           )}
                                         </Select>
                                       </td>
-                                      <td className="border-r border-gray-200 p-0 dark:border-gray-700">
+                                      <td className="border-r border-border-subtle p-0 ">
                                         <TextInput
                                           id={`argument-default-${argument.id}`}
                                           labelText={`Argument ${
@@ -4804,7 +4805,7 @@ export function AgentflowVersionBuilder({
                                 <tr>
                                   <td
                                     colSpan={5}
-                                    className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400"
+                                    className="px-4 py-3 text-xs text-muted "
                                   >
                                     No arguments yet. Click{' '}
                                     <strong>Add argument</strong> below.
@@ -4812,7 +4813,7 @@ export function AgentflowVersionBuilder({
                                 </tr>
                               </tbody>
                             )}
-                          </table>
+                          </TableForm>
                           <Button
                             kind="tertiary"
                             size="md"
@@ -4839,20 +4840,20 @@ export function AgentflowVersionBuilder({
                               </ToggletipContent>
                             </Toggletip>
                           </div>
-                          <table className="w-full border-collapse border border-gray-200 text-sm dark:border-gray-700 [&_.cds--form-item]:!m-0 [&_.cds--select-input]:!border-none [&_.cds--select-input]:!outline-none [&_.cds--text-input]:!border-none [&_.cds--text-input]:!outline-none">
+                          <TableForm className="[&_.cds--select-input]:!outline-none">
                             <thead>
-                              <tr className="border-b border-gray-200 bg-gray-50 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-900">
-                                <th className="w-9 border-r border-gray-200 px-0 py-2 dark:border-gray-700" />
-                                <th className="w-[26%] border-r border-gray-200 px-3 py-2 text-left dark:border-gray-700">
+                              <tr className="border-b border-border-subtle bg-layer text-xs font-medium text-muted ">
+                                <th className="w-9 border-r border-border-subtle px-0 py-2 " />
+                                <th className="w-[26%] border-r border-border-subtle px-3 py-2 text-left ">
                                   Source node
                                 </th>
-                                <th className="border-r border-gray-200 px-3 py-2 text-left dark:border-gray-700">
+                                <th className="border-r border-border-subtle px-3 py-2 text-left ">
                                   Argument / tool parameter
                                 </th>
-                                <th className="w-[20%] border-r border-gray-200 px-3 py-2 text-left dark:border-gray-700">
+                                <th className="w-[20%] border-r border-border-subtle px-3 py-2 text-left ">
                                   Operator
                                 </th>
-                                <th className="w-[20%] border-r border-gray-200 px-3 py-2 text-left dark:border-gray-700">
+                                <th className="w-[20%] border-r border-border-subtle px-3 py-2 text-left ">
                                   Value
                                 </th>
                                 <th className="w-10 px-0 py-2" />
@@ -4898,14 +4899,14 @@ export function AgentflowVersionBuilder({
                                     return (
                                       <tr
                                         key={condition.id}
-                                        className="border-b border-gray-200 last:border-b-0 dark:border-gray-700"
+                                        className="border-b border-border-subtle last:border-b-0 "
                                       >
-                                        <td className="w-9 border-r border-gray-200 p-0 text-center dark:border-gray-700">
-                                          <span className="condition-handle inline-flex cursor-grab items-center justify-center p-2 text-gray-400">
+                                        <td className="w-9 border-r border-border-subtle p-0 text-center ">
+                                          <span className="condition-handle inline-flex cursor-grab items-center justify-center p-2 text-muted">
                                             <Draggable size={16} />
                                           </span>
                                         </td>
-                                        <td className="w-[26%] border-r border-gray-200 p-0 dark:border-gray-700">
+                                        <td className="w-[26%] border-r border-border-subtle p-0 ">
                                           <Select
                                             id={`condition-source-${condition.id}`}
                                             labelText={`Condition ${
@@ -4954,7 +4955,7 @@ export function AgentflowVersionBuilder({
                                             )}
                                           </Select>
                                         </td>
-                                        <td className="border-r border-gray-200 p-0 dark:border-gray-700">
+                                        <td className="border-r border-border-subtle p-0 ">
                                           <Select
                                             id={`condition-field-${condition.id}`}
                                             labelText={`Condition ${
@@ -4988,7 +4989,7 @@ export function AgentflowVersionBuilder({
                                             ))}
                                           </Select>
                                         </td>
-                                        <td className="w-[20%] border-r border-gray-200 p-0 dark:border-gray-700">
+                                        <td className="w-[20%] border-r border-border-subtle p-0 ">
                                           <Select
                                             id={`condition-operator-${condition.id}`}
                                             labelText={`Condition ${
@@ -5017,7 +5018,7 @@ export function AgentflowVersionBuilder({
                                             )}
                                           </Select>
                                         </td>
-                                        <td className="w-[20%] border-r border-gray-200 p-0 dark:border-gray-700">
+                                        <td className="w-[20%] border-r border-border-subtle p-0 ">
                                           <TextInput
                                             id={`condition-value-${condition.id}`}
                                             labelText={`Condition ${
@@ -5064,7 +5065,7 @@ export function AgentflowVersionBuilder({
                                 <tr>
                                   <td
                                     colSpan={6}
-                                    className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400"
+                                    className="px-4 py-3 text-xs text-muted "
                                   >
                                     No conditions yet. Click{' '}
                                     <strong>Add condition</strong> below.
@@ -5072,7 +5073,7 @@ export function AgentflowVersionBuilder({
                                 </tr>
                               </tbody>
                             )}
-                          </table>
+                          </TableForm>
                           <Button
                             kind="tertiary"
                             size="md"
@@ -5099,17 +5100,17 @@ export function AgentflowVersionBuilder({
                               </ToggletipContent>
                             </Toggletip>
                           </div>
-                          <table className="w-full border-collapse border border-gray-200 text-sm dark:border-gray-700 [&_.cds--checkbox-label-text]:hidden [&_.cds--form-item]:!m-0 [&_.cds--list-box]:!border-none [&_.cds--select-input]:!border-none [&_.cds--text-input]:!border-none [&_.cds--text-input]:!outline-none">
+                          <TableForm className="[&_.cds--checkbox-label-text]:hidden">
                             <thead>
-                              <tr className="border-b border-gray-200 bg-gray-50 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-900">
-                                <th className="w-10 border-r border-gray-200 px-0 py-2 dark:border-gray-700" />
-                                <th className="w-[28%] border-r border-gray-200 px-3 py-2 text-left dark:border-gray-700">
+                              <tr className="border-b border-border-subtle bg-layer text-xs font-medium text-muted ">
+                                <th className="w-10 border-r border-border-subtle px-0 py-2 " />
+                                <th className="w-[28%] border-r border-border-subtle px-3 py-2 text-left ">
                                   Name
                                 </th>
-                                <th className="border-r border-gray-200 px-3 py-2 text-left dark:border-gray-700">
+                                <th className="border-r border-border-subtle px-3 py-2 text-left ">
                                   Description
                                 </th>
-                                <th className="w-10 border-r border-gray-200 px-0 py-2 dark:border-gray-700">
+                                <th className="w-10 border-r border-border-subtle px-0 py-2 ">
                                   Setting
                                 </th>
                                 <th className="w-10 px-0 py-2" />
@@ -5140,14 +5141,14 @@ export function AgentflowVersionBuilder({
                                   return (
                                     <tr
                                       key={transition.id}
-                                      className="border-b border-gray-200 dark:border-gray-700"
+                                      className="border-b border-border-subtle "
                                     >
-                                      <td className="border-r border-gray-200 p-0 text-center dark:border-gray-700">
-                                        <span className="transition-handle inline-flex h-10 w-10 cursor-grab items-center justify-center text-gray-400">
+                                      <td className="border-r border-border-subtle p-0 text-center ">
+                                        <span className="transition-handle inline-flex h-10 w-10 cursor-grab items-center justify-center text-muted">
                                           <Draggable size={16} />
                                         </span>
                                       </td>
-                                      <td className="border-r border-gray-200 p-0 dark:border-gray-700">
+                                      <td className="border-r border-border-subtle p-0 ">
                                         <TextInput
                                           id={`transition-name-${transition.id}`}
                                           labelText="Transition name"
@@ -5163,7 +5164,7 @@ export function AgentflowVersionBuilder({
                                           }
                                         />
                                       </td>
-                                      <td className="border-r border-gray-200 p-0 dark:border-gray-700">
+                                      <td className="border-r border-border-subtle p-0 ">
                                         <TextInput
                                           id={`transition-description-${transition.id}`}
                                           labelText="Transition description"
@@ -5181,7 +5182,7 @@ export function AgentflowVersionBuilder({
                                           }
                                         />
                                       </td>
-                                      <td className="w-10 border-r border-gray-200 p-0 text-center dark:border-gray-700">
+                                      <td className="w-10 border-r border-border-subtle p-0 text-center ">
                                         <Button
                                           hasIconOnly
                                           kind="ghost"
@@ -5218,7 +5219,7 @@ export function AgentflowVersionBuilder({
                                 <tr>
                                   <td
                                     colSpan={5}
-                                    className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400"
+                                    className="px-4 py-3 text-xs text-muted "
                                   >
                                     No transitions yet. Click{' '}
                                     <strong>Add transition</strong> below.
@@ -5226,7 +5227,7 @@ export function AgentflowVersionBuilder({
                                 </tr>
                               </tbody>
                             )}
-                          </table>
+                          </TableForm>
                           <Button
                             kind="tertiary"
                             size="md"
@@ -5236,7 +5237,7 @@ export function AgentflowVersionBuilder({
                           >
                             Add transition
                           </Button>
-                          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                          <p className="mt-2 text-xs text-muted ">
                             The connected edge decides the next node after the
                             function call completes.
                           </p>
@@ -5291,10 +5292,10 @@ export function AgentflowVersionBuilder({
                               ).map(input => (
                                 <StructuredListRow
                                   key={`input-${input}`}
-                                  className="!flex !w-full border-b border-gray-200 dark:border-gray-800"
+                                  className="!flex !w-full border-b border-border-subtle "
                                 >
-                                  <StructuredListCell className="!flex !flex-1 items-center gap-2 border-0 px-0 py-2 text-xs text-gray-700 dark:text-gray-300">
-                                    <span className="h-2 w-2 rounded-full bg-gray-500" />
+                                  <StructuredListCell className="!flex !flex-1 items-center gap-2 border-0 px-0 py-2 text-xs text-muted ">
+                                    <span className="h-2 w-2 rounded-full bg-layer" />
                                     <span className="truncate">
                                       Input: {input}
                                     </span>
@@ -5307,9 +5308,9 @@ export function AgentflowVersionBuilder({
                               ).map(output => (
                                 <StructuredListRow
                                   key={`output-${output}`}
-                                  className="!flex !w-full border-b border-gray-200 dark:border-gray-800"
+                                  className="!flex !w-full border-b border-border-subtle "
                                 >
-                                  <StructuredListCell className="!flex !flex-1 items-center gap-2 border-0 px-0 py-2 text-xs text-gray-700 dark:text-gray-300">
+                                  <StructuredListCell className="!flex !flex-1 items-center gap-2 border-0 px-0 py-2 text-xs text-muted ">
                                     <span className="h-2 w-2 rounded-full bg-primary" />
                                     <span className="truncate">
                                       Output: {output}
@@ -5341,7 +5342,7 @@ export function AgentflowVersionBuilder({
           onClose={() => setExampleDialogOpen(false)}
         />
         <ModalBody hasScrollingContent>
-          <p className="mb-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+          <p className="mb-4 text-xs leading-relaxed text-muted ">
             Choose a pre-configured agentflow to fill the canvas. You can
             customize every node after selecting.
           </p>
@@ -5367,16 +5368,16 @@ export function AgentflowVersionBuilder({
               ))}
             </ContentSwitcher>
             {selectedExampleDefinition && (
-              <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
+              <span className="ml-auto text-xs text-muted ">
                 Selected:{' '}
-                <span className="font-medium text-gray-900 dark:text-gray-100">
+                <span className="font-medium text-foreground ">
                   {selectedExampleDefinition.name}
                 </span>
               </span>
             )}
           </div>
 
-          <div className="grid grid-cols-3 border-l border-t border-gray-200 dark:border-gray-800">
+          <div className="grid grid-cols-3 border-l border-t border-border-subtle ">
             {visibleExampleDefinitions.map(definition => {
               const isSelected =
                 selectedExampleDefinition?.name === definition.name;
@@ -5396,11 +5397,9 @@ export function AgentflowVersionBuilder({
                     }
                   }}
                   className={cn(
-                    'relative flex min-h-36 cursor-pointer select-none flex-col border-b border-r border-gray-200 p-4 outline-none transition-colors duration-100 dark:border-gray-800',
+                    'relative flex min-h-36 cursor-pointer select-none flex-col border-b border-r border-border-subtle p-4 outline-none transition-colors duration-100 ',
                     'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
-                    isSelected
-                      ? 'bg-primary/5 dark:bg-primary/10'
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-800',
+                    isSelected ? 'bg-primary/5 ' : 'hover:bg-layer ',
                   )}
                 >
                   <CornerBorderOverlay
@@ -5414,7 +5413,7 @@ export function AgentflowVersionBuilder({
                     )}
                   >
                     {isSelected && (
-                      <Checkmark size={14} className="text-white" />
+                      <Checkmark size={14} className="text-inverse" />
                     )}
                   </div>
 
@@ -5422,11 +5421,11 @@ export function AgentflowVersionBuilder({
                     {category}
                   </Tag>
 
-                  <h3 className="mb-1.5 pr-6 text-sm font-semibold leading-snug text-gray-900 dark:text-white">
+                  <h3 className="mb-1.5 pr-6 text-sm font-semibold leading-snug text-foreground ">
                     {definition.name}
                   </h3>
 
-                  <p className="mb-4 line-clamp-2 flex-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                  <p className="mb-4 line-clamp-2 flex-1 text-xs leading-relaxed text-muted ">
                     {definition.description}
                   </p>
 
@@ -5576,19 +5575,19 @@ export function AgentflowVersionBuilder({
                   </ToggletipContent>
                 </Toggletip>
               </div>
-              <table className="w-full border-collapse border border-gray-200 text-sm dark:border-gray-700 [&_.cds--checkbox-label-text]:hidden [&_.cds--form-item]:!m-0 [&_.cds--list-box]:!border-none [&_.cds--select-input]:!border-none [&_.cds--text-input]:!border-none [&_.cds--text-input]:!outline-none">
+              <TableForm className="[&_.cds--checkbox-label-text]:hidden">
                 <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-900">
-                    <th className="w-[24%] border-r border-gray-200 px-3 py-2 text-left dark:border-gray-700">
+                  <tr className="border-b border-border-subtle bg-layer text-xs font-medium text-muted ">
+                    <th className="w-[24%] border-r border-border-subtle px-3 py-2 text-left ">
                       Name
                     </th>
-                    <th className="w-[18%] border-r border-gray-200 px-3 py-2 text-left dark:border-gray-700">
+                    <th className="w-[18%] border-r border-border-subtle px-3 py-2 text-left ">
                       Type
                     </th>
-                    <th className="border-r border-gray-200 px-3 py-2 text-left dark:border-gray-700">
+                    <th className="border-r border-border-subtle px-3 py-2 text-left ">
                       Description
                     </th>
-                    <th className="w-24 border-r border-gray-200 px-3 py-2 text-left dark:border-gray-700">
+                    <th className="w-24 border-r border-border-subtle px-3 py-2 text-left ">
                       Required
                     </th>
                     <th className="w-10 px-0 py-2" />
@@ -5599,9 +5598,9 @@ export function AgentflowVersionBuilder({
                     {settingsTransitionParameters.map(parameter => (
                       <tr
                         key={parameter.id}
-                        className="border-b border-gray-200 last:border-b-0 dark:border-gray-700"
+                        className="border-b border-border-subtle last:border-b-0 "
                       >
-                        <td className="border-r border-gray-200 p-0 dark:border-gray-700">
+                        <td className="border-r border-border-subtle p-0 ">
                           <TextInput
                             id={`transition-settings-parameter-name-${parameter.id}`}
                             labelText="Parameter name"
@@ -5620,7 +5619,7 @@ export function AgentflowVersionBuilder({
                             }
                           />
                         </td>
-                        <td className="border-r border-gray-200 p-0 dark:border-gray-700">
+                        <td className="border-r border-border-subtle p-0 ">
                           <Select
                             id={`transition-settings-parameter-type-${parameter.id}`}
                             labelText="Parameter type"
@@ -5646,7 +5645,7 @@ export function AgentflowVersionBuilder({
                             ))}
                           </Select>
                         </td>
-                        <td className="border-r border-gray-200 p-0 dark:border-gray-700">
+                        <td className="border-r border-border-subtle p-0 ">
                           <TextInput
                             id={`transition-settings-parameter-description-${parameter.id}`}
                             labelText="Parameter description"
@@ -5665,7 +5664,7 @@ export function AgentflowVersionBuilder({
                             }
                           />
                         </td>
-                        <td className="border-r border-gray-200 px-3 py-0 dark:border-gray-700">
+                        <td className="border-r border-border-subtle px-3 py-0 ">
                           <Checkbox
                             id={`transition-settings-parameter-required-${parameter.id}`}
                             labelText=""
@@ -5702,17 +5701,14 @@ export function AgentflowVersionBuilder({
                 ) : (
                   <tbody>
                     <tr>
-                      <td
-                        colSpan={5}
-                        className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400"
-                      >
+                      <td colSpan={5} className="px-4 py-3 text-xs text-muted ">
                         No parameters yet. Click <strong>Add parameter</strong>{' '}
                         below.
                       </td>
                     </tr>
                   </tbody>
                 )}
-              </table>
+              </TableForm>
               <Button
                 kind="tertiary"
                 size="md"

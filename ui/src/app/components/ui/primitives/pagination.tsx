@@ -10,6 +10,7 @@ export interface CarbonPaginationProps {
   pageSizes: number[];
   onChange: (data: { page: number; pageSize: number }) => void;
   className?: string;
+  sticky?: boolean;
   size?: PaginationSize;
   disabled?: boolean;
   backwardText?: string;
@@ -30,6 +31,7 @@ export function Pagination({
   pageSizes,
   onChange,
   className,
+  sticky = false,
   size = 'md',
   disabled = false,
   backwardText = 'Previous page',
@@ -48,7 +50,10 @@ export function Pagination({
       pageSize={pageSize}
       pageSizes={pageSizes}
       onChange={onChange}
-      className={cn(className)}
+      className={cn(
+        sticky && 'sticky bottom-0 z-10 mt-auto! shrink-0',
+        className,
+      )}
       size={size}
       disabled={disabled}
       backwardText={backwardText}

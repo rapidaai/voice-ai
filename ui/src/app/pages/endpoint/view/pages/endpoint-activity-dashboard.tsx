@@ -64,9 +64,9 @@ function MetricTile(props: {
   loading: boolean;
 }) {
   return (
-    <Tile className="h-[156px] !rounded-none !border !border-gray-200 !bg-white !p-0 dark:!border-gray-800 dark:!bg-[#262626]">
-      <div className="flex h-10 items-center border-b border-gray-200 px-4 dark:border-gray-800">
-        <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+    <Tile className="h-[156px] !rounded-none !border !border-border-subtle !bg-surface !p-0 ">
+      <div className="flex h-10 items-center border-b border-border-subtle px-4 ">
+        <h3 className="truncate text-sm font-semibold text-foreground ">
           {props.title}
         </h3>
       </div>
@@ -85,23 +85,17 @@ function MetricTile(props: {
         ) : (
           <>
             <div>
-              <p className="truncate text-xs text-[var(--cds-text-secondary)]">
-                {props.label}
-              </p>
+              <p className="truncate text-xs text-muted">{props.label}</p>
               <div className="mt-2 flex items-baseline gap-1">
-                <span className="text-4xl font-light leading-none tabular-nums text-gray-900 dark:text-gray-100">
+                <span className="text-4xl font-light leading-none tabular-nums text-foreground ">
                   {props.value}
                 </span>
                 {props.unit && (
-                  <span className="text-sm text-[var(--cds-text-secondary)]">
-                    {props.unit}
-                  </span>
+                  <span className="text-sm text-muted">{props.unit}</span>
                 )}
               </div>
             </div>
-            <p className="truncate text-xs text-[var(--cds-text-secondary)]">
-              {props.description}
-            </p>
+            <p className="truncate text-xs text-muted">{props.description}</p>
           </>
         )}
       </div>
@@ -181,9 +175,9 @@ function RequestDetailsCard(props: {
   const unavailable = props.error ? '--' : undefined;
 
   return (
-    <Tile className="h-[310px] !rounded-none !border !border-gray-200 !bg-white !p-0 dark:!border-gray-800 dark:!bg-[#262626]">
-      <div className="flex h-12 items-center border-b border-gray-200 px-4 dark:border-gray-800">
-        <h2 className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+    <Tile className="h-[310px] !rounded-none !border !border-border-subtle !bg-surface !p-0 ">
+      <div className="flex h-12 items-center border-b border-border-subtle px-4 ">
+        <h2 className="truncate text-sm font-semibold text-foreground ">
           Request details
         </h2>
       </div>
@@ -193,7 +187,7 @@ function RequestDetailsCard(props: {
             <SkeletonText width="52%" className="mb-2!" />
             <SkeletonText heading width="112px" className="mb-2!" />
             <SkeletonText width="72%" className="mb-0!" />
-            <div className="mt-5 space-y-4 border-t border-gray-200 pt-4 dark:border-gray-800">
+            <div className="mt-5 space-y-4 border-t border-border-subtle pt-4 ">
               <SkeletonText width="100%" className="mb-0!" />
               <SkeletonText width="100%" className="mb-0!" />
               <SkeletonText width="100%" className="mb-0!" />
@@ -201,23 +195,19 @@ function RequestDetailsCard(props: {
           </>
         ) : (
           <>
-            <p className="text-xs text-[var(--cds-text-secondary)]">
-              Avg request latency
-            </p>
+            <p className="text-xs text-muted">Avg request latency</p>
             <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-4xl font-light leading-none tabular-nums text-gray-900 dark:text-gray-100">
+              <span className="text-4xl font-light leading-none tabular-nums text-foreground ">
                 {unavailable ?? averageLatency ?? '--'}
               </span>
               {!unavailable && averageLatency !== undefined && (
-                <span className="text-sm text-[var(--cds-text-secondary)]">
-                  ms
-                </span>
+                <span className="text-sm text-muted">ms</span>
               )}
             </div>
-            <p className="mt-2 text-xs text-[var(--cds-text-secondary)]">
+            <p className="mt-2 text-xs text-muted">
               Average across the latest {props.logs.length || 0} requests
             </p>
-            <div className="mt-5 divide-y divide-gray-200 border-t border-gray-200 dark:divide-gray-800 dark:border-gray-800">
+            <div className="mt-5 divide-y divide-border-subtle border-t border-border-subtle ">
               {[
                 { label: 'Successful', value: unavailable ?? successful },
                 { label: 'Failed', value: unavailable ?? failed },
@@ -230,10 +220,8 @@ function RequestDetailsCard(props: {
                   key={row.label}
                   className="flex items-center justify-between gap-4 py-2.5"
                 >
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    {row.label}
-                  </span>
-                  <span className="text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                  <span className="text-sm text-muted ">{row.label}</span>
+                  <span className="text-sm font-semibold tabular-nums text-foreground ">
                     {row.value}
                   </span>
                 </div>
@@ -374,15 +362,15 @@ export function EndpointActivityDashboard({
 
   return (
     <section
-      className="min-h-full w-full bg-gray-100 p-4 dark:bg-[#161616]"
+      className="min-h-full w-full bg-layer p-4 "
       aria-labelledby="endpoint-activity-title"
     >
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs text-[var(--cds-text-secondary)]">Dashboard</p>
+          <p className="text-xs text-muted">Dashboard</p>
           <h1
             id="endpoint-activity-title"
-            className="text-2xl font-normal text-gray-900 dark:text-gray-100"
+            className="text-2xl font-normal text-foreground "
           >
             Endpoint activity
           </h1>
@@ -438,11 +426,11 @@ export function EndpointActivityDashboard({
           loading={loading}
           error={error}
         />
-        <Tile className="h-[310px] !rounded-none !border !border-gray-200 !bg-white !p-0 md:col-span-2 dark:!border-gray-800 dark:!bg-[#262626]">
-          <div className="flex h-12 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-800">
+        <Tile className="h-[310px] !rounded-none !border !border-border-subtle !bg-surface !p-0 md:col-span-2 ">
+          <div className="flex h-12 items-center justify-between border-b border-border-subtle px-4 ">
             <h2
               id="recent-requests-title"
-              className="text-sm font-semibold text-gray-900 dark:text-gray-100"
+              className="text-sm font-semibold text-foreground "
             >
               Request latency
             </h2>
@@ -481,10 +469,10 @@ export function EndpointActivityDashboard({
             </div>
           ) : logs.length === 0 ? (
             <div className="flex h-[262px] flex-col items-start justify-center px-4 py-6">
-              <h3 className="text-base font-semibold text-[var(--cds-text-primary)]">
+              <h3 className="text-base font-semibold text-foreground">
                 No requests yet
               </h3>
-              <p className="mt-1 max-w-lg text-sm text-[var(--cds-text-secondary)]">
+              <p className="mt-1 max-w-lg text-sm text-muted">
                 Run this endpoint in the playground. Its status, latency, and
                 token usage will appear here.
               </p>
@@ -521,29 +509,29 @@ export function EndpointActivityDashboard({
                     >
                       <stop
                         offset="0%"
-                        stopColor="var(--cds-interactive, #0f62fe)"
+                        stopColor="var(--color-primary)"
                         stopOpacity={0.28}
                       />
                       <stop
                         offset="100%"
-                        stopColor="var(--cds-interactive, #0f62fe)"
+                        stopColor="var(--color-primary)"
                         stopOpacity={0.02}
                       />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
-                    stroke="var(--cds-border-subtle-01, #e0e0e0)"
+                    stroke="var(--color-border-subtle)"
                     vertical={false}
                   />
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 11, fill: 'var(--cds-text-secondary)' }}
+                    tick={{ fontSize: 11, fill: 'var(--color-muted)' }}
                     tickLine={false}
                     axisLine={false}
                   />
                   <YAxis
                     width={48}
-                    tick={{ fontSize: 11, fill: 'var(--cds-text-secondary)' }}
+                    tick={{ fontSize: 11, fill: 'var(--color-muted)' }}
                     tickLine={false}
                     axisLine={false}
                     unit=" ms"
@@ -551,10 +539,10 @@ export function EndpointActivityDashboard({
                   <Tooltip
                     formatter={value => [`${value} ms`, 'Latency']}
                     contentStyle={{
-                      border: '1px solid var(--cds-border-subtle-01)',
+                      border: '1px solid var(--color-border-subtle)',
                       borderRadius: 0,
-                      background: 'var(--cds-layer-01)',
-                      color: 'var(--cds-text-primary)',
+                      background: 'var(--color-layer)',
+                      color: 'var(--color-foreground)',
                       fontSize: 12,
                     }}
                   />
@@ -562,7 +550,7 @@ export function EndpointActivityDashboard({
                     type="monotone"
                     dataKey="latency"
                     name="Latency"
-                    stroke="var(--cds-interactive, #0f62fe)"
+                    stroke="var(--color-primary)"
                     fill="url(#endpointLatencyGradient)"
                     strokeWidth={2}
                     activeDot={{ r: 4 }}

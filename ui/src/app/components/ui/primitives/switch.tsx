@@ -50,10 +50,9 @@ function SwitchWithLabelComponent({
         'w-full',
         'form-input',
         'min-h-10',
-        'dark:placeholder-gray-600 placeholder-gray-400',
-        'dark:text-gray-300 text-gray-600',
-        'border-b border-gray-300 dark:border-gray-700',
-        'bg-white dark:bg-gray-950',
+        'text-foreground ',
+        'border-b border-border-subtle ',
+        'bg-surface ',
         'px-4 py-2 flex justify-between items-center w-full gap-4',
         className,
       )}

@@ -243,7 +243,7 @@ export const EndpointTraces: FC<{ currentEndpoint: Endpoint }> = props => {
 
       {endpointLogs && endpointLogs.length > 0 && (
         <Pagination
-          className="shrink-0"
+          sticky
           totalItems={totalCount}
           page={page}
           pageSize={pageSize}
