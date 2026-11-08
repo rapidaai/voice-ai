@@ -274,9 +274,9 @@ jobs:
             cat combined-flow-results.md
           } > "$body_file"
 
-          comment_id=$(gh api \
+          comment_id=$(gh api --paginate --slurp \
             "repos/$GH_REPO/issues/$PR_NUMBER/comments?per_page=100" \
-            --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- rapida-e2e-flow-results -->")))] | first | .id // empty')
+            --jq '[.[][] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- rapida-e2e-flow-results -->")))] | first | .id // empty')
           if [[ -n "$comment_id" ]]; then
             gh api --method PATCH "repos/$GH_REPO/issues/comments/$comment_id" \
               -F body="@$body_file" >/dev/null

@@ -27,6 +27,7 @@ require_text "$ci_workflow" 'name: 01 Validate - Repository'
 require_text "$ci_workflow" 'name: 02 Build - Docker Images'
 require_text "$ci_workflow" 'name: 02 Build - Assistant Native'
 require_text "$ci_workflow" 'name: 03 End-to-End Verification'
+require_text "$ci_workflow" 'actions: read'
 require_text "$ci_workflow" 'pull-requests: write'
 require_text "$ci_workflow" 'name: 05 CI Complete'
 require_text "$ci_workflow" "mode=documentation"
@@ -96,6 +97,7 @@ require_text "$end_to_end_workflow" 'name: Upload complete flow table'
 require_text "$end_to_end_workflow" 'name: Comment complete flow table on pull request'
 require_text "$end_to_end_workflow" '<!-- rapida-e2e-flow-results -->'
 require_text "$end_to_end_workflow" 'pull-requests: write'
+require_text "$end_to_end_workflow" 'gh api --paginate --slurp'
 
 login_guard_count=$(grep -Fc "if: inputs.push == 'true'" "$docker_action")
 if [[ "$login_guard_count" -lt 2 ]]; then

@@ -5,10 +5,15 @@ script_directory=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 temporary_directory=$(mktemp -d "${TMPDIR:-/tmp}/rapida-flow-summary-test.XXXXXX")
 trap 'rm -rf "$temporary_directory"' EXIT HUP INT TERM
 results_directory="$temporary_directory/results"
-manifest_file="$temporary_directory/manifest.txt"
+definition_directory="$temporary_directory/definitions"
+manifest_file="$definition_directory/manifest.txt"
 summary_file="$temporary_directory/summary.md"
-mkdir -p "$results_directory"
+mkdir -p "$results_directory" "$definition_directory/alpha" "$definition_directory/beta"
 printf '%s\n' alpha beta > "$manifest_file"
+printf '%s\n' "run_flow_clients \"\$script_directory\" 'Alpha' nodejs react rest" \
+  > "$definition_directory/alpha/run.sh"
+printf '%s\n' "run_flow_clients \"\$script_directory\" 'Beta' nodejs react rest" \
+  > "$definition_directory/beta/run.sh"
 
 write_result() {
   local artifact=$1
@@ -33,7 +38,7 @@ FLOW_MANIFEST_FILE="$manifest_file" \
 grep -Fq '| Alpha | react | ✅ Passed | 3s |' "$summary_file"
 grep -Fq '| Beta | nodejs | ❌ Failed | 2s |' "$summary_file"
 grep -Fq '| Beta | rest | ⏭️ Not supported | 0s |' "$summary_file"
-grep -Fq 'Passed: 4, failed: 1, not supported: 1.' "$summary_file"
+grep -Fq 'Passed: 4, failed: 1, not supported: 1, not run: 0.' "$summary_file"
 
 mkdir -p "$results_directory/duplicate"
 cp "$results_directory/node-1/flows.tsv" "$results_directory/duplicate/flows.tsv"
@@ -43,5 +48,25 @@ if FLOW_MANIFEST_FILE="$manifest_file" \
   exit 1
 fi
 grep -Fq 'Duplicate flow/client results were found.' "$summary_file"
+
+rm -rf "$results_directory/duplicate" "$results_directory/rest-2"
+if FLOW_MANIFEST_FILE="$manifest_file" \
+  "$script_directory/summarize-results.sh" "$results_directory" "$summary_file"; then
+  printf 'missing flow result unexpectedly passed\n' >&2
+  exit 1
+fi
+grep -Fq '| Beta | rest | ⚠️ Not run | - |' "$summary_file"
+grep -Fq 'Passed: 4, failed: 1, not supported: 0, not run: 1.' "$summary_file"
+
+rm -rf "$results_directory"
+mkdir -p "$results_directory"
+if FLOW_MANIFEST_FILE="$manifest_file" \
+  "$script_directory/summarize-results.sh" "$results_directory" "$summary_file"; then
+  printf 'empty flow results unexpectedly passed\n' >&2
+  exit 1
+fi
+grep -Fq '| Alpha | nodejs | ⚠️ Not run | - |' "$summary_file"
+grep -Fq '| Beta | rest | ⚠️ Not run | - |' "$summary_file"
+grep -Fq 'Passed: 0, failed: 0, not supported: 0, not run: 6.' "$summary_file"
 
 printf 'Flow summary regression tests passed\n'

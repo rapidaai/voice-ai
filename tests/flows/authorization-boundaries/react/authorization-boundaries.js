@@ -44,11 +44,7 @@ function getRequest(assistantID) {
 
 async function expectDenied(action, invoke) {
   try {
-    const response = await invoke();
-    if (!response?.getSuccess() && response?.getCode() !== 200) {
-      console.log(`${action} was rejected with response code ${response.getCode()}`);
-      return;
-    }
+    await invoke();
     throw new Error(`${action} unexpectedly succeeded`);
   } catch (error) {
     if (error?.message === `${action} unexpectedly succeeded`) {
@@ -64,11 +60,7 @@ async function expectDenied(action, invoke) {
 
 async function expectMissing(action, invoke) {
   try {
-    const response = await invoke();
-    if (!response?.getSuccess() && response?.getCode() !== 200) {
-      console.log(`${action} was rejected with response code ${response.getCode()}`);
-      return;
-    }
+    await invoke();
     throw new Error(`${action} unexpectedly succeeded`);
   } catch (error) {
     if (error?.message === `${action} unexpectedly succeeded`) {

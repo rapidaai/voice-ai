@@ -81,9 +81,9 @@ just test-integration-node assistant-components
 just test-integration-react assistant-components
 ```
 
-Local SDK dependencies are cached by the flow lockfile checksum under the
-system temporary directory. Set `FLOW_DEPENDENCY_CACHE_DIR` to retain the
-cache elsewhere. React SDK request and response logging is disabled by default;
+Local SDK dependencies are atomically installed and cached by the flow lockfile
+checksum in a private per-user cache. Set `FLOW_DEPENDENCY_CACHE_DIR` to choose
+a different private cache directory. React SDK request and response logging is disabled by default;
 set `FLOW_SDK_DEBUG=true` only when the full trace is required. The Node SDK's
 similarly named constructor flag selects insecure local gRPC transport and must
 remain enabled for the plaintext development ports.
