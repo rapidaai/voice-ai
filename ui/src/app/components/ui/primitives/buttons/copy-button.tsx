@@ -32,7 +32,7 @@ export function CopyButton({
       renderIcon={copied ? Checkmark : Copy}
       iconDescription={copied ? copiedDescription : copyDescription}
       onClick={() => copyItem(children)}
-      className={cn(copied && 'text-green-600', className)}
+      className={cn(copied && 'text-support-success', className)}
     />
   );
 }

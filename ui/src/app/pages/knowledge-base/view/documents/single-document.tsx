@@ -80,12 +80,12 @@ export const SingleDocument: FC<SingleDocumentProps> = ({
               className={cn(
                 'p-1 w-fit block',
                 document.getDisplaystatus() === 'available' &&
-                  'text-green-600 bg-green-400/20',
+                  'text-support-success bg-support-success/20',
                 document.getDisplaystatus() === 'error' &&
-                  'text-rose-600 bg-rose-400/20',
+                  'text-support-error bg-support-error/20',
                 document.getDisplaystatus() !== 'available' &&
                   document.getDisplaystatus() !== 'error' &&
-                  'text-yellow-600 bg-yellow-400/20',
+                  'text-support-warning bg-support-warning/20',
               )}
             >
               {document.getDisplaystatus() === 'error' ? (
@@ -99,16 +99,17 @@ export const SingleDocument: FC<SingleDocumentProps> = ({
                 className={cn(
                   'font-medium block text-xs leading-4 capitalize',
                   document.getDisplaystatus() === 'available' &&
-                    'text-green-600',
-                  document.getDisplaystatus() === 'error' && 'text-rose-600',
+                    'text-support-success',
+                  document.getDisplaystatus() === 'error' &&
+                    'text-support-error',
                   document.getDisplaystatus() !== 'available' &&
                     document.getDisplaystatus() !== 'error' &&
-                    'text-yellow-600',
+                    'text-support-warning',
                 )}
               >
                 {document.getDisplaystatus()}
               </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400 capitalize truncate">
+              <span className="text-xs text-muted capitalize truncate">
                 {document?.getCreateddate() &&
                   toHumanReadableRelativeTime(document?.getCreateddate()!)}
               </span>
@@ -119,14 +120,14 @@ export const SingleDocument: FC<SingleDocumentProps> = ({
       {kdAction.visibleColumn('getName') && (
         <TableCell>
           <div className="flex items-center gap-2">
-            <div className="p-1.5 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950/30 shrink-0">
+            <div className="p-1.5 border border-border-subtle bg-layer shrink-0">
               <Document className="w-5 h-5" />
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-semibold line-clamp-1 text-gray-900 dark:text-gray-100">
+              <span className="text-sm font-semibold line-clamp-1 text-foreground ">
                 {document.getName()}
               </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+              <span className="text-xs text-muted truncate">
                 Uploaded{' '}
                 {document.getCreateddate() &&
                   toHumanReadableRelativeTime(document.getCreateddate()!)}
@@ -136,7 +137,7 @@ export const SingleDocument: FC<SingleDocumentProps> = ({
         </TableCell>
       )}
       {kdAction.visibleColumn('getDocumenttype') && (
-        <LabelCell className="bg-blue-300/10 text-blue-500 dark:text-blue-400 truncate">
+        <LabelCell className="bg-support-info/10 text-support-info truncate">
           {document
             .getDocumentsource()
             ?.getFieldsMap()

@@ -56,6 +56,8 @@ jest.mock('@/app/components/ui/primitives/form', () => {
 jest.mock('@carbon/react', () => {
   const React = require('react');
   return {
+    Button: ({ children, ...props }: any) =>
+      React.createElement('button', props, children),
     MultiSelect: ({ id, titleText, selectedItems = [], onChange }: any) =>
       React.createElement(
         'div',

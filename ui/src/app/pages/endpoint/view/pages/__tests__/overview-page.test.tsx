@@ -125,6 +125,13 @@ describe('EndpointOverviewPage', () => {
     expect(screen.getByTestId('endpoint-page-header')).toHaveTextContent(
       'Customer support analysis',
     );
+    expect(screen.getByTestId('endpoint-page-header')).toHaveAttribute(
+      'data-resource-detail-header',
+    );
+    expect(screen.getByTestId('endpoint-page-header')).toHaveClass(
+      'h-12',
+      'bg-shell',
+    );
     expect(screen.getByText('Endpoints')).toHaveAttribute(
       'href',
       '/deployment/endpoint',

@@ -130,7 +130,7 @@ describe('VoiceCatalog', () => {
     expect(screen.getByText('voice-1')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Copy Voice 1 voice ID' }),
-    ).toBeInTheDocument();
+    ).toHaveClass('cds--btn--ghost');
 
     await user.click(
       screen.getByRole('button', { name: 'Expand Voice 1 details' }),

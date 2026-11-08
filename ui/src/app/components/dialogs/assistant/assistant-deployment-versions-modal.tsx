@@ -149,13 +149,9 @@ export function AssistantDeploymentVersionsModal({
             <Loading withOverlay={false} />
           </div>
         ) : errorMessage ? (
-          <p className="text-sm text-red-600 dark:text-red-400">
-            {errorMessage}
-          </p>
+          <p className="text-sm text-support-error ">{errorMessage}</p>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            No versions found.
-          </p>
+          <p className="text-sm text-muted ">No versions found.</p>
         ) : (
           <div className="overflow-auto flex-1">
             <Table>

@@ -3,15 +3,12 @@ import { useRapidaStore } from '@/stores/app';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useParams } from 'react-router-dom';
 import { Helmet } from '@/app/components/app-shell/helmet';
-import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
+import { Toggletip, ToggletipButton, ToggletipContent } from '@carbon/react';
+import { Information, SourceControl } from '@carbon/icons-react';
 import {
-  ButtonSet,
-  Toggletip,
-  ToggletipButton,
-  ToggletipContent,
-} from '@carbon/react';
-import { Information } from '@carbon/icons-react';
-import { TabForm } from '@/app/components/ui/composites';
+  CreateFullPageStep,
+  CreateFullPageWithGlobalHeader,
+} from '@/app/components/ui/composites';
 import { FieldSet } from '@/app/components/ui/primitives';
 import { useConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-confirmation';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
@@ -69,15 +66,12 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
    *
    */
   const { authId, token, projectId } = useCurrentCredential();
-  /**
-   * Multistep form stage
-   */
-  const [activeTab, setActiveTab] = useState('change-assistant');
   const navigator = useGlobalNavigation();
   /**
    * error message
    */
   const [errorMessage, setErrorMessage] = useState('');
+  const [versionNoteError, setVersionNoteError] = useState('');
   /**
    * confirmation dialog
    */
@@ -110,6 +104,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
   const [versionMessage, setVersionMessage] = useState(
     `Changed on ${new Date().toLocaleDateString()}`,
   );
+  const [promptInstanceId] = useState(() => randomString(10));
 
   /**
    * global loader
@@ -163,10 +158,11 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
     return true;
   };
 
-  const createProviderModel = () => {
+  const createProviderModel = async () => {
     setErrorMessage('');
     if (!versionMessage || versionMessage.trim() === '') {
-      setErrorMessage('Please provide a valid version description.');
+      const message = 'Enter a version note.';
+      setVersionNoteError(message);
       return;
     }
     showLoader();
@@ -179,35 +175,32 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
     request.setModel(model);
     request.setAssistantid(assistantId);
     request.setDescription(versionMessage);
-    //
-    createAssistantProviderWithDebuggerFromRequest({
-      request,
-      auth: { projectId, token, userId: authId },
-    })
-      .then((car: GetAssistantProviderResponse) => {
-        hideLoader();
-        if (car?.getSuccess()) {
-          toast.success(
-            'Assistant version with model has been created successfully.',
-          );
-          navigator.goToAssistantVersions(assistantId);
-        } else {
-          const errorMessage =
-            'Unable to create assistant version. please try again later.';
-          const error = car?.getError();
-          if (error) {
-            setErrorMessage(error.getHumanmessage());
-            return;
-          }
-          setErrorMessage(errorMessage);
-          return;
-        }
-      })
-      .catch(err => {
-        setErrorMessage(
-          'Unable to create assistant version. please try again later.',
+    try {
+      const car: GetAssistantProviderResponse =
+        await createAssistantProviderWithDebuggerFromRequest({
+          request,
+          auth: { projectId, token, userId: authId },
+        });
+      if (car?.getSuccess()) {
+        toast.success(
+          'Assistant version with model has been created successfully.',
         );
-      });
+        navigator.goToAssistantVersions(assistantId);
+        return;
+      }
+
+      const error = car?.getError();
+      setErrorMessage(
+        error?.getHumanmessage() ||
+          'Unable to create assistant version. please try again later.',
+      );
+    } catch {
+      setErrorMessage(
+        'Unable to create assistant version. please try again later.',
+      );
+    } finally {
+      hideLoader();
+    }
   };
 
   //
@@ -252,131 +245,90 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
   return (
     <>
       <ConfirmDialogComponent />
-      <Helmet title="Create new version"></Helmet>
-      <TabForm
-        activeTab={activeTab}
-        formHeading="Create a new version of this assistant."
-        onChangeActiveTab={() => {}}
+      <Helmet title="Create version"></Helmet>
+      <CreateFullPageWithGlobalHeader
+        title="Create version"
+        description="Update the assistant configuration, then add a version note describing what changed. New versions are not deployed automatically."
         errorMessage={errorMessage}
-        form={[
-          {
-            code: 'change-assistant',
-            name: 'Update Assistant',
-            description:
-              "Update the assistant's definition — including the model, instructions, and variables — as needed.",
-            actions: [
-              <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton
-                  size="lg"
-                  onClick={() => showDialog(navigator.goBack)}
-                >
-                  Cancel
-                </SecondaryButton>
-                <PrimaryButton
-                  size="lg"
-                  onClick={() => {
-                    if (validateInstruction()) {
-                      setActiveTab('commit-assistant');
+        eyebrow="Assistant version"
+        headerIcon={SourceControl}
+        nextButtonText="Continue"
+        onCancel={() => showDialog(navigator.goBack)}
+        onRequestSubmit={createProviderModel}
+        submitButtonText="Create"
+      >
+        <CreateFullPageStep
+          title="Update Assistant"
+          description="Update the assistant definition, including its model, instructions, and variables."
+          hideHeader
+          onNext={validateInstruction}
+        >
+          <div className="flex max-w-4xl flex-col gap-8 px-8 pb-8 pt-6">
+            <div className="flex flex-col gap-6">
+              <TextProvider
+                onChangeParameter={onChangeProviderParameter}
+                onChangeProvider={onChangeProvider}
+                parameters={selectedModel.parameters}
+                provider={selectedModel.provider}
+              />
+            </div>
+
+            <div className="flex flex-col gap-6">
+              <DocNoticeBlock docPath="/assistants/prompt-templating">
+                Prompt variables and system arguments are resolved at runtime.
+                Read the prompt templating guide before creating the version.
+              </DocNoticeBlock>
+              <ConfigPrompt
+                instanceId={promptInstanceId}
+                existingPrompt={template}
+                showRuntimeReplacementHint
+                enableReservedVariableSuggestions
+                onChange={prompt => setTemplate(prompt)}
+              />
+            </div>
+          </div>
+        </CreateFullPageStep>
+
+        <CreateFullPageStep
+          title="Version Note"
+          description="Write a brief note describing what changed in this version."
+          hideHeader
+        >
+          <div className="flex max-w-2xl flex-col gap-10 px-8 pb-8 pt-8">
+            <div className="flex flex-col gap-6">
+              <FieldSet>
+                <div className="mb-2 flex items-center gap-1">
+                  <FormLabel htmlFor="model-version-note">
+                    Version note
+                  </FormLabel>
+                  <Toggletip align="right">
+                    <ToggletipButton label="Show information">
+                      <Information size={14} />
+                    </ToggletipButton>
+                    <ToggletipContent>
+                      Briefly describe what changed in this version.
+                    </ToggletipContent>
+                  </Toggletip>
+                </div>
+                <Textarea
+                  invalid={Boolean(versionNoteError)}
+                  invalidText={versionNoteError}
+                  name="model-version-note"
+                  row={5}
+                  value={versionMessage}
+                  placeholder="Provide a clear and detailed explanation of the changes made to this assistant."
+                  onChange={event => {
+                    setVersionMessage(event.target.value);
+                    if (versionNoteError) {
+                      setVersionNoteError('');
                     }
                   }}
-                >
-                  Continue
-                </PrimaryButton>
-              </ButtonSet>,
-            ],
-            body: (
-              <>
-                <DocNoticeBlock
-                  docPath="/assistants/create-new-version"
-                  linkText="Read docs"
-                >
-                  New versions of the assistant will not be deployed
-                  automatically. You must promote them manually.
-                </DocNoticeBlock>
-                <div className="px-8 pt-6 pb-8 max-w-4xl flex flex-col gap-8">
-                  {/* Model configuration section */}
-                  <div className="flex flex-col gap-6">
-                    <TextProvider
-                      onChangeParameter={onChangeProviderParameter}
-                      onChangeProvider={onChangeProvider}
-                      parameters={selectedModel.parameters}
-                      provider={selectedModel.provider}
-                    />
-                  </div>
-
-                  {/* Prompt template section */}
-                  <div className="flex flex-col gap-6">
-                    <DocNoticeBlock docPath="/assistants/prompt-templating">
-                      Prompt variables and system arguments are resolved at
-                      runtime. Read the prompt templating guide before creating
-                      the version.
-                    </DocNoticeBlock>
-                    <ConfigPrompt
-                      instanceId={randomString(10)}
-                      existingPrompt={template}
-                      showRuntimeReplacementHint
-                      enableReservedVariableSuggestions
-                      onChange={prompt => setTemplate(prompt)}
-                    />
-                  </div>
-                </div>
-              </>
-            ),
-          },
-          {
-            code: 'commit-assistant',
-            name: 'Version note',
-            description:
-              'Write a brief note describing what changed in this version.',
-            actions: [
-              <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton
-                  size="lg"
-                  onClick={() => showDialog(navigator.goBack)}
-                >
-                  Cancel
-                </SecondaryButton>
-                <PrimaryButton
-                  size="lg"
-                  onClick={() => {
-                    createProviderModel();
-                  }}
-                >
-                  Create new version
-                </PrimaryButton>
-              </ButtonSet>,
-            ],
-            body: (
-              <div className="px-8 pt-8 pb-8 max-w-2xl flex flex-col gap-10">
-                <div className="flex flex-col gap-6">
-                  <FieldSet>
-                    <div className="mb-2 flex items-center gap-1">
-                      <FormLabel htmlFor="model-version-note">
-                        Version note
-                      </FormLabel>
-                      <Toggletip align="right">
-                        <ToggletipButton label="Show information">
-                          <Information size={14} />
-                        </ToggletipButton>
-                        <ToggletipContent>
-                          Briefly describe what changed in this version.
-                        </ToggletipContent>
-                      </Toggletip>
-                    </div>
-                    <Textarea
-                      name="model-version-note"
-                      row={5}
-                      value={versionMessage}
-                      placeholder="Provide a clear and detailed explanation of the changes made to this assistant."
-                      onChange={t => setVersionMessage(t.target.value)}
-                    />
-                  </FieldSet>
-                </div>
-              </div>
-            ),
-          },
-        ]}
-      />
+                />
+              </FieldSet>
+            </div>
+          </div>
+        </CreateFullPageStep>
+      </CreateFullPageWithGlobalHeader>
     </>
   );
 };

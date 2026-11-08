@@ -372,7 +372,7 @@ export function CredentialKeyValueField({
       </p>
       <TableForm>
         <thead>
-          <tr className="bg-[var(--cds-layer-accent-01)]">
+          <tr className="bg-layer-accent">
             <TableFormHeaderCell className="w-1/2">Key</TableFormHeaderCell>
             <TableFormHeaderCell className="w-1/2">Value</TableFormHeaderCell>
             <TableFormHeaderCell className="w-10" divider={false} />
@@ -418,7 +418,7 @@ export function CredentialKeyValueField({
                   iconDescription="Remove"
                   kind="ghost"
                   size="sm"
-                  className="!text-[var(--cds-support-error)]"
+                  className="!text-support-error"
                   onClick={() => removeEntry(index)}
                 />
               </TableFormCell>

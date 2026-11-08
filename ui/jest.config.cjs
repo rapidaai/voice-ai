@@ -54,7 +54,7 @@ module.exports = {
     ],
   },
   transformIgnorePatterns: [
-    '[/\\\\]node_modules[/\\\\].+\\.(js|jsx|mjs|cjs|ts|tsx)$',
+    '[/\\\\]node_modules[/\\\\](?!(?:temporal-polyfill|temporal-spec|temporal-utils)[/\\\\]).+\\.(js|jsx|mjs|cjs|ts|tsx)$',
   ],
   moduleNameMapper: {
     '^@/monaco$': '<rootDir>/scripts/jest/monaco-mock.cjs',

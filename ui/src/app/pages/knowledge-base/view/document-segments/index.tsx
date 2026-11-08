@@ -87,7 +87,7 @@ export const DocumentSegments: FC<{
                 <BaseCard key={index} className="p-6 gap-6">
                   {/* Segment header */}
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
+                    <span className="text-xs font-mono text-muted ">
                       {segment.getDocumentId().substring(0, 12)}
                     </span>
                     <div className="flex">
@@ -99,7 +99,7 @@ export const DocumentSegments: FC<{
                   </div>
 
                   {/* Segment text */}
-                  <div className="text-sm text-gray-900 dark:text-gray-100 leading-[20px] flex-1">
+                  <div className="text-sm text-foreground leading-[20px] flex-1">
                     {parseMarkdown(segment.getText())}
                   </div>
 
@@ -107,7 +107,7 @@ export const DocumentSegments: FC<{
                   {Object.entries(segment.getEntities()?.toObject() || {}).some(
                     ([, values]) => Array.isArray(values) && values.length > 0,
                   ) && (
-                    <div className="flex flex-col gap-3 text-sm border-t border-gray-100 dark:border-gray-800 pt-4">
+                    <div className="flex flex-col gap-3 text-sm border-t border-border-subtle pt-4">
                       {Object.entries(
                         segment.getEntities()?.toObject() || {},
                       ).map(
@@ -115,7 +115,7 @@ export const DocumentSegments: FC<{
                           Array.isArray(values) &&
                           values.length > 0 && (
                             <div key={key} className="flex flex-col gap-2">
-                              <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-600">
+                              <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted ">
                                 {key
                                   .replace('List', '')
                                   .replace(/([A-Z])/g, ' $1')
@@ -125,7 +125,7 @@ export const DocumentSegments: FC<{
                                 {values.map((value, i) => (
                                   <span
                                     key={i}
-                                    className="inline-flex items-center h-6 px-3 text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                                    className="inline-flex items-center h-6 px-3 text-xs font-medium bg-layer text-muted "
                                   >
                                     {value}
                                   </span>

@@ -12,6 +12,7 @@ import { ChevronDown } from '@carbon/icons-react';
 import { cn } from '@/utils';
 import { FC, useState } from 'react';
 import { Text } from '@/app/components/ui/primitives/text';
+import { GhostButton } from '@/app/components/ui/primitives';
 
 export interface WebWidgetExperienceConfig extends ExperienceConfig {
   suggestions: string[];
@@ -51,10 +52,11 @@ export const ConfigureExperience: FC<{
           />
         </div>
 
-        <button
+        <GhostButton
+          size="sm"
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center gap-1.5 text-[var(--cds-text-secondary)] transition-colors hover:text-[var(--cds-text-primary)]"
+          className="w-fit"
         >
           <ChevronDown
             size={16}
@@ -66,10 +68,10 @@ export const ConfigureExperience: FC<{
           <Text as="span" variant="body-compact-01">
             {showAdvanced ? 'Hide' : 'Show'} advanced settings
           </Text>
-        </button>
+        </GhostButton>
 
         {showAdvanced && (
-          <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
+          <div className="pt-6 border-t border-border-subtle ">
             <Stack gap={6}>
               <TextInput
                 id="widget-error-message"

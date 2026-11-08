@@ -91,8 +91,9 @@ export const ConfigureAssistantDeploymentPage = () => {
   const [isWidgetExpanded, setIsWidgetExpanded] = useState(false);
   const [isAddDeploymentOpen, setIsAddDeploymentOpen] = useState(false);
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
-  const [openActionsMenu, setOpenActionsMenu] =
-    useState<DeploymentType | null>(null);
+  const [openActionsMenu, setOpenActionsMenu] = useState<DeploymentType | null>(
+    null,
+  );
   const [versionType, setVersionType] =
     useState<AssistantDeploymentType | null>(null);
 
@@ -475,7 +476,7 @@ export const ConfigureAssistantDeploymentPage = () => {
                                 <Text
                                   as="span"
                                   variant="body-compact-01"
-                                  className="text-[var(--cds-text-secondary)]"
+                                  className="text-muted"
                                 >
                                   {NOT_AVAILABLE}
                                 </Text>
@@ -498,7 +499,7 @@ export const ConfigureAssistantDeploymentPage = () => {
                               <Text
                                 as="span"
                                 variant="body-compact-01"
-                                className="whitespace-nowrap text-[var(--cds-text-secondary)]"
+                                className="whitespace-nowrap text-muted"
                               >
                                 {row.created}
                               </Text>
@@ -681,24 +682,20 @@ function DeploymentEmptyState({
       aria-labelledby="deployment-empty-state-title"
       className="flex flex-1 flex-col items-center justify-center px-4 py-12 text-center"
     >
-      <Deploy size={32} className="text-[var(--cds-icon-secondary)]" />
+      <Deploy size={32} className="text-icon-secondary" />
       <Text
         as="h2"
         id="deployment-empty-state-title"
         variant="heading-04"
-        className="mt-6 text-[var(--cds-text-primary)]"
+        className="mt-6 text-foreground"
       >
         Deployment
       </Text>
-      <Text
-        as="p"
-        variant="body-02"
-        className="mt-3 max-w-2xl text-[var(--cds-text-secondary)]"
-      >
+      <Text as="p" variant="body-02" className="mt-3 max-w-2xl text-muted">
         Choose how you want to test or deliver your assistant.
       </Text>
 
-      <div className="mt-8 grid w-full max-w-3xl grid-cols-1 gap-px border border-[var(--cds-border-subtle-01)] bg-[var(--cds-border-subtle-01)] text-left md:grid-cols-2">
+      <div className="mt-8 grid w-full max-w-3xl grid-cols-1 gap-px border border-border-subtle bg-border-subtle text-left md:grid-cols-2">
         {addDeploymentOptions.map(option => {
           const Icon = option.icon;
           return (
@@ -712,19 +709,15 @@ function DeploymentEmptyState({
                 size={20}
                 className="absolute top-6 right-6 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100"
               />
-              <Icon size={24} className="text-[var(--cds-icon-secondary)]" />
+              <Icon size={24} className="text-icon-secondary" />
               <Text
                 as="h3"
                 variant="heading-03"
-                className="mt-6 text-[var(--cds-text-primary)]"
+                className="mt-6 text-foreground"
               >
                 {option.title}
               </Text>
-              <Text
-                as="p"
-                variant="body-01"
-                className="mt-2 text-[var(--cds-text-secondary)]"
-              >
+              <Text as="p" variant="body-01" className="mt-2 text-muted">
                 {option.description}
               </Text>
             </ClickableTile>
@@ -766,23 +759,23 @@ function AddDeploymentDialog({
               <ClickableTile
                 key={option.type}
                 onClick={() => onSelect(option.type)}
-                className="group !flex !min-h-[220px] !flex-col !rounded-none !border !border-gray-200 !bg-gray-50 !p-0 transition-colors hover:!border-primary dark:!border-gray-700 dark:!bg-gray-800 dark:hover:!border-primary"
+                className="group !flex !min-h-[220px] !flex-col !rounded-none !border !border-border-subtle !bg-layer !p-0 transition-colors hover:!border-primary "
               >
                 <div className="flex flex-1 flex-col p-5">
-                  <div className="flex size-12 shrink-0 items-center justify-center bg-primary/10 text-primary dark:bg-primary/10">
+                  <div className="flex size-12 shrink-0 items-center justify-center bg-primary/10 text-primary ">
                     <Icon size={24} />
                   </div>
                   <Text
                     as="h3"
                     variant="body-02"
-                    className="mt-4 text-gray-900 dark:text-white"
+                    className="mt-4 text-foreground "
                   >
                     {option.title}
                   </Text>
                   <Text
                     as="p"
                     variant="body-01"
-                    className="mt-1 flex-1 text-gray-600 dark:text-gray-300"
+                    className="mt-1 flex-1 text-muted "
                   >
                     {option.description}
                   </Text>
@@ -873,21 +866,13 @@ function DeploymentDetail({
 }) {
   return (
     <div>
-      <Text
-        as="dt"
-        variant="label-01"
-        className="text-[var(--cds-text-secondary)]"
-      >
+      <Text as="dt" variant="label-01" className="text-muted">
         <span className="inline-flex items-center gap-1">
           {label}
           <HelpToggletip label={label} helpText={helpText} />
         </span>
       </Text>
-      <Text
-        as="dd"
-        variant="body-01"
-        className="mt-1 text-[var(--cds-text-primary)]"
-      >
+      <Text as="dd" variant="body-01" className="mt-1 text-foreground">
         {value || NOT_AVAILABLE}
       </Text>
     </div>

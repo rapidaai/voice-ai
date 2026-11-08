@@ -35,7 +35,7 @@ export function BlueNoticeBlock({
     <NoticeBlockFrame
       {...attributes}
       className={className}
-      toneClassName="border-l-blue-600 bg-blue-50 dark:bg-blue-900/20"
+      toneClassName="border-l-support-info bg-support-info/10"
     >
       {children}
     </NoticeBlockFrame>
@@ -51,7 +51,7 @@ export function GreenNoticeBlock({
     <NoticeBlockFrame
       {...attributes}
       className={className}
-      toneClassName="border-l-green-600 bg-green-50 dark:bg-green-900/20"
+      toneClassName="border-l-support-success bg-support-success/10"
     >
       {children}
     </NoticeBlockFrame>
@@ -68,7 +68,7 @@ export function RedNoticeBlock({
       {...attributes}
       className={className}
       role="alert"
-      toneClassName="border-l-red-600 bg-red-50 dark:bg-red-900/20"
+      toneClassName="border-l-support-error bg-support-error/10"
     >
       {children}
     </NoticeBlockFrame>
@@ -84,7 +84,7 @@ export function YellowNoticeBlock({
     <NoticeBlockFrame
       {...attributes}
       className={className}
-      toneClassName="border-l-yellow-500 bg-yellow-50 dark:bg-yellow-900/20"
+      toneClassName="border-l-support-warning bg-support-warning/10"
     >
       {children}
     </NoticeBlockFrame>

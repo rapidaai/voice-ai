@@ -175,17 +175,22 @@ jest.mock('@/clients/assistant.client', () => ({
 
 jest.mock('@/app/components/app-shell/helmet', () => ({ Helmet: () => null }));
 
-jest.mock('@/app/components/ui/composites/tab-form', () => ({
-  TabForm: ({ activeTab, form, errorMessage, onChangeActiveTab }: any) => {
-    const active = form.find((x: any) => x.code === activeTab);
+jest.mock('@/app/components/ui/composites/create-full-page', () => ({
+  CreateFullPageWithHeader: ({
+    activeStep,
+    steps,
+    errorMessage,
+    onChangeStep,
+  }: any) => {
+    const active = steps.find((x: any) => x.code === activeStep);
     return (
       <div>
         <div>
-          {form.map((item: any) => (
+          {steps.map((item: any) => (
             <button
               key={item.code}
               type="button"
-              onClick={() => onChangeActiveTab(item.code)}
+              onClick={() => onChangeStep(item.code)}
             >
               {item.name}
             </button>

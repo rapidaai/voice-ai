@@ -1,17 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from '@carbon/react';
-import { PageHeaderBlock } from './page-header-block';
-import { PageTitleBlock } from './page-title-block';
+import { CompactPageHeader } from './compact-page-header';
+import { PageTitleBlock } from './blocks/page-title-block';
 
 const meta = {
-  title: 'Layout/Blocks/PageHeaderBlock',
-  component: PageHeaderBlock,
+  title: 'Layout/CompactPageHeader',
+  component: CompactPageHeader,
   tags: ['autodocs'],
   parameters: {
     docs: {
       description: {
         component:
-          'Page header row for a title area and right-aligned page actions.',
+          'Compact semantic header for dense internal work areas and page-specific actions.',
       },
     },
   },
@@ -25,7 +25,7 @@ const meta = {
       </>
     ),
   },
-} satisfies Meta<typeof PageHeaderBlock>;
+} satisfies Meta<typeof CompactPageHeader>;
 
 export default meta;
 

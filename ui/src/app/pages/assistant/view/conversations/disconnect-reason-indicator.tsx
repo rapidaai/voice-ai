@@ -34,7 +34,7 @@ export const DisconnectReasonIndicator = ({
           label="View disconnect details"
           title="View disconnect details"
         >
-          <Information size={14} className="text-gray-500 dark:text-gray-400" />
+          <Information size={14} className="text-muted " />
         </ToggletipButton>
         <ToggletipContent>
           <div className="grid max-w-[360px] grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 whitespace-normal text-xs">

@@ -43,7 +43,7 @@ export function EndpointTraceModal({
           aria-label="Endpoint trace tabs"
           panelClassName="overflow-auto p-0"
         >
-          <div className="divide-y divide-gray-200 dark:divide-gray-800 w-full">
+          <div className="divide-y divide-border-subtle w-full">
             <OverviewRow label="Status">
               <CarbonStatusIndicator state={currentTrace.getStatus()} />
             </OverviewRow>
@@ -51,23 +51,23 @@ export function EndpointTraceModal({
               <SourceIndicator source={currentTrace.getSource()} />
             </OverviewRow>
             <OverviewRow label="Version">
-              <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
+              <span className="text-sm font-mono text-foreground ">
                 vrsn_{currentTrace.getEndpointprovidermodelid()}
               </span>
             </OverviewRow>
             <OverviewRow label="Time Taken">
-              <span className="text-sm tabular-nums text-gray-900 dark:text-gray-100">
+              <span className="text-sm tabular-nums text-foreground ">
                 {Number(currentTrace.getTimetaken()) / 1000000}ms
               </span>
             </OverviewRow>
             <OverviewRow label="Total Tokens">
-              <span className="text-sm tabular-nums text-gray-900 dark:text-gray-100">
+              <span className="text-sm tabular-nums text-foreground ">
                 {getTotalTokenMetric(currentTrace.getMetricsList())}
               </span>
             </OverviewRow>
             {currentTrace.getCreateddate() && (
               <OverviewRow label="Created">
-                <span className="text-sm text-gray-900 dark:text-gray-100">
+                <span className="text-sm text-foreground ">
                   {toHumanReadableDateTime(currentTrace.getCreateddate()!)}
                 </span>
               </OverviewRow>

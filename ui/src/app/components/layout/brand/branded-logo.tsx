@@ -29,7 +29,7 @@ export const BrandedLogo = forwardRef<HTMLElement, BrandedLogoProps>(
         aria-label={`Environment: ${environmentLabel}`}
         className={cn(
           typographyClassNames['label-01'],
-          'ml-2 shrink-0 whitespace-nowrap rounded-[3px] border border-[var(--cds-support-warning)] px-1 py-0.5 text-[var(--cds-support-warning)]',
+          'ml-2 shrink-0 whitespace-nowrap rounded-[3px] border border-support-warning px-1 py-0.5 text-support-warning',
         )}
       >
         {environmentLabel}

@@ -1,13 +1,18 @@
 import { useState } from 'react';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { useRapidaStore } from '@/stores/app';
-import { TabForm } from '@/app/components/ui/composites';
-import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
-import { ButtonSet, Slider } from '@carbon/react';
+import {
+  CreateFullPageStep,
+  CreateFullPageWithGlobalHeader,
+  TagInput,
+} from '@/app/components/ui/composites';
+import { GhostButton, PrimaryButton } from '@/app/components/ui/primitives';
+import { Slider } from '@carbon/react';
 import {
   ChevronDown,
   ChevronRight,
   Code,
+  ConnectionSignal,
   Debug,
   Globe,
   Phone,
@@ -27,9 +32,7 @@ import { FormLabel } from '@/app/components/ui/primitives';
 import { Input } from '@/app/components/ui/primitives';
 import { Select } from '@/app/components/ui/primitives';
 import { Textarea } from '@/app/components/ui/primitives';
-import { TagInput } from '@/app/components/ui/composites';
 import { AssistantTag } from '@/app/components/domain/tags/assistant-tags';
-import { DocNoticeBlock } from '@/app/components/layout/container/message/notice-block/doc-notice-block';
 import { APiParameter } from '@/app/components/domain/external-api/api-parameter';
 import { InputHelper } from '@/app/components/ui/primitives';
 import { CodeEditor } from '@/app/components/ui/editor/code-editor';
@@ -62,6 +65,7 @@ export function CreateAgentKit() {
   const { theme } = useTheme();
   const { authId, token, projectId } = useCurrentCredential();
   const {
+    goBack,
     goToAssistant,
     goToConfigureDebugger,
     goToConfigureWeb,
@@ -71,11 +75,6 @@ export function CreateAgentKit() {
     goToCreateAssistantWebhook,
   } = useGlobalNavigation();
   const [assistant, setAssistant] = useState<null | Assistant>(null);
-
-  //   steps for configuring agentkit
-  const [activeTab, setActiveTab] = useState<
-    'configure-agentkit' | 'define-assistant' | 'deployment'
-  >('configure-agentkit');
 
   //
   const [errorMessage, setErrorMessage] = useState('');
@@ -113,15 +112,15 @@ export function CreateAgentKit() {
   >([]);
 
   const { showDialog, ConfirmDialogComponent } = useConfirmDialog({});
-  const { loading, showLoader, hideLoader } = useRapidaStore();
-  let navigator = useGlobalNavigation();
+  const { showLoader, hideLoader } = useRapidaStore();
 
-  const createAssistant = () => {
-    showLoader('overlay');
-    if (!name) {
+  const createAssistant = async (): Promise<boolean> => {
+    setErrorMessage('');
+    if (!name.trim()) {
       setErrorMessage('Please provide a valid name for assistant.');
       return false;
     }
+    showLoader('overlay');
 
     // Create assistant provider model
     const assistantProvider = new CreateAssistantProviderRequest();
@@ -175,51 +174,42 @@ export function CreateAgentKit() {
     request.setName(name);
     request.setTagsList(tags);
     request.setDescription(description);
-    createAssistantFromRequest({
-      request,
-      auth: { projectId, token, userId: authId },
-    })
-      .then((car: GetAssistantResponse) => {
-        hideLoader();
-        if (car?.getSuccess()) {
-          let ast = car.getData();
-          if (ast) {
-            toast.success(
-              'Assistant Created Successfully, Your AI assistant is ready to be deployed.',
-            );
-            setAssistant(ast);
-            setActiveTab('deployment');
-          }
-        } else {
-          const errorMessage =
-            'Unable to create assistant. please try again later.';
-          const error = car?.getError();
-          if (error) {
-            setErrorMessage(error.getHumanmessage());
-            return;
-          }
-          setErrorMessage(errorMessage);
-          return;
-        }
-      })
-      .catch(er => {
-        hideLoader();
-        const errorMessage =
-          'Unable to create assistant. please try again later.';
-        setErrorMessage(errorMessage);
-        return;
+    try {
+      const car: GetAssistantResponse = await createAssistantFromRequest({
+        request,
+        auth: { projectId, token, userId: authId },
       });
+      if (car?.getSuccess()) {
+        const createdAssistant = car.getData();
+        if (createdAssistant) {
+          toast.success(
+            'Assistant Created Successfully, Your AI assistant is ready to be deployed.',
+          );
+          setAssistant(createdAssistant);
+          return true;
+        }
+      }
+
+      setErrorMessage(
+        car?.getError()?.getHumanmessage() ||
+          'Unable to create assistant. please try again later.',
+      );
+      return false;
+    } catch {
+      setErrorMessage('Unable to create assistant. please try again later.');
+      return false;
+    } finally {
+      hideLoader();
+    }
   };
 
   const validateAgentkit = (): boolean => {
-    const grpcUrlPattern = /^[a-zA-Z0-9.-]+(:\d+)?$/; // Matches "hostname" or "hostname:port"
+    const grpcUrlPattern = /^[a-zA-Z0-9.-]+(:\d+)?$/;
     const sslCertPattern =
       /^-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----$/;
 
     if (!grpcUrlPattern.test(agentKitUrl)) {
-      setErrorMessage(
-        'Illegal agentKit server url, please provide a valid host:port where agentkit is running.',
-      );
+      setErrorMessage('Enter a valid AgentKit endpoint in host:port format.');
       return false;
     }
 
@@ -311,527 +301,473 @@ export function CreateAgentKit() {
       return false;
     }
 
+    setErrorMessage('');
     return true;
   };
 
   return (
     <>
-      <Helmet title="Create an assistant"></Helmet>
+      <Helmet title="Connect AgentKit"></Helmet>
       <ConfirmDialogComponent />
-      <TabForm
-        formHeading="Complete all steps to connect a new AgentKit."
-        activeTab={activeTab}
-        onChangeActiveTab={() => {}}
+      <CreateFullPageWithGlobalHeader
+        title="Connect AgentKit"
+        description="Connect an AgentKit endpoint, define its assistant profile, then choose how to deploy it."
         errorMessage={errorMessage}
-        form={[
-          {
-            code: 'configure-agentkit',
-            name: 'Configuration',
-            description:
-              'Configure and connect the agent using an AgentKit endpoint.',
-            body: (
-              <>
-                <DocNoticeBlock
-                  docPath="/assistants/overview"
-                  linkText="Read docs"
-                >
-                  Deploy your agent on-premises with the {theme.brand.name}{' '}
-                  orchestration engine via AgentkitConnection.
-                </DocNoticeBlock>
-                <div className="px-8 pt-6 pb-8 max-w-4xl flex flex-col gap-8">
-                  {/* Connection section */}
-                  <div className="flex flex-col gap-6">
-                    <SectionDivider label="Connection" />
-                    <FieldSet className="relative w-full">
-                      <FormLabel>AgentKit Endpoint</FormLabel>
-                      <Input
-                        placeholder="agent.your-domain.com:5051"
-                        value={agentKitUrl}
-                        onChange={v => {
-                          setAgentKitUrl(v.target.value);
-                        }}
-                      />
-                      <InputHelper>
-                        The gRPC server address where your {theme.brand.name}{' '}
-                        AgentKit is running.
-                      </InputHelper>
+        eyebrow="AgentKit assistant"
+        headerIcon={ConnectionSignal}
+        nextButtonText="Continue"
+        onCancel={() => showDialog(goBack)}
+        onRequestSubmit={() => {
+          if (assistant) goToAssistant(assistant.getId());
+        }}
+        submitButtonText="Done"
+      >
+        <CreateFullPageStep
+          title="Configure Connection"
+          description="Connect the assistant to the gRPC endpoint where AgentKit is running."
+          hideHeader
+          onNext={validateAgentkit}
+        >
+          <div className="flex max-w-4xl flex-col gap-8 px-8 pb-8 pt-6">
+            {/* Connection section */}
+            <div className="flex flex-col gap-6">
+              <SectionDivider label="Connection" />
+              <FieldSet className="relative w-full">
+                <FormLabel htmlFor="agentkit-endpoint">
+                  AgentKit Endpoint
+                </FormLabel>
+                <Input
+                  id="agentkit-endpoint"
+                  placeholder="agent.your-domain.com:5051"
+                  value={agentKitUrl}
+                  onChange={v => {
+                    setAgentKitUrl(v.target.value);
+                  }}
+                />
+                <InputHelper>
+                  The gRPC server address where your {theme.brand.name} AgentKit
+                  is running.
+                </InputHelper>
+              </FieldSet>
+            </div>
+
+            <GhostButton
+              size="sm"
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-fit"
+            >
+              <ChevronDown
+                size={16}
+                className={`transition-transform duration-200 ${
+                  showAdvanced ? 'rotate-180' : ''
+                }`}
+              />
+              {showAdvanced ? 'Hide' : 'Show'} advanced settings
+            </GhostButton>
+
+            {showAdvanced && (
+              <div className="pt-6 border-t border-border-subtle flex flex-col gap-8">
+                <div className="flex flex-col gap-6">
+                  <SectionDivider label="Connection tuning" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FieldSet>
+                      <div className="[&_.cds--slider-container]:!mt-0 [&_.cds--slider__range-label]:hidden">
+                        <Slider
+                          id="agentkit-connect-timeout-seconds"
+                          labelText="Connect Timeout (seconds)"
+                          min={1}
+                          max={300}
+                          step={1}
+                          value={
+                            Number(connectTimeoutSeconds) ||
+                            DEFAULT_CONNECT_TIMEOUT_SECONDS
+                          }
+                          onChange={({ value }: { value: number }) => {
+                            setConnectTimeoutSeconds(value.toString());
+                          }}
+                        />
+                      </div>
+                    </FieldSet>
+                    <FieldSet>
+                      <div className="[&_.cds--slider-container]:!mt-0 [&_.cds--slider__range-label]:hidden">
+                        <Slider
+                          id="agentkit-keepalive-time-seconds"
+                          labelText="Keepalive Time (seconds)"
+                          min={10}
+                          max={3600}
+                          step={1}
+                          value={
+                            Number(keepaliveTimeSeconds) ||
+                            DEFAULT_KEEPALIVE_TIME_SECONDS
+                          }
+                          onChange={({ value }: { value: number }) => {
+                            setKeepaliveTimeSeconds(value.toString());
+                          }}
+                        />
+                      </div>
+                    </FieldSet>
+                    <FieldSet>
+                      <div className="[&_.cds--slider-container]:!mt-0 [&_.cds--slider__range-label]:hidden">
+                        <Slider
+                          id="agentkit-keepalive-timeout-seconds"
+                          labelText="Keepalive Timeout (seconds)"
+                          min={1}
+                          max={300}
+                          step={1}
+                          value={
+                            Number(keepaliveTimeoutSeconds) ||
+                            DEFAULT_KEEPALIVE_TIMEOUT_SECONDS
+                          }
+                          onChange={({ value }: { value: number }) => {
+                            setKeepaliveTimeoutSeconds(value.toString());
+                          }}
+                        />
+                      </div>
+                    </FieldSet>
+                    <FieldSet>
+                      <div className="[&_.cds--slider-container]:!mt-0 [&_.cds--slider__range-label]:hidden">
+                        <Slider
+                          id="agentkit-max-receive-message-mb"
+                          labelText="Max Receive Message (MB)"
+                          min={1}
+                          max={100}
+                          step={1}
+                          value={
+                            Number(maxRecvMessageMb) ||
+                            DEFAULT_MAX_RECV_MESSAGE_MB
+                          }
+                          onChange={({ value }: { value: number }) => {
+                            setMaxRecvMessageMb(value.toString());
+                          }}
+                        />
+                      </div>
+                    </FieldSet>
+                    <FieldSet>
+                      <div className="[&_.cds--slider-container]:!mt-0 [&_.cds--slider__range-label]:hidden">
+                        <Slider
+                          id="agentkit-max-send-message-mb"
+                          labelText="Max Send Message (MB)"
+                          min={1}
+                          max={100}
+                          step={1}
+                          value={
+                            Number(maxSendMessageMb) ||
+                            DEFAULT_MAX_SEND_MESSAGE_MB
+                          }
+                          onChange={({ value }: { value: number }) => {
+                            setMaxSendMessageMb(value.toString());
+                          }}
+                        />
+                      </div>
                     </FieldSet>
                   </div>
+                </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="flex items-center gap-1.5 text-xs font-medium text-[var(--cds-text-secondary)] hover:text-[var(--cds-text-primary)] transition-colors"
-                  >
-                    <ChevronDown
-                      size={16}
-                      className={`transition-transform duration-200 ${
-                        showAdvanced ? 'rotate-180' : ''
-                      }`}
-                    />
-                    {showAdvanced ? 'Hide' : 'Show'} advanced settings
-                  </button>
-
-                  {showAdvanced && (
-                    <div className="pt-6 border-t border-gray-200 dark:border-gray-800 flex flex-col gap-8">
-                      <div className="flex flex-col gap-6">
-                        <SectionDivider label="Connection tuning" />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <FieldSet>
-                            <div className="[&_.cds--slider-container]:!mt-0 [&_.cds--slider__range-label]:hidden">
-                              <Slider
-                                id="agentkit-connect-timeout-seconds"
-                                labelText="Connect Timeout (seconds)"
-                                min={1}
-                                max={300}
-                                step={1}
-                                value={
-                                  Number(connectTimeoutSeconds) ||
-                                  DEFAULT_CONNECT_TIMEOUT_SECONDS
-                                }
-                                onChange={({ value }: { value: number }) => {
-                                  setConnectTimeoutSeconds(value.toString());
-                                }}
-                              />
-                            </div>
-                          </FieldSet>
-                          <FieldSet>
-                            <div className="[&_.cds--slider-container]:!mt-0 [&_.cds--slider__range-label]:hidden">
-                              <Slider
-                                id="agentkit-keepalive-time-seconds"
-                                labelText="Keepalive Time (seconds)"
-                                min={10}
-                                max={3600}
-                                step={1}
-                                value={
-                                  Number(keepaliveTimeSeconds) ||
-                                  DEFAULT_KEEPALIVE_TIME_SECONDS
-                                }
-                                onChange={({ value }: { value: number }) => {
-                                  setKeepaliveTimeSeconds(value.toString());
-                                }}
-                              />
-                            </div>
-                          </FieldSet>
-                          <FieldSet>
-                            <div className="[&_.cds--slider-container]:!mt-0 [&_.cds--slider__range-label]:hidden">
-                              <Slider
-                                id="agentkit-keepalive-timeout-seconds"
-                                labelText="Keepalive Timeout (seconds)"
-                                min={1}
-                                max={300}
-                                step={1}
-                                value={
-                                  Number(keepaliveTimeoutSeconds) ||
-                                  DEFAULT_KEEPALIVE_TIMEOUT_SECONDS
-                                }
-                                onChange={({ value }: { value: number }) => {
-                                  setKeepaliveTimeoutSeconds(value.toString());
-                                }}
-                              />
-                            </div>
-                          </FieldSet>
-                          <FieldSet>
-                            <div className="[&_.cds--slider-container]:!mt-0 [&_.cds--slider__range-label]:hidden">
-                              <Slider
-                                id="agentkit-max-receive-message-mb"
-                                labelText="Max Receive Message (MB)"
-                                min={1}
-                                max={100}
-                                step={1}
-                                value={
-                                  Number(maxRecvMessageMb) ||
-                                  DEFAULT_MAX_RECV_MESSAGE_MB
-                                }
-                                onChange={({ value }: { value: number }) => {
-                                  setMaxRecvMessageMb(value.toString());
-                                }}
-                              />
-                            </div>
-                          </FieldSet>
-                          <FieldSet>
-                            <div className="[&_.cds--slider-container]:!mt-0 [&_.cds--slider__range-label]:hidden">
-                              <Slider
-                                id="agentkit-max-send-message-mb"
-                                labelText="Max Send Message (MB)"
-                                min={1}
-                                max={100}
-                                step={1}
-                                value={
-                                  Number(maxSendMessageMb) ||
-                                  DEFAULT_MAX_SEND_MESSAGE_MB
-                                }
-                                onChange={({ value }: { value: number }) => {
-                                  setMaxSendMessageMb(value.toString());
-                                }}
-                              />
-                            </div>
-                          </FieldSet>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-6">
-                        <SectionDivider label="Security" />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <FieldSet>
-                            <FormLabel>Transport Security</FormLabel>
-                            <Select
-                              value={transportSecurity}
-                              options={TRANSPORT_SECURITY_OPTIONS}
-                              onChange={v => {
-                                setTransportSecurity(v.target.value);
-                              }}
-                            />
-                          </FieldSet>
-                          <FieldSet>
-                            <FormLabel>TLS Verification</FormLabel>
-                            <Select
-                              value={tlsVerification}
-                              options={TLS_VERIFICATION_OPTIONS}
-                              onChange={v => {
-                                setTlsVerification(v.target.value);
-                              }}
-                            />
-                          </FieldSet>
-                          <FieldSet>
-                            <FormLabel>TLS Server Name</FormLabel>
-                            <Input
-                              placeholder="agent.your-domain.com"
-                              value={tlsServerName}
-                              onChange={v => {
-                                setTlsServerName(v.target.value);
-                              }}
-                            />
-                          </FieldSet>
-                        </div>
-                        <FieldSet>
-                          <FormLabel>TLS Certificate (Optional)</FormLabel>
-                          <CodeEditor
-                            placeholder="
+                <div className="flex flex-col gap-6">
+                  <SectionDivider label="Security" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FieldSet>
+                      <FormLabel htmlFor="agentkit-transport-security">
+                        Transport Security
+                      </FormLabel>
+                      <Select
+                        id="agentkit-transport-security"
+                        value={transportSecurity}
+                        options={TRANSPORT_SECURITY_OPTIONS}
+                        onChange={v => {
+                          setTransportSecurity(v.target.value);
+                        }}
+                      />
+                    </FieldSet>
+                    <FieldSet>
+                      <FormLabel htmlFor="agentkit-tls-verification">
+                        TLS Verification
+                      </FormLabel>
+                      <Select
+                        id="agentkit-tls-verification"
+                        value={tlsVerification}
+                        options={TLS_VERIFICATION_OPTIONS}
+                        onChange={v => {
+                          setTlsVerification(v.target.value);
+                        }}
+                      />
+                    </FieldSet>
+                    <FieldSet>
+                      <FormLabel htmlFor="agentkit-tls-server-name">
+                        TLS Server Name
+                      </FormLabel>
+                      <Input
+                        id="agentkit-tls-server-name"
+                        placeholder="agent.your-domain.com"
+                        value={tlsServerName}
+                        onChange={v => {
+                          setTlsServerName(v.target.value);
+                        }}
+                      />
+                    </FieldSet>
+                  </div>
+                  <FieldSet>
+                    <FormLabel>TLS Certificate (Optional)</FormLabel>
+                    <CodeEditor
+                      placeholder="
                       -----BEGIN CERTIFICATE-----
 ...
 -----END CERTIFICATE-----"
-                            value={certificate}
-                            onChange={value => {
-                              setCertificate(value);
-                            }}
-                            className="min-h-40 max-h-dvh "
-                          />
-                        </FieldSet>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-6">
-                    <SectionDivider label="Metadata" />
-                    <FieldSet>
-                      <APiParameter
-                        actionButtonLabel="Add Metadata"
-                        setParameterValue={p => {
-                          setParameters(p);
-                        }}
-                        initialValues={parameters}
-                        inputClass="bg-light-background dark:bg-gray-950"
-                      />
-                    </FieldSet>
-                  </div>
-                </div>
-              </>
-            ),
-            actions: [
-              <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton
-                  size="lg"
-                  onClick={() => showDialog(navigator.goBack)}
-                >
-                  Cancel
-                </SecondaryButton>
-                <PrimaryButton
-                  size="lg"
-                  isLoading={loading}
-                  onClick={() => {
-                    if (validateAgentkit()) setActiveTab('define-assistant');
-                  }}
-                >
-                  Continue
-                </PrimaryButton>
-              </ButtonSet>,
-            ],
-          },
-
-          {
-            code: 'define-assistant',
-            name: 'Profile',
-            description:
-              'Provide the name, a brief description, and relevant tags for your assistant to help identify and categorize it.',
-            actions: [
-              <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton
-                  size="lg"
-                  onClick={() => showDialog(navigator.goBack)}
-                >
-                  Cancel
-                </SecondaryButton>
-                <PrimaryButton
-                  size="lg"
-                  isLoading={loading}
-                  onClick={createAssistant}
-                >
-                  Continue
-                </PrimaryButton>
-              </ButtonSet>,
-            ],
-            body: (
-              <div className="px-8 pt-8 pb-8 max-w-2xl flex flex-col gap-10">
-                {/* Identity section */}
-                <div className="flex flex-col gap-6">
-                  <SectionDivider label="Identity" />
-
-                  <FieldSet>
-                    <FormLabel
-                      htmlFor="agent_name"
-                      className="text-xs tracking-wide uppercase"
-                    >
-                      Name{' '}
-                      <span className="text-red-500 ml-0.5 normal-case">*</span>
-                    </FormLabel>
-                    <Input
-                      name="agent_name"
-                      onChange={e => {
-                        setName(e.target.value);
+                      value={certificate}
+                      onChange={value => {
+                        setCertificate(value);
                       }}
-                      value={name}
-                      placeholder="e.g. customer-support-assistant"
+                      className="min-h-40 max-h-dvh "
                     />
-                    <InputHelper>
-                      Provide a name that will appear in the assistant list and
-                      help identify it.
-                    </InputHelper>
                   </FieldSet>
-
-                  <FieldSet>
-                    <FormLabel
-                      htmlFor="description"
-                      className="text-xs tracking-wide uppercase"
-                    >
-                      Description (Optional)
-                    </FormLabel>
-                    <Textarea
-                      row={4}
-                      value={description}
-                      placeholder="What's the purpose of the assistant?"
-                      onChange={t => setDescription(t.target.value)}
-                    />
-                    <InputHelper>
-                      Provide a description to explain what this assistant is
-                      about.
-                    </InputHelper>
-                  </FieldSet>
-                </div>
-
-                {/* Labels section */}
-                <div className="flex flex-col gap-6">
-                  <SectionDivider label="Labels" />
-                  <TagInput
-                    tags={tags}
-                    addTag={onAddTag}
-                    removeTag={onRemoveTag}
-                    allTags={AssistantTag}
-                  />
-                  <InputHelper>
-                    Tags help you organize and filter assistants across your
-                    workspace.
-                  </InputHelper>
                 </div>
               </div>
-            ),
-          },
-          {
-            code: 'deployment',
-            name: 'Deployment',
-            description: 'Enable the assistant to start engaging with users.',
-            actions: [
-              <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton
-                  size="lg"
-                  onClick={() => {
-                    if (assistant) goToAssistant(assistant.getId());
+            )}
+
+            <div className="flex flex-col gap-6">
+              <SectionDivider label="Metadata" />
+              <FieldSet>
+                <APiParameter
+                  actionButtonLabel="Add Metadata"
+                  setParameterValue={p => {
+                    setParameters(p);
                   }}
+                  initialValues={parameters}
+                  inputClass="bg-light-background bg-surface"
+                />
+              </FieldSet>
+            </div>
+          </div>
+        </CreateFullPageStep>
+
+        <CreateFullPageStep
+          title="Define Profile"
+          description="Add a name, description, and labels so the assistant is easy to find and manage."
+          hideHeader
+          nextButtonText="Create and continue"
+          onNext={createAssistant}
+        >
+          <div className="flex max-w-2xl flex-col gap-10 px-8 pb-8 pt-8">
+            {/* Identity section */}
+            <div className="flex flex-col gap-6">
+              <SectionDivider label="Identity" />
+
+              <FieldSet>
+                <FormLabel
+                  htmlFor="agent_name"
+                  className="text-xs tracking-wide uppercase"
                 >
-                  Skip
-                </SecondaryButton>
-                <PrimaryButton
-                  size="lg"
-                  isLoading={loading}
-                  onClick={() => {
-                    if (assistant) goToAssistant(assistant.getId());
+                  Name{' '}
+                  <span className="text-support-error ml-0.5 normal-case">
+                    *
+                  </span>
+                </FormLabel>
+                <Input
+                  id="agent_name"
+                  name="agent_name"
+                  onChange={e => {
+                    setName(e.target.value);
                   }}
+                  value={name}
+                  placeholder="e.g. customer-support-assistant"
+                />
+                <InputHelper>
+                  Provide a name that will appear in the assistant list and help
+                  identify it.
+                </InputHelper>
+              </FieldSet>
+
+              <FieldSet>
+                <FormLabel
+                  htmlFor="description"
+                  className="text-xs tracking-wide uppercase"
                 >
-                  Complete deployment
-                </PrimaryButton>
-              </ButtonSet>,
-            ],
-            body: (
-              <>
-                <DocNoticeBlock
-                  docPath="/assistants/overview"
-                  linkText="Read docs"
-                >
-                  Choose how you'd like to start engaging with users and add
-                  advanced features to customize the user's experience.
-                </DocNoticeBlock>
-                <div className="px-8 pt-6 pb-8 flex flex-col gap-8">
-                  {/* Deployments section */}
-                  <div className="flex flex-col gap-6">
-                    <SectionDivider label="Deployments" />
-                    <dl className="bg-white dark:bg-gray-950">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 divide-x divide-gray-200 dark:divide-gray-800">
-                        <div className="border-y border-gray-200 dark:border-gray-800 grid grid-rows-[1fr_auto]">
-                          <div className="px-4 py-2">
-                            <Phone className="w-6 h-6 opacity-70 mt-4" />
-                            <div className="flex items-center gap-2 mt-4">
-                              <h3 className="text-base/7 font-semibold">
-                                Phone call
-                              </h3>
-                            </div>
-                            <p className="text-sm/6 text-gray-600 md:max-w-2xs dark:text-gray-400">
-                              Enable voice conversations over phone call
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              if (assistant)
-                                goToConfigureCall(assistant.getId());
-                            }}
-                            className="cursor-pointer flex justify-between items-center border-t border-gray-200 dark:border-gray-800 px-4 py-2 text-sm/6 text-blue-500 hover:bg-blue-600 hover:text-white transition-all delay-200"
-                          >
-                            Enable phone call
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
-                        </div>
+                  Description (Optional)
+                </FormLabel>
+                <Textarea
+                  id="description"
+                  row={4}
+                  value={description}
+                  placeholder="What's the purpose of the assistant?"
+                  onChange={t => setDescription(t.target.value)}
+                />
+                <InputHelper>
+                  Provide a description to explain what this assistant is about.
+                </InputHelper>
+              </FieldSet>
+            </div>
 
-                        <div className="border-y border-gray-200 dark:border-gray-800 grid grid-rows-[1fr_auto]">
-                          <div className="px-4 py-2">
-                            <Code className="w-6 h-6 opacity-70 mt-4" />
-                            <div className="flex items-center gap-2 mt-4">
-                              <h3 className="text-base/7 font-semibold">API</h3>
-                            </div>
-                            <p className="text-sm/6 text-gray-600 md:max-w-2xs dark:text-gray-400">
-                              Integrate into your application using SDKs
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              if (assistant)
-                                goToConfigureApi(assistant.getId());
-                            }}
-                            className="cursor-pointer flex justify-between items-center border-t border-gray-200 dark:border-gray-800 px-4 py-2 text-sm/6 text-blue-500 hover:bg-blue-600 hover:text-white transition-all delay-200"
-                          >
-                            Enable API
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
-                        </div>
+            {/* Labels section */}
+            <div className="flex flex-col gap-6">
+              <SectionDivider label="Labels" />
+              <TagInput
+                tags={tags}
+                addTag={onAddTag}
+                removeTag={onRemoveTag}
+                allTags={AssistantTag}
+              />
+              <InputHelper>
+                Tags help you organize and filter assistants across your
+                workspace.
+              </InputHelper>
+            </div>
+          </div>
+        </CreateFullPageStep>
 
-                        <div className="border-y border-gray-200 dark:border-gray-800 grid grid-rows-[1fr_auto]">
-                          <div className="px-4 py-2">
-                            <Globe className="w-6 h-6 opacity-70 mt-4" />
-                            <div className="flex items-center gap-2 mt-4">
-                              <h3 className="text-base/7 font-semibold">
-                                Web Widget
-                              </h3>
-                            </div>
-                            <p className="text-sm/6 text-gray-600 md:max-w-2xs dark:text-gray-400">
-                              Embed on your website to handle text and voice
-                              customer queries.
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              if (assistant)
-                                goToConfigureWeb(assistant.getId());
-                            }}
-                            className="cursor-pointer flex justify-between items-center border-t border-gray-200 dark:border-gray-800 px-4 py-2 text-sm/6 text-blue-500 hover:bg-blue-600 hover:text-white transition-all delay-200"
-                          >
-                            Deploy to Web Widget
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        <div className="border-y border-gray-200 dark:border-gray-800 grid grid-rows-[1fr_auto]">
-                          <div className="px-4 py-2">
-                            <Debug className="w-6 h-6 opacity-70 mt-4" />
-                            <div className="flex items-center gap-2 mt-4">
-                              <h3 className="text-base/7 font-semibold">
-                                Debugger / Testing
-                              </h3>
-                            </div>
-                            <p className="text-sm/6 text-gray-600 md:max-w-2xs dark:text-gray-400">
-                              Deploy the agent for testing and debugging.
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              if (assistant)
-                                goToConfigureDebugger(assistant.getId());
-                            }}
-                            className="cursor-pointer flex justify-between items-center border-t border-gray-200 dark:border-gray-800 px-4 py-2 text-sm/6 text-blue-500 hover:bg-blue-600 hover:text-white transition-all delay-200"
-                          >
-                            Deploy to Debugger / Testing
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
-                        </div>
+        <CreateFullPageStep
+          title="Choose Deployment"
+          description="Choose how to engage users, or finish and configure deployment later."
+          hideBackButton
+          hideCancelButton
+          hideHeader
+        >
+          <div className="flex flex-col gap-8 px-8 pb-8 pt-6">
+            {/* Deployments section */}
+            <div className="flex flex-col gap-6">
+              <SectionDivider label="Deployments" />
+              <dl className="bg-surface ">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 divide-x divide-border-subtle ">
+                  <div className="border-y border-border-subtle grid grid-rows-[1fr_auto]">
+                    <div className="px-4 py-2">
+                      <Phone className="w-6 h-6 opacity-70 mt-4" />
+                      <div className="flex items-center gap-2 mt-4">
+                        <h3 className="text-base/7 font-semibold">
+                          Phone call
+                        </h3>
                       </div>
-                    </dl>
+                      <p className="text-sm/6 text-muted md:max-w-2xs ">
+                        Enable voice conversations over phone call
+                      </p>
+                    </div>
+                    <PrimaryButton
+                      size="md"
+                      onClick={() => {
+                        if (assistant) goToConfigureCall(assistant.getId());
+                      }}
+                      className="w-full max-w-none! border-t border-border-subtle"
+                      renderIcon={ChevronRight}
+                    >
+                      Enable phone call
+                    </PrimaryButton>
                   </div>
 
-                  {/* Analysis section */}
-                  <div className="flex flex-col gap-6">
-                    <SectionDivider label="Analysis" />
-                    <div
-                      className="bg-white dark:bg-gray-950 cursor-pointer"
-                      onClick={() => {
-                        if (assistant)
-                          goToCreateAssistantAnalysis(assistant.getId());
-                      }}
-                    >
-                      <div className="flex w-full justify-between gap-4 select-none border-y border-gray-200 dark:border-gray-800 px-4 py-3">
-                        <div className="text-left text-sm/7 font-semibold text-pretty">
-                          Gain insights from every interaction — automatic
-                          conversation transcripts, quality, sentiment, and SOP
-                          adherence analysis, custom reporting and dashboards.
-                        </div>
-                        <ChevronRight className="w-5 h-5" />
+                  <div className="border-y border-border-subtle grid grid-rows-[1fr_auto]">
+                    <div className="px-4 py-2">
+                      <Code className="w-6 h-6 opacity-70 mt-4" />
+                      <div className="flex items-center gap-2 mt-4">
+                        <h3 className="text-base/7 font-semibold">API</h3>
                       </div>
+                      <p className="text-sm/6 text-muted md:max-w-2xs ">
+                        Integrate into your application using SDKs
+                      </p>
                     </div>
+                    <PrimaryButton
+                      size="md"
+                      onClick={() => {
+                        if (assistant) goToConfigureApi(assistant.getId());
+                      }}
+                      className="w-full max-w-none! border-t border-border-subtle"
+                      renderIcon={ChevronRight}
+                    >
+                      Enable API
+                    </PrimaryButton>
                   </div>
 
-                  {/* Webhook & Integration section */}
-                  <div className="flex flex-col gap-6">
-                    <SectionDivider label="Webhook & Integration" />
-                    <div
-                      className="bg-white dark:bg-gray-950 cursor-pointer"
-                      onClick={() => {
-                        if (assistant)
-                          goToCreateAssistantWebhook(assistant.getId());
-                      }}
-                    >
-                      <div className="flex w-full justify-between gap-4 select-none border-y border-gray-200 dark:border-gray-800 px-4 py-3">
-                        <div className="text-left text-sm/7 font-semibold text-pretty">
-                          Keep your workflows connected by triggering events
-                          when key actions happen — conversation started /
-                          ended, escalation to a human agent, custom events for
-                          analytics or CRM sync.
-                        </div>
-                        <ChevronRight className="w-5 h-5" />
+                  <div className="border-y border-border-subtle grid grid-rows-[1fr_auto]">
+                    <div className="px-4 py-2">
+                      <Globe className="w-6 h-6 opacity-70 mt-4" />
+                      <div className="flex items-center gap-2 mt-4">
+                        <h3 className="text-base/7 font-semibold">
+                          Web Widget
+                        </h3>
                       </div>
+                      <p className="text-sm/6 text-muted md:max-w-2xs ">
+                        Embed on your website to handle text and voice customer
+                        queries.
+                      </p>
                     </div>
+                    <PrimaryButton
+                      size="md"
+                      onClick={() => {
+                        if (assistant) goToConfigureWeb(assistant.getId());
+                      }}
+                      className="w-full max-w-none! border-t border-border-subtle"
+                      renderIcon={ChevronRight}
+                    >
+                      Deploy to Web Widget
+                    </PrimaryButton>
+                  </div>
+
+                  <div className="border-y border-border-subtle grid grid-rows-[1fr_auto]">
+                    <div className="px-4 py-2">
+                      <Debug className="w-6 h-6 opacity-70 mt-4" />
+                      <div className="flex items-center gap-2 mt-4">
+                        <h3 className="text-base/7 font-semibold">
+                          Debugger / Testing
+                        </h3>
+                      </div>
+                      <p className="text-sm/6 text-muted md:max-w-2xs ">
+                        Deploy the agent for testing and debugging.
+                      </p>
+                    </div>
+                    <PrimaryButton
+                      size="md"
+                      onClick={() => {
+                        if (assistant) goToConfigureDebugger(assistant.getId());
+                      }}
+                      className="w-full max-w-none! border-t border-border-subtle"
+                      renderIcon={ChevronRight}
+                    >
+                      Deploy to Debugger / Testing
+                    </PrimaryButton>
                   </div>
                 </div>
-              </>
-            ),
-          },
-        ]}
-      />
+              </dl>
+            </div>
+
+            {/* Analysis section */}
+            <div className="flex flex-col gap-6">
+              <SectionDivider label="Analysis" />
+              <div
+                className="bg-surface cursor-pointer"
+                onClick={() => {
+                  if (assistant) goToCreateAssistantAnalysis(assistant.getId());
+                }}
+              >
+                <div className="flex w-full justify-between gap-4 select-none border-y border-border-subtle px-4 py-3">
+                  <div className="text-left text-sm/7 font-semibold text-pretty">
+                    Gain insights from every interaction — automatic
+                    conversation transcripts, quality, sentiment, and SOP
+                    adherence analysis, custom reporting and dashboards.
+                  </div>
+                  <ChevronRight className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
+
+            {/* Webhook & Integration section */}
+            <div className="flex flex-col gap-6">
+              <SectionDivider label="Webhook & Integration" />
+              <div
+                className="bg-surface cursor-pointer"
+                onClick={() => {
+                  if (assistant) goToCreateAssistantWebhook(assistant.getId());
+                }}
+              >
+                <div className="flex w-full justify-between gap-4 select-none border-y border-border-subtle px-4 py-3">
+                  <div className="text-left text-sm/7 font-semibold text-pretty">
+                    Keep your workflows connected by triggering events when key
+                    actions happen — conversation started / ended, escalation to
+                    a human agent, custom events for analytics or CRM sync.
+                  </div>
+                  <ChevronRight className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </CreateFullPageStep>
+      </CreateFullPageWithGlobalHeader>
     </>
   );
 }

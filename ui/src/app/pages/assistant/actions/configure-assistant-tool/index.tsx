@@ -1,12 +1,10 @@
-import { useRapidaStore } from '@/stores/app';
-import { FC, useEffect, useState } from 'react';
+import { FC, useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast/headless';
 import { useParams } from 'react-router-dom';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { EmptyState } from '@/app/components/ui/feedback';
 import { Edit, TrashCan, ToolKit } from '@carbon/icons-react';
 import { CreateTool } from '@/app/pages/assistant/actions/configure-assistant-tool/create-assistant-tool';
-import { SectionLoader } from '@/app/components/ui/feedback';
 import { useAssistantToolPageStore } from '@/stores/assistant/actions';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { UpdateTool } from '@/app/pages/assistant/actions/configure-assistant-tool/update-assistant-tool';
@@ -17,7 +15,8 @@ import {
   getToolConditionSourceLabel,
 } from '@/app/components/domain/tools/common';
 import {
-  Button,
+  DataTable,
+  DataTableSkeleton,
   Table,
   TableHead,
   TableRow,
@@ -25,13 +24,25 @@ import {
   TableBody,
   TableCell,
   TableToolbar,
+  TableToolbarContent,
+  TableToolbarSearch,
   TableBatchActions,
   TableBatchAction,
-  RadioButton,
+  TableSelectRow,
   Tag,
 } from '@carbon/react';
 import { toHumanReadableDateTime } from '@/utils/date';
 import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
+import { TableSection } from '@/app/components/layout/sections/table-section';
+
+const headers = [
+  { key: 'name', header: 'Name' },
+  { key: 'type', header: 'Type' },
+  { key: 'description', header: 'Description' },
+  { key: 'date', header: 'Date' },
+];
+
+const skeletonHeaders = [{ key: 'select', header: '' }, ...headers];
 
 export function ConfigureAssistantToolPage() {
   const { assistantId } = useParams();
@@ -53,33 +64,31 @@ export function UpdateAssistantToolPage() {
 const ConfigureAssistantTool: FC<{ assistantId: string }> = ({
   assistantId,
 }) => {
-  const navigator = useGlobalNavigation();
   const navigation = useGlobalNavigation();
-  const axtion = useAssistantToolPageStore();
+  const action = useAssistantToolPageStore();
   const { authId, token, projectId } = useCurrentCredential();
-  const { loading, showLoader, hideLoader } = useRapidaStore();
-  const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
+  const [isFetching, setIsFetching] = useState(true);
 
-  useEffect(() => {
-    showLoader('block');
-    get();
-  }, []);
-
-  const get = () => {
-    axtion.getAssistantTool(
+  const fetchTools = useCallback(() => {
+    setIsFetching(true);
+    action.getAssistantTool(
       assistantId,
       projectId,
       token,
       authId,
       e => {
         toast.error(e);
-        hideLoader();
+        setIsFetching(false);
       },
-      v => {
-        hideLoader();
+      () => {
+        setIsFetching(false);
       },
     );
-  };
+  }, [action.getAssistantTool, assistantId, projectId, token, authId]);
+
+  useEffect(() => {
+    fetchTools();
+  }, [fetchTools]);
 
   const { showDialog, ConfirmDialogComponent } = useConfirmDialog({
     title: 'Are you sure?',
@@ -90,8 +99,8 @@ const ConfigureAssistantTool: FC<{ assistantId: string }> = ({
     assistantId: string,
     assistantToolId: string,
   ) => {
-    showLoader('block');
-    axtion.deleteAssistantTool(
+    setIsFetching(true);
+    action.deleteAssistantTool(
       assistantId,
       assistantToolId,
       projectId,
@@ -99,31 +108,39 @@ const ConfigureAssistantTool: FC<{ assistantId: string }> = ({
       authId,
       e => {
         toast.error(e);
-        hideLoader();
+        setIsFetching(false);
       },
-      v => {
+      () => {
         toast.success('Assistant tool deleted successfully');
-        get();
+        fetchTools();
       },
     );
   };
 
   const refreshTools = () => {
-    setSelectedToolId(null);
-    showLoader('block');
-    get();
+    fetchTools();
   };
 
-  if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center">
-        <SectionLoader />
-      </div>
+  const tableRows = action.tools.map(tool => {
+    const method = tool.getExecutionmethod();
+    const methodMeta = BUILDIN_TOOLS.find(
+      candidate => candidate.code === method,
     );
-  }
+
+    return {
+      id: tool.getId(),
+      name: tool.getName(),
+      type:
+        methodMeta?.name || (method === 'mcp' ? 'MCP' : method || 'Unknown'),
+      description: tool.getDescription(),
+      date: tool.getCreateddate()
+        ? toHumanReadableDateTime(tool.getCreateddate()!)
+        : '—',
+    };
+  });
 
   return (
-    <div className="relative flex flex-1 flex-col bg-surface">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col bg-surface">
       <ConfirmDialogComponent />
 
       <AssistantSettingsShellHeader
@@ -133,168 +150,187 @@ const ConfigureAssistantTool: FC<{ assistantId: string }> = ({
         reloadLabel="Reload tools"
         primaryAction={{
           label: 'Add tool',
-          onClick: () => navigator.goToCreateAssistantTool(assistantId),
+          onClick: () => navigation.goToCreateAssistantTool(assistantId),
         }}
       />
 
-      {selectedToolId && (
-        <TableToolbar>
-          <TableBatchActions
-            shouldShowBatchActions
-            totalSelected={1}
-            totalCount={axtion.tools.length}
-            onCancel={() => setSelectedToolId(null)}
-          >
-            <TableBatchAction
-              renderIcon={Edit}
-              onClick={() => {
-                navigation.goToEditAssistantTool(assistantId, selectedToolId);
-                setSelectedToolId(null);
-              }}
-            >
-              Edit tool
-            </TableBatchAction>
-            <TableBatchAction
-              renderIcon={TrashCan}
-              onClick={() => {
-                showDialog(() => {
-                  deleteAssistantTool(assistantId, selectedToolId);
-                });
-                setSelectedToolId(null);
-              }}
-            >
-              Delete tool
-            </TableBatchAction>
-          </TableBatchActions>
-        </TableToolbar>
-      )}
+      {isFetching ? (
+        <TableSection className="min-h-0 overflow-hidden bg-surface">
+          <DataTableSkeleton
+            headers={skeletonHeaders}
+            columnCount={skeletonHeaders.length}
+            rowCount={5}
+            showHeader={false}
+            showToolbar
+            size="lg"
+            className="w-full"
+          />
+        </TableSection>
+      ) : action.tools.length > 0 ? (
+        <TableSection className="min-h-0 bg-surface">
+          <DataTable rows={tableRows} headers={headers} radio>
+            {({
+              rows,
+              headers: tableHeaders,
+              selectedRows,
+              getBatchActionProps,
+              getHeaderProps,
+              getRowProps,
+              getSelectionProps,
+              getTableProps,
+              getToolbarProps,
+              onInputChange,
+            }) => {
+              const batchActionProps = getBatchActionProps();
+              const selectedTool = selectedRows[0]
+                ? action.tools.find(tool => tool.getId() === selectedRows[0].id)
+                : undefined;
 
-      <div className="overflow-auto flex flex-col flex-1">
-        {axtion.tools.length > 0 ? (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeader className="!w-12" />
-                <TableHeader>Name</TableHeader>
-                <TableHeader>Type</TableHeader>
-                <TableHeader>Description</TableHeader>
-                <TableHeader>Date</TableHeader>
-                <TableHeader>Actions</TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {axtion.tools.map((itm, idx) => {
-                const method = itm.getExecutionmethod();
-                const methodMeta = BUILDIN_TOOLS.find(x => x.code === method);
-                const isMcp = method === 'mcp';
-                const selected = selectedToolId === itm.getId();
-                const conditionSource = getToolConditionSource(
-                  itm.getExecutionoptionsList(),
-                );
-
-                return (
-                  <TableRow
-                    key={`tool-row-${idx}`}
-                    isSelected={selected}
-                    onClick={() =>
-                      setSelectedToolId(selected ? null : itm.getId())
-                    }
-                    className="cursor-pointer"
-                  >
-                    <TableCell
-                      className="!w-12 !pr-0"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <RadioButton
-                        id={`tool-select-${itm.getId()}`}
-                        name="tool-select"
-                        labelText=""
-                        hideLabel
-                        checked={selected}
-                        onChange={() =>
-                          setSelectedToolId(selected ? null : itm.getId())
-                        }
-                      />
-                    </TableCell>
-                    <TableCell className="text-sm">{itm.getName()}</TableCell>
-                    <TableCell className="text-sm">
-                      <div className="flex items-center gap-1">
-                        {methodMeta && (
-                          <Tag size="sm" type="gray">
-                            {methodMeta.name}
-                          </Tag>
-                        )}
-                        {isMcp && (
-                          <Tag size="sm" type="purple">
-                            MCP
-                          </Tag>
-                        )}
-                        {!methodMeta && !isMcp && (
-                          <Tag size="sm" type="gray">
-                            {(method || 'Unknown').replace(/_/g, ' ')}
-                          </Tag>
-                        )}
-                        {conditionSource !== 'all' && (
-                          <Tag size="sm" type="blue">
-                            Source:{' '}
-                            {getToolConditionSourceLabel(conditionSource)}
-                          </Tag>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="max-w-[360px] truncate text-sm">
-                      {itm.getDescription()}
-                    </TableCell>
-                    <TableCell className="text-[13px] whitespace-nowrap">
-                      {itm.getCreateddate()
-                        ? toHumanReadableDateTime(itm.getCreateddate()!)
-                        : '—'}
-                    </TableCell>
-                    <TableCell
-                      className="text-sm"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <div className="flex items-center gap-0">
-                        <Button
-                          hasIconOnly
+              return (
+                <>
+                  <TableToolbar {...getToolbarProps()}>
+                    {selectedTool && (
+                      <TableBatchActions
+                        {...batchActionProps}
+                        shouldShowBatchActions
+                      >
+                        <TableBatchAction
                           renderIcon={Edit}
-                          iconDescription="Edit tool"
-                          kind="ghost"
-                          size="sm"
-                          onClick={() =>
+                          iconDescription="Edit"
+                          onClick={() => {
                             navigation.goToEditAssistantTool(
                               assistantId,
-                              itm.getId(),
-                            )
-                          }
-                        />
-                        <Button
-                          hasIconOnly
+                              selectedTool.getId(),
+                            );
+                            batchActionProps.onCancel();
+                          }}
+                        >
+                          Edit
+                        </TableBatchAction>
+                        <TableBatchAction
                           renderIcon={TrashCan}
-                          iconDescription="Delete tool"
-                          kind="ghost"
-                          size="sm"
-                          onClick={() =>
+                          iconDescription="Delete"
+                          onClick={() => {
                             showDialog(() => {
-                              deleteAssistantTool(assistantId, itm.getId());
-                            })
-                          }
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        ) : (
+                              deleteAssistantTool(
+                                assistantId,
+                                selectedTool.getId(),
+                              );
+                            });
+                            batchActionProps.onCancel();
+                          }}
+                        >
+                          Delete
+                        </TableBatchAction>
+                      </TableBatchActions>
+                    )}
+                    <TableToolbarContent>
+                      <TableToolbarSearch
+                        placeholder="Search tools..."
+                        onChange={onInputChange}
+                      />
+                    </TableToolbarContent>
+                  </TableToolbar>
+
+                  <div className="min-h-0 flex-1 overflow-auto">
+                    <Table {...getTableProps()} className="min-w-max">
+                      <TableHead>
+                        <TableRow>
+                          <TableHeader className="!w-12" />
+                          {tableHeaders.map(header => (
+                            <TableHeader
+                              {...getHeaderProps({ header })}
+                              key={header.key}
+                            >
+                              {header.header}
+                            </TableHeader>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {rows.map(tableRow => {
+                          const tool = action.tools.find(
+                            candidate => candidate.getId() === tableRow.id,
+                          );
+                          if (!tool) return null;
+
+                          const method = tool.getExecutionmethod();
+                          const methodMeta = BUILDIN_TOOLS.find(
+                            candidate => candidate.code === method,
+                          );
+                          const isMcp = method === 'mcp';
+                          const conditionSource = getToolConditionSource(
+                            tool.getExecutionoptionsList(),
+                          );
+
+                          return (
+                            <TableRow
+                              {...getRowProps({ row: tableRow })}
+                              key={tableRow.id}
+                            >
+                              <TableSelectRow
+                                {...getSelectionProps({ row: tableRow })}
+                              />
+                              <TableCell className="text-sm">
+                                {tool.getName()}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                <div className="flex items-center gap-1">
+                                  {methodMeta && (
+                                    <Tag size="sm" type="gray">
+                                      {methodMeta.name}
+                                    </Tag>
+                                  )}
+                                  {isMcp && (
+                                    <Tag size="sm" type="purple">
+                                      MCP
+                                    </Tag>
+                                  )}
+                                  {!methodMeta && !isMcp && (
+                                    <Tag size="sm" type="gray">
+                                      {(method || 'Unknown').replace(/_/g, ' ')}
+                                    </Tag>
+                                  )}
+                                  {conditionSource !== 'all' && (
+                                    <Tag size="sm" type="blue">
+                                      Source:{' '}
+                                      {getToolConditionSourceLabel(
+                                        conditionSource,
+                                      )}
+                                    </Tag>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="max-w-[360px] truncate text-sm">
+                                {tool.getDescription()}
+                              </TableCell>
+                              <TableCell className="text-[13px] whitespace-nowrap">
+                                {tool.getCreateddate()
+                                  ? toHumanReadableDateTime(
+                                      tool.getCreateddate()!,
+                                    )
+                                  : '—'}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              );
+            }}
+          </DataTable>
+        </TableSection>
+      ) : (
+        <div className="flex flex-1 items-center justify-center">
           <EmptyState
             icon={ToolKit}
             title="No tools found"
             subtitle="Any tools or MCPs you add will be listed here."
           />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

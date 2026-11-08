@@ -9,7 +9,7 @@ export function TermsPage() {
         </h1>
         <p className="mt-4 text-base leading-7">Last updated on July 2, 2024</p>
         <main>
-          <article className="relative mt-10 prose prose-base max-w-none! dark:prose-invert prose-slate">
+          <article className="relative mt-10 prose prose-base max-w-none! !text-foreground prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-link prose-hr:border-border-subtle">
             <p className="text-lg">
               These Terms of Service ("Terms") govern your access to and use of
               the Rapida.AI platform ("Platform"). By accessing or using the
@@ -263,7 +263,7 @@ export function TermsPage() {
                     us at{' '}
                     <a
                       href="mailto:support@rapida.ai"
-                      className="text-blue-500"
+                      className="text-support-info"
                     >
                       support@rapida.ai
                     </a>

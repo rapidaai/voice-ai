@@ -165,7 +165,7 @@ describe('endpoint listing table UX', () => {
     expect(screen.getByText('100')).toBeInTheDocument();
     expect(screen.queryByText('runs')).not.toBeInTheDocument();
     expect(screen.queryByText('123,456 tokens')).not.toBeInTheDocument();
-    expect(screen.getByText('0%')).toHaveClass('text-green-600');
+    expect(screen.getByText('0%')).toHaveClass('text-support-success');
     expect(screen.queryByText('P50')).not.toBeInTheDocument();
     expect(screen.getByText('120ms')).toBeInTheDocument();
     expect(screen.queryByText('P99')).not.toBeInTheDocument();
@@ -183,8 +183,8 @@ describe('endpoint listing table UX', () => {
       </table>,
     );
 
-    expect(screen.getByText('0%')).toHaveClass('text-green-600');
-    expect(screen.getByText('0%')).not.toHaveClass('text-red-600');
+    expect(screen.getByText('0%')).toHaveClass('text-support-success');
+    expect(screen.getByText('0%')).not.toHaveClass('text-support-error');
 
     rerender(
       <table>
@@ -196,7 +196,7 @@ describe('endpoint listing table UX', () => {
       </table>,
     );
 
-    expect(screen.getByText('12%')).toHaveClass('text-red-600');
+    expect(screen.getByText('12%')).toHaveClass('text-support-error');
   });
 
   it('uses flat icon actions like the activity tables', async () => {

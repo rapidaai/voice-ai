@@ -17,7 +17,7 @@ export const ExecuteMessage: FC<{
     return (
       <div
         className={cn(
-          'flex min-h-12 items-center border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)] px-4',
+          'flex min-h-12 items-center border-b border-border-subtle bg-layer px-4',
           className,
         )}
       >

@@ -45,6 +45,11 @@ jest.mock(
 );
 
 jest.mock('@/app/components/ui/primitives/button', () => ({
+  GhostButton: ({ children, ...props }: React.ComponentProps<'button'>) => (
+    <button type="button" {...props}>
+      {children}
+    </button>
+  ),
   PrimaryButton: ({
     children,
     isLoading,

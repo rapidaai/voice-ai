@@ -510,14 +510,14 @@ function TextCategoryLayout({
           )}
       </div>
       {advancedParams.length > 0 && (
-        <div className="shrink-0 flex border-l border-gray-200 dark:border-gray-700">
+        <div className="shrink-0 flex border-l border-border-subtle">
           <Button
             hasIconOnly
             renderIcon={SettingsAdjust}
             iconDescription="Advanced settings"
             kind="ghost"
             size="md"
-            className="!h-10 !min-h-10 !w-10 !p-0 !bg-[var(--cds-field)]"
+            className="!h-10 !min-h-10 !w-10 !p-0 !bg-field"
             onClick={handleOpen}
           />
           <ComposedModal
@@ -705,14 +705,14 @@ function KeyValueField({
   return (
     <div className={cn(colSpanClass, 'flex flex-col gap-4')} key={param.key}>
       <div className="inline-flex items-center gap-1">
-        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">
+        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted">
           {param.label} ({entries.length})
         </p>
         <HelpToggletip label={param.label} helpText={param.helpText} />
       </div>
       <TableForm>
         <thead>
-          <tr className="bg-[var(--cds-layer-accent-01)]">
+          <tr className="bg-layer-accent">
             <TableFormHeaderCell className="w-1/2">Key</TableFormHeaderCell>
             <TableFormHeaderCell className="w-1/2">Value</TableFormHeaderCell>
             <TableFormHeaderCell className="w-10" divider={false} />
@@ -750,7 +750,7 @@ function KeyValueField({
                   iconDescription="Remove"
                   kind="ghost"
                   size="sm"
-                  className="!text-[var(--cds-support-error)]"
+                  className="!text-support-error"
                   onClick={() => removeEntry(index)}
                 />
               </TableFormCell>

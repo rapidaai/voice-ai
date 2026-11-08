@@ -29,7 +29,7 @@ export function StaticMessageNodeCard({
       {toolbar}
       {handles}
       <Tile className={cardClass} style={{ width }}>
-        <div className="flex h-12 items-center gap-3 border-b border-gray-200 px-4 text-gray-900 dark:border-gray-800 dark:text-white">
+        <div className="flex h-12 items-center gap-3 border-b border-border-subtle px-4 text-foreground ">
           <Icon size={18} className="shrink-0" />
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="min-w-0 truncate text-base font-semibold">
@@ -44,7 +44,7 @@ export function StaticMessageNodeCard({
           )}
         </div>
         <div className="mx-4 mt-4 pb-4">
-          <div className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
+          <div className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase text-muted ">
             Message
             <Toggletip align="right">
               <ToggletipButton label="Show information">
@@ -55,8 +55,8 @@ export function StaticMessageNodeCard({
               </ToggletipContent>
             </Toggletip>
           </div>
-          <div className="border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950">
-            <div className="line-clamp-3 text-sm leading-5 text-gray-800 dark:text-gray-100">
+          <div className="border border-border-subtle bg-surface p-4 ">
+            <div className="line-clamp-3 text-sm leading-5 text-foreground ">
               {messagePreview || 'No message configured'}
             </div>
           </div>

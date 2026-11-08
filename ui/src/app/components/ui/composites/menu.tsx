@@ -68,7 +68,7 @@ export function OptionMenuItem(props: {
   children?: ReactNode;
 }) {
   return props.type === 'danger' ? (
-    <span className="text-rose-600 dark:text-rose-500">{props.children}</span>
+    <span className="text-support-error ">{props.children}</span>
   ) : (
     <></>
   );

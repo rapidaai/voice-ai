@@ -27,7 +27,7 @@ placeholder at container startup. It does not change branding or theme values.
 ```json
 {
   "theme": {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "id": "customer-a",
     "brand": {
       "name": "Customer A",
@@ -54,12 +54,14 @@ placeholder at container startup. It does not change branding or theme values.
     "allowModeSelection": true,
     "colors": {
       "light": {
+        "carbonTheme": "white",
         "primary": "#0f62fe",
         "primaryHover": "#0043ce",
         "primaryActive": "#002d9c",
         "onPrimary": "#ffffff"
       },
       "dark": {
+        "carbonTheme": "g100",
         "primary": "#78a9ff",
         "primaryHover": "#a6c8ff",
         "primaryActive": "#d0e2ff",
@@ -78,6 +80,9 @@ placeholder at container startup. It does not change branding or theme values.
   deployments can use tenant-specific schemes, tokens, or routing conventions.
 - Brand color fields preserve arbitrary non-empty string values, including CSS
   color functions, custom properties, and tenant-specific tokens.
+- Brand color fields must not reference `--cds-*` or `--brand-*` properties.
+  This keeps the public contract independent from Carbon internals and prevents
+  property cycles.
 - Theme loading does not validate color format or contrast. Deployments own
   browser compatibility and accessible contrast for their configured values.
 
@@ -88,7 +93,15 @@ placeholder at container startup. It does not change branding or theme values.
 - A locked `system` mode continues to follow operating-system mode changes.
 - User preference is stored under `ui-theme-mode`.
 - The resolved mode is exposed through `data-color-mode` on `<html>`.
+- The selected Carbon preset is exposed through `data-carbon-theme` and the
+  matching `cds--<preset>` class on `<html>`.
+- The active schema is exposed through `data-theme-schema` on `<html>`.
 - The active tenant identifier is exposed through `data-brand` on `<html>`.
+
+Version 2 requires `carbonTheme`, `primary`, `primaryHover`, `primaryActive`, and
+`onPrimary` for both modes. Light mode accepts `white` or `g10`; dark mode accepts
+`g90` or `g100`. Invalid version 2 input stops before analytics or React starts and
+shows a fixed configuration error. Version 1 remains supported for compatibility.
 
 ## Styling rules
 
@@ -102,12 +115,18 @@ Preferred classes include:
 - `bg-layer` and `bg-layer-hover` for elevated content
 - `text-foreground` and `text-muted`
 - `border-border-subtle` and `border-border-strong`
-- `text-primary`, `bg-primary`, and related interaction utilities
+- `text-primary`, `text-on-primary`, `bg-primary`, `bg-primary-hover`, and
+  `bg-primary-active` for brand actions
 
 Avoid adding structural combinations such as `bg-white dark:bg-gray-900` or
-`border-gray-200 dark:border-gray-800`. Status colors may use explicit semantic
-red, green, yellow, or blue roles when they communicate state rather than
-application structure.
+`border-gray-200 dark:border-gray-800`. Status styling must use Carbon-backed
+semantic support roles. Raw red, green, yellow, and blue utilities are not status
+exceptions.
+
+Renderable components must not add arbitrary color utilities, direct `--cds-*`
+expressions, literal colors, inline color styles, or component stylesheets. Use a
+Carbon component where it supplies the pattern, then compose layout and semantic
+roles with Tailwind classes.
 
 ## Validation
 
@@ -120,6 +139,10 @@ yarn test:theme-contract
 yarn test --watchAll=false --runInBand
 yarn build
 ```
+
+The checker rejects every forbidden styling construct. Literal palettes,
+structural dark color variants, arbitrary or inline color ownership, direct Carbon
+expressions, and unapproved component stylesheets have no migration baseline.
 
 The theme contract check also scans renderable UI source for hardcoded Rapida
 brand literals. The scan covers `ui/src/app/**/*.ts`, `ui/src/app/**/*.tsx`,

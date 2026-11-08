@@ -95,8 +95,8 @@ export function ConfigureMCP({
           </div>
 
           <BlueNoticeBlock>
-            <div className="text-sm text-blue-900 dark:text-blue-100">
-              <div className="text-blue-700 dark:text-blue-300">
+            <div className="text-sm text-support-info ">
+              <div className="text-support-info ">
                 This tool will proxy calls to the specified MCP server. If you
                 provide a specific MCP Tool Name, it will call that tool on the
                 server; otherwise, it will use the tool name specified above.

@@ -8,20 +8,36 @@ import {
   SourceControl,
 } from '@carbon/icons-react';
 import {
+  Button,
   SideNav,
   SideNavItems,
   SideNavLink,
   SideNavMenu,
   SideNavMenuItem,
 } from '@carbon/react';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { cn } from '@/utils';
 
 export function EndpointSideNav(props: { endpointId: string }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(
+    () => !window.matchMedia?.('(max-width: 767px)').matches,
+  );
   const { pathname } = useLocation();
   const basePath = `/deployment/endpoint/${props.endpointId}`;
+
+  useEffect(() => {
+    const media = window.matchMedia?.('(max-width: 767px)');
+    if (!media) return undefined;
+
+    const collapseOnMobile = (event: MediaQueryListEvent) => {
+      if (event.matches) setExpanded(false);
+    };
+
+    if (media.matches) setExpanded(false);
+    media.addEventListener('change', collapseOnMobile);
+    return () => media.removeEventListener('change', collapseOnMobile);
+  }, []);
 
   const isActive = (path: string) => {
     if (path === 'versions' && pathname.endsWith('/create-endpoint-version')) {
@@ -33,17 +49,19 @@ export function EndpointSideNav(props: { endpointId: string }) {
   return (
     <div
       className={cn(
-        'relative flex h-full shrink-0 flex-col',
-        'border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900',
-        'transition-all duration-200',
-        expanded ? 'w-56' : 'w-12',
+        'relative shrink-0 flex flex-col h-full',
+        'bg-shell text-foreground',
+        'border-r border-border-subtle',
+        'transition-[width] duration-200 ease-in-out',
+        expanded ? 'w-64' : 'w-12',
       )}
     >
       <SideNav
         aria-label="Endpoint actions"
         expanded={expanded}
+        isFixedNav
         isRail={!expanded}
-        className="relative! inset-auto! z-0! h-auto! w-full! flex-1 border-none!"
+        className="relative! inset-auto! h-auto! flex-1 w-full! transform-none! border-none! bg-transparent! z-0!"
       >
         <SideNavItems>
           <SideNavLink
@@ -120,17 +138,23 @@ export function EndpointSideNav(props: { endpointId: string }) {
         </SideNavItems>
       </SideNav>
 
-      <div className="shrink-0 border-t border-gray-200 dark:border-gray-800">
-        <button
+      <div className="shrink-0 border-t border-border-subtle">
+        <Button
           type="button"
+          kind="ghost"
+          size="sm"
           onClick={() => setExpanded(current => !current)}
+          aria-label={
+            expanded
+              ? 'Collapse endpoint navigation'
+              : 'Expand endpoint navigation'
+          }
           className={cn(
-            'flex h-10 w-full cursor-pointer items-center px-4',
-            'text-[var(--cds-text-secondary)]',
-            'hover:bg-[var(--cds-layer-hover-01)] hover:text-[var(--cds-text-primary)]',
-            'transition-colors duration-100',
+            '!flex !h-10 !w-full !max-w-none !items-center !justify-start !px-4',
+            '!text-muted',
+            'hover:!bg-layer-hover hover:!text-foreground',
+            '!transition-colors !duration-100',
           )}
-          aria-label={expanded ? 'Collapse nav' : 'Expand nav'}
         >
           <span className="shrink-0">
             {expanded ? (
@@ -139,8 +163,15 @@ export function EndpointSideNav(props: { endpointId: string }) {
               <SidePanelOpen size={16} />
             )}
           </span>
-          {expanded && <span className="ml-3 truncate text-xs">Collapse</span>}
-        </button>
+          <span
+            className={cn(
+              'text-xs truncate transition-all duration-200 ml-3',
+              expanded ? 'opacity-100' : 'opacity-0 w-0 ml-0 overflow-hidden',
+            )}
+          >
+            {expanded ? 'Collapse' : 'Expand'}
+          </span>
+        </Button>
       </div>
     </div>
   );

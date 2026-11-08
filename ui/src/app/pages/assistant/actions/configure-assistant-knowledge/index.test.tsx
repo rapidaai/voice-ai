@@ -25,8 +25,8 @@ jest.mock('@/app/components/domain/cards/knowledge-card', () => ({
   SelectKnowledgeCard: () => <article>Knowledge card</article>,
 }));
 
-jest.mock('@/app/components/layout/blocks/page-header-block', () => ({
-  PageHeaderBlock: ({ children }: any) => <header>{children}</header>,
+jest.mock('@/app/components/layout/compact-page-header', () => ({
+  CompactPageHeader: ({ children }: any) => <header>{children}</header>,
 }));
 
 jest.mock('@/app/components/layout/blocks/page-title-block', () => ({

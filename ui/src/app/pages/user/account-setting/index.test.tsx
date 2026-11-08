@@ -11,8 +11,8 @@ jest.mock('@/app/components/app-shell/helmet', () => ({
   Helmet: ({ title }: any) => <div data-testid="helmet">{title}</div>,
 }));
 
-jest.mock('@/app/components/layout/blocks/page-header-block', () => ({
-  PageHeaderBlock: ({ children }: any) => <header>{children}</header>,
+jest.mock('@/app/components/layout/compact-page-header', () => ({
+  CompactPageHeader: ({ children }: any) => <header>{children}</header>,
 }));
 
 jest.mock('@/app/components/ui/primitives/tabs', () => ({

@@ -170,25 +170,23 @@ function SearchTypeCard({
       className={cn(
         'relative group !min-h-0 !p-4 !text-left !transition-colors !duration-100',
         isSelected
-          ? '!border-gray-200 dark:!border-gray-800 !bg-white dark:!bg-gray-950/50'
-          : '!border-gray-200 dark:!border-gray-800 !bg-white dark:!bg-gray-950/50 hover:!bg-gray-50 dark:hover:!bg-gray-900/60',
+          ? '!border-border-subtle !bg-surface '
+          : '!border-border-subtle !bg-surface hover:!bg-layer ',
       )}
     >
       <CornerBorderOverlay className={isSelected ? 'opacity-100' : undefined} />
       {isSelected && (
         <span className="absolute top-3 right-3 h-5 w-5 inline-flex items-center justify-center bg-primary z-20">
-          <Checkmark size={14} className="text-white" />
+          <Checkmark size={14} className="text-inverse" />
         </span>
       )}
       <div className="flex items-center gap-3 mb-2">
-        <div className="flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 shrink-0 h-8 w-8">
-          <Icon className="text-blue-600" />
+        <div className="flex items-center justify-center bg-support-info/10 shrink-0 h-8 w-8">
+          <Icon className="text-support-info" />
         </div>
         <span className="text-sm font-medium">{title}</span>
       </div>
-      <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-        {description}
-      </p>
+      <p className="text-xs text-muted leading-relaxed">{description}</p>
     </SelectableTile>
   );
 }

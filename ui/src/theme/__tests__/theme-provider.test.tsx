@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { ThemeProvider, useTheme } from '@/theme/theme-provider';
 import { THEME_STORAGE_KEY } from '@/theme/theme-config';
 import { ThemeManifest } from '@/theme/types';
+import themeContract from '@/theme/theme-contract.json';
 import developmentConfig from '@/configs/config.development.json';
 
 const configuredTheme = developmentConfig.theme as unknown as ThemeManifest;
@@ -36,8 +37,11 @@ describe('ThemeProvider', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     document.documentElement.removeAttribute('data-brand');
+    document.documentElement.removeAttribute('data-carbon-theme');
     document.documentElement.removeAttribute('data-color-mode');
     document.documentElement.removeAttribute('data-theme-ready');
+    document.documentElement.removeAttribute('data-theme-schema');
+    document.documentElement.removeAttribute('class');
     document.documentElement.removeAttribute('style');
     document.querySelector("meta[name='theme-color']")?.remove();
     document
@@ -47,6 +51,7 @@ describe('ThemeProvider', () => {
 
   it('applies brand tokens and toggles the resolved color mode', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
+    document.documentElement.classList.add('application-root');
     render(
       <ThemeProvider theme={configuredTheme}>
         <ThemeConsumer />
@@ -63,12 +68,24 @@ describe('ThemeProvider', () => {
       'data-theme-ready',
       'true',
     );
-    expect(
-      document.documentElement.style.getPropertyValue('--brand-primary'),
-    ).toBe(configuredTheme.colors.light.primary);
-    expect(
-      document.documentElement.style.getPropertyValue('--brand-on-primary'),
-    ).toBe(configuredTheme.colors.light.onPrimary);
+    expect(document.documentElement).toHaveAttribute(
+      'data-carbon-theme',
+      configuredTheme.colors.light.carbonTheme,
+    );
+    expect(document.documentElement).toHaveClass(
+      'application-root',
+      `cds--${configuredTheme.colors.light.carbonTheme}`,
+    );
+    expect(document.documentElement).toHaveAttribute('data-theme-schema', '2');
+    for (const [field, { property }] of Object.entries(
+      themeContract.colorFields,
+    )) {
+      expect(document.documentElement.style.getPropertyValue(property)).toBe(
+        configuredTheme.colors.light[
+          field as keyof typeof themeContract.colorFields
+        ],
+      );
+    }
     expect(document.querySelector("meta[name='theme-color']")).toHaveAttribute(
       'content',
       configuredTheme.colors.light.primary,
@@ -78,6 +95,17 @@ describe('ThemeProvider', () => {
 
     expect(screen.getByRole('button')).toHaveTextContent('Rapida AI:dark');
     expect(document.documentElement).toHaveAttribute('data-color-mode', 'dark');
+    expect(document.documentElement).toHaveAttribute(
+      'data-carbon-theme',
+      configuredTheme.colors.dark.carbonTheme,
+    );
+    expect(document.documentElement).toHaveClass(
+      'application-root',
+      `cds--${configuredTheme.colors.dark.carbonTheme}`,
+    );
+    expect(document.documentElement).not.toHaveClass(
+      `cds--${configuredTheme.colors.light.carbonTheme}`,
+    );
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
     expect(
       document.documentElement.style.getPropertyValue('--brand-primary'),

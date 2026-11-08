@@ -68,7 +68,9 @@ test('mobile two-item breadcrumb keeps its parent link', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await authenticatePage(page);
   await page.goto('/organization/users');
-  await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Users', exact: true }),
+  ).toBeVisible();
 
   const breadcrumb = page.locator('.global-breadcrumb');
   await expect(

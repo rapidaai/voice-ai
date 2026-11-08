@@ -314,7 +314,7 @@ export const AssistantMappingTable = <
       </p>
       <TableForm>
         <thead>
-          <tr className="bg-[var(--cds-layer-accent-01)]">
+          <tr className="bg-layer-accent">
             <TableFormHeaderCell className="w-1/4">Type</TableFormHeaderCell>
             <TableFormHeaderCell className="w-1/4">Key</TableFormHeaderCell>
             <TableFormHeaderCell className="w-8" />
@@ -380,9 +380,7 @@ export const AssistantMappingTable = <
                     kind="ghost"
                     size="sm"
                     className={
-                      isRemoveDestructive
-                        ? '!text-[var(--cds-support-error)]'
-                        : undefined
+                      isRemoveDestructive ? '!text-support-error' : undefined
                     }
                     onClick={() => handleRemove(index)}
                   />

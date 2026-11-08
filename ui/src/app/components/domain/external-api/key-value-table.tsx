@@ -103,7 +103,7 @@ export function KeyValueTable({
                     iconDescription="Remove"
                     kind="ghost"
                     size="sm"
-                    className="!text-[var(--cds-support-error)]"
+                    className="!text-support-error"
                     onClick={() => onChange(rows.filter((_, i) => i !== index))}
                   />
                 </TableCell>

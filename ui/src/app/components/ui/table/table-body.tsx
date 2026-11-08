@@ -1,10 +1,11 @@
 import { cn } from '@/utils';
-import type { HTMLAttributes } from 'react';
+import { TableBody as CarbonTableBody } from '@carbon/react';
+import type { ComponentProps } from 'react';
 
-export function TableBody(props: HTMLAttributes<HTMLTableSectionElement>) {
+export function TableBody(props: ComponentProps<typeof CarbonTableBody>) {
   return (
-    <tbody {...props} className={cn('text-[15px]', props.className)}>
+    <CarbonTableBody {...props} className={cn('text-[15px]', props.className)}>
       {props.children}
-    </tbody>
+    </CarbonTableBody>
   );
 }

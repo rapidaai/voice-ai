@@ -183,9 +183,9 @@ jest.mock('@/app/components/ui/primitives/switch', () => ({
   ),
 }));
 
-jest.mock('@/app/components/ui/composites/tab-form', () => ({
-  TabForm: ({ activeTab, form, errorMessage }: any) => {
-    const active = form.find((x: any) => x.code === activeTab);
+jest.mock('@/app/components/ui/composites/create-full-page', () => ({
+  CreateFullPageWithHeader: ({ activeStep, steps, errorMessage }: any) => {
+    const active = steps.find((x: any) => x.code === activeStep);
     return (
       <div>
         {errorMessage ? <div>{errorMessage}</div> : null}

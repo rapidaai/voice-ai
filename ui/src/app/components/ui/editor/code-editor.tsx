@@ -45,18 +45,14 @@ export function CodeEditor({
       ref={ref}
       className={cn(
         'cds--form-item w-full',
-        isExpand &&
-          'fixed inset-0 z-50 bg-[var(--cds-background)] flex flex-col',
+        isExpand && 'fixed inset-0 z-50 bg-surface flex flex-col',
       )}
     >
       {labelText && !isExpand && (
         <label className="cds--label">{labelText}</label>
       )}
       <div
-        className={cn(
-          'relative group w-full',
-          isExpand && 'flex-1 min-h-0',
-        )}
+        className={cn('relative group w-full', isExpand && 'flex-1 min-h-0')}
       >
         <div className="flex items-center absolute right-0 top-0 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button

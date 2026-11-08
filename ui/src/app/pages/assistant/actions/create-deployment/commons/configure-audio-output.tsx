@@ -11,7 +11,7 @@ import {
 } from '@/providers';
 import { ChevronDown } from '@carbon/icons-react';
 import { cn } from '@/utils';
-import { TextInput } from '@/app/components/ui/primitives';
+import { GhostButton, TextInput } from '@/app/components/ui/primitives';
 import { Text } from '@/app/components/ui/primitives/text';
 import { Dropdown, MultiSelect, Slider } from '@carbon/react';
 
@@ -124,10 +124,11 @@ export const ConfigureAudioOutputProvider: React.FC<
 
       {audioOutputConfig.provider && (
         <>
-          <button
+          <GhostButton
+            size="sm"
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-1.5 text-[var(--cds-text-secondary)] transition-colors hover:text-[var(--cds-text-primary)]"
+            className="w-fit"
           >
             <ChevronDown
               size={16}
@@ -139,15 +140,11 @@ export const ConfigureAudioOutputProvider: React.FC<
             <Text as="span" variant="body-compact-01">
               {showAdvanced ? 'Hide' : 'Show'} advanced settings
             </Text>
-          </button>
+          </GhostButton>
 
           {showAdvanced && (
-            <div className="flex flex-col gap-6 pt-6 border-t border-gray-200 dark:border-gray-800">
-              <Text
-                as="p"
-                variant="label-01"
-                className="uppercase text-[var(--cds-text-secondary)]"
-              >
+            <div className="flex flex-col gap-6 pt-6 border-t border-border-subtle ">
+              <Text as="p" variant="label-01" className="uppercase text-muted">
                 Ambient
               </Text>
               <Dropdown
@@ -178,11 +175,7 @@ export const ConfigureAudioOutputProvider: React.FC<
                 }
               />
 
-              <Text
-                as="p"
-                variant="label-01"
-                className="uppercase text-[var(--cds-text-secondary)]"
-              >
+              <Text as="p" variant="label-01" className="uppercase text-muted">
                 Experience
               </Text>
               <MultiSelect

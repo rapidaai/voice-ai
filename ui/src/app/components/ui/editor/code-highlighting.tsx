@@ -37,7 +37,7 @@ function CodeHighlightingComponent({
   return (
     <div
       className={cn(
-        'code-highlighting relative bg-[var(--cds-field)] border border-[var(--cds-border-subtle-01)]',
+        'code-highlighting relative bg-field border border-border-subtle',
         'p-0 m-0 flex flex-1',
         className,
       )}

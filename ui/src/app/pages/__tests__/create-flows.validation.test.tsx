@@ -168,26 +168,6 @@ jest.mock('@/app/pages/assistant/actions/hooks/use-confirmation', () => ({
   }),
 }));
 
-jest.mock('@/app/components/ui/composites/tab-form', () => ({
-  TabForm: ({ activeTab, errorMessage, form, formHeading }: any) => {
-    const active = form.find((f: any) => f.code === activeTab) || form[0];
-    return (
-      <div>
-        <h1>{formHeading}</h1>
-        {errorMessage ? <div>{errorMessage}</div> : null}
-        <div>{active.body}</div>
-        <div>
-          {Array.isArray(active.actions)
-            ? active.actions.map((action: React.ReactElement, idx: number) => (
-                <div key={idx}>{action}</div>
-              ))
-            : active.actions}
-        </div>
-      </div>
-    );
-  },
-}));
-
 jest.mock('@/app/components/domain/providers/text', () => ({
   GetDefaultTextProviderConfigIfInvalid: (...args: unknown[]) =>
     mockGetDefaultTextProviderConfigIfInvalid(...args),
@@ -339,7 +319,9 @@ jest.mock('@/app/components/ui/primitives/fieldset', () => ({
   FieldSet: ({ children }: any) => <div>{children}</div>,
 }));
 jest.mock('@/app/components/ui/primitives/form-label', () => ({
-  FormLabel: ({ children }: any) => <label>{children}</label>,
+  FormLabel: ({ children, ...props }: any) => (
+    <label {...props}>{children}</label>
+  ),
 }));
 
 const getLatestConfigPromptProps = () =>
@@ -481,9 +463,7 @@ describe('Requested create/update flow pages', () => {
   it('create endpoint blocks continue when prompt template variables are missing', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateEndpointPage />);
-    await user.click(
-      screen.getByRole('button', { name: 'Configure instruction' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(
       screen.getByText(
         'Please provide a valid prompt template, it should at least have one variable.',
@@ -516,9 +496,7 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    await user.click(
-      screen.getByRole('button', { name: 'Configure instruction' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(
       screen.queryByText('Please define at least one variable.'),
@@ -553,9 +531,7 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    await user.click(
-      screen.getByRole('button', { name: 'Configure instruction' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(mockValidateTextProviderDefaultOptions).toHaveBeenCalled();
     expect(mockValidateTextProviderDefaultOptions.mock.calls.at(-1)?.[0]).toBe(
@@ -566,9 +542,7 @@ describe('Requested create/update flow pages', () => {
   it('create endpoint version blocks continue when variables are missing', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateNewVersionEndpointPage />);
-    await user.click(
-      screen.getByRole('button', { name: 'Configure instruction' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(
       screen.getByText('Please define at least one variable.'),
     ).toBeInTheDocument();
@@ -586,11 +560,33 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    await user.click(
-      screen.getByRole('button', { name: 'Configure instruction' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(screen.getByText('Version note')).toBeInTheDocument();
+  });
+
+  it('create endpoint version marks an empty version note invalid', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    render(<CreateNewVersionEndpointPage />);
+
+    const endpointVersionPromptProps = getLatestConfigPromptProps();
+    act(() => {
+      endpointVersionPromptProps.onChange({
+        prompt: [{ role: 'system', content: 'Hi {{name}}' }],
+        variables: [{ name: 'name', type: 'string', defaultvalue: '' }],
+      });
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    const versionNote = screen.getByLabelText('Version note');
+    await user.clear(versionNote);
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(versionNote).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Enter a version note.')).toBeVisible();
+
+    await user.type(versionNote, 'Updated endpoint prompt');
+    expect(screen.queryByText('Enter a version note.')).not.toBeInTheDocument();
   });
 
   it('create endpoint version validates using changed provider', async () => {
@@ -610,9 +606,7 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    await user.click(
-      screen.getByRole('button', { name: 'Configure instruction' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(mockValidateTextProviderDefaultOptions).toHaveBeenCalled();
     expect(mockValidateTextProviderDefaultOptions.mock.calls.at(-1)?.[0]).toBe(
@@ -644,12 +638,8 @@ describe('Requested create/update flow pages', () => {
       });
     });
 
-    await user.click(
-      screen.getByRole('button', { name: 'Configure instruction' }),
-    );
-    await user.click(
-      screen.getByRole('button', { name: 'Create new version' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
 
     expect(CreateEndpointProviderModel).toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith(
@@ -735,7 +725,7 @@ describe('Requested create/update flow pages', () => {
 
   it('create assistant version shows unavailable state when assistantId is missing', async () => {
     mockParams = {};
-    render(<CreateVersionAssistantPage />);
+    renderWithTheme(<CreateVersionAssistantPage />);
     expect(screen.getByText('403')).toBeInTheDocument();
     expect(screen.getByText('Assistant not available')).toBeInTheDocument();
     await act(async () => {});
@@ -744,7 +734,7 @@ describe('Requested create/update flow pages', () => {
   it('create assistant version moves to commit step after prompt edit', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     mockParams = { assistantId: 'a-1' };
-    render(<CreateVersionAssistantPage />);
+    renderWithTheme(<CreateVersionAssistantPage />);
     await waitFor(() =>
       expect(mockConfigPrompt.mock.calls.length).toBeGreaterThan(1),
     );
@@ -759,8 +749,68 @@ describe('Requested create/update flow pages', () => {
 
     await user.click(screen.getByRole('button', { name: 'Continue' }));
 
-    expect(screen.getByText('Version note')).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(
+        'Provide a clear and detailed explanation of the changes made to this assistant.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Version note' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
     await act(async () => {});
+  });
+
+  it('create assistant version remains on configuration when validation fails', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    mockParams = { assistantId: 'a-1' };
+    renderWithTheme(<CreateVersionAssistantPage />);
+    await waitFor(() =>
+      expect(mockConfigPrompt.mock.calls.length).toBeGreaterThan(1),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(
+      screen.getByText('Please provide a valid template prompt.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText(
+        'Provide a clear and detailed explanation of the changes made to this assistant.',
+      ),
+    ).not.toBeInTheDocument();
+  });
+
+  it('create assistant version marks an empty version note invalid', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    mockParams = { assistantId: 'a-1' };
+    renderWithTheme(<CreateVersionAssistantPage />);
+    await waitFor(() =>
+      expect(mockConfigPrompt.mock.calls.length).toBeGreaterThan(1),
+    );
+
+    const assistantVersionConfigPrompt = getLatestConfigPromptProps();
+    act(() => {
+      assistantVersionConfigPrompt.onChange({
+        prompt: [{ role: 'system', content: 'Edited {{context}}' }],
+        variables: [{ name: 'context', type: 'string', defaultvalue: '' }],
+      });
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    const versionNote = screen.getByPlaceholderText(
+      'Provide a clear and detailed explanation of the changes made to this assistant.',
+    );
+    await user.clear(versionNote);
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(versionNote).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Enter a version note.')).toBeVisible();
+
+    await user.type(versionNote, 'Updated the assistant instructions.');
+
+    expect(versionNote).not.toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByText('Enter a version note.')).not.toBeInTheDocument();
   });
 
   it('create assistant version shows default system prompt when latest version is not model', async () => {
@@ -773,7 +823,7 @@ describe('Requested create/update flow pages', () => {
       }),
     });
 
-    render(<CreateVersionAssistantPage />);
+    renderWithTheme(<CreateVersionAssistantPage />);
 
     expect(getLatestConfigPromptProps().existingPrompt.prompt).toEqual([
       { role: 'system', content: '' },
@@ -784,7 +834,7 @@ describe('Requested create/update flow pages', () => {
   it('create assistant version validates using changed provider', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     mockParams = { assistantId: 'a-1' };
-    render(<CreateVersionAssistantPage />);
+    renderWithTheme(<CreateVersionAssistantPage />);
     await waitFor(() =>
       expect(mockConfigPrompt.mock.calls.length).toBeGreaterThan(1),
     );

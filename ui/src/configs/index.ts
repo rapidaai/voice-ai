@@ -1,7 +1,6 @@
 /* eslint-disable import/no-mutable-exports */
 import { InputVarType } from '@/models/common';
 import { ConnectionConfig } from '@rapidaai/react';
-import type { ThemeManifest } from '@/theme/types';
 import devConfig from './config.development.json';
 import prodConfig from './config.production.json';
 import { getRuntimeEnv } from './runtime-env';
@@ -49,7 +48,7 @@ export interface RapidaConfig {
   };
   analytics?: SentryAnalyticsConfig;
   workspace: WorkspaceConfig;
-  theme: ThemeManifest;
+  theme: unknown;
 }
 
 type ConfigSource = Omit<RapidaConfig, 'deployment' | 'theme'> & {
@@ -89,7 +88,7 @@ export const withConfigDefaults = (config: ConfigSource): RapidaConfig => {
     deployment: {
       webWidgetScriptUrl,
     },
-    theme: config.theme as ThemeManifest,
+    theme: config.theme,
   };
 };
 const developmentConfig = withConfigDefaults(devConfig as ConfigSource);

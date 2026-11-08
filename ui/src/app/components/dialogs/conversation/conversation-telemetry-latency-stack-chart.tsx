@@ -142,7 +142,7 @@ export function LatencyStackChart(props: LatencyStackChartProps) {
               tickLine={false}
               axisLine={false}
               width={42}
-              tick={{ fontSize: 11, fill: '#9ca3af' }}
+              tick={{ fontSize: 11, fill: 'var(--color-muted)' }}
             />
             {latencyMetricNames.map(metricName => (
               <Area
@@ -150,9 +150,9 @@ export function LatencyStackChart(props: LatencyStackChartProps) {
                 type="monotone"
                 dataKey={metricName}
                 stackId="latency"
-                stroke={LATENCY_METRIC_META[metricName].color}
+                stroke={LATENCY_METRIC_META[metricName].seriesColor}
                 strokeWidth={1.5}
-                fill={LATENCY_METRIC_META[metricName].color}
+                fill={LATENCY_METRIC_META[metricName].seriesColor}
                 fillOpacity={LATENCY_METRIC_META[metricName].fillOpacity}
                 connectNulls
                 dot={false}
@@ -198,7 +198,7 @@ export function LatencyStackChart(props: LatencyStackChartProps) {
                           <div
                             className="w-2 h-2"
                             style={{
-                              backgroundColor: item.color || meta?.color,
+                              backgroundColor: item.color || meta?.seriesColor,
                             }}
                           />
                           <span className="text-xs uppercase text-foreground">
@@ -235,7 +235,7 @@ export function LatencyStackChart(props: LatencyStackChartProps) {
             <div
               className="w-3 h-0.5"
               style={{
-                backgroundColor: LATENCY_METRIC_META[metricName].color,
+                backgroundColor: LATENCY_METRIC_META[metricName].seriesColor,
               }}
             />
             {index + 1}. {LATENCY_METRIC_META[metricName].shortLabel}

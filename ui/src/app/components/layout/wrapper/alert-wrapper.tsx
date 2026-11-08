@@ -14,7 +14,7 @@ export function ErrorWrapper({
       {...attributes}
       className={cn(
         wrapperBaseClassName,
-        'border-border-subtle [border-left-color:var(--cds-support-error)]',
+        'border-border-subtle border-l-support-error',
         className,
       )}
     >
@@ -33,7 +33,7 @@ export function SuccessWrapper({
       {...attributes}
       className={cn(
         wrapperBaseClassName,
-        'border-border-subtle [border-left-color:var(--cds-support-success)]',
+        'border-border-subtle border-l-support-success',
         className,
       )}
     >
@@ -52,7 +52,7 @@ export function InfoWrapper({
       {...attributes}
       className={cn(
         wrapperBaseClassName,
-        'border-border-subtle [border-left-color:var(--cds-support-info)]',
+        'border-border-subtle border-l-support-info',
         className,
       )}
     >
@@ -71,7 +71,7 @@ export function WarnWrapper({
       {...attributes}
       className={cn(
         wrapperBaseClassName,
-        'border-border-subtle [border-left-color:var(--cds-support-warning)]',
+        'border-border-subtle border-l-support-warning',
         className,
       )}
     >

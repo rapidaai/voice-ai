@@ -63,16 +63,16 @@ const EventInspectorDisplay: FC<
         ))}
       </div>
       {occurredAtLabel && (
-        <span className="ml-auto whitespace-nowrap font-mono text-xs text-gray-500">
+        <span className="ml-auto whitespace-nowrap font-mono text-xs text-muted">
           {occurredAtLabel}
         </span>
       )}
     </div>
-    <p className="truncate font-mono text-sm text-gray-900 dark:text-gray-100">
+    <p className="truncate font-mono text-sm text-foreground ">
       {display.primary}
     </p>
     {display.secondary && (
-      <p className="mt-1 truncate font-mono text-xs text-gray-500">
+      <p className="mt-1 truncate font-mono text-xs text-muted">
         {display.secondary}
       </p>
     )}
@@ -601,12 +601,12 @@ const GenericEventInspector: FC<EventRendererProps> = ({
       <Tag type="cool-gray">{getDocumentComponent(document)}</Tag>
       <Tag type="blue">{document.scope}</Tag>
       {occurredAtLabel && (
-        <span className="ml-auto whitespace-nowrap font-mono text-xs text-gray-500">
+        <span className="ml-auto whitespace-nowrap font-mono text-xs text-muted">
           {occurredAtLabel}
         </span>
       )}
     </div>
-    <p className="truncate font-mono text-sm text-gray-900 dark:text-gray-100">
+    <p className="truncate font-mono text-sm text-foreground ">
       {document.title || document.name}
     </p>
   </>
@@ -637,7 +637,7 @@ const SttEventMainTable: FC<EventRendererProps> = ({ document }) => {
   const display = getSttEventDisplay(document);
 
   return (
-    <p className="truncate font-mono text-[13px] text-gray-900 dark:text-gray-100">
+    <p className="truncate font-mono text-[13px] text-foreground ">
       {display.primary}
     </p>
   );
@@ -662,7 +662,7 @@ const VadEventMainTable: FC<EventRendererProps> = ({ document }) => {
   const display = getVadEventDisplay(document);
 
   return (
-    <p className="truncate font-mono text-[13px] text-gray-900 dark:text-gray-100">
+    <p className="truncate font-mono text-[13px] text-foreground ">
       {display.primary}
     </p>
   );
@@ -687,7 +687,7 @@ const EosEventMainTable: FC<EventRendererProps> = ({ document }) => {
   const display = getEosEventDisplay(document);
 
   return (
-    <p className="truncate font-mono text-[13px] text-gray-900 dark:text-gray-100">
+    <p className="truncate font-mono text-[13px] text-foreground ">
       {display.primary}
     </p>
   );
@@ -710,16 +710,16 @@ const TtsEventInspector: FC<EventRendererProps> = ({
           ))}
         </div>
         {occurredAtLabel && (
-          <span className="ml-auto whitespace-nowrap font-mono text-xs text-gray-500">
+          <span className="ml-auto whitespace-nowrap font-mono text-xs text-muted">
             {occurredAtLabel}
           </span>
         )}
       </div>
-      <p className="whitespace-pre-wrap break-words font-mono text-sm text-gray-900 dark:text-gray-100">
+      <p className="whitespace-pre-wrap break-words font-mono text-sm text-foreground ">
         {display.primary}
       </p>
       {display.secondary && (
-        <p className="mt-1 truncate font-mono text-xs text-gray-500">
+        <p className="mt-1 truncate font-mono text-xs text-muted">
           {display.secondary}
         </p>
       )}
@@ -731,7 +731,7 @@ const TtsEventMainTable: FC<EventRendererProps> = ({ document }) => {
   const display = getTtsEventDisplay(document);
 
   return (
-    <p className="truncate font-mono text-[13px] text-gray-900 dark:text-gray-100">
+    <p className="truncate font-mono text-[13px] text-foreground ">
       {display.primary}
     </p>
   );
@@ -754,16 +754,16 @@ const AgentEventInspector: FC<EventRendererProps> = ({
           ))}
         </div>
         {occurredAtLabel && (
-          <span className="ml-auto whitespace-nowrap font-mono text-xs text-gray-500">
+          <span className="ml-auto whitespace-nowrap font-mono text-xs text-muted">
             {occurredAtLabel}
           </span>
         )}
       </div>
-      <p className="whitespace-pre-wrap break-words font-mono text-sm text-gray-900 dark:text-gray-100">
+      <p className="whitespace-pre-wrap break-words font-mono text-sm text-foreground ">
         {display.primary}
       </p>
       {display.secondary && (
-        <p className="mt-1 truncate font-mono text-xs text-gray-500">
+        <p className="mt-1 truncate font-mono text-xs text-muted">
           {display.secondary}
         </p>
       )}
@@ -775,7 +775,7 @@ const AgentEventMainTable: FC<EventRendererProps> = ({ document }) => {
   const display = getAgentEventDisplay(document);
 
   return (
-    <p className="truncate font-mono text-[13px] text-gray-900 dark:text-gray-100">
+    <p className="truncate font-mono text-[13px] text-foreground ">
       {display.primary}
     </p>
   );
@@ -799,7 +799,7 @@ const TurnEventMainTable: FC<EventRendererProps> = ({ document }) => {
   const display = getTurnEventDisplay(document);
 
   return (
-    <p className="truncate font-mono text-[13px] text-gray-900 dark:text-gray-100">
+    <p className="truncate font-mono text-[13px] text-foreground ">
       {display.primary}
       {display.secondary ? ` ${display.secondary}` : ''}
     </p>

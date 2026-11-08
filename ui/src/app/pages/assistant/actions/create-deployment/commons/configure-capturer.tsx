@@ -24,16 +24,12 @@ export const ConfigureCapturer: React.FC<{
   return (
     <>
       {allowed.includes('text') && (
-        <div className="border-b dark:border-gray-800">
-          <div className="px-5 py-4 border-b dark:border-gray-800">
+        <div className="border-b border-border-subtle">
+          <div className="px-5 py-4 border-b border-border-subtle">
             <Text as="h2" variant="heading-compact-01">
               Text Messages
             </Text>
-            <Text
-              as="p"
-              variant="helper-text-01"
-              className="mt-0.5 text-[var(--cds-text-secondary)]"
-            >
+            <Text as="p" variant="helper-text-01" className="mt-0.5 text-muted">
               Store conversation transcripts to a cloud storage provider.
             </Text>
           </div>
@@ -47,16 +43,12 @@ export const ConfigureCapturer: React.FC<{
         </div>
       )}
       {allowed.includes('audio') && (
-        <div className="border-b dark:border-gray-800">
-          <div className="px-5 py-4 border-b dark:border-gray-800">
+        <div className="border-b border-border-subtle">
+          <div className="px-5 py-4 border-b border-border-subtle">
             <Text as="h2" variant="heading-compact-01">
               Audio Recording
             </Text>
-            <Text
-              as="p"
-              variant="helper-text-01"
-              className="mt-0.5 text-[var(--cds-text-secondary)]"
-            >
+            <Text as="p" variant="helper-text-01" className="mt-0.5 text-muted">
               Save call audio recordings to a cloud storage provider.
             </Text>
           </div>

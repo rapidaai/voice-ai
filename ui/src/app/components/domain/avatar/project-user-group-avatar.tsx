@@ -1,7 +1,10 @@
-import { TextImage } from '@/app/components/ui/primitives';
+import {
+  UserAvatar,
+  type UserAvatarSize,
+} from '@/app/components/ui/primitives';
 
 interface ProjectUserGroupAvatarProps {
-  size?: 7 | 8 | 9;
+  size?: UserAvatarSize;
   members: { name: string }[];
   label?: string;
 }
@@ -17,9 +20,14 @@ export function ProjectUserGroupAvatar({
       className="flex flex-wrap justify-center sm:justify-start mb-8 sm:mb-0 -space-x-2 -ml-px"
     >
       {members.map((member, index) => (
-        <li key={`${member.name}-${index}`} aria-label={member.name}>
-          <div className="block rounded-[2px] border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600">
-            <TextImage size={size} name={member.name} />
+        <li key={`${member.name}-${index}`}>
+          <div className="block rounded-full border border-border-subtle hover:border-border-strong">
+            <UserAvatar
+              aria-label={member.name.trim() || 'User'}
+              name={member.name.trim()}
+              role="img"
+              size={size}
+            />
           </div>
         </li>
       ))}

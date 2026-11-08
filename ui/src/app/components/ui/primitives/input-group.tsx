@@ -22,23 +22,23 @@ export function InputGroup({
   return (
     <section
       {...props}
-      className={cn('border-b border-gray-200 dark:border-gray-800', className)}
+      className={cn('border-b border-border-subtle ', className)}
     >
       <div
         onClick={() => setIsExpanded(!isExpanded)}
         className={cn(
           'h-12 px-4 flex items-center justify-between w-full cursor-pointer',
-          'hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors',
-          isExpanded && 'border-b border-gray-200 dark:border-gray-800',
+          'hover:bg-layer transition-colors',
+          isExpanded && 'border-b border-border-subtle ',
         )}
       >
-        <div className="flex-none text-sm font-semibold text-gray-900 dark:text-gray-100">
+        <div className="flex-none text-sm font-semibold text-foreground ">
           {title}
         </div>
         <ChevronDown
           size={16}
           className={cn(
-            'text-gray-500 transition-transform duration-200',
+            'text-muted transition-transform duration-200',
             isExpanded && 'rotate-180',
           )}
         />

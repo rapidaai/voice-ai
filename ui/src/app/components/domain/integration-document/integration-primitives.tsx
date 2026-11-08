@@ -43,16 +43,14 @@ export function IntegrationStep({
   children,
 }: IntegrationStepProps) {
   return (
-    <section className="space-y-3 border-b border-gray-200 px-4 py-5 last:border-b-0 dark:border-gray-800">
+    <section className="space-y-3 border-b border-border-subtle px-4 py-5 last:border-b-0 ">
       <div className="flex items-center gap-2.5">
         <Tag size="sm" type="blue">
           Step {number}
         </Tag>
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-          {title}
-        </h3>
+        <h3 className="text-sm font-semibold text-foreground ">{title}</h3>
       </div>
-      <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+      <p className="text-sm text-muted ">{description}</p>
       {children}
     </section>
   );

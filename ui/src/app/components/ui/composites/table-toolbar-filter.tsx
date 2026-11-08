@@ -81,21 +81,21 @@ export function TableToolbarFilter({
           setLocalFilters(new Set(activeFilters));
           setOpen(!open);
         }}
-        className={cn(activeFilters.size > 0 && '!text-blue-600')}
+        className={cn(activeFilters.size > 0 && '!text-support-info')}
         tooltipPosition="bottom"
       />
       {open && (
         <PopoverContent className={cn('w-72 p-0', panelClassName)}>
           <div>
             {extraContent && (
-              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+              <div className="px-4 py-3 border-b border-border-subtle ">
                 {extraContent}
               </div>
             )}
             {filters.length > 0 && (
               <>
-                <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                  <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <div className="px-4 py-2 border-b border-border-subtle ">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted ">
                     {filtersTitle}
                   </p>
                 </div>
@@ -113,7 +113,7 @@ export function TableToolbarFilter({
                 </div>
               </>
             )}
-            <div className="flex border-t border-gray-200 dark:border-gray-700">
+            <div className="flex border-t border-border-subtle ">
               <Button
                 size="md"
                 kind="secondary"

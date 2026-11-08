@@ -84,7 +84,7 @@ export function JsonEditor({
 
   return (
     <div
-      className="json-editor-surface relative w-full bg-[var(--cds-field)] border-b-2 border-b-[var(--cds-border-strong)]"
+      className="json-editor-surface relative w-full border-b-2 border-b-border-strong bg-field"
       style={{ height }}
     >
       <Editor

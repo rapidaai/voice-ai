@@ -47,7 +47,7 @@ export const MicrophoneBargeIn: Story = {
           parameters={parameters}
           onChangeParameter={setParameters}
         />
-        <div className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-300">
+        <div className="inline-flex items-center gap-1 text-sm text-muted">
           Shared help label
           <HelpToggletip
             label="Shared help label"

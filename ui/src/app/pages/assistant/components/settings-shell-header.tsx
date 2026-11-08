@@ -5,7 +5,7 @@ import {
   HeaderGlobalBar,
   HeaderName,
 } from '@carbon/react';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
+import { CompactPageHeader } from '@/app/components/layout/compact-page-header';
 import { Text } from '@/app/components/ui/primitives';
 
 interface AssistantSettingsShellHeaderProps {
@@ -28,7 +28,7 @@ export function AssistantSettingsShellHeader({
   primaryAction,
 }: AssistantSettingsShellHeaderProps) {
   return (
-    <PageHeaderBlock aria-label={`${title} page header`}>
+    <CompactPageHeader aria-label={`${title} page header`}>
       <HeaderName href={href} prefix="" className="h-full px-0!">
         <span role="heading" aria-level={1} className="block min-w-0 truncate">
           <Text as="span" variant="heading-compact-01">
@@ -63,6 +63,6 @@ export function AssistantSettingsShellHeader({
           )}
         </HeaderGlobalBar>
       )}
-    </PageHeaderBlock>
+    </CompactPageHeader>
   );
 }

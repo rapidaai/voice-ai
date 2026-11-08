@@ -1,0 +1,85 @@
+.markdown-editor .cm-line,
+.prompt-editor .suggest-widget,
+.prompt-editor .suggest-details,
+.json-editor .suggest-widget,
+.json-editor .suggest-details {
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.monaco-editor {
+  position: absolute !important;
+}
+
+.monaco-editor,
+.monaco-editor-background,
+.prompt-editor .margin,
+.json-editor .margin,
+.code-highlighting-editor .margin,
+.ͼ42,
+.ͼo {
+  background: transparent !important;
+}
+
+.monaco-editor .margin-view-overlays .current-line,
+.monaco-editor .view-overlays .current-line,
+.cm-content {
+  border: none !important;
+}
+
+.monaco-editor-overlaymessage {
+  display: none !important;
+}
+
+.prompt-editor .monaco-editor,
+.prompt-editor.monaco-editor,
+.json-editor .monaco-editor,
+.json-editor.monaco-editor,
+.code-highlighting-editor .monaco-editor,
+.code-highlighting-editor.monaco-editor,
+.cm-editor {
+  outline: none !important;
+}
+
+.prompt-editor-placeholder {
+  color: var(--cds-text-secondary);
+}
+
+.json-editor-placeholder,
+.cm-line .cm-placeholder {
+  color: var(--cds-text-placeholder);
+}
+
+.json-editor-surface::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  pointer-events: none;
+  content: '';
+}
+
+.json-editor-surface:focus-within::after {
+  outline-color: var(--cds-focus);
+}
+
+.cm-content {
+  white-space: pre-wrap !important;
+  caret-color: var(--cds-text-primary) !important;
+}
+
+.cm-scroller {
+  line-height: 30px !important;
+}
+
+.cm-gutters {
+  color: var(--cds-text-secondary) !important;
+  background: var(--cds-layer-01) !important;
+  border: none !important;
+}
+
+.ͼ1 .cm-cursor,
+.ͼ1 .cm-dropCursor {
+  border-left: 1px solid var(--cds-text-primary) !important;
+  border-right: 1px solid var(--cds-background) !important;
+}

@@ -20,7 +20,7 @@ export const DurationBreakdownToggletip = ({
         label="View duration breakdown"
         title="View duration breakdown"
       >
-        <Information size={14} className="text-gray-500 dark:text-gray-400" />
+        <Information size={14} className="text-muted " />
       </ToggletipButton>
       <ToggletipContent>
         <div className="grid grid-cols-[auto_auto] gap-x-4 gap-y-1 text-xs">

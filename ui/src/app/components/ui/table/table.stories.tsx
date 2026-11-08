@@ -38,7 +38,7 @@ const columns = [
 
 export const BasicTable: Story = {
   render: () => (
-    <Table className="w-full border border-gray-200 dark:border-gray-800">
+    <Table className="w-full border border-border-subtle">
       <TableHead columns={columns} isActionable />
       <TableBody>
         <TableRow>
@@ -57,7 +57,7 @@ export const BasicTable: Story = {
         </TableRow>
         <TableRow>
           <TableCell>Support assistant</TableCell>
-          <LabelCell className="bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-200">
+          <LabelCell className="bg-layer-accent text-foreground">
             Draft
           </LabelCell>
           <UrlTableCell url="https://api.example.com/support" />

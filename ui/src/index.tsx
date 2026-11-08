@@ -9,20 +9,27 @@ import {
   ThemeProvider,
 } from '@/theme/theme-provider';
 import { CONFIG } from '@/configs';
-import { normalizeThemeManifest } from '@/theme/theme-config';
+import { parseThemeManifest } from '@/theme/theme-config';
 
 const rootElement = document.getElementById('root') as HTMLElement;
-const theme = normalizeThemeManifest(CONFIG.theme);
+const themeResult = parseThemeManifest(CONFIG.theme);
 
-applyThemeToDocument(theme, getInitialThemeState(theme).resolvedMode);
-initializeAnalytics();
+if (!themeResult.ok) {
+  document.title = 'Application configuration error';
+  rootElement.setAttribute('role', 'alert');
+  rootElement.textContent = 'Application configuration error';
+} else {
+  const { theme } = themeResult;
+  applyThemeToDocument(theme, getInitialThemeState(theme).resolvedMode);
+  initializeAnalytics();
 
-ReactDOM.createRoot(rootElement).render(
-  <HelmetProvider>
-    <React.StrictMode>
-      <ThemeProvider theme={theme}>
-        <App />
-      </ThemeProvider>
-    </React.StrictMode>
-  </HelmetProvider>,
-);
+  ReactDOM.createRoot(rootElement).render(
+    <HelmetProvider>
+      <React.StrictMode>
+        <ThemeProvider theme={theme}>
+          <App />
+        </ThemeProvider>
+      </React.StrictMode>
+    </HelmetProvider>,
+  );
+}

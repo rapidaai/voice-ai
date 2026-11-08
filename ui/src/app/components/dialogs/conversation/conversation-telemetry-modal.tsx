@@ -554,7 +554,7 @@ export function ConversationTelemetryDialog(
           </div>
         )}
         {structuredError !== '' && (
-          <div className="border-b border-border-subtle px-4 py-2 text-xs text-[var(--cds-text-error)]">
+          <div className="border-b border-border-subtle px-4 py-2 text-xs text-support-error">
             {structuredError}
           </div>
         )}

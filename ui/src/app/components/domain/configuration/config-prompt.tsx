@@ -193,7 +193,7 @@ export function ConfigPrompt({
           </Toggletip>
         </div>
         {showRuntimeReplacementHint && (
-          <div className="border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+          <div className="border border-border-subtle bg-layer ">
             <Button
               type="button"
               kind="ghost"
@@ -204,11 +204,11 @@ export function ConfigPrompt({
             >
               <span className="flex w-full min-w-0 flex-col items-stretch gap-1 text-left">
                 <span className="flex w-full min-w-0 items-center justify-between gap-2">
-                  <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[var(--cds-text-secondary)]">
+                  <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted">
                     Reserved Variables
                   </span>
                   <ChevronDown
-                    className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${showReservedVariables ? 'rotate-180' : ''}`}
+                    className={`h-4 w-4 shrink-0 text-muted transition-transform ${showReservedVariables ? 'rotate-180' : ''}`}
                   />
                 </span>
                 <InputHelper>
@@ -218,7 +218,7 @@ export function ConfigPrompt({
             </Button>
 
             {showReservedVariables && (
-              <div className="mt-2 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+              <div className="mt-2 border-t border-border-subtle bg-surface ">
                 <TableContainer>
                   <Table size="sm" useZebraStyles={false}>
                     <TableHead>
@@ -231,7 +231,7 @@ export function ConfigPrompt({
                       {RAPIDA_RESERVED_RUNTIME_VARIABLES.map(item => (
                         <TableRow key={item.variable}>
                           <TableCell>
-                            <code className="text-xs text-gray-700 dark:text-gray-200">
+                            <code className="text-xs text-muted ">
                               {item.variable}
                             </code>
                           </TableCell>
@@ -292,7 +292,7 @@ export function ConfigPrompt({
                     </ToggletipContent>
                   </Toggletip>
                 )}
-                <span className="text-xs tabular-nums text-gray-400 dark:text-gray-600">
+                <span className="text-xs tabular-nums text-muted ">
                   {existingPrompt.variables.length}
                 </span>
               </div>
@@ -332,11 +332,11 @@ export function ConfigPrompt({
                           />
                         ) : (
                           <span className="flex min-w-0 items-center gap-2">
-                            <code className="truncate font-mono text-xs font-semibold text-gray-800 dark:text-gray-200">
+                            <code className="truncate font-mono text-xs font-semibold text-foreground ">
                               {v.name}
                             </code>
                             {isReservedVariable && (
-                              <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-700 dark:text-blue-300 border border-blue-300/70 dark:border-blue-700/70">
+                              <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-support-info border border-support-info/70 ">
                                 Reserved
                               </span>
                             )}
@@ -380,7 +380,7 @@ export function ConfigPrompt({
                             }
                           />
                         ) : (
-                          <span className="text-gray-600 dark:text-gray-400">
+                          <span className="text-muted ">
                             {v.defaultvalue || 'No default value'}
                           </span>
                         )}
@@ -430,7 +430,7 @@ export function ConfigPrompt({
                 {existingPrompt.variables.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4}>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="text-sm text-muted ">
                         No template-specific variables yet. Add placeholders
                         like <code>{'{{customer_name}}'}</code> in instruction
                         messages to populate this list.

@@ -17,10 +17,6 @@ import { AssistantConversationRecording } from '@rapidaai/react';
 
 type AudioPlayerProps = {
   recording: AssistantConversationRecording;
-  assistantProgressColor?: string;
-  userProgressColor?: string;
-  cursorColor?: string;
-  buttonsColor?: string;
   barWidth?: number;
   barRadius?: number;
   barGap?: number;
@@ -35,14 +31,10 @@ type AudioPlayerProps = {
 
 export function AudioPlayer({
   recording,
-  assistantProgressColor = '#3b82f6',
-  userProgressColor = '#10b981',
-  cursorColor = '#3b82f6',
   barWidth = 2,
   barRadius = 2,
   barGap = 1,
   height = 100,
-  buttonsColor,
   volumeUpIcon,
   volumeMuteIcon,
   playbackSpeeds = [1, 1.5, 2],
@@ -50,6 +42,9 @@ export function AudioPlayer({
   onPause,
   onVolumeChange,
 }: AudioPlayerProps) {
+  const assistantProgressColor = 'var(--color-data-2)';
+  const userProgressColor = 'var(--color-data-4)';
+  const cursorColor = 'var(--color-data-2)';
   const assistantWaveformRef = useRef<HTMLDivElement | null>(null);
   const userWaveformRef = useRef<HTMLDivElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
@@ -301,10 +296,7 @@ export function AudioPlayer({
 
       <div ref={timelineRef} className="w-full" />
 
-      <div
-        className="flex w-full flex-col justify-between gap-3 md:flex-row md:items-center bg-white dark:bg-gray-900 border-y"
-        style={buttonsColor ? { color: buttonsColor } : undefined}
-      >
+      <div className="flex w-full flex-col justify-between gap-3 border-y bg-surface md:flex-row md:items-center">
         <div className="flex items-center justify-between divide-x border-r">
           <GhostButton
             size="md"
@@ -348,7 +340,7 @@ export function AudioPlayer({
               className={cn(
                 'rounded-none',
                 speed === playBackSpeed &&
-                  'bg-blue-600 text-white hover:bg-blue-600!',
+                  'bg-support-info text-inverse hover:bg-support-info!',
               )}
             >
               {speed}x

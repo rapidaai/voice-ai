@@ -15,8 +15,10 @@ import {
 } from '@/utils/metadata';
 import { useConversationLogPageStore } from '@/stores/activity/conversation-log.store';
 import { Helmet } from '@/app/components/app-shell/helmet';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
-import { PageTitleWithCount } from '@/app/components/layout/blocks/page-title-with-count';
+import {
+  PageHeader,
+  PageHeaderStickyToolbar,
+} from '@/app/components/layout/page-header';
 import { CONFIG } from '@/configs';
 import { CarbonStatusIndicator } from '@/app/components/ui/feedback';
 import SourceIndicator from '@/app/components/domain/indicators/source';
@@ -36,8 +38,11 @@ import {
   Tag,
   Link,
 } from '@carbon/react';
-import { Pagination } from '@/app/components/ui/primitives';
-import { IconOnlyButton } from '@/app/components/ui/primitives';
+import {
+  IconOnlyButton,
+  Pagination,
+  Text,
+} from '@/app/components/ui/primitives';
 import {
   Download,
   Renew,
@@ -49,7 +54,6 @@ import {
   Chat,
 } from '@carbon/icons-react';
 import { EmptyState } from '@/app/components/ui/feedback';
-import { ScrollableTableSection } from '@/app/components/layout/sections/table-section';
 import { ConversationLogQuerySearch } from './conversation-query-search';
 
 export const ListingPage: FC<{}> = () => {
@@ -225,42 +229,54 @@ export const ListingPage: FC<{}> = () => {
           currentAssistantMessage={currentActivity}
         />
       )}
-      <div className="h-full flex flex-col overflow-hidden">
+      <div
+        data-page-scroll
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+      >
         <Helmet title="Conversation Logs" />
-        <PageHeaderBlock>
-          <PageTitleWithCount
-            count={conversationLogAction.assistantMessages.length}
-            total={conversationLogAction.totalCount}
-          >
-            Conversation Logs
-          </PageTitleWithCount>
-        </PageHeaderBlock>
+        <PageHeader
+          eyebrow={
+            <Text variant="label-01" className="text-primary">
+              Observability
+            </Text>
+          }
+          title="Conversation Logs"
+          description="Review conversation events and message-level activity across assistants and deployments."
+          contextualActions={
+            <Text variant="label-01" className="text-muted tabular-nums">
+              {conversationLogAction.assistantMessages.length} of{' '}
+              {conversationLogAction.totalCount}
+            </Text>
+          }
+        />
 
         {/* ── Carbon Toolbar ── */}
-        <TableToolbar>
-          <TableToolbarContent>
-            <ConversationLogQuerySearch
-              value={querySearchValue}
-              onChange={setQuerySearchValue}
-              onApply={conversationLogAction.setCriterias}
-            />
-            <IconOnlyButton
-              kind="ghost"
-              size="lg"
-              renderIcon={Download}
-              iconDescription="Export as CSV"
-              isLoading={downloading}
-              onClick={() => onDownloadAllTraces()}
-            />
-            <IconOnlyButton
-              kind="ghost"
-              size="lg"
-              renderIcon={Renew}
-              iconDescription="Refresh"
-              onClick={() => get()}
-            />
-          </TableToolbarContent>
-        </TableToolbar>
+        <PageHeaderStickyToolbar>
+          <TableToolbar>
+            <TableToolbarContent>
+              <ConversationLogQuerySearch
+                value={querySearchValue}
+                onChange={setQuerySearchValue}
+                onApply={conversationLogAction.setCriterias}
+              />
+              <IconOnlyButton
+                kind="ghost"
+                size="lg"
+                renderIcon={Download}
+                iconDescription="Export as CSV"
+                isLoading={downloading}
+                onClick={() => onDownloadAllTraces()}
+              />
+              <IconOnlyButton
+                kind="ghost"
+                size="lg"
+                renderIcon={Renew}
+                iconDescription="Refresh"
+                onClick={() => get()}
+              />
+            </TableToolbarContent>
+          </TableToolbar>
+        </PageHeaderStickyToolbar>
 
         {/* ── Table ── */}
         {rapidaContext.loading ? (
@@ -268,7 +284,7 @@ export const ListingPage: FC<{}> = () => {
             <Loading withOverlay={false} small />
           </div>
         ) : conversationLogAction.assistantMessages.length > 0 ? (
-          <ScrollableTableSection>
+          <div className="shrink-0 overflow-x-auto">
             <Table className="min-w-max">
               <TableHead>
                 <TableRow>
@@ -342,7 +358,7 @@ export const ListingPage: FC<{}> = () => {
                             </span>
                           </Tag>
                         ) : (
-                          <span className="text-gray-400 text-sm">N/A</span>
+                          <span className="text-muted text-sm">N/A</span>
                         )}
                       </TableCell>
                     )}
@@ -353,7 +369,7 @@ export const ListingPage: FC<{}> = () => {
                             {row.getBody()}
                           </p>
                         ) : (
-                          <span className="text-gray-400 text-sm">N/A</span>
+                          <span className="text-muted text-sm">N/A</span>
                         )}
                       </TableCell>
                     )}
@@ -513,7 +529,7 @@ export const ListingPage: FC<{}> = () => {
                 ))}
               </TableBody>
             </Table>
-          </ScrollableTableSection>
+          </div>
         ) : (
           <EmptyState
             icon={Chat}
@@ -525,6 +541,7 @@ export const ListingPage: FC<{}> = () => {
         {/* ── Pagination ── */}
         {conversationLogAction.assistantMessages.length > 0 && (
           <Pagination
+            sticky
             totalItems={conversationLogAction.totalCount}
             page={conversationLogAction.page}
             pageSize={conversationLogAction.pageSize}

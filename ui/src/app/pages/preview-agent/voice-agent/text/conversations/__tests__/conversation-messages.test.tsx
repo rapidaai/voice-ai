@@ -103,4 +103,22 @@ describe('ConversationMessages', () => {
     );
     expect(screen.queryByText('Rapida')).not.toBeInTheDocument();
   });
+
+  it('exposes message actions as named Carbon buttons', () => {
+    render(
+      <ThemeProvider theme={tenantTheme}>
+        <ConversationMessages vag={{} as any} />
+      </ThemeProvider>,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Copy message' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Helpful' }),
+    ).toHaveAttribute('aria-pressed', 'false');
+    expect(
+      screen.getByRole('button', { name: 'Not helpful' }),
+    ).toHaveAttribute('aria-pressed', 'false');
+  });
 });

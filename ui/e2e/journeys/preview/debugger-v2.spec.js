@@ -141,7 +141,7 @@ for (const viewport of SCREENSHOT_VIEWPORTS) {
 
       await page.getByRole('button', { name: 'Configuration' }).click();
       const languageModel = page.getByRole('button', {
-        name: /Language model, OpenAI, gpt-4\.1-mini/,
+        name: /Language model, openai, gpt-4\.1-mini/i,
       });
       await expect(page.getByText('rapida.credential_id')).toHaveCount(0);
       await expect(page.getByText('credential-secret-123')).toHaveCount(0);

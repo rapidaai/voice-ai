@@ -1,11 +1,9 @@
-import React, { FC, useEffect, useState } from 'react';
+import { FC, useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { toHumanReadableDateTime } from '@/utils/date';
-import { ObjectStorage } from '@carbon/icons-react';
+import { Edit, ObjectStorage, Power, TrashCan } from '@carbon/icons-react';
 import { useCurrentCredential } from '@/hooks/use-credential';
-import { useRapidaStore } from '@/stores/app';
-import { SectionLoader } from '@/app/components/ui/feedback';
 import toast from 'react-hot-toast/headless';
 import { EmptyState } from '@/app/components/ui/feedback';
 import { CreateAssistantStorage } from './create-assistant-storage';
@@ -19,22 +17,25 @@ import {
   ModalBody,
   ModalFooter,
   ModalHeader,
-  OverflowMenu,
-  OverflowMenuItem,
+  DataTable,
+  DataTableSkeleton,
   Table,
+  TableBatchAction,
+  TableBatchActions,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
+  TableSelectRow,
+  TableToolbar,
+  TableToolbarContent,
+  TableToolbarSearch,
   Tag,
 } from '@carbon/react';
 import { AssistantConfiguration, Metadata } from '@rapidaai/react';
 import { Pagination } from '@/app/components/ui/primitives';
-import {
-  ScrollableTableSection,
-  TableSection,
-} from '@/app/components/layout/sections/table-section';
+import { TableSection } from '@/app/components/layout/sections/table-section';
 import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
 
 export function ConfigureAssistantStoragePage() {
@@ -81,6 +82,16 @@ const getStorageTarget = (storage: AssistantConfiguration) => {
   }
 };
 
+const headers = [
+  { key: 'provider', header: 'Provider' },
+  { key: 'type', header: 'Type' },
+  { key: 'target', header: 'Target' },
+  { key: 'status', header: 'Status' },
+  { key: 'created', header: 'Created' },
+];
+
+const skeletonHeaders = [{ key: 'select', header: '' }, ...headers];
+
 type StorageAction = {
   kind: 'enable' | 'disable' | 'delete';
   storage: AssistantConfiguration;
@@ -92,16 +103,12 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
   const navigation = useGlobalNavigation();
   const action = useAssistantStoragePageStore();
   const { authId, token, projectId } = useCurrentCredential();
-  const { loading, showLoader, hideLoader } = useRapidaStore();
+  const [isFetching, setIsFetching] = useState(true);
   const [pendingStorageAction, setPendingStorageAction] =
     useState<StorageAction | null>(null);
 
-  useEffect(() => {
-    showLoader('block');
-    get();
-  }, [assistantId, projectId, token, authId, action.page, action.pageSize]);
-
-  const get = () => {
+  const get = useCallback(() => {
+    setIsFetching(true);
     action.getAssistantStorage(
       assistantId,
       projectId,
@@ -109,16 +116,20 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
       authId,
       error => {
         toast.error(error);
-        hideLoader();
+        setIsFetching(false);
       },
       () => {
-        hideLoader();
+        setIsFetching(false);
       },
     );
-  };
+  }, [assistantId, projectId, token, authId, action.getAssistantStorage]);
+
+  useEffect(() => {
+    get();
+  }, [get, action.page, action.pageSize]);
 
   const deleteStorage = (storageId: string) => {
-    showLoader('block');
+    setIsFetching(true);
     action.deleteAssistantStorage(
       assistantId,
       storageId,
@@ -127,7 +138,7 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
       authId,
       error => {
         toast.error(error);
-        hideLoader();
+        setIsFetching(false);
       },
       () => {
         toast.success('Storage deleted successfully');
@@ -141,7 +152,7 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
     storage: AssistantConfiguration,
     enabled: boolean,
   ) => {
-    showLoader('block');
+    setIsFetching(true);
     action.updateAssistantStorageEnabled(
       assistantId,
       storage,
@@ -151,7 +162,7 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
       authId,
       error => {
         toast.error(error);
-        hideLoader();
+        setIsFetching(false);
       },
       () => {
         toast.success(
@@ -182,16 +193,20 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
         ? 'Disable'
         : 'Delete';
 
-  if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center">
-        <SectionLoader />
-      </div>
-    );
-  }
+  const tableRows = action.storages.map(storage => {
+    const provider = storage.getProvider();
+    return {
+      id: storage.getId(),
+      provider: providerNameByCode.get(provider) || provider,
+      type: storage.getConfigurationtype() || 'storage',
+      target: getStorageTarget(storage),
+      status: storage.getStatus(),
+      created: storage.getCreateddate()?.toString() || '',
+    };
+  });
 
   return (
-    <div className="flex h-full flex-1 flex-col bg-surface">
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-surface">
       <ComposedModal
         open={Boolean(pendingStorageAction)}
         onClose={() => setPendingStorageAction(null)}
@@ -243,118 +258,192 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
         }}
       />
 
-      <TableSection>
-        {action.storages.length > 0 ? (
-          <>
-            <ScrollableTableSection>
-              <Table className="min-w-max">
-                <TableHead>
-                  <TableRow>
-                    <TableHeader>Provider</TableHeader>
-                    <TableHeader>Type</TableHeader>
-                    <TableHeader>Target</TableHeader>
-                    <TableHeader>Status</TableHeader>
-                    <TableHeader>Created</TableHeader>
-                    <TableHeader>Actions</TableHeader>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {action.storages.map(row => {
-                    const provider = row.getProvider();
-                    const providerName =
-                      providerNameByCode.get(provider) || provider;
-                    return (
-                      <TableRow key={row.getId()}>
-                        <TableCell className="text-sm">
-                          {providerName}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          <Tag type="blue" size="sm">
-                            {row.getConfigurationtype() || 'storage'}
-                          </Tag>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {getStorageTarget(row)}
-                        </TableCell>
-                        <TableCell className="text-sm whitespace-nowrap">
-                          <RecordStatusIndicator
-                            state={row.getStatus()}
-                            textSize={14}
-                          />
-                        </TableCell>
-                        <TableCell className="text-[13px] whitespace-nowrap">
-                          {row.getCreateddate()
-                            ? toHumanReadableDateTime(row.getCreateddate()!)
-                            : '-'}
-                        </TableCell>
-                        <TableCell
-                          className="text-sm"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <OverflowMenu
-                            size="sm"
-                            flipped
-                            aria-label="Storage actions"
-                          >
-                            <OverflowMenuItem
-                              itemText="Edit"
-                              onClick={() =>
-                                navigation.goToEditAssistantStorage(
-                                  assistantId,
-                                  row.getId(),
-                                )
-                              }
-                            />
-                            <OverflowMenuItem
-                              itemText={row.getEnabled() ? 'Disable' : 'Enable'}
-                              onClick={() =>
-                                setPendingStorageAction({
-                                  kind: row.getEnabled() ? 'disable' : 'enable',
-                                  storage: row,
-                                })
-                              }
-                            />
-                            <OverflowMenuItem
-                              itemText="Delete"
-                              isDelete
-                              onClick={() =>
-                                setPendingStorageAction({
-                                  kind: 'delete',
-                                  storage: row,
-                                })
-                              }
-                            />
-                          </OverflowMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </ScrollableTableSection>
-            <Pagination
-              totalItems={action.totalCount}
-              page={action.page}
-              pageSize={action.pageSize}
-              pageSizes={[10, 20, 50]}
-              onChange={({ page: newPage, pageSize: newSize }) => {
-                if (newSize !== action.pageSize) {
-                  action.setPageSize(newSize);
-                  return;
-                }
-                action.setPage(newPage);
-              }}
-            />
-          </>
-        ) : (
-          <EmptyState
+      {isFetching ? (
+        <TableSection className="min-h-0 overflow-hidden bg-surface">
+          <DataTableSkeleton
+            headers={skeletonHeaders}
+            columnCount={skeletonHeaders.length}
+            rowCount={5}
+            showHeader={false}
+            showToolbar
+            size="lg"
             className="w-full"
+          />
+        </TableSection>
+      ) : action.storages.length > 0 ? (
+        <TableSection className="min-h-0 bg-surface">
+          <DataTable rows={tableRows} headers={headers} radio>
+            {({
+              rows,
+              headers: tableHeaders,
+              selectedRows,
+              getBatchActionProps,
+              getHeaderProps,
+              getRowProps,
+              getSelectionProps,
+              getTableProps,
+              getToolbarProps,
+              onInputChange,
+            }) => {
+              const batchActionProps = getBatchActionProps();
+              const selectedStorage = selectedRows[0]
+                ? action.storages.find(
+                    storage => storage.getId() === selectedRows[0].id,
+                  )
+                : undefined;
+
+              return (
+                <>
+                  <TableToolbar {...getToolbarProps()}>
+                    {selectedStorage && (
+                      <TableBatchActions
+                        {...batchActionProps}
+                        shouldShowBatchActions
+                      >
+                        <TableBatchAction
+                          renderIcon={Edit}
+                          iconDescription="Edit"
+                          onClick={() => {
+                            navigation.goToEditAssistantStorage(
+                              assistantId,
+                              selectedStorage.getId(),
+                            );
+                            batchActionProps.onCancel();
+                          }}
+                        >
+                          Edit
+                        </TableBatchAction>
+                        <TableBatchAction
+                          renderIcon={Power}
+                          iconDescription={
+                            selectedStorage.getEnabled() ? 'Disable' : 'Enable'
+                          }
+                          onClick={() => {
+                            setPendingStorageAction({
+                              kind: selectedStorage.getEnabled()
+                                ? 'disable'
+                                : 'enable',
+                              storage: selectedStorage,
+                            });
+                            batchActionProps.onCancel();
+                          }}
+                        >
+                          {selectedStorage.getEnabled() ? 'Disable' : 'Enable'}
+                        </TableBatchAction>
+                        <TableBatchAction
+                          renderIcon={TrashCan}
+                          iconDescription="Delete"
+                          onClick={() => {
+                            setPendingStorageAction({
+                              kind: 'delete',
+                              storage: selectedStorage,
+                            });
+                            batchActionProps.onCancel();
+                          }}
+                        >
+                          Delete
+                        </TableBatchAction>
+                      </TableBatchActions>
+                    )}
+                    <TableToolbarContent>
+                      <TableToolbarSearch
+                        placeholder="Search storage..."
+                        onChange={onInputChange}
+                      />
+                    </TableToolbarContent>
+                  </TableToolbar>
+                  <div className="min-h-0 flex-1 overflow-auto">
+                    <Table {...getTableProps()} className="min-w-max">
+                      <TableHead>
+                        <TableRow>
+                          <TableHeader className="!w-12" />
+                          {tableHeaders.map(header => (
+                            <TableHeader
+                              {...getHeaderProps({ header })}
+                              key={header.key}
+                            >
+                              {header.header}
+                            </TableHeader>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {rows.map(tableRow => {
+                          const storage = action.storages.find(
+                            candidate => candidate.getId() === tableRow.id,
+                          );
+                          if (!storage) return null;
+
+                          const provider = storage.getProvider();
+                          const providerName =
+                            providerNameByCode.get(provider) || provider;
+
+                          return (
+                            <TableRow
+                              {...getRowProps({ row: tableRow })}
+                              key={tableRow.id}
+                            >
+                              <TableSelectRow
+                                {...getSelectionProps({ row: tableRow })}
+                              />
+                              <TableCell className="text-sm">
+                                {providerName}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                <Tag type="blue" size="sm">
+                                  {storage.getConfigurationtype() || 'storage'}
+                                </Tag>
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {getStorageTarget(storage)}
+                              </TableCell>
+                              <TableCell className="text-sm whitespace-nowrap">
+                                <RecordStatusIndicator
+                                  state={storage.getStatus()}
+                                  textSize={14}
+                                />
+                              </TableCell>
+                              <TableCell className="text-[13px] whitespace-nowrap">
+                                {storage.getCreateddate()
+                                  ? toHumanReadableDateTime(
+                                      storage.getCreateddate()!,
+                                    )
+                                  : '-'}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <Pagination
+                    sticky
+                    totalItems={action.totalCount}
+                    page={action.page}
+                    pageSize={action.pageSize}
+                    pageSizes={[10, 20, 50]}
+                    onChange={({ page: newPage, pageSize: newSize }) => {
+                      if (newSize !== action.pageSize) {
+                        action.setPageSize(newSize);
+                        return;
+                      }
+                      action.setPage(newPage);
+                    }}
+                  />
+                </>
+              );
+            }}
+          </DataTable>
+        </TableSection>
+      ) : (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState
             icon={ObjectStorage}
             title="No Storage"
             subtitle="There are no assistant storage configurations found."
           />
-        )}
-      </TableSection>
+        </div>
+      )}
     </div>
   );
 };

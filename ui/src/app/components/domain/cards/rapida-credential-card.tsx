@@ -82,9 +82,9 @@ export const RapidaCredentialCard = () => {
   };
 
   return (
-    <div className="border border-gray-200 dark:border-gray-800">
-      <div className="h-10 px-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-800">
-        <span className="text-xs font-medium uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+    <div className="border border-border-subtle ">
+      <div className="h-10 px-4 flex items-center justify-between border-b border-border-subtle ">
+        <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted ">
           SDK Credentials
         </span>
         <ReloadButton
@@ -104,22 +104,22 @@ export const RapidaCredentialCard = () => {
           />
         </div>
       ) : (
-        <div className="divide-y divide-gray-200 dark:divide-gray-800">
+        <div className="divide-y divide-border-subtle ">
           {ourKeys.map((x, idx) => (
             <div
               key={idx}
               className="h-12 px-4 flex items-center justify-between gap-4"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className="text-xs font-medium uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400 shrink-0">
+                <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted shrink-0">
                   Publishable key
                 </span>
-                <span className="font-mono text-xs text-gray-900 dark:text-gray-100 truncate">
+                <span className="font-mono text-xs text-foreground truncate">
                   {x.getKey()}
                 </span>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                <span className="text-xs tabular-nums text-muted ">
                   {x.getCreateddate()
                     ? toHumanReadableRelativeDay(x.getCreateddate()!)
                     : '—'}

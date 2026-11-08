@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { PageActionButtonBlock } from '../page-action-button-block';
-import { PageHeaderBlock } from '../page-header-block';
+import { CompactPageHeader } from '../../compact-page-header';
 import { PageTitleBlock } from '../page-title-block';
 import { PageTitleWithCount } from '../page-title-with-count';
 import { PaginationButtonBlock } from '../pagination-button-block';
@@ -10,7 +10,7 @@ import { SectionDivider } from '../section-divider';
 describe('layout page blocks', () => {
   it('renders header, title, count, pagination, and divider content', () => {
     render(
-      <PageHeaderBlock>
+      <CompactPageHeader>
         <PageTitleWithCount count={3} data-testid="title-count" total={8}>
           Assistants
         </PageTitleWithCount>
@@ -18,7 +18,7 @@ describe('layout page blocks', () => {
           <button type="button">Previous</button>
           <button type="button">Next</button>
         </PaginationButtonBlock>
-      </PageHeaderBlock>,
+      </CompactPageHeader>,
     );
 
     expect(screen.getByText('Assistants')).toBeInTheDocument();
@@ -59,11 +59,11 @@ describe('layout page blocks', () => {
 
   it('supports caller div attributes for title and header blocks', () => {
     render(
-      <PageHeaderBlock aria-label="Page toolbar" data-testid="page-header">
+      <CompactPageHeader aria-label="Page toolbar" data-testid="page-header">
         <PageTitleBlock className="custom-title" id="page-title">
           Deployments
         </PageTitleBlock>
-      </PageHeaderBlock>,
+      </CompactPageHeader>,
     );
 
     expect(screen.getByTestId('page-header')).toHaveAccessibleName(
@@ -73,6 +73,7 @@ describe('layout page blocks', () => {
       'border-border-subtle',
       'bg-shell',
     );
+    expect(screen.getByTestId('page-header').tagName).toBe('HEADER');
     expect(screen.getByText('Deployments')).toHaveClass('custom-title');
     expect(screen.getByText('Deployments')).toHaveAttribute('id', 'page-title');
     expect(screen.getByText('Deployments')).toHaveClass('text-foreground');

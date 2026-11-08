@@ -27,14 +27,22 @@ jest.mock(
   }),
 );
 
-jest.mock('@/app/components/layout/blocks/page-header-block', () => ({
-  PageHeaderBlock: ({ children, className }: any) => (
-    <header className={className}>{children}</header>
+jest.mock('@/app/components/layout/page-header', () => ({
+  PageHeader: ({
+    title,
+    description,
+    eyebrow,
+    titleStart,
+    contextualActions,
+  }: any) => (
+    <header>
+      {eyebrow}
+      {titleStart}
+      <h1>{title}</h1>
+      {contextualActions}
+      <p>{description}</p>
+    </header>
   ),
-}));
-
-jest.mock('@/app/components/layout/blocks/page-title-block', () => ({
-  PageTitleBlock: ({ children }: any) => <div>{children}</div>,
 }));
 
 jest.mock('@/app/components/layout/blocks/pagination-button-block', () => ({
@@ -128,7 +136,12 @@ describe('CartesiaModelInformationPage', () => {
     renderPage();
 
     const providerHeader = screen.getByRole('banner');
-    expect(providerHeader).toHaveClass('min-h-24');
+    expect(providerHeader.closest('[data-page-scroll]')).toHaveClass(
+      'overflow-y-auto',
+      'overflow-x-hidden',
+    );
+    expect(providerHeader).toHaveTextContent('Integrations');
+    expect(providerHeader).toHaveTextContent('Cartesia');
     expect(providerHeader).not.toContainElement(
       screen.getByRole('button', { name: /add new credential/i }),
     );

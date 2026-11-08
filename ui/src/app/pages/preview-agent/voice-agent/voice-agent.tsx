@@ -17,7 +17,14 @@ import { Notification, LinkNotification } from '@/app/components/ui/feedback';
 import { GhostButton, IconOnlyButton } from '@/app/components/ui/primitives';
 import { EmptyState } from '@/app/components/ui/feedback';
 import { Activity, Copy, FilterRemove } from '@carbon/icons-react';
-import { DismissibleTag, Tag } from '@carbon/react';
+import {
+  DismissibleTag,
+  Table as CarbonTable,
+  TableBody,
+  TableCell,
+  TableRow,
+  Tag,
+} from '@carbon/react';
 import { Tabs } from '@/app/components/ui/primitives';
 import { Text } from '@/app/components/ui/primitives';
 import { ArrowLeft } from '@carbon/icons-react';
@@ -71,23 +78,29 @@ function getEventLabel(entry: EventEntry): string {
 // ---------------------------------------------------------------------------
 
 const EVENT_COLORS: Record<string, string> = {
-  session: 'text-gray-500 dark:text-gray-400',
-  stt: 'text-green-600 dark:text-green-400',
-  llm: 'text-blue-600 dark:text-blue-400',
-  tts: 'text-violet-600 dark:text-violet-400',
-  vad: 'text-yellow-600 dark:text-yellow-400',
-  eos: 'text-cyan-600 dark:text-cyan-400',
-  denoise: 'text-orange-600 dark:text-orange-400',
-  audio: 'text-slate-600 dark:text-slate-400',
-  tool: 'text-pink-600 dark:text-pink-400',
-  behavior: 'text-rose-600 dark:text-rose-400',
-  knowledge: 'text-teal-600 dark:text-teal-400',
+  session: 'text-muted ',
+  stt: 'text-support-success ',
+  llm: 'text-support-info ',
+  tts: 'text-data-1 ',
+  vad: 'text-support-warning ',
+  eos: 'text-support-info ',
+  denoise: 'text-support-warning ',
+  audio: 'text-muted ',
+  tool: 'text-data-5 ',
+  behavior: 'text-support-error ',
+  knowledge: 'text-support-info ',
 };
 
-const ConversationEventRow: FC<{ entry: EventEntry }> = ({ entry }) => {
+export const ConversationEventRow: FC<{ entry: EventEntry }> = ({ entry }) => {
   const [expanded, setExpanded] = useState(false);
   const ts = entry.ts.toISOString().slice(11, 23);
   const toggle = () => setExpanded(p => !p);
+  const onToggleKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggle();
+    }
+  };
 
   if (entry.type === 'pipelineEvent') {
     const { name, dataMap, id, time } = entry.payload as {
@@ -97,42 +110,45 @@ const ConversationEventRow: FC<{ entry: EventEntry }> = ({ entry }) => {
       time?: unknown;
     };
     const data = Object.fromEntries(dataMap ?? []);
-    const color = EVENT_COLORS[name] ?? 'text-gray-500 dark:text-gray-400';
+    const color = EVENT_COLORS[name] ?? 'text-muted ';
     const jsonPayload = { id, time, ...data };
 
     return (
       <>
-        <tr
-          className="hover:bg-gray-100 dark:hover:bg-gray-800/60 cursor-pointer select-text"
+        <TableRow
+          aria-expanded={expanded}
+          className="hover:bg-layer cursor-pointer select-text"
           onClick={toggle}
+          onKeyDown={onToggleKeyDown}
+          tabIndex={0}
         >
-          <td className="pl-3 pr-2 py-[3px] whitespace-nowrap tabular-nums text-gray-400 dark:text-gray-500">
+          <TableCell className="pl-3 pr-2 py-[3px] whitespace-nowrap tabular-nums text-muted ">
             {ts}
-          </td>
-          <td
+          </TableCell>
+          <TableCell
             className={cn(
               'px-2 py-[3px] whitespace-nowrap font-semibold',
               color,
             )}
           >
             {name}
-          </td>
-          <td
+          </TableCell>
+          <TableCell
             colSpan={2}
-            className="px-2 pr-3 py-[3px] text-gray-600 dark:text-gray-300 max-w-0 overflow-hidden truncate"
+            className="px-2 pr-3 py-[3px] text-muted max-w-0 overflow-hidden truncate"
           >
             {JSON.stringify(jsonPayload)}
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
         {expanded && (
-          <tr className="bg-gray-50 dark:bg-gray-800/40">
-            <td />
-            <td colSpan={3} className="pl-2 pr-3 pt-1 pb-2">
-              <pre className="whitespace-pre-wrap break-all text-gray-700 dark:text-gray-200 text-sm/6">
+          <TableRow className="bg-layer ">
+            <TableCell />
+            <TableCell colSpan={3} className="pl-2 pr-3 pt-1 pb-2">
+              <pre className="whitespace-pre-wrap break-all text-muted text-sm/6">
                 {JSON.stringify(jsonPayload, null, 2)}
               </pre>
-            </td>
-          </tr>
+            </TableCell>
+          </TableRow>
         )}
       </>
     );
@@ -154,50 +170,53 @@ const ConversationEventRow: FC<{ entry: EventEntry }> = ({ entry }) => {
 
   const labelColor =
     entry.type === 'userMessage'
-      ? 'text-emerald-600 dark:text-emerald-400'
+      ? 'text-support-success '
       : entry.type === 'assistantMessage'
-        ? 'text-indigo-600 dark:text-indigo-400'
+        ? 'text-data-1 '
         : entry.type === 'interrupt'
-          ? 'text-orange-600 dark:text-orange-400'
+          ? 'text-support-warning '
           : entry.type === 'configuration'
-            ? 'text-sky-600 dark:text-sky-400'
+            ? 'text-support-info '
             : entry.type === 'metric'
-              ? 'text-lime-600 dark:text-lime-400'
-              : 'text-red-600 dark:text-red-400';
+              ? 'text-support-success '
+              : 'text-support-error ';
 
   return (
     <>
-      <tr
-        className="hover:bg-gray-100 dark:hover:bg-gray-800/60 cursor-pointer select-text"
+      <TableRow
+        aria-expanded={expanded}
+        className="hover:bg-layer cursor-pointer select-text"
         onClick={toggle}
+        onKeyDown={onToggleKeyDown}
+        tabIndex={0}
       >
-        <td className="pl-3 pr-2 py-[3px] whitespace-nowrap tabular-nums text-gray-400 dark:text-gray-500">
+        <TableCell className="pl-3 pr-2 py-[3px] whitespace-nowrap tabular-nums text-muted ">
           {ts}
-        </td>
-        <td
+        </TableCell>
+        <TableCell
           className={cn(
             'px-2 py-[3px] whitespace-nowrap font-semibold',
             labelColor,
           )}
         >
           {label}
-        </td>
-        <td
+        </TableCell>
+        <TableCell
           colSpan={2}
-          className="px-2 pr-3 py-[3px] text-gray-600 dark:text-gray-300 max-w-0 overflow-hidden truncate"
+          className="px-2 pr-3 py-[3px] text-muted max-w-0 overflow-hidden truncate"
         >
           {JSON.stringify(entry.payload)}
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
       {expanded && (
-        <tr className="bg-gray-50 dark:bg-gray-800/40">
-          <td />
-          <td colSpan={3} className="pl-2 pr-3 pt-1 pb-2">
-            <pre className="whitespace-pre-wrap break-all text-gray-700 dark:text-gray-200 text-sm/6">
+        <TableRow className="bg-layer ">
+          <TableCell />
+          <TableCell colSpan={3} className="pl-2 pr-3 pt-1 pb-2">
+            <pre className="whitespace-pre-wrap break-all text-muted text-sm/6">
               {JSON.stringify(entry.payload, null, 2)}
             </pre>
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       )}
     </>
   );
@@ -375,7 +394,7 @@ export const VoiceAgent: FC<{
   const enableVoiceHref = `/deployment/assistant/${agentConfig.id}/deployment/debugger`;
 
   return (
-    <div className="flex h-dvh min-h-0 flex-col bg-white text-sm/6 dark:bg-gray-950">
+    <div className="flex h-dvh min-h-0 flex-col bg-surface text-sm/6 ">
       <PreviewAgentHeader />
       <PanelGroup
         className="!flex !min-h-0 !flex-1 !overflow-hidden"
@@ -385,12 +404,12 @@ export const VoiceAgent: FC<{
         <Panel
           defaultSize={70}
           minSize={55}
-          className="flex h-full flex-col overflow-hidden bg-white dark:bg-gray-950"
+          className="flex h-full flex-col overflow-hidden bg-surface "
         >
           {/* Header */}
           <div className="shrink-0">
             {debug && (
-              <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border-subtle ">
                 <IconOnlyButton
                   kind="ghost"
                   size="sm"
@@ -400,7 +419,7 @@ export const VoiceAgent: FC<{
                     window.location.href = `/deployment/assistant/${agentConfig.id}/overview`;
                   }}
                 />
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                <span className="text-sm font-medium text-foreground ">
                   Back to Assistant
                 </span>
               </div>
@@ -451,7 +470,7 @@ export const VoiceAgent: FC<{
               />
             )}
             {/* Tab bar */}
-            <div className="border-b border-gray-200 dark:border-gray-800">
+            <div className="border-b border-border-subtle ">
               <Tabs
                 tabs={[
                   'Messages',
@@ -486,8 +505,8 @@ export const VoiceAgent: FC<{
             <div className="flex flex-col flex-1 min-h-0">
               {/* Filter bar */}
               {availableEventLabels.length > 0 && (
-                <div className="shrink-0 flex flex-wrap items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-800">
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 select-none">
+                <div className="shrink-0 flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border-subtle ">
+                  <span className="text-xs font-medium text-muted select-none">
                     Filter
                   </span>
                   {availableEventLabels.map(label =>
@@ -539,19 +558,19 @@ export const VoiceAgent: FC<{
                     className="h-full"
                   />
                 ) : (
-                  <table className="w-full table-fixed font-mono text-sm/6 border-collapse">
+                  <CarbonTable className="w-full table-fixed font-mono text-sm/6 border-collapse">
                     <colgroup>
                       <col className="w-[9rem]" />
                       <col className="w-[6rem]" />
                       <col className="w-[10rem]" />
                       <col />
                     </colgroup>
-                    <tbody>
+                    <TableBody>
                       {filteredEvents.map((entry, i) => (
                         <ConversationEventRow key={i} entry={entry} />
                       ))}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </CarbonTable>
                 )}
                 <div ref={eventsBottomRef} />
               </div>
@@ -567,7 +586,7 @@ export const VoiceAgent: FC<{
           />
         </Panel>
 
-        <PanelResizeHandle className="flex w-px! bg-gray-200 dark:bg-gray-800 hover:bg-blue-700 dark:hover:bg-blue-500 items-stretch"></PanelResizeHandle>
+        <PanelResizeHandle className="flex w-px! bg-layer hover:bg-support-info items-stretch"></PanelResizeHandle>
         {/* ── Right: assistant + metrics ──────────────────────────────── */}
         <Panel
           defaultSize={30}
@@ -630,7 +649,7 @@ export const VoiceAgentDebugger: FC<{
   return (
     <div className="flex flex-col h-full overflow-hidden text-sm">
       {/* Tab bar */}
-      <div className="border-b border-gray-200 dark:border-gray-800">
+      <div className="border-b border-border-subtle ">
         <Tabs
           tabs={[
             'Configuration',
@@ -789,7 +808,7 @@ const AssistantPlaceholder: FC<{
         isLoading={isLoading}
         heading
         skeletonWidth="200px"
-        className="text-2xl font-semibold text-gray-800 dark:text-gray-100 italic"
+        className="text-2xl font-semibold text-foreground italic"
       >
         Hello,
       </Text>
@@ -797,7 +816,7 @@ const AssistantPlaceholder: FC<{
         as="span"
         isLoading={isLoading}
         skeletonWidth="280px"
-        className="text-lg text-gray-400 dark:text-gray-500 font-semibold italic"
+        className="text-lg text-muted font-semibold italic"
       >
         How can I help you today?
       </Text>
@@ -808,24 +827,20 @@ const AssistantPlaceholder: FC<{
 const DebuggerScrollArea: FC<{ children: React.ReactNode }> = ({
   children,
 }) => (
-  <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950">
-    {children}
-  </div>
+  <div className="flex-1 min-h-0 overflow-y-auto bg-surface ">{children}</div>
 );
 
 export const DebuggerTabHeader: FC<{
   title: string;
   subtitle?: string;
 }> = ({ title, subtitle }) => (
-  <div className="border-b border-gray-200/90 px-4 py-3 dark:border-gray-800">
+  <div className="border-b border-border-subtle/90 px-4 py-3 ">
     <div className="min-w-0">
-      <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+      <h3 className="truncate text-sm font-semibold text-foreground ">
         {title}
       </h3>
       {subtitle && (
-        <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
-          {subtitle}
-        </p>
+        <p className="mt-0.5 truncate text-xs text-muted ">{subtitle}</p>
       )}
     </div>
   </div>
@@ -847,7 +862,7 @@ export const ArgumentList: FC<{
   }
 
   return (
-    <div className="divide-y divide-gray-200/90 border-b border-gray-200/90 dark:divide-gray-800 dark:border-gray-800">
+    <div className="divide-y divide-border-subtle/90 border-b border-border-subtle/90 ">
       {variables.map(variable => (
         <ArgumentRow
           key={variable.getName()}
@@ -877,13 +892,13 @@ const ArgumentRow: FC<{
       <div className="mb-2 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div
-            className="truncate font-mono text-sm font-semibold text-gray-900 dark:text-gray-100"
+            className="truncate font-mono text-sm font-semibold text-foreground "
             title={variable.getName()}
           >
             {`{{${variable.getName()}}}`}
           </div>
           {variable.getDefaultvalue() && (
-            <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+            <div className="mt-0.5 truncate text-xs text-muted ">
               Default value loaded
             </div>
           )}
@@ -913,7 +928,7 @@ const ArgumentRow: FC<{
 };
 
 const ArgumentTypePill: FC<{ type: string }> = ({ type }) => (
-  <span className="shrink-0 border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium lowercase text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
+  <span className="shrink-0 border border-border-subtle bg-layer px-2 py-1 text-xs font-medium lowercase text-muted ">
     {type || 'unknown'}
   </span>
 );
@@ -925,7 +940,7 @@ export const ConfigBlock: FC<{
   skeletonRows?: number;
 }> = ({ title, children, isLoading = false, skeletonRows = 3 }) => (
   <section>
-    <div className="border-y border-gray-200/90 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-500 dark:border-gray-800 dark:text-gray-400">
+    <div className="border-y border-border-subtle/90 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-muted ">
       {title}
     </div>
     {isLoading ? (
@@ -945,15 +960,15 @@ export const InfoRow: FC<{ label: string; value: string }> = ({
   };
 
   return (
-    <div className="grid grid-cols-[8rem_minmax(0,1fr)_2rem] items-center gap-x-3 border-t border-gray-100/80 py-2.5 first:border-t-0 dark:border-gray-900/80">
+    <div className="grid grid-cols-[8rem_minmax(0,1fr)_2rem] items-center gap-x-3 border-t border-border-subtle/80 py-2.5 first:border-t-0 ">
       <span
-        className="truncate text-sm lowercase tracking-wide text-gray-500 dark:text-gray-400"
+        className="truncate text-sm lowercase tracking-wide text-muted "
         title={label}
       >
         {label}
       </span>
       <span
-        className="truncate text-right text-sm font-medium text-gray-900 dark:text-gray-100"
+        className="truncate text-right text-sm font-medium text-foreground "
         title={value}
       >
         {value}
@@ -972,8 +987,8 @@ export const InfoRow: FC<{ label: string; value: string }> = ({
 };
 
 export const ConfigEmpty: FC<{ label: string }> = ({ label }) => (
-  <div className="border-t border-gray-100/80 dark:border-gray-900/80 py-2.5 first:border-t-0">
-    <span className="text-sm text-gray-400 dark:text-gray-500">{label}</span>
+  <div className="border-t border-border-subtle/80 py-2.5 first:border-t-0">
+    <span className="text-sm text-muted ">{label}</span>
   </div>
 );
 
@@ -982,10 +997,10 @@ const ConfigRowsSkeleton: FC<{ rowCount: number }> = ({ rowCount }) => (
     {Array.from({ length: rowCount }).map((_, idx) => (
       <div
         key={idx}
-        className="grid grid-cols-[12rem_minmax(0,1fr)] gap-x-4 border-t border-gray-100/80 dark:border-gray-900/80 py-2.5 first:border-t-0"
+        className="grid grid-cols-[12rem_minmax(0,1fr)] gap-x-4 border-t border-border-subtle/80 py-2.5 first:border-t-0"
       >
-        <div className="h-4 w-24 rounded bg-gray-200 dark:bg-gray-800" />
-        <div className="ml-auto h-4 w-36 rounded bg-gray-200 dark:bg-gray-800" />
+        <div className="h-4 w-24 rounded bg-layer " />
+        <div className="ml-auto h-4 w-36 rounded bg-layer " />
       </div>
     ))}
   </div>
@@ -1028,7 +1043,7 @@ const MetricSection: FC<{
 
   return (
     <section>
-      <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted ">
         {title}
       </div>
       <div
@@ -1046,12 +1061,12 @@ export const MetricCard: FC<{ label: string; value: string }> = ({
   label,
   value,
 }) => (
-  <div className="min-w-0 border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-800 dark:bg-gray-900">
-    <span className="block truncate text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">
+  <div className="min-w-0 border border-border-subtle bg-layer px-3 py-2.5 ">
+    <span className="block truncate text-xs uppercase tracking-wide text-muted ">
       {label.replace(/_/g, ' ')}
     </span>
     <span
-      className="mt-1 block truncate text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100"
+      className="mt-1 block truncate text-sm font-semibold tabular-nums text-foreground "
       title={value}
     >
       {value}

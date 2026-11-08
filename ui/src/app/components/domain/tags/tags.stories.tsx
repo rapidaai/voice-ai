@@ -13,12 +13,8 @@ function TagCatalog({ title, tags }: TagCatalogProps) {
   return (
     <section className="space-y-3">
       <div>
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-          {title}
-        </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {tags.length} suggested tags
-        </p>
+        <h3 className="text-base font-semibold text-foreground">{title}</h3>
+        <p className="text-sm text-muted">{tags.length} suggested tags</p>
       </div>
       <div className="flex flex-wrap gap-2">
         {tags.map(tag => (

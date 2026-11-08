@@ -210,12 +210,17 @@ jest.mock('@/app/pages/assistant/actions/hooks/use-confirmation', () => ({
   }),
 }));
 
-jest.mock('@/app/components/ui/composites/tab-form', () => ({
-  TabForm: ({ activeTab, errorMessage, form, formHeading }: any) => {
-    const active = form.find((f: any) => f.code === activeTab) || form[0];
+jest.mock('@/app/components/ui/composites/create-full-page', () => ({
+  CreateFullPageWithHeader: ({
+    activeStep,
+    description,
+    errorMessage,
+    steps,
+  }: any) => {
+    const active = steps.find((f: any) => f.code === activeStep) || steps[0];
     return (
       <div>
-        <h1>{formHeading}</h1>
+        <h1>{description}</h1>
         {errorMessage ? <div>{errorMessage}</div> : null}
         <div>{active.body}</div>
         <div>
@@ -419,8 +424,8 @@ jest.mock('@/app/components/ui/primitives/overflow-menu', () => ({
 }));
 
 jest.mock('@/app/components/app-shell/helmet', () => ({ Helmet: () => null }));
-jest.mock('@/app/components/layout/blocks/page-header-block', () => ({
-  PageHeaderBlock: ({ children }: any) => <div>{children}</div>,
+jest.mock('@/app/components/layout/compact-page-header', () => ({
+  CompactPageHeader: ({ children }: any) => <div>{children}</div>,
 }));
 jest.mock('@/app/components/layout/blocks/page-title-block', () => ({
   PageTitleBlock: ({ children }: any) => <h2>{children}</h2>,
@@ -887,9 +892,7 @@ describe('Deployment and tool flows', () => {
     await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    await user.click(
-      within(screen.getByRole('dialog')).getByText('Debugger'),
-    );
+    await user.click(within(screen.getByRole('dialog')).getByText('Debugger'));
     expect(mockGlobalNavigation.goToConfigureDebugger).toHaveBeenCalledWith(
       'assistant-1',
     );
@@ -916,9 +919,7 @@ describe('Deployment and tool flows', () => {
     await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    await user.click(
-      within(screen.getByRole('dialog')).getByText('SDK / API'),
-    );
+    await user.click(within(screen.getByRole('dialog')).getByText('SDK / API'));
     expect(mockGlobalNavigation.goToConfigureApi).toHaveBeenCalledWith(
       'assistant-1',
     );
@@ -936,9 +937,7 @@ describe('Deployment and tool flows', () => {
     await user.click(
       screen.getAllByRole('button', { name: /Add deployment/i })[0],
     );
-    await user.click(
-      within(screen.getByRole('dialog')).getByText('Debugger'),
-    );
+    await user.click(within(screen.getByRole('dialog')).getByText('Debugger'));
     expect(mockGlobalNavigation.goToConfigureDebugger).toHaveBeenCalledWith(
       'assistant-1',
     );
@@ -1073,9 +1072,7 @@ describe('Deployment and tool flows', () => {
     await user.click(actionsButton);
     expect(actionMenu).toHaveAttribute('data-menu-open', 'true');
 
-    await user.click(
-      screen.getByRole('button', { name: 'View all versions' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'View all versions' }));
 
     expect(actionMenu).toHaveAttribute('data-menu-open', 'false');
     expect(screen.getByRole('dialog')).toHaveTextContent('Deployment versions');

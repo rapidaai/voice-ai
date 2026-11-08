@@ -29,7 +29,7 @@ export const ReservedVariables: Story = {
     return (
       <div className="max-w-4xl">
         <PromptEditor
-          className="border border-gray-200 dark:border-gray-800"
+          className="border border-border-subtle"
           enableReservedVariableSuggestions
           height="280px"
           onChange={setValue}

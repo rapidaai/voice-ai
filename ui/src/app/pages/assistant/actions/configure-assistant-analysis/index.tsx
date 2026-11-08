@@ -1,11 +1,9 @@
-import React, { FC, useEffect, useState } from 'react';
+import { FC, useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { toHumanReadableDateTime } from '@/utils/date';
-import { ChartLine } from '@carbon/icons-react';
+import { ChartLine, Edit, Power, TrashCan } from '@carbon/icons-react';
 import { useCurrentCredential } from '@/hooks/use-credential';
-import { useRapidaStore } from '@/stores/app';
-import { SectionLoader } from '@/app/components/ui/feedback';
 import toast from 'react-hot-toast/headless';
 import { EmptyState } from '@/app/components/ui/feedback';
 import { CreateAssistantAnalysis } from '@/app/pages/assistant/actions/configure-assistant-analysis/create-assistant-analysis';
@@ -25,8 +23,14 @@ import {
   ModalBody,
   ModalFooter,
   ModalHeader,
-  OverflowMenu,
-  OverflowMenuItem,
+  DataTable,
+  DataTableSkeleton,
+  TableBatchAction,
+  TableBatchActions,
+  TableSelectRow,
+  TableToolbar,
+  TableToolbarContent,
+  TableToolbarSearch,
 } from '@carbon/react';
 import { TableSection } from '@/app/components/layout/sections/table-section';
 import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
@@ -57,6 +61,17 @@ const getAnalysisPriority = (row: any): number => {
   const value = Number(getAnalysisOptionMap(row).get('execution_priority'));
   return Number.isFinite(value) ? value : 0;
 };
+
+const headers = [
+  { key: 'name', header: 'Name' },
+  { key: 'endpoint', header: 'Endpoint' },
+  { key: 'version', header: 'Version' },
+  { key: 'priority', header: 'Priority' },
+  { key: 'status', header: 'Status' },
+  { key: 'date', header: 'Date' },
+];
+
+const skeletonHeaders = [{ key: 'select', header: '' }, ...headers];
 
 type AnalysisAction = {
   kind: 'enable' | 'disable' | 'delete';
@@ -92,12 +107,12 @@ const ConfigureAssistantAnalysis: FC<{ assistantId: string }> = ({
   const navigation = useGlobalNavigation();
   const axtion = useAssistantAnalysisPageStore();
   const { authId, token, projectId } = useCurrentCredential();
-  const { loading, showLoader, hideLoader } = useRapidaStore();
+  const [isFetching, setIsFetching] = useState(true);
   const [pendingAnalysisAction, setPendingAnalysisAction] =
     useState<AnalysisAction | null>(null);
 
-  const get = () => {
-    showLoader('block');
+  const get = useCallback(() => {
+    setIsFetching(true);
     axtion.getAssistantAnalysis(
       assistantId,
       projectId,
@@ -105,20 +120,20 @@ const ConfigureAssistantAnalysis: FC<{ assistantId: string }> = ({
       authId,
       e => {
         toast.error(e);
-        hideLoader();
+        setIsFetching(false);
       },
       () => {
-        hideLoader();
+        setIsFetching(false);
       },
     );
-  };
+  }, [assistantId, projectId, token, authId, axtion.getAssistantAnalysis]);
 
   useEffect(() => {
     get();
-  }, [assistantId, projectId, token, authId, axtion.page, axtion.pageSize]);
+  }, [get, axtion.page, axtion.pageSize]);
 
   const deleteAssistantAnalysis = (assistantId: string, analysisId: string) => {
-    showLoader('block');
+    setIsFetching(true);
     axtion.deleteAssistantAnalysis(
       assistantId,
       analysisId,
@@ -127,7 +142,7 @@ const ConfigureAssistantAnalysis: FC<{ assistantId: string }> = ({
       authId,
       e => {
         toast.error(e);
-        hideLoader();
+        setIsFetching(false);
       },
       () => {
         toast.success('Analysis deleted successfully');
@@ -138,7 +153,7 @@ const ConfigureAssistantAnalysis: FC<{ assistantId: string }> = ({
   };
 
   const updateAnalysisEnabled = (analysis: any, enabled: boolean) => {
-    showLoader('block');
+    setIsFetching(true);
     axtion.updateAssistantAnalysisEnabled(
       assistantId,
       analysis,
@@ -148,7 +163,7 @@ const ConfigureAssistantAnalysis: FC<{ assistantId: string }> = ({
       authId,
       e => {
         toast.error(e);
-        hideLoader();
+        setIsFetching(false);
       },
       () => {
         toast.success(
@@ -179,16 +194,18 @@ const ConfigureAssistantAnalysis: FC<{ assistantId: string }> = ({
         ? 'Disable'
         : 'Delete';
 
-  if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center">
-        <SectionLoader />
-      </div>
-    );
-  }
+  const tableRows = axtion.analysises.map(row => ({
+    id: row.getId(),
+    name: getAnalysisName(row),
+    endpoint: getAnalysisEndpointId(row),
+    version: getAnalysisEndpointVersion(row),
+    priority: String(getAnalysisPriority(row)),
+    status: row.getStatus(),
+    date: row.getCreateddate()?.toString() || '',
+  }));
 
   return (
-    <div className="flex h-full flex-1 flex-col bg-surface">
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-surface">
       <ComposedModal
         open={Boolean(pendingAnalysisAction)}
         onClose={() => setPendingAnalysisAction(null)}
@@ -241,116 +258,191 @@ const ConfigureAssistantAnalysis: FC<{ assistantId: string }> = ({
           onClick: () => navigation.goToCreateAssistantAnalysis(assistantId),
         }}
       />
-      <TableSection>
-        {axtion.analysises.length > 0 ? (
-          <>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHeader>Name</TableHeader>
-                  <TableHeader>Endpoint</TableHeader>
-                  <TableHeader>Version</TableHeader>
-                  <TableHeader>Priority</TableHeader>
-                  <TableHeader>Status</TableHeader>
-                  <TableHeader>Date</TableHeader>
-                  <TableHeader>Action</TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {axtion.analysises.map(row => {
-                  return (
-                    <TableRow key={row.getId()}>
-                      <TableCell className="text-sm">
-                        {getAnalysisName(row)}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <span className="font-mono text-[13px]">
-                          {getAnalysisEndpointId(row) || '—'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {getAnalysisEndpointVersion(row)}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {getAnalysisPriority(row)}
-                      </TableCell>
-                      <TableCell className="text-sm whitespace-nowrap">
-                        <RecordStatusIndicator
-                          state={row.getStatus()}
-                          textSize={14}
-                        />
-                      </TableCell>
-                      <TableCell className="text-[13px] whitespace-nowrap">
-                        {row.getCreateddate()
-                          ? toHumanReadableDateTime(row.getCreateddate()!)
-                          : '—'}
-                      </TableCell>
-                      <TableCell
-                        className="text-sm"
-                        onClick={e => e.stopPropagation()}
+      {isFetching ? (
+        <TableSection className="min-h-0 overflow-hidden bg-surface">
+          <DataTableSkeleton
+            headers={skeletonHeaders}
+            columnCount={skeletonHeaders.length}
+            rowCount={5}
+            showHeader={false}
+            showToolbar
+            size="lg"
+            className="w-full"
+          />
+        </TableSection>
+      ) : axtion.analysises.length > 0 ? (
+        <TableSection className="min-h-0 bg-surface">
+          <DataTable rows={tableRows} headers={headers} radio>
+            {({
+              rows,
+              headers: tableHeaders,
+              selectedRows,
+              getBatchActionProps,
+              getHeaderProps,
+              getRowProps,
+              getSelectionProps,
+              getTableProps,
+              getToolbarProps,
+              onInputChange,
+            }) => {
+              const batchActionProps = getBatchActionProps();
+              const selectedAnalysis = selectedRows[0]
+                ? axtion.analysises.find(
+                    row => row.getId() === selectedRows[0].id,
+                  )
+                : undefined;
+
+              return (
+                <>
+                  <TableToolbar {...getToolbarProps()}>
+                    {selectedAnalysis && (
+                      <TableBatchActions
+                        {...batchActionProps}
+                        shouldShowBatchActions
                       >
-                        <OverflowMenu
-                          size="sm"
-                          flipped
-                          aria-label="Analysis actions"
+                        <TableBatchAction
+                          renderIcon={Edit}
+                          iconDescription="Edit"
+                          onClick={() => {
+                            navigation.goToEditAssistantAnalysis(
+                              assistantId,
+                              selectedAnalysis.getId(),
+                            );
+                            batchActionProps.onCancel();
+                          }}
                         >
-                          <OverflowMenuItem
-                            itemText="Edit"
-                            onClick={() =>
-                              navigation.goToEditAssistantAnalysis(
-                                assistantId,
-                                row.getId(),
-                              )
-                            }
-                          />
-                          <OverflowMenuItem
-                            itemText={row.getEnabled() ? 'Disable' : 'Enable'}
-                            onClick={() =>
-                              setPendingAnalysisAction({
-                                kind: row.getEnabled() ? 'disable' : 'enable',
-                                analysis: row,
-                              })
-                            }
-                          />
-                          <OverflowMenuItem
-                            itemText="Delete"
-                            isDelete
-                            onClick={() =>
-                              setPendingAnalysisAction({
-                                kind: 'delete',
-                                analysis: row,
-                              })
-                            }
-                          />
-                        </OverflowMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            <Pagination
-              totalItems={axtion.totalCount}
-              page={axtion.page}
-              pageSize={axtion.pageSize}
-              pageSizes={[10, 20, 50]}
-              onChange={({ page, pageSize }) => {
-                if (pageSize !== axtion.pageSize) {
-                  axtion.setPageSize(pageSize);
-                } else {
-                  axtion.setPage(page);
-                }
-              }}
-            />
-          </>
-        ) : (
+                          Edit
+                        </TableBatchAction>
+                        <TableBatchAction
+                          renderIcon={Power}
+                          iconDescription={
+                            selectedAnalysis.getEnabled() ? 'Disable' : 'Enable'
+                          }
+                          onClick={() => {
+                            setPendingAnalysisAction({
+                              kind: selectedAnalysis.getEnabled()
+                                ? 'disable'
+                                : 'enable',
+                              analysis: selectedAnalysis,
+                            });
+                            batchActionProps.onCancel();
+                          }}
+                        >
+                          {selectedAnalysis.getEnabled() ? 'Disable' : 'Enable'}
+                        </TableBatchAction>
+                        <TableBatchAction
+                          renderIcon={TrashCan}
+                          iconDescription="Delete"
+                          onClick={() => {
+                            setPendingAnalysisAction({
+                              kind: 'delete',
+                              analysis: selectedAnalysis,
+                            });
+                            batchActionProps.onCancel();
+                          }}
+                        >
+                          Delete
+                        </TableBatchAction>
+                      </TableBatchActions>
+                    )}
+                    <TableToolbarContent>
+                      <TableToolbarSearch
+                        placeholder="Search analysis..."
+                        onChange={onInputChange}
+                      />
+                    </TableToolbarContent>
+                  </TableToolbar>
+                  <div className="min-h-0 flex-1 overflow-auto">
+                    <Table {...getTableProps()} className="min-w-max">
+                      <TableHead>
+                        <TableRow>
+                          <TableHeader className="!w-12" />
+                          {tableHeaders.map(header => (
+                            <TableHeader
+                              {...getHeaderProps({ header })}
+                              key={header.key}
+                            >
+                              {header.header}
+                            </TableHeader>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {rows.map(tableRow => {
+                          const analysis = axtion.analysises.find(
+                            row => row.getId() === tableRow.id,
+                          );
+                          if (!analysis) return null;
+
+                          return (
+                            <TableRow
+                              {...getRowProps({ row: tableRow })}
+                              key={tableRow.id}
+                            >
+                              <TableSelectRow
+                                {...getSelectionProps({ row: tableRow })}
+                              />
+                              <TableCell className="text-sm">
+                                {getAnalysisName(analysis)}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                <span className="font-mono text-[13px]">
+                                  {getAnalysisEndpointId(analysis) || '—'}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {getAnalysisEndpointVersion(analysis)}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {getAnalysisPriority(analysis)}
+                              </TableCell>
+                              <TableCell className="text-sm whitespace-nowrap">
+                                <RecordStatusIndicator
+                                  state={analysis.getStatus()}
+                                  textSize={14}
+                                />
+                              </TableCell>
+                              <TableCell className="text-[13px] whitespace-nowrap">
+                                {analysis.getCreateddate()
+                                  ? toHumanReadableDateTime(
+                                      analysis.getCreateddate()!,
+                                    )
+                                  : '—'}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <Pagination
+                    sticky
+                    totalItems={axtion.totalCount}
+                    page={axtion.page}
+                    pageSize={axtion.pageSize}
+                    pageSizes={[10, 20, 50]}
+                    onChange={({ page, pageSize }) => {
+                      if (pageSize !== axtion.pageSize) {
+                        axtion.setPageSize(pageSize);
+                      } else {
+                        axtion.setPage(page);
+                      }
+                    }}
+                  />
+                </>
+              );
+            }}
+          </DataTable>
+        </TableSection>
+      ) : (
+        <div className="flex flex-1 items-center justify-center">
           <EmptyState
             icon={ChartLine}
             title="No analysis"
             subtitle="Any analysis you add will be listed here."
           />
-        )}
-      </TableSection>
+        </div>
+      )}
     </div>
   );
 };

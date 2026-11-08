@@ -32,7 +32,7 @@ function FieldLabelWithToggletip(props: {
   description: ReactNode;
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-[var(--cds-text-primary)]">
+    <span className="inline-flex items-center gap-1.5 text-foreground">
       <span>{props.label}</span>
       <Toggletip align="right">
         <ToggletipButton
@@ -94,8 +94,8 @@ export function EndpointSettingsPage(props: { currentEndpoint: Endpoint }) {
   };
 
   return (
-    <main className="flex w-full flex-1 flex-col overflow-auto bg-white dark:bg-gray-900">
-      <div className="border-b border-gray-200 px-4 pb-6 pt-4 dark:border-gray-800">
+    <main className="flex w-full flex-1 flex-col overflow-auto bg-surface ">
+      <div className="border-b border-border-subtle px-4 pb-6 pt-4 ">
         <Breadcrumb noTrailingSlash className="mb-2">
           <BreadcrumbItem href={`/deployment/endpoint/${endpointId}/overview`}>
             Endpoint
@@ -111,7 +111,7 @@ export function EndpointSettingsPage(props: { currentEndpoint: Endpoint }) {
             description="Your endpoint's unique identifier. This cannot be changed."
           />
           <div className="inline-flex max-w-full items-center gap-1">
-            <span className="min-w-0 max-w-[32rem] truncate font-mono text-sm text-gray-700 dark:text-gray-200">
+            <span className="min-w-0 max-w-[32rem] truncate font-mono text-sm text-muted ">
               {endpointId}
             </span>
             <CopyButton className="h-6 w-6 shrink-0">{endpointId}</CopyButton>
@@ -173,9 +173,7 @@ export function EndpointSettingsPage(props: { currentEndpoint: Endpoint }) {
                 </Tag>
               ))
             ) : (
-              <p className="text-sm text-[var(--cds-text-secondary)]">
-                No tags assigned.
-              </p>
+              <p className="text-sm text-muted">No tags assigned.</p>
             )}
           </div>
           <TertiaryButton

@@ -80,20 +80,18 @@ export const ManualFile: FC<ManualFileProps> = ({
         className="flex flex-col rounded-xl w-full py-4 group text-center"
       >
         <div className="h-full w-full text-center flex flex-col justify-center items-center px-4 space-y-4 min-h-[400px]">
-          <div className="p-4 border rounded-[4px] bg-white/10 backdrop-blur-sm">
+          <div className="p-4 border rounded-[4px] bg-surface/10 backdrop-blur-sm">
             <Upload className="h-8 w-8 flex-no-shrink opacity-60" />
           </div>
           <p className="cursor-pointer opacity-70 text-base font-medium">
-            <span className="underline text-blue-600 dark:text-blue-400">
-              Drag and drop
-            </span>{' '}
+            <span className="underline text-support-info ">Drag and drop</span>{' '}
             files here <br /> or select a file from your computer
           </p>
           <div className="flex flex-col space-y-1 w-full overflow-auto max-h-[200px]">
             {knowledgeDocuments.map((knowledgeDocument, idx) => {
               return (
                 <SingleRowWrapper
-                  className="text-sm font-medium group w-full pl-2 bg-white dark:bg-gray-950"
+                  className="text-sm font-medium group w-full pl-2 bg-surface "
                   onClick={e => e.preventDefault()}
                   key={`kd-${idx}`}
                 >

@@ -1,6 +1,7 @@
 import { Play } from '@carbon/icons-react';
 import { Button, HeaderGlobalBar, Loading } from '@carbon/react';
 import { FC } from 'react';
+import { CompactPageHeader } from '@/app/components/layout/compact-page-header';
 
 export const PlaygroundHeader: FC<{
   isValid: boolean;
@@ -8,12 +9,9 @@ export const PlaygroundHeader: FC<{
   disabled?: boolean;
 }> = ({ loading, disabled = false }) => {
   return (
-    <header
-      className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer)]"
-      data-testid="endpoint-page-header"
-    >
+    <CompactPageHeader data-testid="endpoint-page-header">
       <div className="min-w-0 pl-4">
-        <h1 className="truncate text-sm font-semibold text-[var(--cds-text-primary)]">
+        <h1 className="truncate text-sm font-semibold text-foreground">
           Playground
         </h1>
       </div>
@@ -41,6 +39,6 @@ export const PlaygroundHeader: FC<{
           )}
         </Button>
       </HeaderGlobalBar>
-    </header>
+    </CompactPageHeader>
   );
 };

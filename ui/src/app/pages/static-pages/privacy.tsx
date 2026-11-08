@@ -16,7 +16,7 @@ export function PrivacyPage() {
           Last updated on July 2, 2024
         </p>
         <main>
-          <article className="relative mt-10 prose prose-base max-w-none! dark:prose-invert prose-slate">
+          <article className="relative mt-10 prose prose-base max-w-none! !text-foreground prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-link prose-hr:border-border-subtle">
             <p className="text-lg">
               {brandName} ("we", "us", or "our") respects the privacy of its
               customers ("Customers") and is committed to protecting the
@@ -141,7 +141,7 @@ export function PrivacyPage() {
                   <h3 className="text-lg">2. Contact Us</h3> If you have any
                   questions about this Privacy Policy or your information,
                   please contact us at{' '}
-                  <a href={theme.links.support} className="text-blue-500">
+                  <a href={theme.links.support} className="text-support-info">
                     {supportContact}
                   </a>
                 </div>
@@ -194,7 +194,7 @@ export function PrivacyPage() {
                 <div className="text-lg">
                   If you have any questions about this Privacy Policy, please
                   contact us at{' '}
-                  <a href={theme.links.support} className="text-blue-500">
+                  <a href={theme.links.support} className="text-support-info">
                     {supportContact}
                   </a>
                 </div>

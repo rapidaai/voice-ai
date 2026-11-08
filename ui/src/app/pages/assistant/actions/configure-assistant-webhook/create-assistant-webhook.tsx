@@ -19,7 +19,7 @@ import { Metadata } from '@rapidaai/react';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import toast from 'react-hot-toast/headless';
 import { useRapidaStore } from '@/stores/app';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import { WebhookEventSelector } from './webhook-event-selector';
 import { WebhookEventGroup, webhookEvents } from './webhook-events';
 import { createAssistantConfigurationForAssistant } from '@/clients/assistant.client';
@@ -230,12 +230,14 @@ export const CreateAssistantWebhook: FC<{ assistantId: string }> = ({
   return (
     <>
       <ConfirmDialogComponent />
-      <TabForm
-        formHeading="Complete all steps to configure your webhook."
-        activeTab={activeTab}
-        onChangeActiveTab={() => {}}
+      <CreateFullPageWithHeader
+        title="Configure webhook"
+        eyebrow="Assistant"
+        description="Complete all steps to configure your webhook."
+        activeStep={activeTab}
+        onChangeStep={() => {}}
         errorMessage={errorMessage}
-        form={[
+        steps={[
           {
             code: 'events',
             name: 'Events',

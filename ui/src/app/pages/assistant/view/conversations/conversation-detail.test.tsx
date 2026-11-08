@@ -50,8 +50,8 @@ jest.mock(
   () => ({ ConversationMessages: () => <div>Message content</div> }),
 );
 
-jest.mock('@/app/components/layout/blocks/page-header-block', () => ({
-  PageHeaderBlock: ({ children }: { children: React.ReactNode }) => (
+jest.mock('@/app/components/layout/compact-page-header', () => ({
+  CompactPageHeader: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
 }));

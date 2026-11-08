@@ -47,14 +47,14 @@ export function DateFilter({ onApply, onReset, className }: DateFilterProps) {
         iconDescription="Filter by date"
         kind="ghost"
         onClick={() => setOpen(!open)}
-        className={cn(dates.length === 2 && '!text-blue-600')}
+        className={cn(dates.length === 2 && '!text-support-info')}
         tooltipPosition="bottom"
       />
       {open && (
         <PopoverContent className="w-max p-0">
           <div>
-            <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-              <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            <div className="px-4 py-2 border-b border-border-subtle ">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted ">
                 Filter by date
               </p>
             </div>
@@ -79,7 +79,7 @@ export function DateFilter({ onApply, onReset, className }: DateFilterProps) {
                 />
               </CarbonDatePicker>
             </div>
-            <div className="flex border-t border-gray-200 dark:border-gray-700">
+            <div className="flex border-t border-border-subtle ">
               <Button
                 size="md"
                 kind="secondary"

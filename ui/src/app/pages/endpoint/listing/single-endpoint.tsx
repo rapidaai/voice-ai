@@ -76,7 +76,7 @@ export const SingleEndpoint: FC<SingleEndpointProps> = ({ endpoint }) => {
           {providerModel?.getId() ? (
             <VersionIndicator id={providerModel.getId()} />
           ) : (
-            <span className="text-sm text-gray-400">-</span>
+            <span className="text-sm text-muted">-</span>
           )}
         </TableCell>
       )}
@@ -96,7 +96,7 @@ export const SingleEndpoint: FC<SingleEndpointProps> = ({ endpoint }) => {
               )}
             </div>
           ) : (
-            <span className="text-sm text-gray-400">-</span>
+            <span className="text-sm text-muted">-</span>
           )}
         </TableCell>
       )}
@@ -133,7 +133,7 @@ export const SingleEndpoint: FC<SingleEndpointProps> = ({ endpoint }) => {
           lastActivity.toDate().getTime() > new Date('1970-01-01').getTime() ? (
             toHumanReadableRelativeTime(lastActivity)
           ) : (
-            <span className="text-gray-400">Not yet run</span>
+            <span className="text-muted">Not yet run</span>
           )}
         </TableCell>
       )}
@@ -206,7 +206,7 @@ const formatPercent = (value: number): string =>
   `${Number.isInteger(value) ? value : value.toFixed(2)}%`;
 
 const errorRateClass = (errorRate: number): string => {
-  if (errorRate === 0) return 'text-green-600 dark:text-green-400';
-  if (errorRate < 5) return 'text-yellow-600 dark:text-yellow-400';
-  return 'text-red-600 dark:text-red-400';
+  if (errorRate === 0) return 'text-support-success ';
+  if (errorRate < 5) return 'text-support-warning ';
+  return 'text-support-error ';
 };

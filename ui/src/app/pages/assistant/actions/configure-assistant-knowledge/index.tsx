@@ -1,4 +1,4 @@
-import { GhostButton } from '@/app/components/ui/primitives';
+import { GhostButton, PrimaryButton } from '@/app/components/ui/primitives';
 import { useRapidaStore } from '@/stores/app';
 import { FC, useEffect } from 'react';
 import toast from 'react-hot-toast/headless';
@@ -7,7 +7,7 @@ import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { EmptyState } from '@/app/components/ui/feedback';
 import { SelectKnowledgeCard } from '@/app/components/domain/cards/knowledge-card';
 import { Add, Information, Launch } from '@carbon/icons-react';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
+import { CompactPageHeader } from '@/app/components/layout/compact-page-header';
 import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useAssistantKnowledgePageStore } from '@/stores/assistant/actions';
@@ -104,11 +104,11 @@ const ConfigureAssistantKnowledge: FC<{ assistantId: string }> = ({
   return (
     <div className="relative flex flex-col flex-1">
       <ConfirmDialogComponent />
-      <PageHeaderBlock>
+      <CompactPageHeader>
         <PageTitleBlock>Configure Knowledge</PageTitleBlock>
-        <div className="flex items-stretch h-12 border-l border-gray-200 dark:border-gray-800">
+        <div className="flex items-stretch h-12 border-l border-border-subtle ">
           <TablePagination
-            className="py-0 border-r border-gray-200 dark:border-gray-800"
+            className="py-0 border-r border-border-subtle "
             currentPage={axtion.page}
             onChangeCurrentPage={axtion.setPage}
             totalItem={axtion.totalCount}
@@ -116,26 +116,28 @@ const ConfigureAssistantKnowledge: FC<{ assistantId: string }> = ({
             onChangePageSize={axtion.setPageSize}
             onChangeColumns={axtion.setColumns}
           />
-          <button
+          <GhostButton
+            size="md"
             type="button"
             onClick={() => navigation.goToCreateKnowledge()}
-            className="flex items-center gap-2 px-4 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border-r border-gray-200 dark:border-gray-800 transition-colors whitespace-nowrap"
+            className="h-full whitespace-nowrap border-r border-border-subtle"
+            renderIcon={Launch}
           >
             Create new knowledge
-            <Launch className="w-4 h-4" />
-          </button>
-          <button
+          </GhostButton>
+          <PrimaryButton
+            size="md"
             type="button"
             onClick={() => navigation.goToCreateAssistantKnowledge(assistantId)}
-            className="flex items-center gap-2 px-4 text-sm text-white bg-primary hover:bg-primary/90 transition-colors whitespace-nowrap"
+            className="h-full whitespace-nowrap"
+            renderIcon={Add}
           >
             Connect knowledge
-            <Add className="w-4 h-4" />
-          </button>
+          </PrimaryButton>
         </div>
-      </PageHeaderBlock>
+      </CompactPageHeader>
       <div
-        className="flex items-center p-2 px-4 text-blue-800 border-l-4 border-blue-300 bg-blue-50 dark:text-blue-400 dark:bg-gray-800 dark:border-blue-800"
+        className="flex items-center p-2 px-4 text-support-info border-l-4 border-support-info bg-support-info/10 "
         role="alert"
       >
         <Information className="shrink-0 w-4 h-4" />
@@ -149,7 +151,7 @@ const ConfigureAssistantKnowledge: FC<{ assistantId: string }> = ({
           <div className="p-2 grid sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
             {axtion.knowledges.map((itm, idx) => (
               <SelectKnowledgeCard
-                className="col-span-1 bg-white max-w-none"
+                className="col-span-1 bg-surface max-w-none"
                 knowledge={itm.getKnowledge()!}
                 key={`knolwedge-card-${idx}`}
                 knowledgeOptions={[
@@ -164,7 +166,9 @@ const ConfigureAssistantKnowledge: FC<{ assistantId: string }> = ({
                   },
                   {
                     option: (
-                      <span className="text-rose-600">Delete knowledge</span>
+                      <span className="text-support-error">
+                        Delete knowledge
+                      </span>
                     ),
                     onActionClick: () => {
                       showDialog(() => {

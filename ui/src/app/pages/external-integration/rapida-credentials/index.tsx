@@ -9,9 +9,7 @@ import toast from 'react-hot-toast/headless';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { EmptyState } from '@/app/components/ui/feedback';
 import { AuthContext } from '@/context/auth-context';
-import { PageHeaderBlock } from '@/app/components/layout/blocks/page-header-block';
-import { PageTitleBlock } from '@/app/components/layout/blocks/page-title-block';
-import { PageTitleWithCount } from '@/app/components/layout/blocks/page-title-with-count';
+import { PageHeader } from '@/app/components/layout/page-header';
 import {
   Add,
   Renew,
@@ -28,6 +26,8 @@ import { CopyButton } from '@/app/components/ui/primitives';
 import { GhostButton } from '@/app/components/ui/primitives';
 import { IconOnlyButton } from '@/app/components/ui/primitives';
 import { BaseCard } from '@/app/components/ui/primitives';
+import { PrimaryButton } from '@/app/components/ui/primitives';
+import { Text } from '@/app/components/ui/primitives';
 import {
   createProjectPublishableCredential,
   listProjectCredentials,
@@ -130,31 +130,46 @@ export function ProjectCredentialPage() {
    *
    */
   return (
-    <>
+    <div
+      data-page-scroll
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+    >
       <Helmet title="Providers and Models" />
-      <PageHeaderBlock className="border-b">
-        <PageTitleWithCount count={ourKeys.length} total={ourKeys.length}>
-          Project Developer Keys
-        </PageTitleWithCount>
-        <div className="flex items-stretch h-12 border-l border-gray-200 dark:border-gray-800">
-          <IconOnlyButton
-            kind="ghost"
-            size="md"
-            renderIcon={Renew}
-            iconDescription="Refresh credentials"
-            onClick={shouldReload}
-            className="h-full"
-          />
-          <button
-            type="button"
-            onClick={onCreateProjectCredential}
-            className="flex items-center gap-2 px-4 text-sm text-[var(--brand-on-primary)] bg-primary hover:bg-primary/90 transition-colors whitespace-nowrap"
-          >
-            Create credential
-            <Add size={16} />
-          </button>
-        </div>
-      </PageHeaderBlock>
+      <PageHeader
+        eyebrow={
+          <Text variant="label-01" className="text-primary">
+            Integrations
+          </Text>
+        }
+        title="Project Developer Keys"
+        description="Create and manage project-scoped keys used to authenticate platform service requests."
+        contextualActions={
+          <Text variant="label-01" className="text-muted tabular-nums">
+            {ourKeys.length}
+          </Text>
+        }
+        pageActions={
+          <div className="flex w-full items-stretch md:w-auto">
+            <IconOnlyButton
+              kind="ghost"
+              size="md"
+              renderIcon={Renew}
+              iconDescription="Refresh credentials"
+              onClick={shouldReload}
+              className="h-full"
+            />
+            <PrimaryButton
+              size="md"
+              type="button"
+              onClick={onCreateProjectCredential}
+              className="h-full whitespace-nowrap"
+              renderIcon={Add}
+            >
+              Create credential
+            </PrimaryButton>
+          </div>
+        }
+      />
       <DocNoticeBlock docPath="/integrations/rapida-credentials">
         These are project-specific keys. They are used to authenticate and
         interact with the platform service for this particular project.
@@ -175,7 +190,7 @@ export function ProjectCredentialPage() {
           />
         </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -205,24 +220,24 @@ const CredentialCard: FC<{ credential: ProjectCredential }> = ({
       {/* Card header */}
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+          <span className="text-sm font-medium text-foreground truncate">
             {credential.getName()}
           </span>
-          <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400 shrink-0">
+          <span className="text-xs tabular-nums text-muted shrink-0">
             {toHumanReadableDate(credential.getCreateddate()!)}
           </span>
         </div>
       </div>
 
       {/* Key row */}
-      <div className="px-4 pb-4 border-t border-gray-100 dark:border-gray-800 pt-3">
+      <div className="px-4 pb-4 border-t border-border-subtle pt-3">
         <div className="flex items-center gap-2">
-          <code className="flex-1 bg-gray-50 dark:bg-gray-950 px-3 py-2 font-mono text-xs min-w-0 overflow-hidden truncate">
+          <code className="flex-1 bg-layer px-3 py-2 font-mono text-xs min-w-0 overflow-hidden truncate">
             {isVisible
               ? credential.getKey()
               : maskCredential(credential.getKey())}
           </code>
-          <div className="flex shrink-0 border border-gray-200 dark:border-gray-700 divide-x divide-gray-200 dark:divide-gray-700">
+          <div className="flex shrink-0 border border-border-subtle divide-x divide-border-subtle ">
             <GhostButton
               size="md"
               onClick={() => setIsVisible(!isVisible)}
@@ -271,13 +286,20 @@ export function PersonalCredentialPage() {
    *
    */
   return (
-    <>
+    <div
+      data-page-scroll
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+    >
       <Helmet title="Providers and Models" />
-      <PageHeaderBlock className="border-b">
-        <div className="flex items-center gap-3">
-          <PageTitleBlock>Personal Tokens</PageTitleBlock>
-        </div>
-      </PageHeaderBlock>
+      <PageHeader
+        eyebrow={
+          <Text variant="label-01" className="text-primary">
+            Integrations
+          </Text>
+        }
+        title="Personal Tokens"
+        description="Use your personal access token to authenticate platform service requests across projects."
+      />
       <DocNoticeBlock docPath="/integrations/rapida-credentials">
         These are your personal access tokens. They are used to authenticate and
         interact with the platform service across all your projects.
@@ -286,20 +308,20 @@ export function PersonalCredentialPage() {
         <BaseCard>
           {/* Card header */}
           <div className="px-4 pt-4 pb-3">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            <span className="text-sm font-medium text-foreground ">
               Personal Token
             </span>
           </div>
 
           {/* Fields */}
-          <div className="px-4 pb-4 border-t border-gray-100 dark:border-gray-800 pt-3 space-y-4">
+          <div className="px-4 pb-4 border-t border-border-subtle pt-3 space-y-4">
             <FieldSet>
               <FormLabel>Authorization</FormLabel>
               <div className="flex items-center gap-2">
-                <code className="flex-1 bg-gray-50 dark:bg-gray-950 px-3 py-2 font-mono text-xs min-w-0 overflow-hidden truncate">
+                <code className="flex-1 bg-layer px-3 py-2 font-mono text-xs min-w-0 overflow-hidden truncate">
                   {isVisible ? token : maskCredential(token)}
                 </code>
-                <div className="flex shrink-0 border border-gray-200 dark:border-gray-700 divide-x divide-gray-200 dark:divide-gray-700">
+                <div className="flex shrink-0 border border-border-subtle divide-x divide-border-subtle ">
                   <GhostButton
                     size="md"
                     onClick={() => setIsVisible(!isVisible)}
@@ -320,10 +342,10 @@ export function PersonalCredentialPage() {
             <FieldSet>
               <FormLabel>x-auth-id</FormLabel>
               <div className="flex items-center gap-2">
-                <code className="flex-1 bg-gray-50 dark:bg-gray-950 px-3 py-2 font-mono text-xs min-w-0 overflow-hidden truncate">
+                <code className="flex-1 bg-layer px-3 py-2 font-mono text-xs min-w-0 overflow-hidden truncate">
                   {isVisible ? authId : maskCredential(authId)}
                 </code>
-                <div className="flex shrink-0 border border-gray-200 dark:border-gray-700 divide-x divide-gray-200 dark:divide-gray-700">
+                <div className="flex shrink-0 border border-border-subtle divide-x divide-border-subtle ">
                   <CopyButton className="h-8 w-8">{authId}</CopyButton>
                 </div>
               </div>
@@ -331,10 +353,10 @@ export function PersonalCredentialPage() {
             <FieldSet>
               <FormLabel>Project ID</FormLabel>
               <div className="flex items-center gap-2">
-                <code className="flex-1 bg-gray-50 dark:bg-gray-950 px-3 py-2 font-mono text-xs min-w-0 overflow-hidden truncate">
+                <code className="flex-1 bg-layer px-3 py-2 font-mono text-xs min-w-0 overflow-hidden truncate">
                   {isVisible ? projectId : maskCredential(projectId)}
                 </code>
-                <div className="flex shrink-0 border border-gray-200 dark:border-gray-700 divide-x divide-gray-200 dark:divide-gray-700">
+                <div className="flex shrink-0 border border-border-subtle divide-x divide-border-subtle ">
                   <CopyButton className="h-8 w-8">{projectId}</CopyButton>
                 </div>
               </div>
@@ -342,6 +364,6 @@ export function PersonalCredentialPage() {
           </div>
         </BaseCard>
       </section>
-    </>
+    </div>
   );
 }

@@ -14,7 +14,7 @@ import {
 import { ToolDefinitionForm } from '@/app/components/domain/tools/common';
 import toast from 'react-hot-toast/headless';
 import { useRapidaStore } from '@/stores/app';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import { ButtonSet } from '@carbon/react';
 import { createAssistantToolForAssistant } from '@/clients/assistant.client';
 
@@ -148,12 +148,14 @@ export const CreateTool: FC<{ assistantId: string }> = ({ assistantId }) => {
   return (
     <>
       <ConfirmDialogComponent />
-      <TabForm
-        formHeading="Complete all steps to configure your tool."
-        activeTab={activeTab}
-        onChangeActiveTab={() => {}}
+      <CreateFullPageWithHeader
+        title="Configure tool"
+        eyebrow="Assistant"
+        description="Complete all steps to configure your tool."
+        activeStep={activeTab}
+        onChangeStep={() => {}}
         errorMessage={errorMessage}
-        form={[
+        steps={[
           {
             code: 'action',
             name: 'Action',

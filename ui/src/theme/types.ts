@@ -1,16 +1,25 @@
+import themeContract from './theme-contract.json';
+
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export type ResolvedThemeMode = Exclude<ThemeMode, 'system'>;
 
-export interface ThemeColors {
-  primary: string;
-  primaryHover: string;
-  primaryActive: string;
-  onPrimary: string;
-}
+export type LightCarbonTheme = keyof typeof themeContract.carbonThemes.light;
+export type DarkCarbonTheme = keyof typeof themeContract.carbonThemes.dark;
+export type ThemeColorField = keyof typeof themeContract.colorFields;
+
+export type ThemeColors = Record<ThemeColorField, string>;
+
+export type LightThemeColors = ThemeColors & {
+  carbonTheme: LightCarbonTheme;
+};
+
+export type DarkThemeColors = ThemeColors & {
+  carbonTheme: DarkCarbonTheme;
+};
 
 export interface ThemeManifest {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   id: string;
   brand: {
     name: string;
@@ -37,7 +46,22 @@ export interface ThemeManifest {
   defaultMode: ThemeMode;
   allowModeSelection: boolean;
   colors: {
-    light: ThemeColors;
-    dark: ThemeColors;
+    light: LightThemeColors;
+    dark: DarkThemeColors;
   };
 }
+
+export type ThemeConfigIssueCode =
+  | 'required'
+  | 'invalid-type'
+  | 'unsupported'
+  | 'internal-reference';
+
+export interface ThemeConfigIssue {
+  path: string;
+  code: ThemeConfigIssueCode;
+}
+
+export type ThemeParseResult =
+  | { ok: true; theme: ThemeManifest }
+  | { ok: false; issues: ThemeConfigIssue[] };

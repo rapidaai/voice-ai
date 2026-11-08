@@ -78,9 +78,7 @@ describe('ErrorContainer', () => {
 
     expect(container).toHaveClass('w-full', 'flex-1', 'items-center');
     expect(code).toHaveClass(...typographyClassNames['heading-06'].split(' '));
-    expect(title).toHaveClass(
-      ...typographyClassNames['heading-04'].split(' '),
-    );
+    expect(title).toHaveClass(...typographyClassNames['heading-04'].split(' '));
     expect(description).toHaveClass(
       ...typographyClassNames['body-01'].split(' '),
     );

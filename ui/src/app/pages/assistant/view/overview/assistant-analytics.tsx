@@ -46,12 +46,12 @@ import { Information } from '@carbon/icons-react';
 import { getAssistantDashboardRange } from '@/clients/assistant.client';
 
 const CHART_COLORS = [
-  'var(--cds-interactive, #1e40af)',
-  '#22d3ee',
-  '#f59e0b',
-  '#10b981',
-  '#f43f5e',
-  '#8b5cf6',
+  'var(--color-primary)',
+  'var(--color-data-2)',
+  'var(--color-data-3)',
+  'var(--color-data-4)',
+  'var(--color-data-5)',
+  'var(--color-data-1)',
 ];
 
 const DATE_RANGES = [
@@ -302,7 +302,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
   const sessionsAction = (
     <Toggletip align="bottom-left">
       <ToggletipButton label="Sessions actions" title="Sessions actions">
-        <Information size={16} className="text-gray-600 dark:text-gray-300" />
+        <Information size={16} className="text-muted " />
       </ToggletipButton>
       <ToggletipContent>
         <p className="text-xs mb-2">
@@ -322,11 +322,11 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
   );
 
   return (
-    <div className="w-full min-h-full bg-gray-100 p-4 dark:bg-[#161616]">
+    <div className="w-full min-h-full bg-layer p-4 ">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs text-[var(--cds-text-secondary)]">Dashboard</p>
-          <h2 className="text-2xl font-normal text-gray-900 dark:text-gray-100">
+          <p className="text-xs text-muted">Dashboard</p>
+          <h2 className="text-2xl font-normal text-foreground ">
             Assistant activity
           </h2>
         </div>
@@ -527,30 +527,38 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
               >
                 <defs>
                   <linearGradient id="sttGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ff832b" stopOpacity={0.28} />
+                    <stop
+                      offset="0%"
+                      stopColor="var(--color-data-3)"
+                      stopOpacity={0.28}
+                    />
                     <stop
                       offset="100%"
-                      stopColor="#ff832b"
+                      stopColor="var(--color-data-3)"
                       stopOpacity={0.02}
                     />
                   </linearGradient>
                   <linearGradient id="eosGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#1192e8" stopOpacity={0.28} />
+                    <stop
+                      offset="0%"
+                      stopColor="var(--color-data-2)"
+                      stopOpacity={0.28}
+                    />
                     <stop
                       offset="100%"
-                      stopColor="#1192e8"
+                      stopColor="var(--color-data-2)"
                       stopOpacity={0.02}
                     />
                   </linearGradient>
                   <linearGradient id="ttsGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop
                       offset="0%"
-                      stopColor="var(--cds-interactive, #0f62fe)"
+                      stopColor="var(--color-primary)"
                       stopOpacity={0.28}
                     />
                     <stop
                       offset="100%"
-                      stopColor="var(--cds-interactive, #0f62fe)"
+                      stopColor="var(--color-primary)"
                       stopOpacity={0.02}
                     />
                   </linearGradient>
@@ -561,10 +569,14 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                     x2="0"
                     y2="1"
                   >
-                    <stop offset="0%" stopColor="#24a148" stopOpacity={0.28} />
+                    <stop
+                      offset="0%"
+                      stopColor="var(--color-data-4)"
+                      stopOpacity={0.28}
+                    />
                     <stop
                       offset="100%"
-                      stopColor="#24a148"
+                      stopColor="var(--color-data-4)"
                       stopOpacity={0.02}
                     />
                   </linearGradient>
@@ -572,7 +584,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                 <Area
                   type="monotone"
                   dataKey="sttLatency"
-                  stroke="#ff832b"
+                  stroke="var(--color-data-3)"
                   strokeWidth={1.5}
                   fill="url(#sttGradient)"
                   dot={false}
@@ -581,7 +593,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                 <Area
                   type="monotone"
                   dataKey="eosLatency"
-                  stroke="#1192e8"
+                  stroke="var(--color-data-2)"
                   strokeWidth={1.5}
                   fill="url(#eosGradient)"
                   dot={false}
@@ -590,7 +602,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                 <Area
                   type="monotone"
                   dataKey="ttsLatency"
-                  stroke="var(--cds-interactive, #0f62fe)"
+                  stroke="var(--color-primary)"
                   strokeWidth={1.5}
                   fill="url(#ttsGradient)"
                   dot={false}
@@ -599,7 +611,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                 <Area
                   type="monotone"
                   dataKey="agentLatency"
-                  stroke="#24a148"
+                  stroke="var(--color-data-4)"
                   strokeWidth={1.5}
                   fill="url(#agentGradient)"
                   dot={false}
@@ -616,8 +628,8 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                         agentLatency: 'Agent',
                       };
                       return (
-                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-lg px-3 py-2 text-sm min-w-[140px]">
-                          <p className="text-xs mb-1.5 text-[var(--cds-text-secondary)]">
+                        <div className="bg-surface border border-border-subtle shadow-lg px-3 py-2 text-sm min-w-[140px]">
+                          <p className="text-xs mb-1.5 text-muted">
                             {payload[0]?.payload?.label}
                           </p>
                           {(payload as ChartTooltipPayload[]).map(p => (
@@ -629,7 +641,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                                 className="w-2 h-2"
                                 style={{ backgroundColor: p.stroke }}
                               />
-                              <span className="text-gray-600 dark:text-gray-300 uppercase text-xs">
+                              <span className="text-muted uppercase text-xs">
                                 {labelMap[p.dataKey] || p.dataKey}
                               </span>
                               <span className="ml-auto font-semibold tabular-nums">
@@ -646,10 +658,10 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
             </ResponsiveContainer>
           </div>
           <div className="flex flex-wrap gap-4 px-4 pb-4 text-xs">
-            <LegendItem color="#ff832b" label="STT" />
-            <LegendItem color="#1192e8" label="EOS" />
-            <LegendItem color="var(--cds-interactive, #0f62fe)" label="TTS" />
-            <LegendItem color="#24a148" label="Agent" />
+            <LegendItem color="var(--color-data-3)" label="STT" />
+            <LegendItem color="var(--color-data-2)" label="EOS" />
+            <LegendItem color="var(--color-primary)" label="TTS" />
+            <LegendItem color="var(--color-data-4)" label="Agent" />
           </div>
         </DashboardWidget>
 
@@ -761,7 +773,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
           skeletonVariant="bar-chart"
           bodyClassName="pt-4"
         >
-          <p className="mb-3 text-xs text-[var(--cds-text-secondary)]">
+          <p className="mb-3 text-xs text-muted">
             Messages over selected range
           </p>
           <div className="h-[206px]">
@@ -774,40 +786,32 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                   dataKey="total"
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fontSize: 11, fill: '#9ca3af' }}
+                  tick={{ fontSize: 11, fill: 'var(--color-muted)' }}
                   width={36}
                 />
                 <XAxis
                   dataKey="dateHour"
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fontSize: 11, fill: '#9ca3af' }}
+                  tick={{ fontSize: 11, fill: 'var(--color-muted)' }}
                   interval="preserveStartEnd"
                 />
                 <Tooltip
                   cursor={{
-                    fill: 'var(--cds-interactive, #0f62fe)',
+                    fill: 'var(--color-primary)',
                     fillOpacity: 0.08,
                   }}
                   content={
                     (({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       return (
-                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-lg px-3 py-2.5 text-sm min-w-[140px]">
-                          <p className="text-xs mb-1.5 text-[var(--cds-text-secondary)]">
+                        <div className="bg-surface border border-border-subtle shadow-lg px-3 py-2.5 text-sm min-w-[140px]">
+                          <p className="text-xs mb-1.5 text-muted">
                             {payload[0]?.payload?.label}
                           </p>
                           <div className="flex items-center gap-2">
-                            <div
-                              className="w-2 h-2"
-                              style={{
-                                backgroundColor:
-                                  'var(--cds-interactive, #0f62fe)',
-                              }}
-                            />
-                            <span className="text-gray-600 dark:text-gray-300">
-                              Messages
-                            </span>
+                            <div className="h-2 w-2 bg-primary" />
+                            <span className="text-muted ">Messages</span>
                             <span className="ml-auto font-semibold tabular-nums">
                               {payload[0]?.value}
                             </span>
@@ -819,7 +823,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                 />
                 <Bar
                   dataKey="total"
-                  fill="var(--cds-interactive, #0f62fe)"
+                  fill="var(--color-primary)"
                   fillOpacity={0.9}
                   maxBarSize={32}
                 />
@@ -853,14 +857,14 @@ const DashboardWidget: FC<{
 }) => (
   <Tile
     className={cn(
-      '!rounded-none !p-0 !bg-white dark:!bg-[#262626] border border-gray-200 dark:border-gray-800 h-[310px]',
+      '!rounded-none !p-0 !bg-surface border border-border-subtle h-[310px]',
       size === 'large' && 'xl:col-span-2',
       className,
     )}
   >
-    <div className="flex h-12 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-800">
+    <div className="flex h-12 items-center justify-between border-b border-border-subtle px-4 ">
       <div className="min-w-0">
-        <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+        <h3 className="truncate text-sm font-semibold text-foreground ">
           {title}
         </h3>
       </div>
@@ -885,9 +889,9 @@ const KpiTile: FC<{
   action?: ReactNode;
   isLoading?: boolean;
 }> = ({ title, label, value, unit, caption, action, isLoading = false }) => (
-  <Tile className="!rounded-none !p-0 !bg-white dark:!bg-[#262626] border border-gray-200 dark:border-gray-800 h-[156px]">
-    <div className="flex h-10 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-800">
-      <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+  <Tile className="!rounded-none !p-0 !bg-surface border border-border-subtle h-[156px]">
+    <div className="flex h-10 items-center justify-between border-b border-border-subtle px-4 ">
+      <h3 className="truncate text-sm font-semibold text-foreground ">
         {title}
       </h3>
       {action && <div className="ml-3 shrink-0">{action}</div>}
@@ -898,25 +902,15 @@ const KpiTile: FC<{
       ) : (
         <>
           <div>
-            <p className="truncate text-xs text-[var(--cds-text-secondary)]">
-              {label}
-            </p>
+            <p className="truncate text-xs text-muted">{label}</p>
             <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-4xl font-light leading-none tabular-nums text-gray-900 dark:text-gray-100">
+              <span className="text-4xl font-light leading-none tabular-nums text-foreground ">
                 {typeof value === 'number' ? value.toLocaleString() : value}
               </span>
-              {unit && (
-                <span className="text-sm text-[var(--cds-text-secondary)]">
-                  {unit}
-                </span>
-              )}
+              {unit && <span className="text-sm text-muted">{unit}</span>}
             </div>
           </div>
-          {caption && (
-            <p className="truncate text-xs text-[var(--cds-text-secondary)]">
-              {caption}
-            </p>
-          )}
+          {caption && <p className="truncate text-xs text-muted">{caption}</p>}
         </>
       )}
     </div>
@@ -1010,7 +1004,7 @@ const DashboardWidgetSkeleton: FC<{
       <SkeletonText width="44%" className="!mb-2" />
       <SkeletonText heading width="112px" className="!mb-2" />
       <SkeletonText width="72%" className="!mb-0" />
-      <div className="mt-5 divide-y divide-gray-200 border-t border-gray-200 dark:divide-gray-800 dark:border-gray-800">
+      <div className="mt-5 divide-y divide-border-subtle border-t border-border-subtle ">
         {Array.from({ length: 3 }).map((_, index) => (
           <div
             key={index}
@@ -1032,18 +1026,14 @@ const WidgetHeroMetric: FC<{
   caption?: string;
 }> = ({ label, value, unit, caption }) => (
   <div>
-    <p className="text-xs text-[var(--cds-text-secondary)]">{label}</p>
+    <p className="text-xs text-muted">{label}</p>
     <div className="mt-2 flex items-baseline gap-1">
-      <span className="text-4xl font-light leading-none tabular-nums text-gray-900 dark:text-gray-100">
+      <span className="text-4xl font-light leading-none tabular-nums text-foreground ">
         {typeof value === 'number' ? value.toLocaleString() : value}
       </span>
-      {unit && (
-        <span className="text-sm text-[var(--cds-text-secondary)]">{unit}</span>
-      )}
+      {unit && <span className="text-sm text-muted">{unit}</span>}
     </div>
-    {caption && (
-      <p className="mt-2 text-xs text-[var(--cds-text-secondary)]">{caption}</p>
-    )}
+    {caption && <p className="mt-2 text-xs text-muted">{caption}</p>}
   </div>
 );
 
@@ -1053,14 +1043,12 @@ const InlineMetric: FC<{
   unit?: string;
 }> = ({ label, value, unit }) => (
   <div>
-    <p className="text-xs text-[var(--cds-text-secondary)]">{label}</p>
+    <p className="text-xs text-muted">{label}</p>
     <div className="mt-1 flex items-baseline gap-1">
-      <span className="text-2xl font-light leading-none tabular-nums text-gray-900 dark:text-gray-100">
+      <span className="text-2xl font-light leading-none tabular-nums text-foreground ">
         {typeof value === 'number' ? value.toLocaleString() : value}
       </span>
-      {unit && (
-        <span className="text-xs text-[var(--cds-text-secondary)]">{unit}</span>
-      )}
+      {unit && <span className="text-xs text-muted">{unit}</span>}
     </div>
   </div>
 );
@@ -1068,16 +1056,16 @@ const InlineMetric: FC<{
 const WidgetList: FC<{
   rows: Array<{ label: string; value: ReactNode }>;
 }> = ({ rows }) => (
-  <div className="mt-5 divide-y divide-gray-200 border-t border-gray-200 dark:divide-gray-800 dark:border-gray-800">
+  <div className="mt-5 divide-y divide-border-subtle border-t border-border-subtle ">
     {rows.map(row => (
       <div
         key={row.label}
         className="flex items-center justify-between gap-4 py-2.5"
       >
-        <span className="min-w-0 truncate text-sm text-gray-600 dark:text-gray-300">
+        <span className="min-w-0 truncate text-sm text-muted ">
           {row.label}
         </span>
-        <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+        <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground ">
           {row.value}
         </span>
       </div>
@@ -1102,7 +1090,7 @@ const DonutContent: FC<{
 }> = ({ data, dataKey, nameKey, total }) => {
   if (data.length === 0)
     return (
-      <div className="flex h-full items-center justify-center text-sm text-[var(--cds-text-secondary)]">
+      <div className="flex h-full items-center justify-center text-sm text-muted">
         No source data
       </div>
     );
@@ -1132,12 +1120,13 @@ const DonutContent: FC<{
                 (({ active, payload }) => {
                   if (!active || !payload?.length) return null;
                   const item = payload[0];
+                  const itemColor = item.color || 'var(--color-data-1)';
                   return (
-                    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-lg px-3 py-2 text-sm">
+                    <div className="bg-surface border border-border-subtle shadow-lg px-3 py-2 text-sm">
                       <div className="flex items-center gap-2">
                         <div
                           className="w-2.5 h-2.5 shrink-0"
-                          style={{ backgroundColor: item.color || '#6366f1' }}
+                          style={{ backgroundColor: itemColor }}
                         />
                         <span className="capitalize">
                           {item.name || 'Unknown'}
@@ -1154,9 +1143,7 @@ const DonutContent: FC<{
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center">
             <p className="text-lg font-bold tabular-nums">{total}</p>
-            <p className="text-[10px] uppercase text-[var(--cds-text-secondary)]">
-              Total
-            </p>
+            <p className="text-[10px] uppercase text-muted">Total</p>
           </div>
         </div>
       </div>
@@ -1170,15 +1157,13 @@ const DonutContent: FC<{
               className="w-2.5 h-2.5 shrink-0"
               style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
             />
-            <span className="truncate flex-1 capitalize text-[var(--cds-text-secondary)]">
+            <span className="truncate flex-1 capitalize text-muted">
               {item[nameKey] || 'Unknown'}
             </span>
             <span className="font-semibold tabular-nums">
               {item.percentage}%
             </span>
-            <span className="tabular-nums text-[var(--cds-text-secondary)]">
-              ({item.count})
-            </span>
+            <span className="tabular-nums text-muted">({item.count})</span>
           </div>
         ))}
       </div>
@@ -1191,7 +1176,7 @@ const LanguageContent: FC<{
 }> = ({ data }) => {
   if (data.length === 0)
     return (
-      <div className="flex h-full items-center justify-center text-sm text-[var(--cds-text-secondary)]">
+      <div className="flex h-full items-center justify-center text-sm text-muted">
         No language data
       </div>
     );
@@ -1201,14 +1186,14 @@ const LanguageContent: FC<{
       {data.slice(0, 5).map((item, i) => (
         <div key={item.name || i}>
           <div className="mb-1.5 flex items-center justify-between gap-4 text-sm">
-            <span className="truncate capitalize text-gray-700 dark:text-gray-200">
+            <span className="truncate capitalize text-muted ">
               {item.name || 'Unknown'}
             </span>
-            <span className="shrink-0 font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+            <span className="shrink-0 font-semibold tabular-nums text-foreground ">
               {item.percentage}%
             </span>
           </div>
-          <div className="h-2 bg-gray-200 dark:bg-gray-800">
+          <div className="h-2 bg-layer ">
             <div
               className="h-2"
               style={{
@@ -1217,7 +1202,7 @@ const LanguageContent: FC<{
               }}
             />
           </div>
-          <p className="mt-1 text-xs text-[var(--cds-text-secondary)]">
+          <p className="mt-1 text-xs text-muted">
             {item.count.toLocaleString()} messages
           </p>
         </div>

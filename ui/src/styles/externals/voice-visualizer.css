@@ -1,0 +1,34 @@
+.listening {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-evenly;
+  overflow: hidden;
+}
+
+.listening::before,
+.listening::after {
+  position: absolute;
+  bottom: -27vmin;
+  left: -18vmin;
+  z-index: 1;
+  width: 20vmax;
+  height: 20vmax;
+  pointer-events: none;
+  content: '';
+  background: color-mix(in srgb, var(--cds-text-inverse) 10%, transparent);
+  transform-origin: 55% 55%;
+  animation:
+    morph 1s linear infinite alternate,
+    spin 2s linear infinite;
+  will-change: border-radius, transform;
+}
+
+.listening::after {
+  left: -10vmin;
+  background: color-mix(in srgb, var(--cds-text-inverse) 20%, transparent);
+  animation:
+    morph 2s linear infinite alternate,
+    spin 4s linear infinite;
+}

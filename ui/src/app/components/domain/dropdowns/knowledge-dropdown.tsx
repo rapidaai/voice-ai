@@ -38,7 +38,7 @@ export function KnowledgeDropdownView({
       <div className="cds--label domain-connected-dropdown-label">
         Knowledge
       </div>
-      <div className="domain-connected-dropdown-row flex w-full items-stretch bg-[var(--cds-field)] border-b border-b-[var(--cds-border-strong)]">
+      <div className="domain-connected-dropdown-row flex w-full items-stretch border-b border-b-border-strong bg-field">
         <div className="min-w-0 flex-1">
           <Dropdown
             id="knowledge-dropdown"

@@ -129,7 +129,7 @@ export function EndpointArgumentField(props: {
   return (
     <div
       className={cn(
-        'border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer-01)] px-4 py-4',
+        'border-b border-border-subtle bg-layer px-4 py-4',
         'last:border-b-0',
       )}
     >
@@ -139,13 +139,13 @@ export function EndpointArgumentField(props: {
       >
         <span className="min-w-0">
           <span
-            className="block truncate font-mono text-sm font-semibold text-[var(--cds-text-primary)]"
+            className="block truncate font-mono text-sm font-semibold text-foreground"
             title={variable.getName()}
           >
             {`{{${variable.getName()}}}`}
           </span>
           {variable.getDefaultvalue() && (
-            <span className="mt-1 block text-xs text-[var(--cds-text-secondary)]">
+            <span className="mt-1 block text-xs text-muted">
               Default value loaded
             </span>
           )}
@@ -184,12 +184,12 @@ export function EndpointArgumentList(props: {
 
   if (variables.length === 0) {
     return (
-      <div className="flex min-h-[14rem] items-center justify-center bg-[var(--cds-layer-01)] px-6 text-center">
+      <div className="flex min-h-[14rem] items-center justify-center bg-layer px-6 text-center">
         <div>
-          <p className="text-sm font-semibold text-[var(--cds-text-primary)]">
+          <p className="text-sm font-semibold text-foreground">
             No arguments defined
           </p>
-          <p className="mt-1 max-w-sm text-sm text-[var(--cds-text-secondary)]">
+          <p className="mt-1 max-w-sm text-sm text-muted">
             This endpoint does not expose prompt variables.
           </p>
         </div>
@@ -198,7 +198,7 @@ export function EndpointArgumentList(props: {
   }
 
   return (
-    <div className="divide-y divide-[var(--cds-border-subtle-01)]">
+    <div className="divide-y divide-border-subtle">
       {variables.map(variable => {
         const editable = isEndpointVariableEditable(variable.getType());
         return (

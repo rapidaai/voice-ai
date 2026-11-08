@@ -63,7 +63,7 @@ export function RightSideModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           onClick={handleClose}
-          className="fixed inset-0 z-50 [background:var(--cds-overlay)]"
+          className="fixed inset-0 z-50 [background:var(--color-overlay)]"
         >
           <motion.div
             {...attributes}

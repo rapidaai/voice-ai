@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { cn } from '@/utils';
 import { SidePanelOpen, SidePanelClose } from '@carbon/icons-react';
 import {
+  Button,
   SideNav,
   SideNavItems,
   SideNavLink,
@@ -173,10 +174,10 @@ export const AssistantSideNav: FC<AssistantSideNavProps> = ({
     <div
       className={cn(
         'relative shrink-0 flex flex-col h-full',
-        'bg-white dark:bg-gray-900',
-        'border-r border-gray-200 dark:border-gray-800',
-        'transition-all duration-200',
-        expanded ? 'w-56' : 'w-12',
+        'bg-shell text-foreground',
+        'border-r border-border-subtle',
+        'transition-[width] duration-200 ease-in-out',
+        expanded ? 'w-64' : 'w-12',
       )}
     >
       <SideNav
@@ -184,7 +185,7 @@ export const AssistantSideNav: FC<AssistantSideNavProps> = ({
         expanded={expanded}
         isFixedNav
         isRail={!expanded}
-        className="relative! inset-auto! h-auto! flex-1 w-full! border-none! z-0!"
+        className="relative! inset-auto! h-auto! flex-1 w-full! transform-none! border-none! bg-transparent! z-0!"
       >
         <SideNavItems>
           {assistantNavSections.map((section, idx) => (
@@ -202,17 +203,23 @@ export const AssistantSideNav: FC<AssistantSideNavProps> = ({
         </SideNavItems>
       </SideNav>
 
-      <div className="shrink-0 border-t border-gray-200 dark:border-gray-800">
-        <button
+      <div className="shrink-0 border-t border-border-subtle">
+        <Button
           type="button"
+          kind="ghost"
+          size="sm"
           onClick={onToggle}
+          aria-label={
+            expanded
+              ? 'Collapse assistant navigation'
+              : 'Expand assistant navigation'
+          }
           className={cn(
-            'flex items-center h-10 w-full cursor-pointer px-4',
-            'text-gray-700 dark:text-gray-300',
-            'hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-100',
-            'transition-colors duration-100',
+            '!flex !h-10 !w-full !max-w-none !items-center !justify-start !px-4',
+            '!text-muted',
+            'hover:!bg-layer-hover hover:!text-foreground',
+            '!transition-colors !duration-100',
           )}
-          aria-label={expanded ? 'Collapse nav' : 'Expand nav'}
         >
           <span className="shrink-0">
             {expanded ? (
@@ -221,8 +228,15 @@ export const AssistantSideNav: FC<AssistantSideNavProps> = ({
               <SidePanelOpen size={16} />
             )}
           </span>
-          {expanded && <span className="text-xs truncate ml-3">Collapse</span>}
-        </button>
+          <span
+            className={cn(
+              'text-xs truncate transition-all duration-200 ml-3',
+              expanded ? 'opacity-100' : 'opacity-0 w-0 ml-0 overflow-hidden',
+            )}
+          >
+            {expanded ? 'Collapse' : 'Expand'}
+          </span>
+        </Button>
       </div>
     </div>
   );

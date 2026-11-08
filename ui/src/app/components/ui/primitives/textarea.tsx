@@ -81,8 +81,8 @@ export const ScalableTextarea = React.forwardRef<
     <div
       className={cn(
         'block w-full px-4 py-2.5',
-        'bg-light-background dark:bg-gray-950',
-        'border-0 border-b border-gray-300 dark:border-gray-700',
+        'bg-light-background bg-surface',
+        'border-0 border-b border-border-subtle ',
         'outline-solid outline-[1.5px] outline-transparent outline-offset-[-1.5px]',
         'focus-within:outline-primary focus-within:border-primary',
         'rounded-none transition-colors duration-100',
@@ -97,8 +97,8 @@ export const ScalableTextarea = React.forwardRef<
         style={{ height: textareaHeight }}
         className={cn(
           'block w-full resize-none min-h-8 max-h-80',
-          'text-sm text-gray-900 dark:text-gray-100',
-          'placeholder-gray-400 dark:placeholder-gray-600',
+          'text-sm text-foreground ',
+          'placeholder-placeholder',
           'bg-transparent',
           'focus:ring-0 focus:outline-hidden',
           props.className,

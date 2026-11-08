@@ -5,15 +5,13 @@ import { useAllProviderCredentials } from '@/hooks/use-model';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast/headless';
 import { Helmet } from '@/app/components/app-shell/helmet';
-import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
+import { Toggletip, ToggletipButton, ToggletipContent } from '@carbon/react';
+import { Api_1, ArrowUpRight, Information } from '@carbon/icons-react';
 import {
-  ButtonSet,
-  Toggletip,
-  ToggletipButton,
-  ToggletipContent,
-} from '@carbon/react';
-import { ArrowUpRight, Information } from '@carbon/icons-react';
-import { TabForm } from '@/app/components/ui/composites';
+  CreateFullPageStep,
+  CreateFullPageWithGlobalHeader,
+  TagInput,
+} from '@/app/components/ui/composites';
 import {
   CreateEndpointResponse,
   EndpointAttribute,
@@ -33,22 +31,20 @@ import { randomMeaningfullName, randomString } from '@/utils';
 import { FieldSet } from '@/app/components/ui/primitives';
 import { FormLabel } from '@/app/components/ui/primitives';
 import { Input } from '@/app/components/ui/primitives';
-import { TagInput } from '@/app/components/ui/composites';
 import { EndpointTag } from '@/app/components/domain/tags/endpoint-tags';
 import { Textarea } from '@/app/components/ui/primitives';
 import { ServiceError } from '@rapidaai/react';
 import { ChatCompletePrompt } from '@/utils/prompt';
 import { InputHelper } from '@/app/components/ui/primitives';
 import { ConfigureEndpointPromptDialog } from '@/app/components/dialogs/endpoint';
-import { CornerBorderOverlay } from '@/app/components/ui/primitives';
+import { ActionCard } from '@/app/components/ui/primitives';
 import { createEndpoint as createEndpointRequest } from '@/clients';
 
 export function CreateEndpointPage() {
   const { authId, token, projectId } = useCurrentCredential();
 
-  const [activeTab, setActiveTab] = useState('choose-model');
   const [errorMessage, setErrorMessage] = useState('');
-  const { loading, showLoader, hideLoader } = useRapidaStore();
+  const { showLoader, hideLoader } = useRapidaStore();
   const { providerCredentials } = useAllProviderCredentials();
   const navigator = useNavigate();
 
@@ -62,6 +58,7 @@ export function CreateEndpointPage() {
     prompt: [{ role: 'system', content: '' }],
     variables: [],
   });
+  const [promptInstanceId] = useState(() => randomString(10));
 
   const [textProviderModel, setTextProviderModel] = useState<{
     provider: string;
@@ -121,7 +118,7 @@ export function CreateEndpointPage() {
     [],
   );
 
-  const onvalidateEndpointInstruction = () => {
+  const validateEndpointInstruction = (): boolean => {
     const err = ValidateTextProviderDefaultOptions(
       textProviderModel.provider,
       textProviderModel.parameters,
@@ -131,14 +128,14 @@ export function CreateEndpointPage() {
     );
     if (err) {
       setErrorMessage(err);
-      return;
+      return false;
     }
 
     if (promptConfig.variables.length === 0) {
       setErrorMessage(
         'Please provide a valid prompt template, it should at least have one variable.',
       );
-      return;
+      return false;
     }
 
     const hasNonEmptyContent = promptConfig.prompt.some(
@@ -146,50 +143,55 @@ export function CreateEndpointPage() {
     );
     if (!hasNonEmptyContent) {
       setErrorMessage('Please provide content for at least one prompt item.');
-      return;
+      return false;
     }
 
     setErrorMessage('');
-    setActiveTab('define-endpoint');
+    return true;
   };
 
-  const createEndpoint = () => {
-    if (name.trim() === '') {
-      setErrorMessage(
-        'Please a valid name for endpoint, that can help you indentify the endpoint',
+  const createEndpoint = () =>
+    new Promise<void>(resolve => {
+      if (name.trim() === '') {
+        setErrorMessage('Enter a name for the endpoint.');
+        resolve();
+        return;
+      }
+      setErrorMessage('');
+      showLoader('overlay');
+
+      const endpointProviderModelAttr = new EndpointProviderModelAttribute();
+      endpointProviderModelAttr.setModelprovidername(
+        textProviderModel.provider,
       );
-      return;
-    }
-    setErrorMessage('');
-    showLoader('overlay');
+      endpointProviderModelAttr.setEndpointmodeloptionsList(
+        textProviderModel.parameters,
+      );
+      endpointProviderModelAttr.setChatcompleteprompt(
+        ChatCompletePrompt(promptConfig),
+      );
 
-    const endpointProviderModelAttr = new EndpointProviderModelAttribute();
-    endpointProviderModelAttr.setModelprovidername(textProviderModel.provider);
-    endpointProviderModelAttr.setEndpointmodeloptionsList(
-      textProviderModel.parameters,
-    );
-    endpointProviderModelAttr.setChatcompleteprompt(
-      ChatCompletePrompt(promptConfig),
-    );
+      const endpointattr = new EndpointAttribute();
+      endpointattr.setName(name);
+      if (description.trim() !== '') {
+        endpointattr.setDescription(description);
+      }
 
-    const endpointattr = new EndpointAttribute();
-    endpointattr.setName(name);
-    if (description.trim() !== '') {
-      endpointattr.setDescription(description);
-    }
-
-    createEndpointRequest({
-      endpointProviderModel: endpointProviderModelAttr,
-      endpoint: endpointattr,
-      tags,
-      auth: {
-        userId: authId,
-        token,
-        projectId,
-      },
-      callback: afterCreateEndpoint,
+      createEndpointRequest({
+        endpointProviderModel: endpointProviderModelAttr,
+        endpoint: endpointattr,
+        tags,
+        auth: {
+          userId: authId,
+          token,
+          projectId,
+        },
+        callback: (error, response) => {
+          afterCreateEndpoint(error, response);
+          resolve();
+        },
+      });
     });
-  };
 
   const [isShow, setIsShow] = useState(false);
   const [isConfigureEndpointPromptOpen, setIsConfigureEndpointPromptOpen] =
@@ -281,7 +283,7 @@ export function CreateEndpointPage() {
 
   return (
     <>
-      <Helmet title="Create an Endpoint" />
+      <Helmet title="Create endpoint" />
       <ConfigureEndpointPromptDialog
         modalOpen={isConfigureEndpointPromptOpen}
         setModalOpen={setIsConfigureEndpointPromptOpen}
@@ -299,170 +301,138 @@ export function CreateEndpointPage() {
         onClose={() => setIsShow(false)}
       />
 
-      <TabForm
-        formHeading="Complete all steps to create a new endpoint."
-        activeTab={activeTab}
-        onChangeActiveTab={() => {}}
+      <CreateFullPageWithGlobalHeader
+        title="Create endpoint"
+        description="Configure the model and instruction, then define how the endpoint appears in your workspace."
         errorMessage={errorMessage}
-        form={[
-          {
-            name: 'Choose Model',
-            description:
-              'Select the LLM provider and configure your prompt template.',
-            code: 'choose-model',
-            body: (
-              <div className="px-8 pt-6 pb-8 max-w-4xl flex flex-col gap-8">
-                {/* Carbon Clickable Tile — Usecase Template slot */}
-                <button
-                  type="button"
-                  className="group relative w-full flex items-start justify-between gap-4 p-4 text-left bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-100"
-                  onClick={() => setIsConfigureEndpointPromptOpen(true)}
-                >
-                  {/* Corner accent brackets */}
-                  <CornerBorderOverlay />
-                  <div className="flex flex-col gap-1 min-w-0">
-                    <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--cds-text-secondary)]">
-                      Quick start
-                    </span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      Usecase Template
-                    </span>
-                    <span className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
-                      Browse pre-configured templates and auto-fill your form.
-                    </span>
+        eyebrow="Hosted endpoint"
+        headerIcon={Api_1}
+        nextButtonText="Continue"
+        onCancel={() => setIsShow(true)}
+        onRequestSubmit={createEndpoint}
+        submitButtonText="Create endpoint"
+      >
+        <CreateFullPageStep
+          title="Configure Model"
+          description="Select the LLM provider and configure the prompt template."
+          hideHeader
+          onNext={validateEndpointInstruction}
+        >
+          <div className="flex max-w-4xl flex-col gap-8 px-8 pb-8 pt-6">
+            <ActionCard
+              className="group relative flex w-full items-start justify-between gap-4 border border-border-subtle bg-surface p-4 text-left transition-colors duration-100 hover:bg-layer"
+              onClick={() => setIsConfigureEndpointPromptOpen(true)}
+            >
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Quick start
+                </span>
+                <span className="text-sm font-medium text-foreground">
+                  Usecase Template
+                </span>
+                <span className="text-xs leading-relaxed text-muted">
+                  Browse pre-configured templates and auto-fill your form.
+                </span>
+              </div>
+              <ArrowUpRight
+                className="mt-0.5 shrink-0 text-muted transition-colors group-hover:text-primary"
+                size={16}
+              />
+            </ActionCard>
+
+            <div className="flex flex-col gap-6">
+              <TextProvider
+                onChangeProvider={onChangeTextProvider}
+                onChangeParameter={onChangeTextProviderParameter}
+                parameters={textProviderModel.parameters}
+                provider={textProviderModel.provider}
+              />
+            </div>
+
+            <div className="flex flex-col gap-6">
+              <ConfigPrompt
+                instanceId={promptInstanceId}
+                existingPrompt={promptConfig}
+                onChange={prompt => setPromptConfig(prompt)}
+              />
+            </div>
+          </div>
+        </CreateFullPageStep>
+
+        <CreateFullPageStep
+          title="Define Profile"
+          description="Add a name, description, and labels so the endpoint is easy to find and manage."
+          hideHeader
+        >
+          <div className="flex max-w-2xl flex-col gap-10 px-8 pb-8 pt-8">
+            <div className="flex flex-col gap-6">
+              <FieldSet>
+                <div className="flex items-baseline justify-between">
+                  <div className="flex items-center gap-1">
+                    <FormLabel htmlFor="name">Endpoint name</FormLabel>
+                    <Toggletip align="right">
+                      <ToggletipButton label="Endpoint name information">
+                        <Information size={14} />
+                      </ToggletipButton>
+                      <ToggletipContent>
+                        Use a short, stable name that makes this endpoint easy
+                        to identify.
+                      </ToggletipContent>
+                    </Toggletip>
                   </div>
-                  <ArrowUpRight
-                    className="shrink-0 mt-0.5 text-gray-500 dark:text-gray-400 group-hover:text-primary transition-colors"
-                    size={16}
-                  />
-                </button>
-
-                {/* Model configuration section */}
-                <div className="flex flex-col gap-6">
-                  <TextProvider
-                    onChangeProvider={onChangeTextProvider}
-                    onChangeParameter={onChangeTextProviderParameter}
-                    parameters={textProviderModel.parameters}
-                    provider={textProviderModel.provider}
-                  />
+                  <span className="text-xs tabular-nums text-muted">
+                    {name.length}/100
+                  </span>
                 </div>
+                <Input
+                  id="name"
+                  name="name"
+                  maxLength={100}
+                  onChange={e => setName(e.target.value)}
+                  value={name}
+                  placeholder="e.g. customer-support-v1"
+                />
+              </FieldSet>
 
-                {/* Prompt template section */}
-                <div className="flex flex-col gap-6">
-                  <ConfigPrompt
-                    instanceId={randomString(10)}
-                    existingPrompt={promptConfig}
-                    onChange={prompt => setPromptConfig(prompt)}
-                  />
+              <FieldSet>
+                <div className="flex items-center gap-1">
+                  <FormLabel htmlFor="description">Description</FormLabel>
+                  <Toggletip align="right">
+                    <ToggletipButton label="Endpoint description information">
+                      <Information size={14} />
+                    </ToggletipButton>
+                    <ToggletipContent>
+                      Describe what this endpoint is for and when it should be
+                      used.
+                    </ToggletipContent>
+                  </Toggletip>
                 </div>
-              </div>
-            ),
-            actions: [
-              <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg" onClick={() => setIsShow(true)}>
-                  Cancel
-                </SecondaryButton>
-                <PrimaryButton
-                  size="lg"
-                  isLoading={loading}
-                  onClick={onvalidateEndpointInstruction}
-                >
-                  Configure instruction
-                </PrimaryButton>
-              </ButtonSet>,
-            ],
-          },
-          {
-            code: 'define-endpoint',
-            name: 'Define Endpoint Profile',
-            description:
-              'Give your endpoint a name, description, and labels to make it easy to find and manage.',
-            actions: [
-              <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg" onClick={() => setIsShow(true)}>
-                  Cancel
-                </SecondaryButton>
-                <PrimaryButton
-                  size="lg"
-                  isLoading={loading}
-                  onClick={createEndpoint}
-                >
-                  Create endpoint
-                </PrimaryButton>
-              </ButtonSet>,
-            ],
-            body: (
-              <div className="px-8 pt-8 pb-8 max-w-2xl flex flex-col gap-10">
-                <div className="flex flex-col gap-6">
-                  <FieldSet>
-                    <div className="flex items-baseline justify-between">
-                      <div className="flex items-center gap-1">
-                        <FormLabel htmlFor="name">Endpoint name</FormLabel>
-                        <Toggletip align="right">
-                          <ToggletipButton label="Endpoint name information">
-                            <Information size={14} />
-                          </ToggletipButton>
-                          <ToggletipContent>
-                            Use a short, stable name that makes this endpoint
-                            easy to identify.
-                          </ToggletipContent>
-                        </Toggletip>
-                      </div>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
-                        {name.length}/100
-                      </span>
-                    </div>
-                    <Input
-                      id="name"
-                      name="name"
-                      maxLength={100}
-                      onChange={e => setName(e.target.value)}
-                      value={name}
-                      placeholder="e.g. customer-support-v1"
-                    />
-                  </FieldSet>
+                <Textarea
+                  id="description"
+                  row={4}
+                  name="description"
+                  value={description}
+                  placeholder="What does this endpoint do? When should it be used?"
+                  onChange={t => setDescription(t.target.value)}
+                />
+              </FieldSet>
+            </div>
 
-                  <FieldSet>
-                    <div className="flex items-center gap-1">
-                      <FormLabel htmlFor="description">Description</FormLabel>
-                      <Toggletip align="right">
-                        <ToggletipButton label="Endpoint description information">
-                          <Information size={14} />
-                        </ToggletipButton>
-                        <ToggletipContent>
-                          Describe what this endpoint is for and when it should
-                          be used.
-                        </ToggletipContent>
-                      </Toggletip>
-                    </div>
-                    <Textarea
-                      id="description"
-                      row={4}
-                      name="description"
-                      value={description}
-                      placeholder="What does this endpoint do? When should it be used?"
-                      onChange={t => setDescription(t.target.value)}
-                    />
-                  </FieldSet>
-                </div>
-
-                <div className="flex flex-col gap-6">
-                  <TagInput
-                    tags={tags}
-                    addTag={onAddTag}
-                    removeTag={onRemoveTag}
-                    allTags={EndpointTag}
-                  />
-                  <InputHelper>
-                    Tags help you organize and filter endpoints across your
-                    workspace.
-                  </InputHelper>
-                </div>
-              </div>
-            ),
-          },
-        ]}
-      />
+            <div className="flex flex-col gap-6">
+              <TagInput
+                tags={tags}
+                addTag={onAddTag}
+                removeTag={onRemoveTag}
+                allTags={EndpointTag}
+              />
+              <InputHelper>
+                Tags help you organize and filter endpoints across your
+                workspace.
+              </InputHelper>
+            </div>
+          </div>
+        </CreateFullPageStep>
+      </CreateFullPageWithGlobalHeader>
     </>
   );
 }

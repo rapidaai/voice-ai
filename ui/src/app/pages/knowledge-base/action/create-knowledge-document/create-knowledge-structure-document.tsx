@@ -4,7 +4,11 @@ import { useCredential } from '@/hooks/use-credential';
 import { useRapidaStore } from '@/stores/app';
 import { KnowledgeDocument } from '@rapidaai/react';
 import { useCreateKnowledgeDocumentPageStore } from '@/stores/knowledge/create-knowledge-document.store';
-import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
+import {
+  GhostButton,
+  PrimaryButton,
+  SecondaryButton,
+} from '@/app/components/ui/primitives';
 import { ButtonSet } from '@carbon/react';
 import { ManualFile } from '@/app/pages/knowledge-base/action/components/datasource-uploader/manual-file';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
@@ -79,14 +83,14 @@ export function CreateKnowledgeStructureDocumentPage() {
 
       {/* Back link */}
       <div className="px-6 pt-6 pb-2">
-        <button
+        <GhostButton
+          size="sm"
           type="button"
-          className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-primary transition-colors"
           onClick={goBack}
         >
           <ArrowLeft className="w-4 h-4" />
           Back to knowledge
-        </button>
+        </GhostButton>
       </div>
 
       <div className="px-6 pb-8 flex flex-col gap-8">
@@ -97,7 +101,7 @@ export function CreateKnowledgeStructureDocumentPage() {
             <FormLabel className="text-xs tracking-wide uppercase">
               Document Type
             </FormLabel>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-muted ">
               Select the category that best matches the content of the document
               you are about to upload.
             </p>

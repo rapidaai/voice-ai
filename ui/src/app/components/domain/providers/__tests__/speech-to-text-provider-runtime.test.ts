@@ -347,8 +347,7 @@ describe('Speech-to-text provider runtime standard', () => {
     expect(nova3MedicalLanguages).not.toContain('as');
     expect(nova3MedicalLanguages).not.toContain('ja');
 
-    const nova3PharmaLanguages =
-      getDeepgramModelLanguageData('nova-3-pharma');
+    const nova3PharmaLanguages = getDeepgramModelLanguageData('nova-3-pharma');
     expect(nova3PharmaLanguages).toEqual([
       'en',
       'en-US',

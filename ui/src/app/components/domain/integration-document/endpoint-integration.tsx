@@ -214,7 +214,7 @@ if err != nil {
       fullWidth
       fill
       aria-label="Endpoint integration languages"
-      className="bg-white dark:bg-gray-900"
+      className="bg-surface "
       panelClassName="overflow-auto !p-0"
     >
       {languageTabs.map(tab => tab.element)}

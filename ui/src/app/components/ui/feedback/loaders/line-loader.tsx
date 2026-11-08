@@ -17,7 +17,7 @@ export function AnimatedLine({
     <div {...props} className={cn('w-full overflow-hidden', className)}>
       <div
         className={cn(
-          'bg-linear-to-r h-0.5 from-indigo-500 via-purple-500 to-pink-500 w-full transition-all duration-700 translate-x-full',
+          'bg-linear-to-r h-0.5 from-data-1 via-data-1 to-data-5 w-full transition-all duration-700 translate-x-full',
         )}
         style={{
           animation: `fill 2s linear ${animate}`,

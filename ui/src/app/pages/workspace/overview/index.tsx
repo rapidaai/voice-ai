@@ -102,7 +102,7 @@ export function OverviewPage() {
         <DescriptiveHeading heading="Organization Profile" />
       </div>
       <form
-        className="space-y-8 py-4 px-4 border-t dark:border-gray-800"
+        className="space-y-8 py-4 px-4 border-t border-border-subtle"
         onSubmit={handleSubmit(onUpdateOrganization)}
       >
         <fieldset>
@@ -191,7 +191,7 @@ export function OverviewPage() {
             </div>
           </div>
         </fieldset>
-        <footer className="border-t pt-8 dark:border-gray-700">
+        <footer className="border-t pt-8 border-border-subtle">
           <ul className="flex justify-end">
             <li className="ml-3">
               <ArrowButton type="submit" label="Update details" />

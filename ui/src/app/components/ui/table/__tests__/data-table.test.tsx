@@ -69,7 +69,11 @@ describe('ScrollableResizableTable', () => {
       </ScrollableResizableTable>,
     );
 
-    expect(screen.getByText('Name')).toHaveStyle({ width: '320px' });
-    expect(screen.getByText('Status')).toHaveStyle({ width: '200px' });
+    expect(screen.getByText('Name').closest('th')).toHaveStyle({
+      width: '320px',
+    });
+    expect(screen.getByText('Status').closest('th')).toHaveStyle({
+      width: '200px',
+    });
   });
 });

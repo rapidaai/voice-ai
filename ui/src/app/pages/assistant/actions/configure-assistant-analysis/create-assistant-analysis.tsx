@@ -9,7 +9,7 @@ import { randomMeaningfullName } from '@/utils';
 import { EndpointDropdown } from '@/app/components/domain/dropdowns/endpoint-dropdown';
 import { Endpoint, Metadata } from '@rapidaai/react';
 import toast from 'react-hot-toast/headless';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import {
   ASSISTANT_CONDITION_KEY_OPTIONS,
   ASSISTANT_CONDITION_OPERATOR_OPTIONS,
@@ -182,12 +182,14 @@ export const CreateAssistantAnalysis: FC<{ assistantId: string }> = ({
   return (
     <>
       <ConfirmDialogComponent />
-      <TabForm
-        formHeading="Complete all steps to configure your analysis."
-        activeTab={activeTab}
-        onChangeActiveTab={() => {}}
+      <CreateFullPageWithHeader
+        title="Configure analysis"
+        eyebrow="Assistant"
+        description="Complete all steps to configure your analysis."
+        activeStep={activeTab}
+        onChangeStep={() => {}}
         errorMessage={errorMessage}
-        form={[
+        steps={[
           {
             code: 'configure',
             name: 'Configure',

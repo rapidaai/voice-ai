@@ -355,7 +355,7 @@ const EditAssistantCallDeployment: FC<{ assistantId: string }> = ({
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-900">
+    <div className="flex flex-col flex-1 min-h-0 bg-surface ">
       <ConfirmDialogComponent />
       <DeploymentEditHeader
         eyebrow="Phone deployment"

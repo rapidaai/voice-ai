@@ -97,12 +97,12 @@ function WidgetConfiguration({
     <section>
       <DeploymentSectionHeader label="Widget settings" />
       <DeploymentRow label="Name">
-        <span className="text-sm text-gray-900 dark:text-gray-100">
+        <span className="text-sm text-foreground ">
           {deployment.getName() || 'Not configured'}
         </span>
       </DeploymentRow>
       <DeploymentRow label="Suggested prompts" className="h-auto min-h-12 py-3">
-        <span className="max-w-[320px] break-words text-right text-sm text-gray-900 dark:text-gray-100">
+        <span className="max-w-[320px] break-words text-right text-sm text-foreground ">
           {suggestions.length > 0 ? suggestions.join(', ') : 'Not configured'}
         </span>
       </DeploymentRow>
@@ -129,7 +129,7 @@ function WidgetConfiguration({
 function FeatureRow({ label, enabled }: { label: string; enabled: boolean }) {
   return (
     <DeploymentRow label={label}>
-      <span className="text-sm text-gray-900 dark:text-gray-100">
+      <span className="text-sm text-foreground ">
         {enabled ? 'Enabled' : 'Disabled'}
       </span>
     </DeploymentRow>

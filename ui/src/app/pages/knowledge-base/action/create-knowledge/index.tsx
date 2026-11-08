@@ -9,7 +9,7 @@ import { useRapidaStore } from '@/stores/app';
 import { PrimaryButton, SecondaryButton } from '@/app/components/ui/primitives';
 import { ButtonSet } from '@carbon/react';
 import { KnowledgeDocument } from '@rapidaai/react';
-import { TabForm } from '@/app/components/ui/composites';
+import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
 import { useCreateKnowledgeDocumentPageStore } from '@/stores/knowledge/create-knowledge-document.store';
 import { Knowledge } from '@rapidaai/react';
 import { KnowledgeTags } from '@/app/components/domain/tags/knowledge-tags';
@@ -129,12 +129,14 @@ export function CreateKnowledgePage() {
         onClose={() => setIsShow(false)}
       />
 
-      <TabForm
-        activeTab={activeTab}
-        formHeading="Complete all steps to create a knowledge base."
-        onChangeActiveTab={() => {}}
+      <CreateFullPageWithHeader
+        title="Create knowledge base"
+        eyebrow="Knowledge"
+        activeStep={activeTab}
+        description="Complete all steps to create a knowledge base."
+        onChangeStep={() => {}}
         errorMessage={errorMessage}
-        form={[
+        steps={[
           {
             name: 'Configure Embedding',
             description:
@@ -189,11 +191,11 @@ export function CreateKnowledgePage() {
                         className="text-xs tracking-wide uppercase"
                       >
                         Knowledge name{' '}
-                        <span className="text-red-500 ml-0.5 normal-case">
+                        <span className="text-support-error ml-0.5 normal-case">
                           *
                         </span>
                       </FormLabel>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+                      <span className="text-xs text-muted tabular-nums">
                         {name.length}/100
                       </span>
                     </div>
@@ -234,10 +236,10 @@ export function CreateKnowledgePage() {
                 {/* Labels section */}
                 <div className="flex flex-col gap-6">
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                    <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted whitespace-nowrap">
                       Labels
                     </span>
-                    <div className="flex-1 h-px bg-gray-100 dark:bg-gray-800" />
+                    <div className="flex-1 h-px bg-layer " />
                     {tags.length > 0 && (
                       <span className="text-xs tabular-nums bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
                         {tags.length}

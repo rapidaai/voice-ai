@@ -247,7 +247,7 @@ export function IconButtonWithBadge({
           className={cn(
             'absolute -top-1 -right-1 flex items-center justify-center',
             'min-w-[18px] h-[18px] px-1 rounded-full',
-            'bg-red-600 text-white text-[10px] font-semibold leading-none',
+            'bg-support-error text-inverse text-[10px] font-semibold leading-none',
             'pointer-events-none',
           )}
         >

@@ -1,16 +1,11 @@
 import { Endpoint, EndpointProviderModel } from '@rapidaai/react';
 import { Code, SourceControl } from '@carbon/icons-react';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  Button,
-  HeaderGlobalAction,
-  HeaderGlobalBar,
-} from '@carbon/react';
+import { HeaderGlobalAction } from '@carbon/react';
 import { useNavigate } from 'react-router-dom';
 
 import { EndpointActivityDashboard } from './endpoint-activity-dashboard';
 import { useEndpointPageStore } from '@/stores/endpoint';
+import { ResourceDetailHeader } from '@/app/components/layout/resource-detail-header';
 
 export function EndpointOverviewPage(props: {
   currentEndpoint: Endpoint;
@@ -22,27 +17,14 @@ export function EndpointOverviewPage(props: {
   const endpointId = currentEndpoint.getId();
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col bg-[var(--cds-background)]">
-      <header
-        className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--cds-border-subtle-01)] bg-[var(--cds-layer)]"
-        data-testid="endpoint-page-header"
-      >
-        <div className="min-w-0 pl-4">
-          <Breadcrumb noTrailingSlash>
-            <BreadcrumbItem href="/deployment/endpoint">
-              Endpoints
-            </BreadcrumbItem>
-            <BreadcrumbItem isCurrentPage>
-              <span className="block max-w-[42vw] truncate">
-                {currentEndpoint.getName()}
-              </span>
-            </BreadcrumbItem>
-          </Breadcrumb>
-        </div>
-        <HeaderGlobalBar
-          aria-label="Endpoint overview header actions"
-          className="h-full items-center"
-        >
+    <main className="flex min-h-0 flex-1 flex-col bg-surface">
+      <ResourceDetailHeader
+        collectionHref="/deployment/endpoint"
+        collectionLabel="Endpoints"
+        resourceName={currentEndpoint.getName()}
+        actionsLabel="Endpoint overview header actions"
+        testId="endpoint-page-header"
+        secondaryActions={
           <HeaderGlobalAction
             aria-label="View integration"
             tooltipAlignment="end"
@@ -50,22 +32,16 @@ export function EndpointOverviewPage(props: {
           >
             <Code size={20} />
           </HeaderGlobalAction>
-          <Button
-            aria-label="Create new version"
-            kind="primary"
-            size="lg"
-            renderIcon={SourceControl}
-            className="h-full! min-h-full! items-center justify-center whitespace-nowrap"
-            onClick={() =>
-              navigate(
-                `/deployment/endpoint/${endpointId}/create-endpoint-version`,
-              )
-            }
-          >
-            Create new version
-          </Button>
-        </HeaderGlobalBar>
-      </header>
+        }
+        primaryAction={{
+          label: 'Create new version',
+          icon: SourceControl,
+          onClick: () =>
+            navigate(
+              `/deployment/endpoint/${endpointId}/create-endpoint-version`,
+            ),
+        }}
+      />
 
       <div className="min-h-0 flex-1 overflow-auto">
         <EndpointActivityDashboard

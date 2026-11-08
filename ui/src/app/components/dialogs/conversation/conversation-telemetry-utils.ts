@@ -140,30 +140,35 @@ export const METRIC_SCOPE_OPTIONS: SelectOption[] = [
 
 export const LATENCY_METRIC_META: Record<
   LatencyMetricName,
-  { label: string; shortLabel: string; color: string; fillOpacity: number }
+  {
+    label: string;
+    shortLabel: string;
+    seriesColor: string;
+    fillOpacity: number;
+  }
 > = {
   'stt.latency_ms': {
     label: 'STT Latency',
     shortLabel: 'STT',
-    color: '#fbbf24',
+    seriesColor: 'var(--color-data-3)',
     fillOpacity: 0.16,
   },
   'tts.latency_ms': {
     label: 'TTS Latency',
     shortLabel: 'TTS',
-    color: '#7c3aed',
+    seriesColor: 'var(--color-data-1)',
     fillOpacity: 0.38,
   },
   'agent.ttft_ms': {
     label: 'Agent Time to First Token',
     shortLabel: 'Agent TTFT',
-    color: '#10b981',
+    seriesColor: 'var(--color-data-4)',
     fillOpacity: 0.3,
   },
   'eos.latency_ms': {
     label: 'EOS Latency',
     shortLabel: 'EOS',
-    color: '#06b6d4',
+    seriesColor: 'var(--color-data-2)',
     fillOpacity: 0.22,
   },
 };

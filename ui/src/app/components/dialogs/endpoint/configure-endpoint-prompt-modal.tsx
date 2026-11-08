@@ -63,7 +63,7 @@ export function ConfigureEndpointPromptDialog({
       />
 
       <ModalBody hasForm hasScrollingContent>
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-4">
+        <p className="text-xs text-muted leading-relaxed mb-4">
           Choose a pre-configured template to auto-fill your model, prompt, and
           parameters. You can customise everything after selecting.
         </p>
@@ -83,7 +83,7 @@ export function ConfigureEndpointPromptDialog({
                   {template.name}
                 </h3>
 
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2 mb-4 flex-1">
+                <p className="text-xs text-muted leading-relaxed line-clamp-2 mb-4 flex-1">
                   {template.description}
                 </p>
 

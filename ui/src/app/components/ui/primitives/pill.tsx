@@ -8,8 +8,8 @@ export function Pill(props: HTMLAttributes<HTMLSpanElement>) {
       onClick={props.onClick}
       className={cn(
         'px-3 py-1.5 font-medium truncate',
-        'items-center text-[12px] capitalize bg-gray-200/30 dark:bg-gray-800/30 rounded-[2px]',
-        'ring-gray-700/20 dark:ring-gray-400/20 ring-[1px]',
+        'items-center text-[12px] capitalize bg-layer/30 rounded-[2px]',
+        'ring-border-strong/20 ring-[1px]',
         props.className,
       )}
     >

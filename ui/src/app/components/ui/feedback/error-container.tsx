@@ -30,7 +30,7 @@ export function ErrorContainer({
     <section
       aria-labelledby={titleId}
       className={cn(
-        'flex min-h-0 w-full flex-1 items-center justify-center px-4 py-12 text-[var(--cds-text-primary)] sm:px-6 lg:px-8',
+        'flex min-h-0 w-full flex-1 items-center justify-center px-4 py-12 text-foreground sm:px-6 lg:px-8',
         className,
       )}
     >
@@ -38,22 +38,17 @@ export function ErrorContainer({
         <Text
           as="span"
           variant="heading-06"
-          className="[color:var(--cds-text-secondary)]"
+          className="[color:var(--color-muted)]"
         >
           {code}
         </Text>
-        <Text
-          as="h1"
-          id={titleId}
-          variant="heading-04"
-          className="mt-4"
-        >
+        <Text as="h1" id={titleId} variant="heading-04" className="mt-4">
           {title}
         </Text>
         <Text
           as="p"
           variant="body-01"
-          className="mt-3 max-w-lg [color:var(--cds-text-secondary)]"
+          className="mt-3 max-w-lg [color:var(--color-muted)]"
         >
           {description}
         </Text>

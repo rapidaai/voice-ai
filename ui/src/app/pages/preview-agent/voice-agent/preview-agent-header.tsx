@@ -1,9 +1,10 @@
 import { FC } from 'react';
 import { BrandedLogo } from '@/app/components/layout/brand/branded-logo';
 import { CustomerOptions } from '@/app/components/layout/navigation/actionable-header';
+import { CompactPageHeader } from '@/app/components/layout/compact-page-header';
 
 export const PreviewAgentHeader: FC = () => (
-  <header className="flex h-12 shrink-0 items-center justify-between border-b border-border-subtle bg-shell">
+  <CompactPageHeader className="pl-0">
     <div className="flex min-w-0 items-center px-4">
       <BrandedLogo
         variant="full"
@@ -12,5 +13,5 @@ export const PreviewAgentHeader: FC = () => (
       />
     </div>
     <CustomerOptions showProjectSelector={false} />
-  </header>
+  </CompactPageHeader>
 );

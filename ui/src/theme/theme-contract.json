@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 2,
+  "storageKey": "ui-theme-mode",
+  "documentAttributes": {
+    "brand": "data-brand",
+    "colorMode": "data-color-mode",
+    "carbonTheme": "data-carbon-theme",
+    "themeReady": "data-theme-ready",
+    "themeSchema": "data-theme-schema"
+  },
+  "colorFields": {
+    "primary": {
+      "property": "--brand-primary"
+    },
+    "primaryHover": {
+      "property": "--brand-primary-hover"
+    },
+    "primaryActive": {
+      "property": "--brand-primary-active"
+    },
+    "onPrimary": {
+      "property": "--brand-on-primary"
+    }
+  },
+  "carbonProperties": {
+    "brandOverrides": {
+      "primary": [
+        "--cds-background-brand",
+        "--cds-border-interactive",
+        "--cds-button-primary",
+        "--cds-button-tertiary",
+        "--cds-focus",
+        "--cds-interactive",
+        "--cds-link-primary"
+      ],
+      "primaryHover": [
+        "--cds-button-primary-hover",
+        "--cds-button-tertiary-hover",
+        "--cds-link-primary-hover"
+      ],
+      "primaryActive": [
+        "--cds-button-primary-active",
+        "--cds-button-tertiary-active"
+      ],
+      "onPrimary": ["--cds-icon-on-color", "--cds-text-on-color"]
+    },
+    "presetOwned": [
+      "--cds-background",
+      "--cds-background-hover",
+      "--cds-background-inverse",
+      "--cds-background-inverse-hover",
+      "--cds-border-strong-01",
+      "--cds-border-subtle",
+      "--cds-border-subtle-01",
+      "--cds-button-secondary",
+      "--cds-chat-prompt-background",
+      "--cds-field",
+      "--cds-field-01",
+      "--cds-icon-disabled",
+      "--cds-icon-primary",
+      "--cds-icon-secondary",
+      "--cds-layer-01",
+      "--cds-layer-02",
+      "--cds-layer-accent-01",
+      "--cds-layer-hover-01",
+      "--cds-layer-selected-01",
+      "--cds-notification-background-warning",
+      "--cds-overlay",
+      "--cds-support-error",
+      "--cds-support-info",
+      "--cds-support-success",
+      "--cds-support-warning",
+      "--cds-text-disabled",
+      "--cds-text-helper",
+      "--cds-text-inverse",
+      "--cds-text-placeholder",
+      "--cds-text-primary",
+      "--cds-text-secondary"
+    ]
+  },
+  "carbonThemes": {
+    "light": {
+      "white": true,
+      "g10": true
+    },
+    "dark": {
+      "g90": true,
+      "g100": true
+    }
+  }
+}

@@ -85,7 +85,7 @@ export function GenericModal(props: GenericModalProps) {
           exit={{ opacity: 0 }}
           onClick={() => props.setModalOpen(false)}
           className={cn(
-            'bg-slate-900/20 dark:bg-slate-400/5 backdrop-blur-xs p-8 fixed inset-0 z-50 grid place-items-center overflow-y-scroll',
+            'bg-layer/20 backdrop-blur-xs p-8 fixed inset-0 z-50 grid place-items-center overflow-y-scroll',
             props.className,
           )}
         >
@@ -103,7 +103,7 @@ export function GenericModal(props: GenericModalProps) {
 
 GenericModal.defaultProps = {
   transitionBackdropClass:
-    'fixed inset-0 backdrop-blur-xs dark:bg-gray-500/30 bg-gray-800/10 z-50 transition-opacity w-100 h-100 flex items-center',
+    'fixed inset-0 backdrop-blur-xs bg-layer/30 z-50 transition-opacity w-100 h-100 flex items-center',
   transitionDialogClass:
     'fixed inset-0 z-50 overflow-hidden flex items-center justify-center px-4 sm:px-6',
   whenEnter: 'transition ease-in-out duration-200',

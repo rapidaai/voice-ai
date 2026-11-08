@@ -99,7 +99,7 @@ export const AudioMessagingAction: FC<AudioMessagingActionProps> = ({
             onClick={async () => {
               await handleToggleMute();
             }}
-            className="group h-10 px-3 flex items-center justify-center border border-red-600 text-red-600 hover:bg-red-600 hover:text-white disabled:opacity-50 transition-all duration-200 cursor-pointer"
+            className="group h-10 px-3 flex items-center justify-center border border-support-error text-support-error hover:bg-support-error hover:text-inverse disabled:opacity-50 transition-all duration-200 cursor-pointer"
           >
             {isMuted ? (
               <MicrophoneOff size={16} className="shrink-0" />
@@ -119,9 +119,7 @@ export const AudioMessagingAction: FC<AudioMessagingActionProps> = ({
               maxBarHeight={18}
               barColor={cn(
                 'rounded-full transition-all duration-150',
-                isMuted
-                  ? 'bg-red-400/50 dark:bg-red-500/50'
-                  : 'bg-primary dark:bg-primary opacity-80',
+                isMuted ? 'bg-support-error/50 ' : 'bg-primary opacity-80',
               )}
               frequencies={visualizerFrequencies}
             />
@@ -129,9 +127,9 @@ export const AudioMessagingAction: FC<AudioMessagingActionProps> = ({
             {/* Device Selector Dropdown */}
             <FlyoutLink
               FlyoutContent={
-                <div className="flex flex-col rounded-[2px] w-[300px] overflow-hidden bg-white dark:bg-gray-950 border-subtle border shadow-lg dark:border-gray-700">
-                  <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                <div className="flex flex-col rounded-[2px] w-[300px] overflow-hidden bg-surface border-subtle border shadow-lg border-border-subtle">
+                  <div className="px-3 py-2 border-b border-border-subtle ">
+                    <span className="text-xs font-semibold text-muted uppercase tracking-wide">
                       Select Microphone
                     </span>
                   </div>
@@ -145,8 +143,8 @@ export const AudioMessagingAction: FC<AudioMessagingActionProps> = ({
                             'w-full text-left rounded-[2px] px-3 py-2.5 text-sm transition-all duration-150',
                             'flex items-center justify-between gap-2',
                             isActive
-                              ? 'bg-primary text-white'
-                              : 'hover:bg-primary/10 text-gray-700 dark:text-gray-200',
+                              ? 'bg-primary text-on-primary'
+                              : 'hover:bg-primary/10 text-muted ',
                           )}
                           onClick={() => handleDeviceChange(device.deviceId)}
                         >
@@ -156,7 +154,7 @@ export const AudioMessagingAction: FC<AudioMessagingActionProps> = ({
                             </span>
                           </div>
                           {isActive && (
-                            <Checkmark className="w-4 h-4 shrink-0 text-white" />
+                            <Checkmark className="w-4 h-4 shrink-0 text-inverse" />
                           )}
                         </button>
                       );
@@ -168,12 +166,12 @@ export const AudioMessagingAction: FC<AudioMessagingActionProps> = ({
             >
               {isOpen => (
                 <div className="flex items-center gap-1 px-2 py-2 rounded-[2px] hover:bg-primary/10 transition-colors">
-                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300 max-w-[120px] truncate">
+                  <span className="text-xs font-medium text-muted max-w-[120px] truncate">
                     {activeDeviceLabel}
                   </span>
                   <ChevronDown
                     className={cn(
-                      'w-4 h-4 transition-transform duration-300 text-gray-500 dark:text-gray-400',
+                      'w-4 h-4 transition-transform duration-300 text-muted ',
                       isOpen ? 'rotate-180' : '',
                     )}
                   />
@@ -197,7 +195,7 @@ export const AudioMessagingAction: FC<AudioMessagingActionProps> = ({
             onClick={async () => {
               await handleDisconnectAgent();
             }}
-            className="group h-10 px-3 flex items-center justify-center bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white transition-all duration-200 cursor-pointer"
+            className="group h-10 px-3 flex items-center justify-center bg-support-error hover:bg-support-error disabled:opacity-50 text-inverse transition-all duration-200 cursor-pointer"
           >
             <StopFilledAlt size={16} className="shrink-0" />
             <span className="max-w-0 group-hover:max-w-[80px] overflow-hidden transition-all duration-200 whitespace-nowrap group-hover:ml-2 text-sm font-medium">
@@ -231,7 +229,7 @@ const FlyoutLink = ({ children, FlyoutContent, className }) => {
             className="absolute left-0 bottom-12 z-50"
           >
             <div className="absolute -top-6 left-0 right-0 h-6 bg-transparent" />
-            <div className="absolute left-4 -bottom-2 h-4 w-4 rotate-45 bg-white dark:bg-gray-950 border-b border-r dark:border-gray-700" />
+            <div className="absolute left-4 -bottom-2 h-4 w-4 rotate-45 bg-surface border-b border-r border-border-subtle" />
             {FlyoutContent}
           </motion.div>
         )}

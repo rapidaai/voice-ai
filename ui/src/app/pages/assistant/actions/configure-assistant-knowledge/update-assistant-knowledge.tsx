@@ -161,7 +161,7 @@ export const UpdateKnowledge: FC<{ assistantId: string }> = ({
     >
       <ConfirmDialogComponent />
       <div className="overflow-auto flex flex-col flex-1 pb-20">
-        <div className=" bg-white dark:bg-gray-900">
+        <div className=" bg-surface ">
           <div
             className={cn(
               'px-6 py-6 flex flex-col gap-8 pl-8 w-full max-w-6xl',
@@ -185,8 +185,8 @@ export const UpdateKnowledge: FC<{ assistantId: string }> = ({
                   onChange={() => setSearchType(RETRIEVE_METHOD.hybrid)}
                 >
                   <Card className="p-3 flex flex-row space-x-3 bg-light-background">
-                    <div className="rounded-[2px] flex items-center justify-center bg-blue-200/30 dark:bg-blue-200/10 shrink-0 h-10 w-10">
-                      <DataBase className="text-blue-600" />
+                    <div className="rounded-[2px] flex items-center justify-center bg-support-info/30 shrink-0 h-10 w-10">
+                      <DataBase className="text-support-info" />
                     </div>
                     <div className="flex flex-col">
                       <span className="font-medium text-[14px]">
@@ -209,8 +209,8 @@ export const UpdateKnowledge: FC<{ assistantId: string }> = ({
                   onChange={() => setSearchType(RETRIEVE_METHOD.semantic)}
                 >
                   <Card className="p-3 flex flex-row space-x-3 bg-light-background">
-                    <div className="rounded-[2px] flex items-center justify-center bg-blue-200/30 dark:bg-blue-200/10 shrink-0 h-10 w-10">
-                      <ModelAlt className="text-blue-600" />
+                    <div className="rounded-[2px] flex items-center justify-center bg-support-info/30 shrink-0 h-10 w-10">
+                      <ModelAlt className="text-support-info" />
                     </div>
                     <div className="flex flex-col">
                       <span className="font-medium text-[14px]">
@@ -232,8 +232,8 @@ export const UpdateKnowledge: FC<{ assistantId: string }> = ({
                   onChange={() => setSearchType(RETRIEVE_METHOD.fullText)}
                 >
                   <Card className="p-3 flex flex-row space-x-3 bg-light-background">
-                    <div className="rounded-[2px] flex items-center justify-center bg-blue-200/30 dark:bg-blue-200/10 shrink-0 h-10 w-10">
-                      <Search className="text-blue-600" />
+                    <div className="rounded-[2px] flex items-center justify-center bg-support-info/30 shrink-0 h-10 w-10">
+                      <Search className="text-support-info" />
                     </div>
                     <div className="flex flex-col">
                       <span className="font-medium text-[14px]">

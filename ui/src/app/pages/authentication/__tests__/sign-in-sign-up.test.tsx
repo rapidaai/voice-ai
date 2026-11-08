@@ -311,10 +311,7 @@ describe('Authentication pages', () => {
     const forgotPasswordLink = screen.getByRole('link', {
       name: 'Forgot password?',
     });
-    expect(forgotPasswordLink).toHaveAttribute(
-      'href',
-      '/auth/forgot-password',
-    );
+    expect(forgotPasswordLink).toHaveAttribute('href', '/auth/forgot-password');
     expect(forgotPasswordLink.firstElementChild).toHaveClass(
       'text-[0.875rem]',
       'leading-[1.125rem]',
