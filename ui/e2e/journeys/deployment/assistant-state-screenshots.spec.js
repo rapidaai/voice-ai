@@ -74,10 +74,23 @@ const scenarios = [
     state: 'success',
     path: overviewPath,
     setup: async () => {},
-    assert: page =>
-      expect(
+    assert: async page => {
+      await expect(
         page.getByRole('heading', { name: 'Assistant activity' }),
-      ).toBeVisible(),
+      ).toBeVisible();
+      await expect(
+        page.getByLabel('Assistant deployment checklist'),
+      ).toBeVisible();
+      await expect(
+        page.getByLabel('Assistant deployment checklist'),
+      ).toHaveClass(/fixed/);
+      await expect(
+        page.getByText('Deploy your assistant', { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByText('25% complete', { exact: true }),
+      ).toBeVisible();
+    },
   },
   {
     feature: 'overview',

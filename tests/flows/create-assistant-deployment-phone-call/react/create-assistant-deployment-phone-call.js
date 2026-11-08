@@ -58,7 +58,7 @@ async function runFlow(mode) {
   const auth = mode.auth;
   const connection = new ConnectionConfig(
     { web: webEndpoint, assistant: assistantEndpoint },
-    true,
+    process.env.FLOW_SDK_DEBUG === "true",
   );
 
   const providerModel =

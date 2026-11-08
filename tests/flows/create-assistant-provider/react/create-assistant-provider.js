@@ -77,7 +77,10 @@ function authenticationModes() {
 
 async function runFlow(mode) {
   const auth = mode.auth;
-  const connection = new ConnectionConfig({ web: webEndpoint }, true);
+  const connection = new ConnectionConfig(
+    { web: webEndpoint },
+    process.env.FLOW_SDK_DEBUG === "true",
+  );
   const assistantID = await createAssistant(
     connection,
     auth,

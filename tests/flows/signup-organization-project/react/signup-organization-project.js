@@ -43,7 +43,10 @@ async function main() {
   const name = requireValue("FLOW_NAME");
   const organizationName = requireValue("FLOW_ORGANIZATION");
   const projectName = requireValue("FLOW_PROJECT");
-  const connection = new ConnectionConfig({ web: webEndpoint }, true);
+  const connection = new ConnectionConfig(
+    { web: webEndpoint },
+    process.env.FLOW_SDK_DEBUG === "true",
+  );
 
   const registration = await call((callback) =>
     RegisterUser(connection, email, password, name, callback),

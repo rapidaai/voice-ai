@@ -29,7 +29,10 @@ function authenticate(connection, userEmail, userPassword) {
 }
 
 async function main() {
-  const connection = new ConnectionConfig({ web: webEndpoint }, true);
+  const connection = new ConnectionConfig(
+    { web: webEndpoint },
+    process.env.FLOW_SDK_DEBUG === "true",
+  );
   const response = await authenticate(
     connection,
     requireValue(email, "FLOW_EMAIL"),

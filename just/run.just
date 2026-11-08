@@ -33,3 +33,11 @@ test-stt-integration:
 # Run all transformer integration tests.
 test-transformer-integration:
     go test -tags integration -v -timeout 180s ./api/assistant-api/internal/transformer/...
+
+# Run Node.js SDK integration flows against locally running services.
+test-integration-node journey="":
+    if [[ -n "{{journey}}" ]]; then bash tests/flows/run-local.sh nodejs "{{journey}}"; else bash tests/flows/run-local.sh nodejs; fi
+
+# Run React SDK integration flows against locally running services.
+test-integration-react journey="":
+    if [[ -n "{{journey}}" ]]; then bash tests/flows/run-local.sh react "{{journey}}"; else bash tests/flows/run-local.sh react; fi

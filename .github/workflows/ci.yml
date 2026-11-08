@@ -145,6 +145,10 @@ jobs:
   end-to-end:
     name: 03 End-to-End Verification
     needs: docker
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
     uses: ./.github/workflows/reusable-end-to-end-ci.yml
 
   ci-success:

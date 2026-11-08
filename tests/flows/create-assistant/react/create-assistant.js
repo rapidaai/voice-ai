@@ -49,7 +49,10 @@ function authenticationModes() {
 async function createAssistant(mode) {
   const assistantName = `${requireValue("FLOW_ASSISTANT")} ${mode.name}`;
   const auth = mode.auth;
-  const connection = new ConnectionConfig({ web: webEndpoint }, true);
+  const connection = new ConnectionConfig(
+    { web: webEndpoint },
+    process.env.FLOW_SDK_DEBUG === "true",
+  );
 
   const providerModel =
     new CreateAssistantProviderRequest.CreateAssistantProviderModel();

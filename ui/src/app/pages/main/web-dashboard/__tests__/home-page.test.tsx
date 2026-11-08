@@ -16,6 +16,7 @@ import {
   getDashboardStartDate,
   HomePage,
 } from '@/app/pages/main/web-dashboard';
+import { listAssistants } from '@/clients/assistant.client';
 import { getProjectDashboardRange } from '@/clients/dashboard.client';
 
 const mockLineChart = jest.fn(
@@ -38,6 +39,10 @@ jest.mock('@carbon/charts-react', () => ({
 
 jest.mock('@/clients/dashboard.client', () => ({
   getProjectDashboardRange: jest.fn(),
+}));
+
+jest.mock('@/clients/assistant.client', () => ({
+  listAssistants: jest.fn(),
 }));
 
 jest.mock('@/theme/theme-provider', () => ({
@@ -64,6 +69,44 @@ const mockGetProjectDashboardRange =
   getProjectDashboardRange as jest.MockedFunction<
     typeof getProjectDashboardRange
   >;
+const mockListAssistants = listAssistants as jest.MockedFunction<
+  typeof listAssistants
+>;
+
+const assistantListResponse = (count: number) =>
+  ({
+    getSuccess: () => true,
+    getDataList: () => Array.from({ length: count }, () => ({})),
+  }) as never;
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
+}
+
+const metricExplanations = [
+  [
+    'Sessions information',
+    'Total conversation sessions handled during the selected time range.',
+  ],
+  [
+    'Success Rate information',
+    'Percentage of project sessions completed successfully during the selected time range.',
+  ],
+  [
+    'Average Latency information',
+    'Average of the available speech-to-text, end-of-speech, text-to-speech, and agent time-to-first-token averages during the selected time range.',
+  ],
+  [
+    'Failed Sessions information',
+    'Project sessions that failed during the selected time range.',
+  ],
+] as const;
 
 let pageHeaderIntersectionCallback: IntersectionObserverCallback;
 
@@ -228,6 +271,7 @@ describe('Dashboard HomePage', () => {
       user: { name: 'Jordan Lee' },
     };
     mockGetProjectDashboardRange.mockResolvedValue(dashboardResponse());
+    mockListAssistants.mockResolvedValue(assistantListResponse(0));
   });
 
   it('renders the project dashboard from the public dashboard API', async () => {
@@ -310,10 +354,21 @@ describe('Dashboard HomePage', () => {
     expect(kpis).toHaveLength(4);
     kpis.forEach(card => {
       expect(card).toHaveClass(
+        'min-h-[156px]',
         'border',
         'border-border-subtle',
         'bg-surface',
-        'p-5',
+      );
+      expect(card.querySelector('[data-dashboard-kpi-header]')).toHaveClass(
+        'h-10',
+        'border-b',
+        'border-border-subtle',
+        'px-4',
+      );
+      expect(card.querySelector('[data-dashboard-kpi-body]')).toHaveClass(
+        'min-h-[116px]',
+        'flex-1',
+        'p-4',
       );
     });
     expect(container.querySelector('[data-dashboard-grid]')).toHaveClass(
@@ -325,6 +380,39 @@ describe('Dashboard HomePage', () => {
       expect(card).toHaveClass('border', 'border-border-subtle', 'bg-surface');
       expect(card.querySelector('header')).toHaveClass('px-6', 'py-4');
     });
+  });
+
+  it.each(metricExplanations)(
+    'matches %s to its KPI explanation',
+    async (name, description) => {
+      const user = userEvent.setup({ writeToClipboard: false });
+      render(<HomePage />);
+
+      await screen.findByText('12,486');
+      const informationButton = screen.getByRole('button', { name });
+      await user.click(informationButton);
+
+      expect(informationButton).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByText(description)).toBeInTheDocument();
+    },
+  );
+
+  it('opens and dismisses a KPI explanation from the keyboard', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    render(<HomePage />);
+
+    await screen.findByText('12,486');
+    const informationButton = screen.getByRole('button', {
+      name: metricExplanations[0][0],
+    });
+    informationButton.focus();
+    await user.keyboard('{Enter}');
+    expect(informationButton).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(metricExplanations[0][1])).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(informationButton).toHaveAttribute('aria-expanded', 'false'),
+    );
   });
 
   it('uses canonical Carbon typography across dashboard content', async () => {
@@ -405,6 +493,23 @@ describe('Dashboard HomePage', () => {
     expect(
       container.querySelectorAll('[data-dashboard-loading-card]'),
     ).toHaveLength(8);
+    const loadingKpis = container.querySelectorAll(
+      '[data-dashboard-loading-kpi]',
+    );
+    expect(loadingKpis).toHaveLength(4);
+    loadingKpis.forEach(card => {
+      expect(card.querySelector('[data-dashboard-kpi-header]')).toHaveClass(
+        'h-10',
+        'border-b',
+        'border-border-subtle',
+        'px-4',
+      );
+      expect(card.querySelector('[data-dashboard-kpi-body]')).toHaveClass(
+        'min-h-[116px]',
+        'flex-1',
+        'p-4',
+      );
+    });
   });
 
   it('keeps the selected time range visible and requests that duration', async () => {
@@ -528,7 +633,7 @@ describe('Dashboard HomePage', () => {
     expect(screen.getByText('Top Assistants')).toBeInTheDocument();
   });
 
-  it('renders a simple assistant CTA when the dashboard has no activity', async () => {
+  it('renders a setup checklist when the dashboard has no activity', async () => {
     mockGetProjectDashboardRange.mockResolvedValue(
       dashboardResponse({
         analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
@@ -540,24 +645,59 @@ describe('Dashboard HomePage', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: 'Your dashboard is not ready yet',
+        name: 'Build your first dashboard insights',
         level: 2,
       }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Workspace Overview', level: 1 }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Getting started')).toBeInTheDocument();
+    const checklist = screen.getByLabelText('Dashboard setup checklist');
+    expect(checklist).toHaveClass('app-dashboard-onboarding-checklist');
+    expect(
+      within(checklist).getByText('Set up your dashboard'),
+    ).toBeInTheDocument();
+    expect(within(checklist).getByText('25% complete')).toBeInTheDocument();
+    expect(within(checklist).getByText('Workspace created')).toBeInTheDocument();
+    expect(
+      within(checklist).getByRole('button', { name: 'Create an assistant' }),
+    ).toBeInTheDocument();
+    expect(
+      within(checklist).getByRole('button', {
+        name: 'Configure and test your assistant',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(checklist).getByRole('button', {
+        name: 'Return here to review performance',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(checklist).getByRole('button', { name: 'View all assistants' }),
+    ).toBeInTheDocument();
+    const checklistToggle = within(checklist).getByRole('button', {
+      name: 'Collapse or expand dashboard setup',
+    });
+    expect(checklistToggle).toHaveAttribute(
+      'aria-label',
+      'Toggle dashboard setup checklist',
+    );
+    expect(checklistToggle).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(checklistToggle);
+    expect(checklistToggle).toHaveAttribute('aria-expanded', 'false');
     expect(
       screen.getByText(
-        'Create an assistant and run a test conversation. Sessions, latency, and health will appear here after the first session.',
+        'Complete these steps to generate workspace performance data. Metrics will appear after an assistant completes its first test conversation.',
       ),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Open assistants' }),
+    ).toHaveAttribute('href', '/deployment/assistant');
     expect(
       screen.getByRole('link', { name: 'Create assistant' }),
     ).toHaveAttribute('href', '/deployment/assistant/create-assistant');
     expect(
-      screen.queryByRole('link', { name: 'View assistants' }),
+      screen.queryByText('Your dashboard is not ready yet'),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Add credential' }),
@@ -578,6 +718,140 @@ describe('Dashboard HomePage', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('does not show setup progress for an existing workspace with an empty range', async () => {
+    const assistantLookup = createDeferred<never>();
+    const getDataList = jest.fn(() => [{}]);
+    mockGetProjectDashboardRange.mockResolvedValue(
+      dashboardResponse({
+        analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+        usageState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+      }),
+    );
+    mockListAssistants.mockReturnValue(assistantLookup.promise);
+
+    render(<HomePage />);
+
+    await waitFor(() => expect(mockListAssistants).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      assistantLookup.resolve({
+        getSuccess: () => true,
+        getDataList,
+      } as never);
+    });
+    expect(getDataList).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByRole('heading', {
+        name: 'No activity in this time range',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'No sessions or component usage were recorded during the selected time range.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Dashboard setup checklist'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/% complete/)).not.toBeInTheDocument();
+  });
+
+  it('avoids inferred setup progress when assistant status is unavailable', async () => {
+    const assistantLookup = createDeferred<never>();
+    mockGetProjectDashboardRange.mockResolvedValue(
+      dashboardResponse({
+        analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+        usageState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+      }),
+    );
+    mockListAssistants.mockReturnValue(assistantLookup.promise);
+
+    render(<HomePage />);
+
+    await waitFor(() => expect(mockListAssistants).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      assistantLookup.reject(new Error('unavailable'));
+    });
+    expect(
+      await screen.findByRole('heading', {
+        name: 'No activity in this time range',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Dashboard setup checklist'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/% complete/)).not.toBeInTheDocument();
+  });
+
+  it('retries assistant detection when an empty dashboard refreshes', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    const firstAssistantLookup = createDeferred<never>();
+    mockGetProjectDashboardRange.mockResolvedValue(
+      dashboardResponse({
+        analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+        usageState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+      }),
+    );
+    mockListAssistants
+      .mockReturnValueOnce(firstAssistantLookup.promise)
+      .mockResolvedValueOnce(assistantListResponse(0));
+
+    render(<HomePage />);
+
+    await waitFor(() => expect(mockListAssistants).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      firstAssistantLookup.reject(new Error('unavailable'));
+    });
+    await user.click(
+      screen.getByRole('button', { name: 'Refresh dashboard' }),
+    );
+
+    expect(
+      await screen.findByLabelText('Dashboard setup checklist'),
+    ).toBeInTheDocument();
+    expect(mockListAssistants).toHaveBeenCalledTimes(2);
+    expect(mockGetProjectDashboardRange).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves the selected range when the setup checklist refreshes', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    mockGetProjectDashboardRange.mockResolvedValue(
+      dashboardResponse({
+        analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+        usageState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+      }),
+    );
+
+    render(<HomePage />);
+
+    await screen.findByLabelText('Dashboard setup checklist');
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Time range' }),
+      '7d',
+    );
+    await waitFor(() =>
+      expect(mockGetProjectDashboardRange).toHaveBeenCalledTimes(2),
+    );
+    const checklist = await screen.findByLabelText(
+      'Dashboard setup checklist',
+    );
+    await user.click(
+      within(checklist).getByRole('button', {
+        name: 'Return here to review performance',
+      }),
+    );
+
+    await waitFor(() =>
+      expect(mockGetProjectDashboardRange).toHaveBeenCalledTimes(3),
+    );
+    expect(screen.getByRole('combobox', { name: 'Time range' })).toHaveValue(
+      '7d',
+    );
+    const request = mockGetProjectDashboardRange.mock.calls[2][0];
+    expect(request.toDate.getSeconds() - request.fromDate.getSeconds()).toBe(
+      7 * 24 * 60 * 60,
+    );
+  });
+
   it('replaces the empty dashboard when the project changes', async () => {
     mockGetProjectDashboardRange
       .mockResolvedValueOnce(
@@ -591,7 +865,7 @@ describe('Dashboard HomePage', () => {
     const { rerender } = render(<HomePage />);
 
     await screen.findByRole('heading', {
-      name: 'Your dashboard is not ready yet',
+      name: 'Build your first dashboard insights',
     });
     mockCurrentCredential = {
       ...mockCurrentCredential,
@@ -602,7 +876,7 @@ describe('Dashboard HomePage', () => {
     expect(await screen.findByText('212')).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', {
-        name: 'Your dashboard is not ready yet',
+        name: 'Build your first dashboard insights',
       }),
     ).not.toBeInTheDocument();
   });
@@ -620,7 +894,7 @@ describe('Dashboard HomePage', () => {
     expect(screen.getByText('Component Usage')).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', {
-        name: 'Your dashboard is not ready yet',
+        name: 'Build your first dashboard insights',
       }),
     ).not.toBeInTheDocument();
   });

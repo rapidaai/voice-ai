@@ -52,6 +52,34 @@ test('mobile sidebar expands without reducing dashboard width', async ({
   await expect(dashboard).toHaveCSS('width', '342px');
 });
 
+test('mobile KPI explanations stay inside the dashboard viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await gotoJourney(page, dashboardJourney);
+
+  await page
+    .getByRole('button', { name: 'Sessions information', exact: true })
+    .click();
+  const explanation = page.getByText(
+    'Total conversation sessions handled during the selected time range.',
+  );
+  await expect(explanation).toBeVisible();
+
+  const [dashboardBounds, explanationBounds] = await Promise.all([
+    page.locator('[data-dashboard-page]').boundingBox(),
+    explanation
+      .locator('xpath=ancestor::*[contains(@class, "toggletip-content")]')
+      .boundingBox(),
+  ]);
+  expect(dashboardBounds).not.toBeNull();
+  expect(explanationBounds).not.toBeNull();
+  expect(explanationBounds.x).toBeGreaterThanOrEqual(dashboardBounds.x);
+  expect(explanationBounds.x + explanationBounds.width).toBeLessThanOrEqual(
+    dashboardBounds.x + dashboardBounds.width,
+  );
+});
+
 test('dashboard stacks activity and health panels at lg width', async ({
   page,
 }) => {
