@@ -79,6 +79,16 @@ const assistantListResponse = (count: number) =>
     getDataList: () => Array.from({ length: count }, () => ({})),
   }) as never;
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
+}
+
 const metricExplanations = [
   [
     'Sessions information',
@@ -709,16 +719,26 @@ describe('Dashboard HomePage', () => {
   });
 
   it('does not show setup progress for an existing workspace with an empty range', async () => {
+    const assistantLookup = createDeferred<never>();
+    const getDataList = jest.fn(() => [{}]);
     mockGetProjectDashboardRange.mockResolvedValue(
       dashboardResponse({
         analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
         usageState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
       }),
     );
-    mockListAssistants.mockResolvedValue(assistantListResponse(1));
+    mockListAssistants.mockReturnValue(assistantLookup.promise);
 
     render(<HomePage />);
 
+    await waitFor(() => expect(mockListAssistants).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      assistantLookup.resolve({
+        getSuccess: () => true,
+        getDataList,
+      } as never);
+    });
+    expect(getDataList).toHaveBeenCalledTimes(1);
     expect(
       await screen.findByRole('heading', {
         name: 'No activity in this time range',
@@ -736,16 +756,21 @@ describe('Dashboard HomePage', () => {
   });
 
   it('avoids inferred setup progress when assistant status is unavailable', async () => {
+    const assistantLookup = createDeferred<never>();
     mockGetProjectDashboardRange.mockResolvedValue(
       dashboardResponse({
         analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
         usageState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
       }),
     );
-    mockListAssistants.mockRejectedValue(new Error('unavailable'));
+    mockListAssistants.mockReturnValue(assistantLookup.promise);
 
     render(<HomePage />);
 
+    await waitFor(() => expect(mockListAssistants).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      assistantLookup.reject(new Error('unavailable'));
+    });
     expect(
       await screen.findByRole('heading', {
         name: 'No activity in this time range',
@@ -755,6 +780,36 @@ describe('Dashboard HomePage', () => {
       screen.queryByLabelText('Dashboard setup checklist'),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/% complete/)).not.toBeInTheDocument();
+  });
+
+  it('retries assistant detection when an empty dashboard refreshes', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    const firstAssistantLookup = createDeferred<never>();
+    mockGetProjectDashboardRange.mockResolvedValue(
+      dashboardResponse({
+        analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+        usageState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+      }),
+    );
+    mockListAssistants
+      .mockReturnValueOnce(firstAssistantLookup.promise)
+      .mockResolvedValueOnce(assistantListResponse(0));
+
+    render(<HomePage />);
+
+    await waitFor(() => expect(mockListAssistants).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      firstAssistantLookup.reject(new Error('unavailable'));
+    });
+    await user.click(
+      screen.getByRole('button', { name: 'Refresh dashboard' }),
+    );
+
+    expect(
+      await screen.findByLabelText('Dashboard setup checklist'),
+    ).toBeInTheDocument();
+    expect(mockListAssistants).toHaveBeenCalledTimes(2);
+    expect(mockGetProjectDashboardRange).toHaveBeenCalledTimes(2);
   });
 
   it('preserves the selected range when the setup checklist refreshes', async () => {

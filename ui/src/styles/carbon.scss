@@ -486,7 +486,7 @@
 }
 
 :root[data-theme-schema='1'] .app-onboarding-checklist {
-  --app-checklist-foreground: var(--cds-text-on-color);
+  --app-checklist-foreground: var(--brand-on-primary);
 }
 
 :root[data-theme-schema='2'] .app-onboarding-checklist {

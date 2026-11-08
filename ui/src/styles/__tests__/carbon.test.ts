@@ -81,14 +81,14 @@ describe('Carbon theme adapters', () => {
     );
   });
 
-  it('uses the Carbon on-color token for version 1 onboarding checklists', () => {
+  it('uses the configured brand contrast for onboarding checklists', () => {
     const styles = readStyles('carbon.scss');
 
     expect(styles).toMatch(
-      /:root\[data-theme-schema='1'\]\s+\.app-onboarding-checklist\s*{[\s\S]*?--app-checklist-foreground: var\(--cds-text-on-color\)/,
+      /:root\[data-theme-schema='1'\]\s+\.app-onboarding-checklist\s*{[^}]*--app-checklist-foreground: var\(--brand-on-primary\)/,
     );
     expect(styles).toMatch(
-      /:root\[data-theme-schema='2'\]\s+\.app-onboarding-checklist\s*{[\s\S]*?--app-checklist-foreground: var\(--brand-on-primary\)/,
+      /:root\[data-theme-schema='2'\]\s+\.app-onboarding-checklist\s*{[^}]*--app-checklist-foreground: var\(--brand-on-primary\)/,
     );
   });
 });

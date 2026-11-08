@@ -1082,6 +1082,7 @@ export const HomePage = () => {
   const [loadError, setLoadError] = useState(false);
   const [refreshError, setRefreshError] = useState(false);
   const [hasAssistants, setHasAssistants] = useState<boolean | null>(null);
+  const [assistantLookupVersion, setAssistantLookupVersion] = useState(0);
   const requestId = useRef(0);
   const dashboardContextKey = useRef('');
   const dashboardRef = useRef<{
@@ -1149,6 +1150,11 @@ export const HomePage = () => {
     fetchDashboard();
   }, [fetchDashboard]);
 
+  const refreshDashboardActivity = useCallback(() => {
+    setAssistantLookupVersion(version => version + 1);
+    fetchDashboard();
+  }, [fetchDashboard]);
+
   useEffect(
     () => () => {
       requestId.current += 1;
@@ -1195,7 +1201,13 @@ export const HomePage = () => {
     return () => {
       isCurrent = false;
     };
-  }, [authId, isDashboardActivityEmpty, projectId, token]);
+  }, [
+    assistantLookupVersion,
+    authId,
+    isDashboardActivityEmpty,
+    projectId,
+    token,
+  ]);
   const metrics = useMemo(
     () => (analytics ? buildMetrics(analytics) : []),
     [analytics],
@@ -1281,7 +1293,7 @@ export const HomePage = () => {
                 <div className="col-span-full">
                   <DashboardNoActivity
                     isFirstTimeWorkspace={hasAssistants === false}
-                    onRefresh={fetchDashboard}
+                    onRefresh={refreshDashboardActivity}
                   />
                 </div>
               ) : dashboard ? (

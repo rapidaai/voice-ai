@@ -157,7 +157,8 @@ test('dashboard checklist actions open their intended assistant destinations', a
         readyText: undefined,
       });
       await page.getByRole('button', { name }).click();
-      await expect(page).toHaveURL(new RegExp(`${destination}$`));
+      await page.waitForURL(url => url.pathname === destination);
+      expect(new URL(page.url()).pathname).toBe(destination);
     } finally {
       await cleanup();
     }
