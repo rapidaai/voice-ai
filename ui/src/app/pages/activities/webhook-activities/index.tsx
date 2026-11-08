@@ -279,7 +279,7 @@ export function ListingPage() {
 
         {webhookLogs.length > 0 && (
           <Pagination
-            className="mt-auto shrink-0"
+            sticky
             totalItems={totalCount}
             page={page}
             pageSize={pageSize}

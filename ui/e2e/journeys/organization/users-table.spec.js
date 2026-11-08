@@ -77,7 +77,14 @@ for (const colorMode of ['light', 'dark']) {
 
     await expect(page.getByText('Ada Lovelace', { exact: true })).toBeVisible();
     await expect(page.getByPlaceholder('Search users...')).toBeVisible();
-    await expect(page.locator('.cds--pagination')).toHaveClass(/shrink-0/);
+    const pagination = page.locator('.cds--pagination');
+    await expect(pagination).toHaveClass(/sticky/);
+    await expect(pagination).toHaveClass(/bottom-0/);
+    const paginationBox = await pagination.boundingBox();
+    expect(paginationBox).not.toBeNull();
+    expect(
+      Math.abs(viewport.height - (paginationBox.y + paginationBox.height)),
+    ).toBeLessThanOrEqual(1);
     await checkA11y(page, journey);
 
     await expect(page).toHaveScreenshot(

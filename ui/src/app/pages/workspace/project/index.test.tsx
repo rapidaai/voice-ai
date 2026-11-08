@@ -174,7 +174,13 @@ describe('ProjectPage', () => {
         .querySelector('.cds--table-toolbar')
         ?.closest('[data-page-header-sticky-toolbar]'),
     ).toHaveClass('sticky', 'top-10', 'z-10');
-    expect(pagination).toHaveClass('mt-auto', 'shrink-0');
+    expect(pagination).toHaveClass(
+      'sticky',
+      'bottom-0',
+      'z-10',
+      'mt-auto!',
+      'shrink-0',
+    );
     expect(pagination?.previousElementSibling).toHaveClass(
       'shrink-0',
       'overflow-x-auto',

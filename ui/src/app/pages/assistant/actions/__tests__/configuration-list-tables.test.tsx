@@ -168,7 +168,12 @@ describe('assistant configuration list tables', () => {
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Disable' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
-    expect(container.querySelector('.cds--pagination')).toHaveClass('shrink-0');
+    expect(container.querySelector('.cds--pagination')).toHaveClass(
+      'sticky',
+      'bottom-0',
+      'z-10',
+      'shrink-0',
+    );
   });
 
   it.each([

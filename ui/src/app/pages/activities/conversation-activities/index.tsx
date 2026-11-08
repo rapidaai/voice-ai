@@ -541,7 +541,7 @@ export const ListingPage: FC<{}> = () => {
         {/* ── Pagination ── */}
         {conversationLogAction.assistantMessages.length > 0 && (
           <Pagination
-            className="mt-auto shrink-0"
+            sticky
             totalItems={conversationLogAction.totalCount}
             page={conversationLogAction.page}
             pageSize={conversationLogAction.pageSize}

@@ -417,7 +417,7 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
                     </Table>
                   </div>
                   <Pagination
-                    className="shrink-0"
+                    sticky
                     totalItems={action.totalCount}
                     page={action.page}
                     pageSize={action.pageSize}

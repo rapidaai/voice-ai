@@ -208,7 +208,7 @@ describe('Version list', () => {
     );
   });
 
-  it('keeps pagination at the bottom of the page container', async () => {
+  it('keeps pagination sticky at the bottom of the page container', async () => {
     const { container } = render(
       <Version assistant={assistant} onReload={jest.fn()} />,
     );
@@ -218,7 +218,7 @@ describe('Version list', () => {
     });
 
     const pagination = container.querySelector('.cds--pagination');
-    expect(pagination).toHaveClass('shrink-0');
+    expect(pagination).toHaveClass('sticky', 'bottom-0', 'z-10', 'shrink-0');
     expect(pagination?.previousElementSibling).toHaveClass(
       'min-h-0',
       'flex-1',

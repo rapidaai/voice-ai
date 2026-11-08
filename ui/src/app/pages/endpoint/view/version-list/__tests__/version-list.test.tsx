@@ -205,7 +205,7 @@ describe('Endpoint version list', () => {
     expect(mockShowLoader).not.toHaveBeenCalled();
   });
 
-  it('keeps pagination below the scrollable table region', async () => {
+  it('keeps pagination sticky below the scrollable table region', async () => {
     const { container } = render(
       <Version currentEndpoint={endpoint} onReload={jest.fn()} />,
     );
@@ -215,7 +215,7 @@ describe('Endpoint version list', () => {
     });
 
     const pagination = container.querySelector('.cds--pagination');
-    expect(pagination).toHaveClass('shrink-0');
+    expect(pagination).toHaveClass('sticky', 'bottom-0', 'z-10', 'shrink-0');
     expect(pagination?.previousElementSibling).toHaveClass(
       'min-h-0',
       'flex-1',

@@ -218,7 +218,7 @@ export function EndpointPage() {
 
       {endpointActions.endpoints && endpointActions.endpoints.length > 0 && (
         <Pagination
-          className="shrink-0"
+          sticky
           totalItems={endpointActions.totalCount}
           page={endpointActions.page}
           pageSize={endpointActions.pageSize}

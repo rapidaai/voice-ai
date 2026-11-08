@@ -233,7 +233,7 @@ export function ListingPage() {
 
         {activities.length > 0 && (
           <Pagination
-            className="mt-auto shrink-0"
+            sticky
             totalItems={totalCount}
             page={page}
             pageSize={pageSize}

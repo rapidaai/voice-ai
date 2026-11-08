@@ -336,7 +336,7 @@ export function UserPage() {
                         </Table>
                       </div>
                       <Pagination
-                        className="mt-auto shrink-0"
+                        sticky
                         totalItems={userActions.totalCount}
                         page={userActions.page}
                         pageSize={userActions.pageSize}

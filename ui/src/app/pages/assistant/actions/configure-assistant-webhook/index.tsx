@@ -456,7 +456,7 @@ const ConfigureAssistantWebhook: FC<{ assistantId: string }> = ({
                     </Table>
                   </div>
                   <Pagination
-                    className="shrink-0"
+                    sticky
                     totalItems={axtion.totalCount}
                     page={axtion.page}
                     pageSize={axtion.pageSize}

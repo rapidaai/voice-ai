@@ -66,8 +66,13 @@ jest.mock('@/app/components/ui/primitives/modal', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives/pagination', () => ({
-  Pagination: ({ onChange, pageSize }: any) => (
-    <button onClick={() => onChange({ page: 2, pageSize })}>Next page</button>
+  Pagination: ({ onChange, pageSize, sticky }: any) => (
+    <button
+      data-sticky={sticky}
+      onClick={() => onChange({ page: 2, pageSize })}
+    >
+      Next page
+    </button>
   ),
 }));
 
@@ -224,6 +229,10 @@ describe('listing page create CTAs', () => {
     ).toHaveLength(1);
     expect(screen.getByText('1 of 4')).toBeInTheDocument();
     expect(screen.queryByText('Create new Assistant')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next page' })).toHaveAttribute(
+      'data-sticky',
+      'true',
+    );
 
     unmount();
     render(<EndpointPage />);
@@ -233,6 +242,10 @@ describe('listing page create CTAs', () => {
     ).toHaveLength(1);
     expect(screen.getByText('1 of 5')).toBeInTheDocument();
     expect(screen.queryByText('Add new endpoint')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next page' })).toHaveAttribute(
+      'data-sticky',
+      'true',
+    );
   });
 
   it('keeps empty-state create copy and filtered no-results copy consistent', () => {

@@ -66,8 +66,11 @@ jest.mock('@/app/components/ui/primitives/button', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives/pagination', () => ({
-  Pagination: ({ onChange, pageSize, className }: any) => (
-    <div className={className} data-testid="pagination">
+  Pagination: ({ onChange, pageSize, className, sticky }: any) => (
+    <div
+      className={`${sticky ? 'sticky bottom-0 z-10 shrink-0' : ''} ${className || ''}`}
+      data-testid="pagination"
+    >
       <button
         data-testid="change-page"
         onClick={() => onChange({ page: 2, pageSize })}
@@ -296,6 +299,11 @@ describe('ConfigureAssistantWebhookPage listing', () => {
 
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Disable' })).toBeInTheDocument();
-    expect(screen.getByTestId('pagination')).toHaveClass('shrink-0');
+    expect(screen.getByTestId('pagination')).toHaveClass(
+      'sticky',
+      'bottom-0',
+      'z-10',
+      'shrink-0',
+    );
   });
 });

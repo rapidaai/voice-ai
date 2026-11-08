@@ -381,7 +381,7 @@ export function Conversations({ currentAssistant }: ConversationProps) {
       {!loadError &&
         assistantConversationListAction.assistantConversations.length > 0 && (
           <Pagination
-            className="shrink-0"
+            sticky
             totalItems={assistantConversationListAction.totalCount}
             page={assistantConversationListAction.page}
             pageSize={assistantConversationListAction.pageSize}

@@ -300,7 +300,7 @@ export function Version(props: {
               </div>
 
               <Pagination
-                className="shrink-0"
+                sticky
                 totalItems={endpointProviderAction.totalCount}
                 page={endpointProviderAction.page}
                 pageSize={endpointProviderAction.pageSize}

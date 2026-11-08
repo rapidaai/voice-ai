@@ -335,7 +335,7 @@ export function ProjectPage() {
                         </Table>
                       </div>
                       <Pagination
-                        className="mt-auto shrink-0"
+                        sticky
                         totalItems={totalCount}
                         page={page}
                         pageSize={pageSize}

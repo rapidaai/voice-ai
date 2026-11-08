@@ -1233,7 +1233,8 @@ export const ListingPage = () => {
               />
 
               <Pagination
-                className="mt-auto shrink-0 border-t border-border-subtle"
+                sticky
+                className="border-t border-border-subtle"
                 totalItems={totalItem}
                 page={page}
                 pageSize={pageSize}

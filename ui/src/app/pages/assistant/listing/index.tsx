@@ -250,7 +250,7 @@ export function AssistantPage() {
         assistantAction.assistants &&
         assistantAction.assistants.length > 0 && (
           <Pagination
-            className="shrink-0"
+            sticky
             totalItems={assistantAction.totalCount}
             page={assistantAction.page}
             pageSize={assistantAction.pageSize}

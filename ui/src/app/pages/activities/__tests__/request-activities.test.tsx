@@ -165,7 +165,11 @@ jest.mock('@/app/components/ui/table/table-link', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives/pagination', () => ({
-  Pagination: () => <div>pagination</div>,
+  Pagination: ({ sticky }: any) => (
+    <div data-sticky={sticky} data-testid="pagination">
+      pagination
+    </div>
+  ),
 }));
 
 jest.mock('@/app/components/ui/feedback/empty-state', () => ({
@@ -254,6 +258,10 @@ describe('Request logs listing', () => {
     expect(
       container.querySelector('[data-page-header-sticky-toolbar]'),
     ).toHaveClass('sticky', 'top-10', 'z-10');
+    expect(screen.getByTestId('pagination')).toHaveAttribute(
+      'data-sticky',
+      'true',
+    );
   });
 
   it('retries request only after confirm dialog acceptance', async () => {
