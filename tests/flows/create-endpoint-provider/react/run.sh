@@ -3,6 +3,8 @@ set -eu
 
 script_directory=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
+. "$script_directory/../../process-lifecycle.sh"
+# shellcheck disable=SC1091
 . "$script_directory/../../project-fixture.sh"
 
 export FLOW_FIXTURE_ID='8100502'
@@ -15,14 +17,12 @@ export FLOW_ENDPOINT='CI React Endpoint'
 export FLOW_EXPECTED_COUNT='20'
 
 cleanup() {
-  cleanup_endpoint_fixture
-  cleanup_project_fixture
+  cleanup_endpoint_project_fixture
 }
 
-trap cleanup EXIT
-trap 'exit 1' HUP INT TERM
+register_flow_cleanup cleanup
 cleanup_endpoint_fixture
 seed_project_fixture
 
-timeout 120s node "$script_directory/create-endpoint-provider.js"
+run_flow_process timeout 120s node "$script_directory/create-endpoint-provider.js"
 verify_endpoint_provider_fixture

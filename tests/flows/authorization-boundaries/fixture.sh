@@ -1,6 +1,18 @@
 #!/bin/sh
 
 cleanup_restricted_user() {
+  unexpected_user=$(psql -v ON_ERROR_STOP=1 -At -h "${FLOW_POSTGRES_HOST:-postgres}" \
+    -U rapida_user -d web_db \
+    -v user_id="$FLOW_RESTRICTED_USER_ID" \
+    -v email="$FLOW_RESTRICTED_EMAIL" <<'SQL'
+SELECT count(*) FROM user_auths
+WHERE id = :'user_id' AND email IS DISTINCT FROM :'email';
+SQL
+)
+  if [ "$unexpected_user" != '0' ]; then
+    printf 'refusing to clean a user not owned by this flow fixture\n' >&2
+    return 1
+  fi
   psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
     -v user_id="$FLOW_RESTRICTED_USER_ID" >/dev/null <<'SQL'
 DELETE FROM user_auth_tokens WHERE user_auth_id = :'user_id';
@@ -11,15 +23,32 @@ SQL
 }
 
 cleanup_security_data() {
-  cleanup_project_fixture
+  security_cleanup_status=0
+  cleanup_project_fixture || security_cleanup_status=$?
   original_fixture_id=$FLOW_FIXTURE_ID
   original_project_id=$FLOW_PROJECT_ID
+  original_email=$FLOW_EMAIL
+  original_organization=$FLOW_ORGANIZATION
+  original_project=$FLOW_PROJECT
+  original_organization_description=${FLOW_ORGANIZATION_DESCRIPTION:-CI SDK flow fixture}
+  original_project_description=${FLOW_PROJECT_DESCRIPTION:-CI SDK flow fixture}
   FLOW_FIXTURE_ID=$FLOW_OTHER_ORGANIZATION_ID
   FLOW_PROJECT_ID=$FLOW_OTHER_PROJECT_ID
-  cleanup_project_fixture
+  FLOW_EMAIL=$FLOW_OTHER_EMAIL
+  FLOW_ORGANIZATION='CI Authorization Other Organization'
+  FLOW_PROJECT='CI Authorization Other Project'
+  FLOW_ORGANIZATION_DESCRIPTION='Cross-project authorization fixture'
+  FLOW_PROJECT_DESCRIPTION='Cross-project authorization fixture'
+  cleanup_project_fixture || security_cleanup_status=$?
   FLOW_FIXTURE_ID=$original_fixture_id
   FLOW_PROJECT_ID=$original_project_id
-  cleanup_restricted_user
+  FLOW_EMAIL=$original_email
+  FLOW_ORGANIZATION=$original_organization
+  FLOW_PROJECT=$original_project
+  FLOW_ORGANIZATION_DESCRIPTION=$original_organization_description
+  FLOW_PROJECT_DESCRIPTION=$original_project_description
+  cleanup_restricted_user || security_cleanup_status=$?
+  return "$security_cleanup_status"
 }
 
 seed_security_fixtures() {

@@ -6,6 +6,8 @@ readonly flow_password='ci-flow-signin-password'
 readonly flow_token='ci-flow-signin-react-token'
 readonly flow_id='8100002'
 script_directory=$(cd "$(dirname "$0")" && pwd)
+# shellcheck disable=SC1091
+. "$script_directory/../../process-lifecycle.sh"
 
 cleanup() {
   psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
@@ -16,8 +18,7 @@ DELETE FROM user_auths WHERE email = :'flow_email';
 SQL
 }
 
-trap cleanup EXIT
-trap 'exit 1' HUP INT TERM
+register_flow_cleanup cleanup
 cleanup
 
 psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
@@ -41,4 +42,4 @@ FROM created_user;
 SQL
 
 FLOW_EMAIL="$flow_email" FLOW_PASSWORD="$flow_password" \
-  timeout 30s node "$script_directory/signin.js"
+  run_flow_process timeout 30s node "$script_directory/signin.js"

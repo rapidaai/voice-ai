@@ -9,8 +9,10 @@ readonly flow_updated_project='CI React Project Lifecycle Updated'
 readonly flow_owner_email='ci-flow-project-owner-react@example.invalid'
 readonly flow_member_email='ci-flow-project-member-react@example.invalid'
 script_directory=$(cd "$(dirname "$0")" && pwd)
+# shellcheck disable=SC1091
+. "$script_directory/../../process-lifecycle.sh"
 
-cleanup() {
+cleanup_records() {
   psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
     -v owner_id="$flow_owner_id" \
     -v member_id="$flow_member_id" \
@@ -47,7 +49,7 @@ SQL
 }
 
 seed() {
-  cleanup
+  cleanup_records
 
   psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
     -v owner_id="$flow_owner_id" \
@@ -117,8 +119,11 @@ export FLOW_PROJECT="$flow_project"
 export FLOW_UPDATED_PROJECT="$flow_updated_project"
 export FLOW_MEMBER_EMAIL="$flow_member_email"
 
-trap cleanup EXIT
-trap 'exit 1' HUP INT TERM
+cleanup() {
+  cleanup_records
+}
+
+register_flow_cleanup cleanup
 seed
-timeout 30s node "$script_directory/project-lifecycle.js"
+run_flow_process timeout 30s node "$script_directory/project-lifecycle.js"
 verify

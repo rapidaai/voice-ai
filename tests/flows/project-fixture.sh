@@ -1,6 +1,42 @@
 #!/bin/sh
 
+assert_project_fixture_ownership() {
+  unexpected_records=$(psql -v ON_ERROR_STOP=1 -At -h "${FLOW_POSTGRES_HOST:-postgres}" \
+    -U rapida_user -d web_db \
+    -v fixture_id="$FLOW_FIXTURE_ID" \
+    -v project_id="$FLOW_PROJECT_ID" \
+    -v email="$FLOW_EMAIL" \
+    -v organization="$FLOW_ORGANIZATION" \
+    -v project="$FLOW_PROJECT" \
+    -v organization_description="${FLOW_ORGANIZATION_DESCRIPTION:-CI SDK flow fixture}" \
+    -v project_description="${FLOW_PROJECT_DESCRIPTION:-CI SDK flow fixture}" <<'SQL'
+SELECT count(*) FROM (
+  SELECT id FROM organizations
+  WHERE id = :'fixture_id'
+    AND (name IS DISTINCT FROM :'organization'
+      OR description IS DISTINCT FROM :'organization_description'
+      OR contact IS DISTINCT FROM :'email')
+  UNION ALL
+  SELECT id FROM projects
+  WHERE id = :'project_id'
+    AND (organization_id IS DISTINCT FROM :'fixture_id'
+      OR name IS DISTINCT FROM :'project'
+      OR description IS DISTINCT FROM :'project_description')
+  UNION ALL
+  SELECT id FROM user_auths
+  WHERE id = :'fixture_id'
+    AND email IS DISTINCT FROM :'email'
+) AS unexpected;
+SQL
+)
+  if [ "$unexpected_records" != '0' ]; then
+    printf 'refusing to clean records not owned by this flow fixture\n' >&2
+    return 1
+  fi
+}
+
 cleanup_endpoint_fixture() {
+  assert_project_fixture_ownership || return
   psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d endpoint_db \
     -v project_id="$FLOW_PROJECT_ID" >/dev/null <<'SQL'
 CREATE TEMP TABLE flow_endpoints AS
@@ -22,8 +58,10 @@ SQL
 }
 
 cleanup_project_fixture() {
+  assert_project_fixture_ownership || return
+  project_cleanup_status=0
   psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d assistant_db \
-    -v project_id="$FLOW_PROJECT_ID" >/dev/null <<'SQL'
+    -v project_id="$FLOW_PROJECT_ID" >/dev/null <<'SQL' || project_cleanup_status=$?
 CREATE TEMP TABLE flow_assistants AS
 SELECT id FROM assistants WHERE project_id = :'project_id';
 
@@ -105,9 +143,10 @@ WHERE assistant_id IN (SELECT id FROM flow_assistants);
 DELETE FROM assistants WHERE id IN (SELECT id FROM flow_assistants);
 SQL
 
+  web_cleanup_status=0
   psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
     -v fixture_id="$FLOW_FIXTURE_ID" \
-    -v project_id="$FLOW_PROJECT_ID" >/dev/null <<'SQL'
+    -v project_id="$FLOW_PROJECT_ID" >/dev/null <<'SQL' || web_cleanup_status=$?
 DELETE FROM vaults WHERE project_id = :'project_id';
 DELETE FROM project_credentials WHERE project_id = :'project_id';
 DELETE FROM user_project_roles WHERE project_id = :'project_id';
@@ -117,6 +156,17 @@ DELETE FROM projects WHERE id = :'project_id';
 DELETE FROM organizations WHERE id = :'fixture_id';
 DELETE FROM user_auths WHERE id = :'fixture_id';
 SQL
+  if [ "$project_cleanup_status" -ne 0 ]; then
+    return "$project_cleanup_status"
+  fi
+  return "$web_cleanup_status"
+}
+
+cleanup_endpoint_project_fixture() {
+  fixture_cleanup_status=0
+  cleanup_endpoint_fixture || fixture_cleanup_status=$?
+  cleanup_project_fixture || fixture_cleanup_status=$?
+  return "$fixture_cleanup_status"
 }
 
 format_flow_ari_host() {

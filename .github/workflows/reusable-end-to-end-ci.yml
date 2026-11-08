@@ -266,6 +266,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          set -o pipefail
           marker='<!-- rapida-e2e-flow-results -->'
           body_file=$(mktemp)
           comments_file=$(mktemp)
@@ -276,8 +277,8 @@ jobs:
           } > "$body_file"
 
           gh api --paginate --slurp \
-            "repos/$GH_REPO/issues/$PR_NUMBER/comments?per_page=100" \
-            --jq '.[][] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- rapida-e2e-flow-results -->"))) | .id' \
+            "repos/$GH_REPO/issues/$PR_NUMBER/comments?per_page=100" | \
+            jq -r '.[][] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- rapida-e2e-flow-results -->"))) | .id' \
             > "$comments_file"
           mapfile -t comment_ids < "$comments_file"
           if [[ "${#comment_ids[@]}" -gt 0 ]]; then

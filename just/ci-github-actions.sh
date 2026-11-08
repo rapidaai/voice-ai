@@ -98,6 +98,8 @@ require_text "$end_to_end_workflow" 'name: Comment complete flow table on pull r
 require_text "$end_to_end_workflow" '<!-- rapida-e2e-flow-results -->'
 require_text "$end_to_end_workflow" 'pull-requests: write'
 require_text "$end_to_end_workflow" 'gh api --paginate --slurp'
+require_text "$end_to_end_workflow" 'set -o pipefail'
+require_text "$end_to_end_workflow" "jq -r '.[][]"
 # shellcheck disable=SC2016 # This literal array expansion belongs to the workflow.
 require_text "$end_to_end_workflow" 'for duplicate_comment_id in "${comment_ids[@]:1}"'
 require_text "$end_to_end_workflow" 'gh api --method DELETE'

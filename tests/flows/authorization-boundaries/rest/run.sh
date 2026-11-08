@@ -3,6 +3,8 @@ set -eu
 
 script_directory=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
+. "$script_directory/../../process-lifecycle.sh"
+# shellcheck disable=SC1091
 . "$script_directory/../../project-fixture.sh"
 # shellcheck disable=SC1091
 . "$script_directory/../fixture.sh"
@@ -21,12 +23,20 @@ export FLOW_RESTRICTED_EMAIL='ci-flow-authorization-restricted@example.invalid'
 export FLOW_RESTRICTED_TOKEN='ci-flow-authorization-restricted-token'
 
 assistant_endpoint=${ASSISTANT_API_REST_ENDPOINT:-http://assistant-api:9007}
-temporary_directory=$(mktemp -d)
+temporary_directory=''
 
 cleanup() {
-  cleanup_security_data
-  rm -rf "$temporary_directory"
+  trap '' HUP INT TERM
+  cleanup_status=0
+  cleanup_security_data || cleanup_status=$?
+  if [ -n "$temporary_directory" ]; then
+    rm -rf "$temporary_directory" || cleanup_status=$?
+  fi
+  return "$cleanup_status"
 }
+
+register_flow_cleanup cleanup
+temporary_directory=$(mktemp -d)
 
 expect_denied() {
   label=$1
@@ -98,8 +108,6 @@ run_authorization_checks() {
   expect_invalid_identifier "$temporary_directory/invalid-identifier.json"
 }
 
-trap cleanup EXIT
-trap 'exit 1' HUP INT TERM
 cleanup_security_data
 seed_project_fixture
 seed_security_fixtures

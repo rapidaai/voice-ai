@@ -9,9 +9,10 @@ Flows are grouped first by user journey and then by public client. Every client 
 Use this order in every client runner:
 
 1. Export deterministic fixture values and configurable service or database hosts.
-2. Register cleanup for `EXIT`, then make `HUP`, `INT`, and `TERM` exit nonzero.
+2. Source `process-lifecycle.sh` and register the client cleanup function.
 3. Clean stale fixture state, then seed prerequisites.
-4. Exercise the public SDK or REST surface with a bounded timeout.
+4. Exercise SDK commands through `run_flow_process` with a bounded timeout, or
+   bound every REST request directly.
 5. Assert the public response in the client implementation.
 6. Assert persistent side effects from the runner when the response alone is insufficient.
 7. Let the registered cleanup remove all fixture state.
@@ -81,10 +82,10 @@ just test-integration-node assistant-components
 just test-integration-react assistant-components
 ```
 
-Local SDK dependencies are atomically installed and cached by the flow lockfile
-checksum in a private per-user cache. Set `FLOW_DEPENDENCY_CACHE_DIR` to choose
-a different private cache directory. Abandoned installation locks are reclaimed
-after their owning process exits. React SDK request and response logging is
+Local SDK dependencies are installed into private immutable directories and
+atomically published by the flow lockfile checksum. Interrupted installations
+never become the active cache entry. Set `FLOW_DEPENDENCY_CACHE_DIR` to choose a
+different private cache directory. React SDK request and response logging is
 disabled by default; set `FLOW_SDK_DEBUG=true` only when the full trace is
 required. The Node SDK's similarly named constructor flag selects insecure
 local gRPC transport and must remain enabled for the plaintext development ports.

@@ -3,6 +3,8 @@ set -eu
 
 script_directory=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
+. "$script_directory/../../process-lifecycle.sh"
+# shellcheck disable=SC1091
 . "$script_directory/../../project-fixture.sh"
 
 export FLOW_FIXTURE_ID='8100702'
@@ -14,9 +16,12 @@ export FLOW_PROJECT='CI Assistant Lifecycle React Project'
 export FLOW_ASSISTANT='CI React Lifecycle Assistant'
 export FLOW_EXPECTED_COUNT='1'
 
-trap cleanup_project_fixture EXIT
-trap 'exit 1' HUP INT TERM
+cleanup() {
+  cleanup_project_fixture
+}
+
+register_flow_cleanup cleanup
 seed_project_fixture
 
-timeout 30s node "$script_directory/assistant-lifecycle.js"
+run_flow_process timeout 30s node "$script_directory/assistant-lifecycle.js"
 verify_assistant_lifecycle_fixture

@@ -13,6 +13,23 @@ fail() {
   exit 1
 }
 
+logical_commands() {
+  awk '
+    {
+      line = $0
+      if (line ~ /\\[[:space:]]*$/) {
+        sub(/\\[[:space:]]*$/, "", line)
+        command = command line " "
+        next
+      }
+      print command line
+      command = ""
+    }
+    END { if (command != "") print command }
+  ' "$1" | sed -E 's/[[:space:]]*(&&|\|\||;)[[:space:]]*/\
+/g'
+}
+
 [[ -f "$manifest" ]] || fail "missing manifest: $manifest"
 
 while IFS= read -r journey || [[ -n "$journey" ]]; do
@@ -50,29 +67,36 @@ while IFS= read -r journey || [[ -n "$journey" ]]; do
     client_runner="$journey_directory/$client/run.sh"
     [[ -x "$client_runner" ]] || fail "client runner is missing or not executable: $journey/$client/run.sh"
     grep -Fqx 'set -eu' "$client_runner" || fail "$journey/$client/run.sh must use set -eu"
-    grep -Eq '^trap .+ EXIT$' "$client_runner" || \
-      fail "$journey/$client/run.sh must clean up on EXIT"
-    grep -Fqx "trap 'exit 1' HUP INT TERM" "$client_runner" || \
-      fail "$journey/$client/run.sh must exit on termination signals"
+    # shellcheck disable=SC2016 # The runner must contain this literal variable reference.
+    grep -Fqx '. "$script_directory/../../process-lifecycle.sh"' "$client_runner" || \
+      fail "$journey/$client/run.sh must source process-lifecycle.sh"
+    grep -Eq '^register_flow_cleanup [a-z_]+$' "$client_runner" || \
+      fail "$journey/$client/run.sh must register cleanup with the process lifecycle"
+    temporary_line=$(grep -n 'mktemp -d' "$client_runner" | head -1 | cut -d: -f1 || true)
+    if [[ -n "$temporary_line" ]]; then
+      cleanup_line=$(grep -n '^register_flow_cleanup ' "$client_runner" | head -1 | cut -d: -f1)
+      [[ "$cleanup_line" -lt "$temporary_line" ]] || \
+        fail "$journey/$client/run.sh must register cleanup before creating temporary files"
+    fi
 
     if [[ "$client" == 'rest' ]]; then
       operation_count=0
-      while IFS=: read -r operation_line operation; do
+      while IFS= read -r operation; do
         operation_count=$((operation_count + 1))
         [[ "$operation" =~ --max-time[[:space:]]+0*[1-9][0-9]*([[:space:]]|\\|$) ]] || \
-          fail "$journey/$client/run.sh:$operation_line must bound REST calls with a positive --max-time"
-      done < <(grep -En '(^|[^[:alnum:]_])curl([[:space:]]|$)' "$client_runner" || true)
+          fail "$journey/$client/run.sh must bound every REST call with a positive --max-time"
+      done < <(logical_commands "$client_runner" | grep -E '(^|[^[:alnum:]_])curl([[:space:]]|$)' || true)
       [[ "$operation_count" -gt 0 ]] || fail "$journey/$client/run.sh must contain a REST operation"
     else
       operation_count=0
-      while IFS=: read -r operation_line operation; do
-        if [[ "$operation" =~ \&[[:space:]]*$ ]]; then
+      while IFS= read -r operation; do
+        if [[ "$operation" =~ \&[[:space:]]*$ && ! "$operation" =~ timeout[[:space:]] ]]; then
           continue
         fi
         operation_count=$((operation_count + 1))
         [[ "$operation" =~ timeout[[:space:]]+0*[1-9][0-9]*s[[:space:]]+node[[:space:]] ]] || \
-          fail "$journey/$client/run.sh:$operation_line must bound SDK calls with a positive timeout"
-      done < <(grep -En '(^|[^[:alnum:]_])node([[:space:]]|$)' "$client_runner" || true)
+          fail "$journey/$client/run.sh must bound every SDK call with a positive timeout"
+      done < <(logical_commands "$client_runner" | grep -E '(^|[^[:alnum:]_])node([[:space:]]|$)' || true)
       [[ "$operation_count" -gt 0 ]] || fail "$journey/$client/run.sh must contain an SDK operation"
     fi
 
@@ -114,9 +138,9 @@ while IFS= read -r journey || [[ -n "$journey" ]]; do
       seed_line=$(grep -n '^seed_project_fixture$' "$client_runner" | head -1 | cut -d: -f1)
       [[ -n "$seed_line" ]] || fail "$journey/$client/run.sh must seed the shared project fixture"
       if [[ "$client" == 'rest' ]]; then
-        operation_line=$(grep -nE '^run_flow |^run_[a-z_]+_checks$' "$client_runner" | head -1 | cut -d: -f1)
+        operation_line=$(grep -nE '^run_flow( |$)|^run_[a-z_]+_checks$' "$client_runner" | head -1 | cut -d: -f1)
       else
-        operation_line=$(grep -nE '^timeout [0-9]+s node ' "$client_runner" | head -1 | cut -d: -f1)
+        operation_line=$(grep -nE '^run_flow_process timeout [0-9]+s node ' "$client_runner" | head -1 | cut -d: -f1)
       fi
       [[ -n "$operation_line" && "$seed_line" -lt "$operation_line" ]] || \
         fail "$journey/$client/run.sh must seed before exercising the public client"

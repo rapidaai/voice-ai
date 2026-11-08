@@ -3,6 +3,8 @@ set -eu
 
 script_directory=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
+. "$script_directory/../../process-lifecycle.sh"
+# shellcheck disable=SC1091
 . "$script_directory/../../project-fixture.sh"
 # shellcheck disable=SC1091
 . "$script_directory/../fixture.sh"
@@ -24,10 +26,9 @@ cleanup() {
   cleanup_security_data
 }
 
-trap cleanup EXIT
-trap 'exit 1' HUP INT TERM
+register_flow_cleanup cleanup
 cleanup_security_data
 seed_project_fixture
 seed_security_fixtures
-timeout 30s node "$script_directory/authorization-boundaries.js"
+run_flow_process timeout 30s node "$script_directory/authorization-boundaries.js"
 verify_authorization_fixture

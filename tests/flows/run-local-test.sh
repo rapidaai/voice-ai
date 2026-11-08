@@ -18,23 +18,21 @@ dependency_key=$(shasum -a 256 \
   "$script_directory/package.json" "$script_directory/package-lock.json" \
   | shasum -a 256 | awk '{print $1}')
 
-stale_cache="$temporary_directory/stale-cache"
-stale_log="$temporary_directory/stale-install.log"
-mkdir -p "$stale_cache/$dependency_key.lock"
-printf '%s\n%s\n' '999999' 'Mon Jan  1 00:00:00 2001' \
-  > "$stale_cache/$dependency_key.lock/owner"
-if PATH="$fake_bin:$PATH" FLOW_NPM_LOG="$stale_log" \
-  FLOW_DEPENDENCY_CACHE_DIR="$stale_cache" \
+abandoned_cache="$temporary_directory/abandoned-cache"
+abandoned_log="$temporary_directory/abandoned-install.log"
+mkdir -p "$abandoned_cache/$dependency_key.install.abandoned"
+if PATH="$fake_bin:$PATH" FLOW_NPM_LOG="$abandoned_log" \
+  FLOW_DEPENDENCY_CACHE_DIR="$abandoned_cache" \
   bash "$script_directory/run-local.sh" react missing-journey >/dev/null 2>&1; then
-  printf 'unknown journey unexpectedly passed after stale lock recovery\n' >&2
+  printf 'unknown journey unexpectedly passed after abandoned install recovery\n' >&2
   exit 1
 else
   status=$?
 fi
 [[ "$status" -eq 2 ]]
-[[ -f "$stale_cache/$dependency_key/.complete" ]]
-[[ ! -d "$stale_cache/$dependency_key.lock" ]]
-[[ $(wc -l < "$stale_log") -eq 1 ]]
+[[ -L "$abandoned_cache/$dependency_key" ]]
+[[ -f "$abandoned_cache/$dependency_key/.complete" ]]
+[[ $(wc -l < "$abandoned_log") -eq 1 ]]
 
 concurrent_cache="$temporary_directory/concurrent-cache"
 concurrent_log="$temporary_directory/concurrent-install.log"
@@ -53,9 +51,10 @@ wait "$react_pid"
 react_status=$?
 set -e
 [[ "$node_status" -eq 2 && "$react_status" -eq 2 ]]
+[[ -L "$concurrent_cache/$dependency_key" ]]
 [[ -f "$concurrent_cache/$dependency_key/.complete" ]]
-[[ ! -d "$concurrent_cache/$dependency_key.lock" ]]
-[[ $(wc -l < "$concurrent_log") -eq 1 ]]
+install_count=$(wc -l < "$concurrent_log")
+[[ "$install_count" -ge 1 && "$install_count" -le 2 ]]
 
 unsafe_cache="$temporary_directory/unsafe-cache"
 mkdir -p "$unsafe_cache"

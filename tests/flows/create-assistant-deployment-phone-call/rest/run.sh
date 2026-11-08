@@ -3,6 +3,8 @@ set -eu
 
 script_directory=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
+. "$script_directory/../../process-lifecycle.sh"
+# shellcheck disable=SC1091
 . "$script_directory/../../project-fixture.sh"
 
 export FLOW_FIXTURE_ID='8100403'
@@ -22,17 +24,24 @@ export FLOW_FROM_NUMBER='ci-rest-caller'
 export FLOW_TO_NUMBER='ci-rest-destination'
 
 assistant_endpoint=${ASSISTANT_API_REST_ENDPOINT:-http://assistant-api:9007}
-temporary_directory=$(mktemp -d)
-mock_pid=''
+temporary_directory=''
 
 cleanup() {
-  if [ -n "$mock_pid" ]; then
-    kill "$mock_pid" 2>/dev/null || true
-    wait "$mock_pid" 2>/dev/null || true
+  cleanup_status=0
+  if [ -n "$flow_process_id" ]; then
+    kill "$flow_process_id" 2>/dev/null || true
+    wait "$flow_process_id" 2>/dev/null || true
+    flow_process_id=''
   fi
-  cleanup_project_fixture
-  rm -rf "$temporary_directory"
+  cleanup_project_fixture || cleanup_status=$?
+  if [ -n "$temporary_directory" ]; then
+    rm -rf "$temporary_directory" || cleanup_status=$?
+  fi
+  return "$cleanup_status"
 }
+
+register_flow_cleanup cleanup
+temporary_directory=$(mktemp -d)
 
 request() {
   auth_mode=$1
@@ -111,13 +120,10 @@ run_flow() {
   printf 'REST assistant deployment phone call flow passed with %s\n' "$auth_name"
 }
 
-trap cleanup EXIT
-trap 'exit 1' HUP INT TERM
 seed_project_fixture
 seed_project_api_key_fixture
 seed_asterisk_vault_fixture
-node "$script_directory/../mock-ari-server.js" "$FLOW_ARI_PORT" &
-mock_pid=$!
+start_flow_process node "$script_directory/../mock-ari-server.js" "$FLOW_ARI_PORT"
 sleep 1
 
 run_flow personal-access-token 'personal access token' pat

@@ -3,6 +3,8 @@ set -eu
 
 script_directory=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
+. "$script_directory/../../process-lifecycle.sh"
+# shellcheck disable=SC1091
 . "$script_directory/../../project-fixture.sh"
 
 export FLOW_FIXTURE_ID='8100203'
@@ -17,12 +19,17 @@ export FLOW_EXPECTED_ASSISTANTS='10'
 export FLOW_EXPECTED_PROVIDERS='2'
 
 assistant_endpoint=${ASSISTANT_API_REST_ENDPOINT:-http://assistant-api:9007}
-temporary_directory=$(mktemp -d)
+temporary_directory=''
 
 cleanup() {
   cleanup_project_fixture
-  rm -rf "$temporary_directory"
+  if [ -n "$temporary_directory" ]; then
+    rm -rf "$temporary_directory"
+  fi
 }
+
+register_flow_cleanup cleanup
+temporary_directory=$(mktemp -d)
 
 request() {
   auth_mode=$1
@@ -87,8 +94,6 @@ run_flow() {
   printf 'REST create assistant provider flow passed with %s\n' "$auth_name"
 }
 
-trap cleanup EXIT
-trap 'exit 1' HUP INT TERM
 seed_project_fixture
 seed_project_api_key_fixture
 

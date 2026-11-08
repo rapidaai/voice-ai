@@ -3,6 +3,8 @@ set -eu
 
 script_directory=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
+. "$script_directory/../../process-lifecycle.sh"
+# shellcheck disable=SC1091
 . "$script_directory/../../project-fixture.sh"
 
 export FLOW_FIXTURE_ID='8100301'
@@ -13,8 +15,7 @@ export FLOW_ORGANIZATION='CI Create Vault Node Organization'
 export FLOW_PROJECT='CI Create Vault Node Project'
 export FLOW_VAULT_NAME='CI Node SDK OpenAI Key'
 
-trap cleanup_project_fixture EXIT
-trap 'exit 1' HUP INT TERM
+register_flow_cleanup cleanup_project_fixture
 seed_project_fixture
 
-timeout 30s node "$script_directory/create-vault.js"
+run_flow_process timeout 30s node "$script_directory/create-vault.js"

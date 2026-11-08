@@ -3,6 +3,8 @@ set -eu
 
 script_directory=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
+. "$script_directory/../../process-lifecycle.sh"
+# shellcheck disable=SC1091
 . "$script_directory/../../project-fixture.sh"
 
 export FLOW_FIXTURE_ID='8100802'
@@ -16,9 +18,8 @@ export FLOW_EXPECTED_ASSISTANTS='1'
 export FLOW_EXPECTED_TOOLS='1'
 export FLOW_EXPECTED_CONFIGURATIONS='5'
 
-trap cleanup_project_fixture EXIT
-trap 'exit 1' HUP INT TERM
+register_flow_cleanup cleanup_project_fixture
 seed_project_fixture
 
-timeout 60s node "$script_directory/assistant-components.js"
+run_flow_process timeout 60s node "$script_directory/assistant-components.js"
 verify_assistant_components_fixture

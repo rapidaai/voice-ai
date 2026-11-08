@@ -27,7 +27,9 @@ else
     tests/flows/check-contract.sh
     tests/flows/check-contract-test.sh
     tests/flows/project-fixture-test.sh
+    tests/flows/process-lifecycle.sh
     tests/flows/run-local-test.sh
+    tests/flows/signal-lifecycle-test.sh
     tests/flows/run-test.sh
     tests/flows/summarize-results.sh
     tests/flows/summarize-results-test.sh
