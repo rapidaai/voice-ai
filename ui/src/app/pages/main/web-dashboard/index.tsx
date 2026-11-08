@@ -1,11 +1,15 @@
 import {
   ArrowRight,
-  Bot,
   CheckmarkFilled,
   Information,
   Renew,
   WarningAltFilled,
 } from '@carbon/icons-react';
+import { Checklist } from '@carbon/ibm-products/lib/components/Checklist/Checklist';
+import type {
+  Kind as ChecklistTaskKind,
+  Theme as ChecklistTheme,
+} from '@carbon/ibm-products/lib/components/Checklist/Checklist.types';
 import {
   Button,
   DataTable,
@@ -61,6 +65,7 @@ import { EmptyState } from '@/app/components/ui/feedback';
 import { PageHeader } from '@/app/components/layout/page-header';
 import {
   PrimaryButton,
+  SecondaryButton,
   Text,
   typographyClassNames,
 } from '@/app/components/ui/primitives';
@@ -102,6 +107,8 @@ const failureTableHeaders = [
 ];
 
 const numberFormatter = new Intl.NumberFormat();
+const uncheckedChecklistTask = 'unchecked' as ChecklistTaskKind;
+const checkedChecklistTask = 'checked' as ChecklistTaskKind;
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   month: 'short',
   day: 'numeric',
@@ -277,18 +284,16 @@ function DashboardCard({
 }
 
 function DashboardNoActivity() {
+  const { resolvedMode } = useTheme();
+
   return (
     <section
       data-dashboard-empty
       aria-labelledby="dashboard-getting-started-title"
       className="flex min-h-[420px] items-center bg-layer"
     >
-      <div className="mx-auto w-full max-w-[640px] px-6 py-12 md:px-12 md:py-16">
-        <div className="flex h-12 w-12 items-center justify-center bg-primary text-on-primary">
-          <Bot aria-hidden="true" size={24} />
-        </div>
-
-        <Text as="p" variant="label-01" className="mt-8 text-muted">
+      <div className="mx-auto w-full max-w-[640px] border border-border-subtle bg-surface px-6 py-10 md:px-10 md:py-12">
+        <Text as="p" variant="label-01" className="text-primary">
           Getting started
         </Text>
         <Text
@@ -297,28 +302,75 @@ function DashboardNoActivity() {
           variant="heading-05"
           className="mt-2 text-foreground"
         >
-          Your dashboard is not ready yet
+          Build your first dashboard insights
         </Text>
         <Text
           as="p"
           variant="body-02"
           className="mt-4 max-w-[520px] text-muted"
         >
-          Create an assistant and run a test conversation. Sessions, latency,
-          and health will appear here after the first session.
+          Complete these steps to generate workspace performance data. Metrics
+          will appear after an assistant completes its first test conversation.
         </Text>
 
-        <div className="mt-6">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <PrimaryButton
-            size="lg"
-            href="/deployment/assistant/create-assistant"
+            size="md"
+            href="/deployment/assistant"
             renderIcon={ArrowRight}
-            className="w-full max-w-[320px] justify-between"
+          >
+            Open assistants
+          </PrimaryButton>
+          <SecondaryButton
+            size="md"
+            href="/deployment/assistant/create-assistant"
           >
             Create assistant
-          </PrimaryButton>
+          </SecondaryButton>
         </div>
       </div>
+
+      <Checklist
+        chartLabel="25% complete"
+        chartValue={0.25}
+        checklistAriaLabel="Dashboard setup checklist"
+        checklistToggleAriaLabel="Toggle dashboard setup checklist"
+        className="app-onboarding-checklist fixed bottom-4 right-4 z-30 max-h-[calc(100vh-2rem)] w-[calc(100%_-_5rem)] max-w-[400px] overflow-auto border border-border-strong shadow-xl"
+        onClickViewAll={() => window.location.assign('/deployment/assistant')}
+        taskLists={[
+          {
+            title: 'Recommended steps',
+            tasks: [
+              {
+                kind: checkedChecklistTask,
+                label: 'Workspace created',
+              },
+              {
+                kind: uncheckedChecklistTask,
+                label: 'Create an assistant',
+                onClick: () =>
+                  window.location.assign(
+                    '/deployment/assistant/create-assistant',
+                  ),
+              },
+              {
+                kind: uncheckedChecklistTask,
+                label: 'Configure and test your assistant',
+                onClick: () => window.location.assign('/deployment/assistant'),
+              },
+              {
+                kind: uncheckedChecklistTask,
+                label: 'Return here to review performance',
+                onClick: () => window.location.assign('/dashboard'),
+              },
+            ],
+          },
+        ]}
+        title="Set up your dashboard"
+        theme={resolvedMode as ChecklistTheme}
+        toggleLabel="Collapse or expand dashboard setup"
+        viewAllLabel="View all assistants"
+      />
     </section>
   );
 }

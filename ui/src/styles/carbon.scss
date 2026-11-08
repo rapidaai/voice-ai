@@ -58,6 +58,7 @@
 @use '@carbon/react/scss/components/tabs';
 @use '@carbon/react/scss/components/structured-list';
 @use '@carbon/react/scss/components/accordion';
+@use '@carbon/ibm-products/scss/components/Checklist';
 
 .debugger-configuration-accordion > .cds--accordion__item:first-child {
   border-block-start: 0;
@@ -482,4 +483,25 @@
 // ─── SideNav submenu items font weight ───────────────────────────────────────
 .cds--side-nav__menu-item .cds--side-nav__link-text {
   font-weight: 500;
+}
+
+:root[data-theme-schema] .app-onboarding-checklist {
+  --cds-icon-primary: var(--brand-on-primary);
+  --cds-interactive: var(--brand-on-primary);
+  --cds-link-primary: var(--brand-on-primary);
+  --cds-link-primary-hover: var(--brand-on-primary);
+  --cds-text-primary: var(--brand-on-primary);
+  --cds-text-secondary: var(--brand-on-primary);
+
+  color: var(--brand-on-primary);
+}
+
+:root[data-theme-schema] .app-onboarding-checklist,
+:root[data-theme-schema]
+  .app-onboarding-checklist
+  :is(.c4p--checklist__header, .c4p--checklist__content-inner),
+:root[data-theme-schema]
+  .app-onboarding-checklist
+  .c4p--checklist__chart::after {
+  background-color: var(--cds-background-brand);
 }

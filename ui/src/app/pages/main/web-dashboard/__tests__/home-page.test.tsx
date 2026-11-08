@@ -315,9 +315,12 @@ describe('Dashboard HomePage', () => {
         'border-border-subtle',
         'bg-surface',
       );
-      expect(
-        card.querySelector('[data-dashboard-kpi-header]'),
-      ).toHaveClass('h-10', 'border-b', 'border-border-subtle', 'px-4');
+      expect(card.querySelector('[data-dashboard-kpi-header]')).toHaveClass(
+        'h-10',
+        'border-b',
+        'border-border-subtle',
+        'px-4',
+      );
       expect(card.querySelector('[data-dashboard-kpi-body]')).toHaveClass(
         'h-[116px]',
         'p-4',
@@ -574,7 +577,7 @@ describe('Dashboard HomePage', () => {
     expect(screen.getByText('Top Assistants')).toBeInTheDocument();
   });
 
-  it('renders a simple assistant CTA when the dashboard has no activity', async () => {
+  it('renders a setup checklist when the dashboard has no activity', async () => {
     mockGetProjectDashboardRange.mockResolvedValue(
       dashboardResponse({
         analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
@@ -586,24 +589,59 @@ describe('Dashboard HomePage', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: 'Your dashboard is not ready yet',
+        name: 'Build your first dashboard insights',
         level: 2,
       }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Workspace Overview', level: 1 }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Getting started')).toBeInTheDocument();
+    const checklist = screen.getByLabelText('Dashboard setup checklist');
+    expect(checklist).toHaveClass('fixed', 'bottom-4', 'right-4');
+    expect(
+      within(checklist).getByText('Set up your dashboard'),
+    ).toBeInTheDocument();
+    expect(within(checklist).getByText('25% complete')).toBeInTheDocument();
+    expect(within(checklist).getByText('Workspace created')).toBeInTheDocument();
+    expect(
+      within(checklist).getByRole('button', { name: 'Create an assistant' }),
+    ).toBeInTheDocument();
+    expect(
+      within(checklist).getByRole('button', {
+        name: 'Configure and test your assistant',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(checklist).getByRole('button', {
+        name: 'Return here to review performance',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(checklist).getByRole('button', { name: 'View all assistants' }),
+    ).toBeInTheDocument();
+    const checklistToggle = within(checklist).getByRole('button', {
+      name: 'Collapse or expand dashboard setup',
+    });
+    expect(checklistToggle).toHaveAttribute(
+      'aria-label',
+      'Toggle dashboard setup checklist',
+    );
+    expect(checklistToggle).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(checklistToggle);
+    expect(checklistToggle).toHaveAttribute('aria-expanded', 'false');
     expect(
       screen.getByText(
-        'Create an assistant and run a test conversation. Sessions, latency, and health will appear here after the first session.',
+        'Complete these steps to generate workspace performance data. Metrics will appear after an assistant completes its first test conversation.',
       ),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Open assistants' }),
+    ).toHaveAttribute('href', '/deployment/assistant');
     expect(
       screen.getByRole('link', { name: 'Create assistant' }),
     ).toHaveAttribute('href', '/deployment/assistant/create-assistant');
     expect(
-      screen.queryByRole('link', { name: 'View assistants' }),
+      screen.queryByText('Your dashboard is not ready yet'),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Add credential' }),
@@ -637,7 +675,7 @@ describe('Dashboard HomePage', () => {
     const { rerender } = render(<HomePage />);
 
     await screen.findByRole('heading', {
-      name: 'Your dashboard is not ready yet',
+      name: 'Build your first dashboard insights',
     });
     mockCurrentCredential = {
       ...mockCurrentCredential,
@@ -648,7 +686,7 @@ describe('Dashboard HomePage', () => {
     expect(await screen.findByText('212')).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', {
-        name: 'Your dashboard is not ready yet',
+        name: 'Build your first dashboard insights',
       }),
     ).not.toBeInTheDocument();
   });
@@ -666,7 +704,7 @@ describe('Dashboard HomePage', () => {
     expect(screen.getByText('Component Usage')).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', {
-        name: 'Your dashboard is not ready yet',
+        name: 'Build your first dashboard insights',
       }),
     ).not.toBeInTheDocument();
   });

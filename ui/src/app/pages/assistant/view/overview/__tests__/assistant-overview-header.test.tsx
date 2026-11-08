@@ -6,6 +6,7 @@ import '@testing-library/jest-dom';
 import { Overview } from '@/app/pages/assistant/view/overview';
 
 const mockGoToCreateAssistantVersion = jest.fn();
+const mockGoToDeploymentAssistant = jest.fn();
 let mockLoading = false;
 
 jest.mock('@/stores/app', () => ({
@@ -17,8 +18,12 @@ jest.mock('@/stores/app', () => ({
 jest.mock('@/hooks/use-global-navigator', () => ({
   useGlobalNavigation: () => ({
     goToCreateAssistantVersion: mockGoToCreateAssistantVersion,
-    goToDeploymentAssistant: jest.fn(),
+    goToDeploymentAssistant: mockGoToDeploymentAssistant,
   }),
+}));
+
+jest.mock('@/theme/theme-provider', () => ({
+  useTheme: () => ({ resolvedMode: 'light' }),
 }));
 
 jest.mock('@/app/components/ui/feedback/loaders/section-loader', () => ({
@@ -34,6 +39,10 @@ jest.mock('@/app/pages/assistant/view/overview/assistant-analytics', () => ({
 }));
 
 jest.mock('@carbon/icons-react', () => ({
+  CheckmarkOutline: () => <span>complete</span>,
+  ChevronUp: () => <span>chevron-up</span>,
+  CircleDash: () => <span>not-started</span>,
+  Incomplete: () => <span>in-progress</span>,
   SourceControl: () => <span>source-control</span>,
 }));
 
@@ -54,18 +63,40 @@ jest.mock('@carbon/react', () => ({
       {children}
     </button>
   ),
+  Heading: ({ children, className, ...props }: any) => (
+    <h2 className={className} {...props}>
+      {children}
+    </h2>
+  ),
   HeaderGlobalBar: ({ children, className, ...props }: any) => (
     <div className={className} role="toolbar" {...props}>
       {children}
     </div>
   ),
+  IconButton: ({ children, label, ...props }: any) => (
+    <button title={label} {...props}>
+      {children}
+    </button>
+  ),
+  Section: ({ as: Component = 'section', children, ...props }: any) => (
+    <Component {...props}>{children}</Component>
+  ),
 }));
 
-const makeAssistant = () =>
+const makeAssistant = ({
+  deployed = true,
+  deploymentStatus = 'ACTIVE',
+} = {}) =>
   ({
     getId: () => 'assistant-1',
     getName: () => 'Production assistant',
-    getApideployment: () => ({ getId: () => 'api-deployment-1' }),
+    getApideployment: () =>
+      deployed
+        ? {
+            getId: () => 'api-deployment-1',
+            getStatus: () => deploymentStatus,
+          }
+        : undefined,
     getDebuggerdeployment: () => undefined,
     getWebplugindeployment: () => undefined,
     getPhonedeployment: () => undefined,
@@ -129,5 +160,79 @@ describe('Assistant overview header', () => {
       }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText('Assistant analytics')).not.toBeInTheDocument();
+  });
+
+  it('shows a floating deployment checklist only when no deployment is enabled', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    const { rerender } = render(
+      <Overview currentAssistant={makeAssistant({ deployed: false })} />,
+    );
+
+    const checklist = screen.getByLabelText('Assistant deployment checklist');
+    expect(checklist).toHaveClass('fixed', 'bottom-4', 'right-4');
+    expect(within(checklist).getByText('Deploy your assistant')).toBeVisible();
+    expect(within(checklist).getByText('25% complete')).toBeVisible();
+    expect(within(checklist).getByText('Assistant created')).toBeVisible();
+    expect(
+      within(checklist).getByRole('button', {
+        name: 'Choose a deployment channel',
+      }),
+    ).toBeVisible();
+    expect(
+      within(checklist).getByRole('button', {
+        name: 'Configure deployment settings',
+      }),
+    ).toBeVisible();
+    expect(
+      within(checklist).getByRole('button', {
+        name: 'Enable your deployment',
+      }),
+    ).toBeVisible();
+
+    const toggle = within(checklist).getByRole('button', {
+      name: 'Toggle assistant deployment checklist',
+    });
+    expect(toggle).toHaveAttribute(
+      'title',
+      'Collapse or expand deployment setup',
+    );
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(
+      within(checklist).getByRole('button', {
+        name: 'View deployment options',
+      }),
+    );
+    expect(mockGoToDeploymentAssistant).toHaveBeenCalledWith('assistant-1');
+
+    rerender(<Overview currentAssistant={makeAssistant()} />);
+    expect(
+      screen.queryByLabelText('Assistant deployment checklist'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows deployment setup as 75% complete while deployment is inactive', () => {
+    render(
+      <Overview
+        currentAssistant={makeAssistant({ deploymentStatus: 'INACTIVE' })}
+      />,
+    );
+
+    const checklist = screen.getByLabelText('Assistant deployment checklist');
+    expect(within(checklist).getByText('75% complete')).toBeVisible();
+    expect(within(checklist).getByText('Assistant created')).toBeVisible();
+    expect(
+      within(checklist).getByText('Choose a deployment channel'),
+    ).toBeVisible();
+    expect(
+      within(checklist).getByText('Configure deployment settings'),
+    ).toBeVisible();
+    expect(
+      within(checklist).getByRole('button', {
+        name: 'Enable your deployment',
+      }),
+    ).toBeVisible();
   });
 });

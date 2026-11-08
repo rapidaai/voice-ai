@@ -60,16 +60,33 @@ const dashboardStates = [
   },
   {
     name: 'empty',
-    expectText: 'Your dashboard is not ready yet',
+    expectText: 'Build your first dashboard insights',
     async install(page) {
       return installEmptyDashboardClientMock(page);
     },
     async assert(page) {
       await expect(
         page.getByRole('heading', {
-          name: 'Your dashboard is not ready yet',
+          name: 'Build your first dashboard insights',
         }),
       ).toBeVisible();
+      await expect(
+        page.getByRole('link', { name: 'Open assistants' }),
+      ).toHaveAttribute('href', '/deployment/assistant');
+      await expect(
+        page.getByLabel('Dashboard setup checklist'),
+      ).toBeVisible();
+      await expect(page.getByLabel('Dashboard setup checklist')).toHaveClass(
+        /fixed/,
+      );
+      await expect(
+        page.getByText('25% complete', { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', {
+          name: 'Collapse or expand dashboard setup',
+        }),
+      ).toHaveAttribute('aria-expanded', 'true');
       await expect(
         page.getByRole('link', { name: 'Create assistant' }),
       ).toHaveAttribute('href', '/deployment/assistant/create-assistant');
@@ -100,12 +117,22 @@ test('dashboard empty state links to assistant creation', async ({ page }) => {
   try {
     await gotoJourney(page, {
       ...dashboardJourney,
-      expectText: 'Your dashboard is not ready yet',
+      expectText: 'Build your first dashboard insights',
       readyText: undefined,
     });
     await expect(
+      page.getByRole('link', { name: 'Open assistants' }),
+    ).toHaveAttribute('href', '/deployment/assistant');
+    await expect(
       page.getByRole('link', { name: 'Create assistant' }),
     ).toHaveAttribute('href', '/deployment/assistant/create-assistant');
+    const checklistToggle = page.getByRole('button', {
+      name: 'Collapse or expand dashboard setup',
+    });
+    await checklistToggle.click();
+    await expect(checklistToggle).toHaveAttribute('aria-expanded', 'false');
+    await checklistToggle.click();
+    await expect(checklistToggle).toHaveAttribute('aria-expanded', 'true');
   } finally {
     await cleanup();
   }
@@ -171,17 +198,18 @@ for (const colorMode of COLOR_MODES) {
     try {
       await gotoJourney(page, {
         ...dashboardJourney,
-        expectText: 'Your dashboard is not ready yet',
+        expectText: 'Build your first dashboard insights',
         readyText: undefined,
       });
       await expect(
         page.getByRole('heading', {
-          name: 'Your dashboard is not ready yet',
+          name: 'Build your first dashboard insights',
         }),
       ).toBeVisible();
       await expect(
-        page.getByRole('link', { name: 'Create assistant' }),
+        page.getByRole('link', { name: 'Open assistants' }),
       ).toBeVisible();
+      await expect(page.getByLabel('Dashboard setup checklist')).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
       await expandDashboardForScreenshot(page);
 
