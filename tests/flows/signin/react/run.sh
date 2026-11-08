@@ -8,7 +8,7 @@ readonly flow_id='8100002'
 script_directory=$(cd "$(dirname "$0")" && pwd)
 
 cleanup() {
-  psql -v ON_ERROR_STOP=1 -h postgres -U rapida_user -d web_db \
+  psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
     -v flow_email="$flow_email" >/dev/null <<'SQL'
 DELETE FROM user_auth_tokens
 WHERE user_auth_id IN (SELECT id FROM user_auths WHERE email = :'flow_email');
@@ -19,7 +19,7 @@ SQL
 trap cleanup EXIT HUP INT TERM
 cleanup
 
-psql -v ON_ERROR_STOP=1 -h postgres -U rapida_user -d web_db \
+psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
   -v flow_email="$flow_email" \
   -v flow_password="$flow_password" \
   -v flow_token="$flow_token" \

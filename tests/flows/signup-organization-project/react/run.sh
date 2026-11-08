@@ -9,7 +9,7 @@ readonly flow_project='CI React SDK Project'
 script_directory=$(cd "$(dirname "$0")" && pwd)
 
 cleanup() {
-  psql -v ON_ERROR_STOP=1 -h postgres -U rapida_user -d web_db \
+  psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
     -v flow_email="$flow_email" \
     -v flow_organization="$flow_organization" >/dev/null <<'SQL'
 CREATE TEMP TABLE flow_users AS

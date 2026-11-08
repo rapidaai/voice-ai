@@ -324,6 +324,15 @@ case "$mode" in
   flows)
     /workspace/tests/flows/run.sh
     ;;
+  flows-nodejs)
+    /workspace/tests/flows/run.sh nodejs
+    ;;
+  flows-react)
+    /workspace/tests/flows/run.sh react
+    ;;
+  flows-rest)
+    /workspace/tests/flows/run.sh rest
+    ;;
   *)
     printf 'unsupported test mode: %s\n' "$mode" >&2
     exit 2

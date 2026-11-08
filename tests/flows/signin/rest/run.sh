@@ -9,7 +9,7 @@ readonly web_endpoint="${WEB_API_REST_ENDPOINT:-http://web-api:9001}"
 temporary_directory=$(mktemp -d)
 
 cleanup_data() {
-  psql -v ON_ERROR_STOP=1 -h postgres -U rapida_user -d web_db \
+  psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
     -v flow_email="$flow_email" >/dev/null <<'SQL'
 DELETE FROM user_auth_tokens
 WHERE user_auth_id IN (SELECT id FROM user_auths WHERE email = :'flow_email');
@@ -25,7 +25,7 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 cleanup_data
 
-psql -v ON_ERROR_STOP=1 -h postgres -U rapida_user -d web_db \
+psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
   -v flow_email="$flow_email" \
   -v flow_password="$flow_password" \
   -v flow_token="$flow_token" \

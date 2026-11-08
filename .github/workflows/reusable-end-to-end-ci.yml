@@ -140,16 +140,46 @@ jobs:
           retention-days: 7
 
   flows:
-    name: User Flows
+    name: User Flows / ${{ matrix.label }} / Shard ${{ matrix.shard }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: node
+            label: Node.js SDK
+            recipe: ci-flows-node
+            shard: 1
+          - id: node
+            label: Node.js SDK
+            recipe: ci-flows-node
+            shard: 2
+          - id: react
+            label: React SDK
+            recipe: ci-flows-react
+            shard: 1
+          - id: react
+            label: React SDK
+            recipe: ci-flows-react
+            shard: 2
+          - id: rest
+            label: REST
+            recipe: ci-flows-rest
+            shard: 1
+          - id: rest
+            label: REST
+            recipe: ci-flows-rest
+            shard: 2
     env:
-      COMPOSE_PROJECT_NAME: rapida-flows-${{ github.run_id }}-${{ github.run_attempt }}
-      CI_STACK_AUTH_TOKEN: ci-flows-${{ github.run_id }}-${{ github.run_attempt }}
-      CI_STACK_PROJECT_API_KEY: ci-flows-project-${{ github.run_id }}-${{ github.run_attempt }}
+      COMPOSE_PROJECT_NAME: rapida-flows-${{ matrix.id }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
+      CI_STACK_AUTH_TOKEN: ci-flows-${{ matrix.id }}-${{ github.run_id }}-${{ github.run_attempt }}
+      CI_STACK_PROJECT_API_KEY: ci-flows-${{ matrix.id }}-project-${{ github.run_id }}-${{ github.run_attempt }}
       CI_STACK_CACHE_SCOPE: ci
-      CI_STACK_DIAGNOSTICS_DIR: ${{ github.workspace }}/flow-diagnostics
-      CI_STACK_REPORTS_DIR: ${{ github.workspace }}/flow-reports
+      CI_STACK_DIAGNOSTICS_DIR: ${{ github.workspace }}/flow-diagnostics-${{ matrix.id }}-${{ matrix.shard }}
+      CI_STACK_REPORTS_DIR: ${{ github.workspace }}/flow-reports-${{ matrix.id }}-${{ matrix.shard }}
+      FLOW_SHARD_INDEX: ${{ matrix.shard }}
+      FLOW_SHARD_TOTAL: 2
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -164,22 +194,102 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
         with:
-          name: rapida-flows-${{ github.run_id }}-${{ github.run_attempt }}
+          name: rapida-flows-${{ matrix.id }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           driver: docker-container
           install: true
 
-      - name: Run user flows
-        run: just ci-flows
+      - name: Run ${{ matrix.label }} user flows
+        run: just "${{ matrix.recipe }}"
 
       - name: Publish flow results
-        if: always() && hashFiles('flow-reports/flows.md') != ''
-        run: cat flow-reports/flows.md >> "$GITHUB_STEP_SUMMARY"
+        if: always()
+        run: |
+          report="$CI_STACK_REPORTS_DIR/flows.md"
+          if [[ -f "$report" ]]; then
+            cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-      - name: Upload flow diagnostics
-        if: failure() && hashFiles('flow-diagnostics/**') != ''
+      - name: Upload flow results
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: flow-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
-          path: flow-diagnostics
+          name: flow-results-${{ matrix.id }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: flow-reports-${{ matrix.id }}-${{ matrix.shard }}
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload flow diagnostics
+        if: failure() && hashFiles(format('flow-diagnostics-{0}-{1}/**', matrix.id, matrix.shard)) != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: flow-diagnostics-${{ matrix.id }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: flow-diagnostics-${{ matrix.id }}-${{ matrix.shard }}
           if-no-files-found: error
           retention-days: 7
+
+  flow-summary:
+    name: User Flows / Summary
+    if: always()
+    needs: flows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Download flow results
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: flow-results-*
+          path: downloaded-flow-results
+
+      - name: Publish complete flow table
+        run: |
+          status=0
+          bash tests/flows/summarize-results.sh \
+            downloaded-flow-results combined-flow-results.md || status=$?
+          cat combined-flow-results.md >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Comment complete flow table on pull request
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && hashFiles('combined-flow-results.md') != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          marker='<!-- rapida-e2e-flow-results -->'
+          body_file=$(mktemp)
+          trap 'rm -f "$body_file"' EXIT
+          {
+            printf '%s\n\n' "$marker"
+            cat combined-flow-results.md
+          } > "$body_file"
+
+          comment_id=$(gh api \
+            "repos/$GH_REPO/issues/$PR_NUMBER/comments?per_page=100" \
+            --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- rapida-e2e-flow-results -->")))] | first | .id // empty')
+          if [[ -n "$comment_id" ]]; then
+            gh api --method PATCH "repos/$GH_REPO/issues/comments/$comment_id" \
+              -F body="@$body_file" >/dev/null
+          else
+            gh api --method POST "repos/$GH_REPO/issues/$PR_NUMBER/comments" \
+              -F body="@$body_file" >/dev/null
+          fi
+
+      - name: Upload complete flow table
+        if: always() && hashFiles('combined-flow-results.md') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: complete-flow-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: combined-flow-results.md
+          if-no-files-found: error
+          retention-days: 14

@@ -27,6 +27,7 @@ require_text "$ci_workflow" 'name: 01 Validate - Repository'
 require_text "$ci_workflow" 'name: 02 Build - Docker Images'
 require_text "$ci_workflow" 'name: 02 Build - Assistant Native'
 require_text "$ci_workflow" 'name: 03 End-to-End Verification'
+require_text "$ci_workflow" 'pull-requests: write'
 require_text "$ci_workflow" 'name: 05 CI Complete'
 require_text "$ci_workflow" "mode=documentation"
 require_text "$ci_workflow" "*.md | docs/* | rfcs/*"
@@ -70,7 +71,8 @@ require_text "$docker_workflow" 'dockerfile: ./tests/smoke/Dockerfile'
 require_text "$docker_workflow" 'max-parallel: 6'
 require_text "$docker_workflow" 'push: "false"'
 
-if grep -Eq '^[[:space:]]+needs:' "$end_to_end_workflow"; then
+parallel_end_to_end_jobs=$(sed '/^  flow-summary:/,$d' "$end_to_end_workflow")
+if grep -Eq '^[[:space:]]+needs:' <<< "$parallel_end_to_end_jobs"; then
   echo 'End-to-end suites must remain independent and run in parallel.' >&2
   exit 1
 fi
@@ -80,6 +82,20 @@ if [[ "$cache_scope_count" -ne 4 ]]; then
   echo 'Every end-to-end suite must use the stable CI cache scope.' >&2
   exit 1
 fi
+
+# shellcheck disable=SC2016 # GitHub evaluates this workflow expression.
+require_text "$end_to_end_workflow" 'FLOW_SHARD_INDEX: ${{ matrix.shard }}'
+require_text "$end_to_end_workflow" 'FLOW_SHARD_TOTAL: 2'
+require_text "$end_to_end_workflow" 'name: Upload flow results'
+# shellcheck disable=SC2016 # GitHub evaluates these workflow expressions.
+require_text "$end_to_end_workflow" 'name: flow-results-${{ matrix.id }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}'
+require_text "$end_to_end_workflow" 'name: User Flows / Summary'
+require_text "$end_to_end_workflow" 'needs: flows'
+require_text "$end_to_end_workflow" 'bash tests/flows/summarize-results.sh'
+require_text "$end_to_end_workflow" 'name: Upload complete flow table'
+require_text "$end_to_end_workflow" 'name: Comment complete flow table on pull request'
+require_text "$end_to_end_workflow" '<!-- rapida-e2e-flow-results -->'
+require_text "$end_to_end_workflow" 'pull-requests: write'
 
 login_guard_count=$(grep -Fc "if: inputs.push == 'true'" "$docker_action")
 if [[ "$login_guard_count" -lt 2 ]]; then

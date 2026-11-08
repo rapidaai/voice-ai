@@ -3,9 +3,9 @@ set -Eeuo pipefail
 
 bash just/require-docker.sh
 
-mode=${1:?usage: ci-stack.sh <build|integration|smoke|flows|telephony-callbacks>}
+mode=${1:?usage: ci-stack.sh <build|integration|smoke|flows|flows-nodejs|flows-react|flows-rest|telephony-callbacks>}
 case "$mode" in
-  build | integration | smoke | flows | telephony-callbacks) ;;
+  build | integration | smoke | flows | flows-nodejs | flows-react | flows-rest | telephony-callbacks) ;;
   *)
     printf 'unsupported CI stack mode: %s\n' "$mode" >&2
     exit 2
@@ -56,9 +56,9 @@ chmod 0777 "$CI_STACK_REPORTS_DIR"
 
 "${compose[@]}" config --quiet
 bash -n tests/smoke/run.sh
-bash -n tests/flows/run.sh tests/flows/*/run.sh tests/flows/*/*/run.sh
+bash -n tests/flows/check-contract.sh tests/flows/check-contract-test.sh tests/flows/run-test.sh tests/flows/summarize-results.sh tests/flows/summarize-results-test.sh tests/flows/run.sh tests/flows/*/fixture.sh tests/flows/*/run.sh tests/flows/*/*/run.sh
 bash -n tests/integration/telephony/*/run.sh
-bash just/shellcheck.sh tests/smoke/run.sh tests/flows/run.sh tests/flows/*/run.sh tests/flows/*/*/run.sh tests/integration/telephony/*/run.sh
+bash just/shellcheck.sh tests/smoke/run.sh tests/flows/check-contract.sh tests/flows/check-contract-test.sh tests/flows/run-test.sh tests/flows/summarize-results.sh tests/flows/summarize-results-test.sh tests/flows/run.sh tests/flows/*/fixture.sh tests/flows/*/run.sh tests/flows/*/*/run.sh tests/integration/telephony/*/run.sh
 ./bin/check-go-version-consistency
 ./docker/assistant-api/scripts/verify-native-deps.sh docker/assistant-api/native-deps.lock
 bash just/ci-python.sh openapi/scripts/generate_assistant_postman_collection.py --check

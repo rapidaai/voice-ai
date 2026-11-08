@@ -24,6 +24,12 @@ else
     just/doctor.sh
     just/require-docker.sh
     just/shellcheck.sh
+    tests/flows/check-contract.sh
+    tests/flows/check-contract-test.sh
+    tests/flows/run-test.sh
+    tests/flows/summarize-results.sh
+    tests/flows/summarize-results-test.sh
+    tests/flows/*/fixture.sh
     tests/flows/run.sh
     tests/flows/*/run.sh
     tests/flows/*/*/run.sh

@@ -150,6 +150,8 @@ services:
       GITHUB_ACTIONS: ${GITHUB_ACTIONS:-false}
       CI_STACK_AUTH_TOKEN: ${CI_STACK_AUTH_TOKEN:?CI_STACK_AUTH_TOKEN is required}
       CI_STACK_PROJECT_API_KEY: ${CI_STACK_PROJECT_API_KEY:?CI_STACK_PROJECT_API_KEY is required}
+      FLOW_SHARD_INDEX: ${FLOW_SHARD_INDEX:-1}
+      FLOW_SHARD_TOTAL: ${FLOW_SHARD_TOTAL:-1}
     tmpfs:
       - /run/secrets:mode=0700,uid=1000,gid=1000
     volumes:

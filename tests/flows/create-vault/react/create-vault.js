@@ -31,7 +31,10 @@ async function main() {
     AuthId: requireValue("FLOW_FIXTURE_ID"),
     ProjectId: requireValue("FLOW_PROJECT_ID"),
   });
-  const connection = new ConnectionConfig({ web: webEndpoint }, true);
+  const connection = new ConnectionConfig(
+    { web: webEndpoint },
+    process.env.FLOW_SDK_DEBUG === "true",
+  );
   const request = new CreateProviderCredentialRequest();
   request.setProvider("openai:OpenAI");
   request.setName(vaultName);
