@@ -216,16 +216,18 @@ seed_project_fixture() {
     -v email="$FLOW_EMAIL" \
     -v token="$FLOW_TOKEN" \
     -v organization="$FLOW_ORGANIZATION" \
-    -v project="$FLOW_PROJECT" >/dev/null <<'SQL'
+    -v project="$FLOW_PROJECT" \
+    -v organization_description="${FLOW_ORGANIZATION_DESCRIPTION:-CI SDK flow fixture}" \
+    -v project_description="${FLOW_PROJECT_DESCRIPTION:-CI SDK flow fixture}" >/dev/null <<'SQL'
 INSERT INTO organizations (
   id, name, description, size, industry, contact, status, created_actor_type
 ) VALUES (
-  :'fixture_id', :'organization', 'CI SDK flow fixture', '1', 'software', :'email', 'ACTIVE', 'unknown'
+  :'fixture_id', :'organization', :'organization_description', '1', 'software', :'email', 'ACTIVE', 'unknown'
 );
 INSERT INTO projects (
   id, organization_id, name, description, status, created_actor_type
 ) VALUES (
-  :'project_id', :'fixture_id', :'project', 'CI SDK flow fixture', 'ACTIVE', 'unknown'
+  :'project_id', :'fixture_id', :'project', :'project_description', 'ACTIVE', 'unknown'
 );
 INSERT INTO user_auths (
   id, name, email, password, status, source, created_actor_type

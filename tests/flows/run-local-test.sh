@@ -4,6 +4,7 @@ set -Eeuo pipefail
 script_directory=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 temporary_directory=$(mktemp -d "${TMPDIR:-/tmp}/rapida-run-local-test.XXXXXX")
 trap 'rm -rf "$temporary_directory"' EXIT HUP INT TERM
+real_ln=$(command -v ln)
 fake_bin="$temporary_directory/bin"
 mkdir -p "$fake_bin"
 # shellcheck disable=SC2016 # The generated executable reads this environment variable.
@@ -55,6 +56,38 @@ set -e
 [[ -f "$concurrent_cache/$dependency_key/.complete" ]]
 install_count=$(wc -l < "$concurrent_log")
 [[ "$install_count" -ge 1 && "$install_count" -le 2 ]]
+[[ $(find "$concurrent_cache" -maxdepth 1 -type d -name "$dependency_key.install.*" | wc -l) -eq 1 ]]
+
+interrupt_cache="$temporary_directory/interrupt-cache"
+interrupt_log="$temporary_directory/interrupt-install.log"
+publish_bin="$temporary_directory/publish-bin"
+mkdir -p "$publish_bin"
+# shellcheck disable=SC2016 # The generated executable signals its invoking shell.
+printf '%s\n' \
+  '#!/bin/sh' \
+  '"$FLOW_REAL_LN" "$@"' \
+  'kill -TERM "$PPID"' \
+  > "$publish_bin/ln"
+chmod +x "$publish_bin/ln"
+if PATH="$publish_bin:$fake_bin:$PATH" FLOW_REAL_LN="$real_ln" \
+  FLOW_NPM_LOG="$interrupt_log" FLOW_DEPENDENCY_CACHE_DIR="$interrupt_cache" \
+  bash "$script_directory/run-local.sh" react missing-journey >/dev/null 2>&1; then
+  printf 'interrupted cache publication unexpectedly passed\n' >&2
+  exit 1
+fi
+[[ -L "$interrupt_cache/$dependency_key" ]]
+[[ -f "$interrupt_cache/$dependency_key/.complete" ]]
+[[ $(find "$interrupt_cache" -maxdepth 1 -type d -name "$dependency_key.install.*" | wc -l) -eq 1 ]]
+if PATH="$fake_bin:$PATH" FLOW_NPM_LOG="$interrupt_log" \
+  FLOW_DEPENDENCY_CACHE_DIR="$interrupt_cache" \
+  bash "$script_directory/run-local.sh" react missing-journey >/dev/null 2>&1; then
+  printf 'unknown journey unexpectedly passed after interrupted publication\n' >&2
+  exit 1
+else
+  status=$?
+fi
+[[ "$status" -eq 2 ]]
+[[ $(wc -l < "$interrupt_log") -eq 1 ]]
 
 unsafe_cache="$temporary_directory/unsafe-cache"
 mkdir -p "$unsafe_cache"

@@ -55,10 +55,16 @@ mkdir -p "$CI_STACK_DIAGNOSTICS_DIR" "$CI_STACK_REPORTS_DIR"
 chmod 0777 "$CI_STACK_REPORTS_DIR"
 
 "${compose[@]}" config --quiet
-bash -n tests/smoke/run.sh
-bash -n tests/flows/check-contract.sh tests/flows/check-contract-test.sh tests/flows/project-fixture-test.sh tests/flows/process-lifecycle.sh tests/flows/run-local-test.sh tests/flows/signal-lifecycle-test.sh tests/flows/run-test.sh tests/flows/summarize-results.sh tests/flows/summarize-results-test.sh tests/flows/run.sh tests/flows/*/fixture.sh tests/flows/*/run.sh tests/flows/*/*/run.sh
-bash -n tests/integration/telephony/*/run.sh
-bash just/shellcheck.sh tests/smoke/run.sh tests/flows/check-contract.sh tests/flows/check-contract-test.sh tests/flows/project-fixture-test.sh tests/flows/process-lifecycle.sh tests/flows/run-local-test.sh tests/flows/signal-lifecycle-test.sh tests/flows/run-test.sh tests/flows/summarize-results.sh tests/flows/summarize-results-test.sh tests/flows/run.sh tests/flows/*/fixture.sh tests/flows/*/run.sh tests/flows/*/*/run.sh tests/integration/telephony/*/run.sh
+for shell_script in \
+  tests/smoke/run.sh \
+  tests/flows/*.sh \
+  tests/flows/*/fixture.sh \
+  tests/flows/*/run.sh \
+  tests/flows/*/*/run.sh \
+  tests/integration/telephony/*/run.sh; do
+  bash -n "$shell_script"
+done
+bash just/shellcheck.sh tests/smoke/run.sh tests/flows/*.sh tests/flows/*/fixture.sh tests/flows/*/run.sh tests/flows/*/*/run.sh tests/integration/telephony/*/run.sh
 ./bin/check-go-version-consistency
 ./docker/assistant-api/scripts/verify-native-deps.sh docker/assistant-api/native-deps.lock
 bash just/ci-python.sh openapi/scripts/generate_assistant_postman_collection.py --check

@@ -15,19 +15,121 @@ fail() {
 
 logical_commands() {
   awk '
+    function emit_command(complete_command) {
+      complete_command = command
+      sub(/^[[:space:]]+/, "", complete_command)
+      sub(/[[:space:]]+$/, "", complete_command)
+      if (complete_command != "") print complete_command
+      command = ""
+    }
+    function split_commands(line, character_index, character, next_character, previous_character,
+                            escaped, single_quoted, double_quoted) {
+      escaped = single_quoted = double_quoted = 0
+      for (character_index = 1; character_index <= length(line); character_index++) {
+        character = substr(line, character_index, 1)
+        next_character = substr(line, character_index + 1, 1)
+        previous_character = substr(line, character_index - 1, 1)
+        if (escaped) {
+          command = command character
+          escaped = 0
+          continue
+        }
+        if (single_quoted) {
+          command = command character
+          if (character == "\047") single_quoted = 0
+          continue
+        }
+        if (double_quoted) {
+          command = command character
+          if (character == "\\") escaped = 1
+          else if (character == "\"") double_quoted = 0
+          continue
+        }
+        if (character == "\\") {
+          command = command character
+          escaped = 1
+          continue
+        }
+        if (character == "\047") {
+          command = command character
+          single_quoted = 1
+          continue
+        }
+        if (character == "\"") {
+          command = command character
+          double_quoted = 1
+          continue
+        }
+        if (character == "#" && (character_index == 1 || previous_character ~ /[[:space:]]/)) break
+        if (character == ";") {
+          emit_command()
+          continue
+        }
+        if (character == "&" && previous_character != ">") {
+          emit_command()
+          if (next_character == "&") character_index++
+          continue
+        }
+        if (character == "|") {
+          emit_command()
+          if (next_character == "|") character_index++
+          continue
+        }
+        command = command character
+      }
+      emit_command()
+    }
     {
       line = $0
       if (line ~ /\\[[:space:]]*$/) {
         sub(/\\[[:space:]]*$/, "", line)
-        command = command line " "
+        continued = continued line " "
         next
       }
-      print command line
-      command = ""
+      split_commands(continued line)
+      continued = ""
     }
-    END { if (command != "") print command }
-  ' "$1" | sed -E 's/[[:space:]]*(&&|\|\||;)[[:space:]]*/\
-/g'
+    END { if (continued != "") split_commands(continued) }
+  ' "$1"
+}
+
+temporary_creation_line() {
+  awk '
+    NR == FNR {
+      if (!inside_function && $0 ~ /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*\{/) {
+        function_name = $0
+        sub(/^[[:space:]]*/, "", function_name)
+        sub(/[[:space:]]*\(\).*/, "", function_name)
+        if ($0 ~ /mktemp -d/) creates_temporary_directory[function_name] = 1
+        inside_function = ($0 !~ /}[[:space:]]*$/)
+        next
+      }
+      if (inside_function && $0 ~ /mktemp -d/) creates_temporary_directory[function_name] = 1
+      if (inside_function && $0 ~ /^[[:space:]]*}[[:space:]]*$/) inside_function = 0
+      next
+    }
+    {
+      if (!inside_function && $0 ~ /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*\{/) {
+        inside_function = ($0 !~ /}[[:space:]]*$/)
+        next
+      }
+      if (inside_function) {
+        if ($0 ~ /^[[:space:]]*}[[:space:]]*$/) inside_function = 0
+        next
+      }
+      if ($0 ~ /mktemp -d/) {
+        print FNR
+        exit
+      }
+      invocation = $0
+      sub(/^[[:space:]]*/, "", invocation)
+      sub(/[[:space:];|&].*$/, "", invocation)
+      if (creates_temporary_directory[invocation]) {
+        print FNR
+        exit
+      }
+    }
+  ' "$1" "$1"
 }
 
 [[ -f "$manifest" ]] || fail "missing manifest: $manifest"
@@ -72,7 +174,7 @@ while IFS= read -r journey || [[ -n "$journey" ]]; do
       fail "$journey/$client/run.sh must source process-lifecycle.sh"
     grep -Eq '^register_flow_cleanup [a-z_]+$' "$client_runner" || \
       fail "$journey/$client/run.sh must register cleanup with the process lifecycle"
-    temporary_line=$(grep -n 'mktemp -d' "$client_runner" | head -1 | cut -d: -f1 || true)
+    temporary_line=$(temporary_creation_line "$client_runner")
     if [[ -n "$temporary_line" ]]; then
       cleanup_line=$(grep -n '^register_flow_cleanup ' "$client_runner" | head -1 | cut -d: -f1)
       [[ "$cleanup_line" -lt "$temporary_line" ]] || \
@@ -90,9 +192,6 @@ while IFS= read -r journey || [[ -n "$journey" ]]; do
     else
       operation_count=0
       while IFS= read -r operation; do
-        if [[ "$operation" =~ \&[[:space:]]*$ && ! "$operation" =~ timeout[[:space:]] ]]; then
-          continue
-        fi
         operation_count=$((operation_count + 1))
         [[ "$operation" =~ timeout[[:space:]]+0*[1-9][0-9]*s[[:space:]]+node[[:space:]] ]] || \
           fail "$journey/$client/run.sh must bound every SDK call with a positive timeout"

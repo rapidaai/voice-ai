@@ -12,7 +12,37 @@ script_directory=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$script_directory/../../process-lifecycle.sh"
 
+assert_cleanup_records_owned() {
+  unexpected_records=$(psql -v ON_ERROR_STOP=1 -At -h "${FLOW_POSTGRES_HOST:-postgres}" \
+    -U rapida_user -d web_db \
+    -v owner_id="$flow_owner_id" \
+    -v member_id="$flow_member_id" \
+    -v organization="$flow_organization" \
+    -v owner_email="$flow_owner_email" \
+    -v member_email="$flow_member_email" <<'SQL'
+SELECT count(*) FROM (
+  SELECT id FROM user_auths
+  WHERE id = :'owner_id' AND email IS DISTINCT FROM :'owner_email'
+  UNION ALL
+  SELECT id FROM user_auths
+  WHERE id = :'member_id' AND email IS DISTINCT FROM :'member_email'
+  UNION ALL
+  SELECT id FROM organizations
+  WHERE name = :'organization'
+    AND (id IS DISTINCT FROM :'owner_id'
+      OR description IS DISTINCT FROM 'CI React project lifecycle fixture'
+      OR contact IS DISTINCT FROM :'owner_email')
+) AS unexpected;
+SQL
+)
+  if [ "$unexpected_records" != '0' ]; then
+    printf 'refusing to clean records not owned by the project lifecycle fixture\n' >&2
+    return 1
+  fi
+}
+
 cleanup_records() {
+  assert_cleanup_records_owned || return
   psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
     -v owner_id="$flow_owner_id" \
     -v member_id="$flow_member_id" \

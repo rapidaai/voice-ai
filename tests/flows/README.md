@@ -19,6 +19,14 @@ Use this order in every client runner:
 
 Fixture identifiers must be flow-specific and repeatable. Use reserved `.invalid` email addresses, never real recipients. Database access must use `${FLOW_POSTGRES_HOST:-postgres}`. Service endpoints must retain their existing environment override. A test must not depend on data created by another flow or leave persistent data behind.
 
+The process lifecycle sends `TERM` to the active process tree and sends `KILL`
+after five seconds if it does not stop. Cleanup ignores repeated cancellation
+signals, applies PostgreSQL connection, lock, and statement deadlines, and is
+terminated after 30 seconds. Set `FLOW_PROCESS_TERMINATION_TIMEOUT_SECONDS` or
+`FLOW_CLEANUP_TIMEOUT_SECONDS` to a positive integer only when a slower local
+environment requires a different deadline. Cleanup failures and forced
+termination are written to stderr.
+
 To add or extend a flow:
 
 1. Add the journey directory and its standard journey `run.sh`.

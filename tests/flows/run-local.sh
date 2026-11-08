@@ -44,6 +44,10 @@ validate_private_directory() {
 
 cleanup_install() {
   if [[ -n "$install_directory" && -d "$install_directory" ]]; then
+    if [[ -L "$dependency_link" ]] &&
+      [[ $(readlink "$dependency_link") == "$(basename "$install_directory")" ]]; then
+      return
+    fi
     rm -rf "$install_directory"
   fi
 }
@@ -87,7 +91,7 @@ else
   cp "$script_directory/package.json" "$script_directory/package-lock.json" "$install_directory/"
   npm ci --omit=dev --prefix "$install_directory"
   touch "$install_directory/.complete"
-  if ln -s "$(basename "$install_directory")" "$dependency_link" 2>/dev/null; then
+  if ln -sn "$(basename "$install_directory")" "$dependency_link" 2>/dev/null; then
     dependency_directory=$install_directory
     install_directory=''
   else

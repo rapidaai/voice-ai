@@ -120,6 +120,24 @@ temporary_directory=$(mktemp -d)' "$1/alpha/nodejs/run.sh"
   rm "$1/alpha/nodejs/run.sh.bak"
 }
 
+create_temp_with_registered_helper() {
+  # shellcheck disable=SC2016 # The inserted command must retain command substitution.
+  sed -i.bak '/cleanup() { :; }/i\
+create_temporary_directory() { temporary_directory=$(mktemp -d); }' "$1/alpha/nodejs/run.sh"
+  sed -i.bak '/register_flow_cleanup/a\
+create_temporary_directory' "$1/alpha/nodejs/run.sh"
+  rm "$1/alpha/nodejs/run.sh.bak"
+}
+
+create_temp_with_unregistered_helper() {
+  # shellcheck disable=SC2016 # The inserted command must retain command substitution.
+  sed -i.bak '/cleanup() { :; }/i\
+create_temporary_directory() { temporary_directory=$(mktemp -d); }' "$1/alpha/nodejs/run.sh"
+  sed -i.bak '/register_flow_cleanup/i\
+create_temporary_directory' "$1/alpha/nodejs/run.sh"
+  rm "$1/alpha/nodejs/run.sh.bak"
+}
+
 use_zero_sdk_timeout() {
   sed -i.bak 's/timeout 1s node/timeout 0s node/' "$1/alpha/nodejs/run.sh"
   rm "$1/alpha/nodejs/run.sh.bak"
@@ -136,6 +154,20 @@ add_same_line_unbounded_sdk_operation() {
   # shellcheck disable=SC2016 # The inserted commands must retain the fixture variable.
   sed -i.bak 's|run_flow_process timeout 1s node "$script_directory/flow.js"|run_flow_process timeout 1s node "$script_directory/flow.js"; node "$script_directory/flow.js"|' \
     "$1/alpha/nodejs/run.sh"
+  rm "$1/alpha/nodejs/run.sh.bak"
+}
+
+add_pipeline_unbounded_sdk_operation() {
+  # shellcheck disable=SC2016 # The inserted commands must retain the fixture variable.
+  sed -i.bak 's#run_flow_process timeout 1s node "$script_directory/flow.js"#run_flow_process timeout 1s node "$script_directory/flow.js" | node "$script_directory/flow.js"#' \
+    "$1/alpha/nodejs/run.sh"
+  rm "$1/alpha/nodejs/run.sh.bak"
+}
+
+add_background_unbounded_sdk_operation() {
+  # shellcheck disable=SC2016 # The inserted command must retain the fixture variable.
+  sed -i.bak '/run_flow_process timeout 1s node/a\
+node "$script_directory/flow.js" &' "$1/alpha/nodejs/run.sh"
   rm "$1/alpha/nodejs/run.sh.bak"
 }
 
@@ -208,6 +240,11 @@ write_fixture "$continued_root"
 add_continued_rest_operation "$continued_root"
 "$script_directory/check-contract.sh" "$continued_root" >/dev/null
 
+helper_root="$temporary_directory/helper"
+write_fixture "$helper_root"
+create_temp_with_registered_helper "$helper_root"
+"$script_directory/check-contract.sh" "$helper_root" >/dev/null
+
 expect_failure invalid-javascript 'contains invalid JavaScript' break_javascript
 expect_failure duplicate-id 'fixture identifier 9100001 is reused' reuse_fixture_id
 expect_failure invalid-email 'must use a reserved .invalid email address' use_real_email_domain
@@ -215,9 +252,12 @@ expect_failure wrong-order 'must verify persistent state after exercising the pu
 expect_failure missing-react 'must declare react coverage' remove_react_coverage
 expect_failure missing-signal-exit 'must register cleanup with the process lifecycle' remove_signal_exit
 expect_failure early-temporary-directory 'must register cleanup before creating temporary files' create_temp_before_cleanup
+expect_failure early-helper-temporary-directory 'must register cleanup before creating temporary files' create_temp_with_unregistered_helper
 expect_failure zero-sdk-timeout 'must bound every SDK call with a positive timeout' use_zero_sdk_timeout
 expect_failure unbounded-sdk-operation 'must bound every SDK call with a positive timeout' add_unbounded_sdk_operation
 expect_failure same-line-sdk-operation 'must bound every SDK call with a positive timeout' add_same_line_unbounded_sdk_operation
+expect_failure pipeline-sdk-operation 'must bound every SDK call with a positive timeout' add_pipeline_unbounded_sdk_operation
+expect_failure background-sdk-operation 'must bound every SDK call with a positive timeout' add_background_unbounded_sdk_operation
 expect_failure zero-rest-timeout 'must bound every REST call with a positive --max-time' use_zero_rest_timeout
 expect_failure unbounded-rest-operation 'must bound every REST call with a positive --max-time' add_unbounded_rest_operation
 expect_failure same-line-rest-operation 'must bound every REST call with a positive --max-time' add_same_line_unbounded_rest_operation

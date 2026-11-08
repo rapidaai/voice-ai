@@ -6,6 +6,7 @@ repository_workflow=.github/workflows/reusable-repository-ci.yml
 docker_workflow=.github/workflows/reusable-docker-ci.yml
 end_to_end_workflow=.github/workflows/reusable-end-to-end-ci.yml
 docker_action=.github/actions/docker-build/action.yml
+ci_stack=just/ci-stack.sh
 
 require_text() {
   local file=$1
@@ -71,6 +72,13 @@ require_text "$docker_workflow" 'component: test-runner'
 require_text "$docker_workflow" 'dockerfile: ./tests/smoke/Dockerfile'
 require_text "$docker_workflow" 'max-parallel: 6'
 require_text "$docker_workflow" 'push: "false"'
+require_text "$ci_stack" "for shell_script in \\"
+# shellcheck disable=SC2016 # The CI stack expands this loop variable.
+require_text "$ci_stack" 'bash -n "$shell_script"'
+if grep -Fq 'bash -n tests/smoke/run.sh tests/flows/' "$ci_stack"; then
+  echo 'CI stack syntax validation must invoke Bash once per script.' >&2
+  exit 1
+fi
 
 parallel_end_to_end_jobs=$(sed '/^  flow-summary:/,$d' "$end_to_end_workflow")
 if grep -Eq '^[[:space:]]+needs:' <<< "$parallel_end_to_end_jobs"; then
