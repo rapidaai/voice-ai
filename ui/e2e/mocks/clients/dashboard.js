@@ -1,5 +1,9 @@
 const { Timestamp } = require('google-protobuf/google/protobuf/timestamp_pb');
 const { fulfillGrpcWeb } = require('../grpc-web');
+const {
+  ASSISTANT_LIST_PATH,
+  EMPTY_ASSISTANT_LIST_RESPONSE,
+} = require('./assistant');
 
 const previousWindow = global.window;
 const previousSelf = global.self;
@@ -267,12 +271,20 @@ function buildEmptyDashboardResponse() {
 
 async function installEmptyDashboardClientMock(page) {
   const response = buildEmptyDashboardResponse();
-  const handler = route => {
+  const dashboardHandler = route => {
     if (route.request().method() !== 'POST') return route.fallback();
     return fulfillGrpcWeb(route, response);
   };
-  await page.route(DASHBOARD_PATH, handler);
-  return () => page.unroute(DASHBOARD_PATH, handler);
+  const assistantHandler = route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    return fulfillGrpcWeb(route, EMPTY_ASSISTANT_LIST_RESPONSE);
+  };
+  await page.route(DASHBOARD_PATH, dashboardHandler);
+  await page.route(ASSISTANT_LIST_PATH, assistantHandler);
+  return async () => {
+    await page.unroute(DASHBOARD_PATH, dashboardHandler);
+    await page.unroute(ASSISTANT_LIST_PATH, assistantHandler);
+  };
 }
 
 async function installDashboardClientMock(page) {

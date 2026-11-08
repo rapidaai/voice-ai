@@ -485,15 +485,23 @@
   font-weight: 500;
 }
 
-:root[data-theme-schema] .app-onboarding-checklist {
-  --cds-icon-primary: var(--brand-on-primary);
-  --cds-interactive: var(--brand-on-primary);
-  --cds-link-primary: var(--brand-on-primary);
-  --cds-link-primary-hover: var(--brand-on-primary);
-  --cds-text-primary: var(--brand-on-primary);
-  --cds-text-secondary: var(--brand-on-primary);
+:root[data-theme-schema='1'] .app-onboarding-checklist {
+  --app-checklist-foreground: var(--cds-text-on-color);
+}
 
-  color: var(--brand-on-primary);
+:root[data-theme-schema='2'] .app-onboarding-checklist {
+  --app-checklist-foreground: var(--brand-on-primary);
+}
+
+:root[data-theme-schema] .app-onboarding-checklist {
+  --cds-icon-primary: var(--app-checklist-foreground);
+  --cds-interactive: var(--app-checklist-foreground);
+  --cds-link-primary: var(--app-checklist-foreground);
+  --cds-link-primary-hover: var(--app-checklist-foreground);
+  --cds-text-primary: var(--app-checklist-foreground);
+  --cds-text-secondary: var(--app-checklist-foreground);
+
+  color: var(--app-checklist-foreground);
 }
 
 :root[data-theme-schema] .app-onboarding-checklist,
@@ -504,4 +512,31 @@
   .app-onboarding-checklist
   .c4p--checklist__chart::after {
   background-color: var(--cds-background-brand);
+}
+
+.app-dashboard-onboarding-checklist {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 30;
+  width: calc(100% - 5rem);
+  max-width: 25rem;
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+}
+
+@media (max-width: 639px), (max-height: 700px) {
+  [data-dashboard-empty] {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    padding-block: 1rem;
+  }
+
+  .app-dashboard-onboarding-checklist {
+    position: static;
+    width: 100%;
+    max-height: none;
+    margin-inline: auto;
+  }
 }

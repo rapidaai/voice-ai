@@ -16,6 +16,7 @@ import {
   getDashboardStartDate,
   HomePage,
 } from '@/app/pages/main/web-dashboard';
+import { listAssistants } from '@/clients/assistant.client';
 import { getProjectDashboardRange } from '@/clients/dashboard.client';
 
 const mockLineChart = jest.fn(
@@ -38,6 +39,10 @@ jest.mock('@carbon/charts-react', () => ({
 
 jest.mock('@/clients/dashboard.client', () => ({
   getProjectDashboardRange: jest.fn(),
+}));
+
+jest.mock('@/clients/assistant.client', () => ({
+  listAssistants: jest.fn(),
 }));
 
 jest.mock('@/theme/theme-provider', () => ({
@@ -64,6 +69,34 @@ const mockGetProjectDashboardRange =
   getProjectDashboardRange as jest.MockedFunction<
     typeof getProjectDashboardRange
   >;
+const mockListAssistants = listAssistants as jest.MockedFunction<
+  typeof listAssistants
+>;
+
+const assistantListResponse = (count: number) =>
+  ({
+    getSuccess: () => true,
+    getDataList: () => Array.from({ length: count }, () => ({})),
+  }) as never;
+
+const metricExplanations = [
+  [
+    'Sessions information',
+    'Total conversation sessions handled during the selected time range.',
+  ],
+  [
+    'Success Rate information',
+    'Percentage of project sessions completed successfully during the selected time range.',
+  ],
+  [
+    'Average Latency information',
+    'Average of the available speech-to-text, end-of-speech, text-to-speech, and agent time-to-first-token averages during the selected time range.',
+  ],
+  [
+    'Failed Sessions information',
+    'Project sessions that failed during the selected time range.',
+  ],
+] as const;
 
 let pageHeaderIntersectionCallback: IntersectionObserverCallback;
 
@@ -228,6 +261,7 @@ describe('Dashboard HomePage', () => {
       user: { name: 'Jordan Lee' },
     };
     mockGetProjectDashboardRange.mockResolvedValue(dashboardResponse());
+    mockListAssistants.mockResolvedValue(assistantListResponse(0));
   });
 
   it('renders the project dashboard from the public dashboard API', async () => {
@@ -310,7 +344,7 @@ describe('Dashboard HomePage', () => {
     expect(kpis).toHaveLength(4);
     kpis.forEach(card => {
       expect(card).toHaveClass(
-        'h-[156px]',
+        'min-h-[156px]',
         'border',
         'border-border-subtle',
         'bg-surface',
@@ -322,7 +356,8 @@ describe('Dashboard HomePage', () => {
         'px-4',
       );
       expect(card.querySelector('[data-dashboard-kpi-body]')).toHaveClass(
-        'h-[116px]',
+        'min-h-[116px]',
+        'flex-1',
         'p-4',
       );
     });
@@ -337,27 +372,37 @@ describe('Dashboard HomePage', () => {
     });
   });
 
-  it('explains each important KPI with an accessible toggletip', async () => {
+  it.each(metricExplanations)(
+    'matches %s to its KPI explanation',
+    async (name, description) => {
+      const user = userEvent.setup({ writeToClipboard: false });
+      render(<HomePage />);
+
+      await screen.findByText('12,486');
+      const informationButton = screen.getByRole('button', { name });
+      await user.click(informationButton);
+
+      expect(informationButton).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByText(description)).toBeInTheDocument();
+    },
+  );
+
+  it('opens and dismisses a KPI explanation from the keyboard', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     render(<HomePage />);
 
     await screen.findByText('12,486');
-
-    const informationButtons = [
-      'Sessions information',
-      'Success Rate information',
-      'Average Latency information',
-      'Failed Sessions information',
-    ].map(name => screen.getByRole('button', { name }));
-
-    expect(informationButtons).toHaveLength(4);
-
-    await user.click(informationButtons[0]);
-    expect(
-      await screen.findByText(
-        'Total conversation sessions handled during the selected time range.',
-      ),
-    ).toBeVisible();
+    const informationButton = screen.getByRole('button', {
+      name: metricExplanations[0][0],
+    });
+    informationButton.focus();
+    await user.keyboard('{Enter}');
+    expect(informationButton).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(metricExplanations[0][1])).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(informationButton).toHaveAttribute('aria-expanded', 'false'),
+    );
   });
 
   it('uses canonical Carbon typography across dashboard content', async () => {
@@ -450,7 +495,8 @@ describe('Dashboard HomePage', () => {
         'px-4',
       );
       expect(card.querySelector('[data-dashboard-kpi-body]')).toHaveClass(
-        'h-[116px]',
+        'min-h-[116px]',
+        'flex-1',
         'p-4',
       );
     });
@@ -597,7 +643,7 @@ describe('Dashboard HomePage', () => {
       screen.getByRole('heading', { name: 'Workspace Overview', level: 1 }),
     ).toBeInTheDocument();
     const checklist = screen.getByLabelText('Dashboard setup checklist');
-    expect(checklist).toHaveClass('fixed', 'bottom-4', 'right-4');
+    expect(checklist).toHaveClass('app-dashboard-onboarding-checklist');
     expect(
       within(checklist).getByText('Set up your dashboard'),
     ).toBeInTheDocument();
@@ -660,6 +706,95 @@ describe('Dashboard HomePage', () => {
     expect(
       screen.queryByText('No recent failures yet'),
     ).not.toBeInTheDocument();
+  });
+
+  it('does not show setup progress for an existing workspace with an empty range', async () => {
+    mockGetProjectDashboardRange.mockResolvedValue(
+      dashboardResponse({
+        analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+        usageState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+      }),
+    );
+    mockListAssistants.mockResolvedValue(assistantListResponse(1));
+
+    render(<HomePage />);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'No activity in this time range',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'No sessions or component usage were recorded during the selected time range.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Dashboard setup checklist'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/% complete/)).not.toBeInTheDocument();
+  });
+
+  it('avoids inferred setup progress when assistant status is unavailable', async () => {
+    mockGetProjectDashboardRange.mockResolvedValue(
+      dashboardResponse({
+        analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+        usageState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+      }),
+    );
+    mockListAssistants.mockRejectedValue(new Error('unavailable'));
+
+    render(<HomePage />);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'No activity in this time range',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Dashboard setup checklist'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/% complete/)).not.toBeInTheDocument();
+  });
+
+  it('preserves the selected range when the setup checklist refreshes', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    mockGetProjectDashboardRange.mockResolvedValue(
+      dashboardResponse({
+        analyticsState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+        usageState: DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY,
+      }),
+    );
+
+    render(<HomePage />);
+
+    await screen.findByLabelText('Dashboard setup checklist');
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Time range' }),
+      '7d',
+    );
+    await waitFor(() =>
+      expect(mockGetProjectDashboardRange).toHaveBeenCalledTimes(2),
+    );
+    const checklist = await screen.findByLabelText(
+      'Dashboard setup checklist',
+    );
+    await user.click(
+      within(checklist).getByRole('button', {
+        name: 'Return here to review performance',
+      }),
+    );
+
+    await waitFor(() =>
+      expect(mockGetProjectDashboardRange).toHaveBeenCalledTimes(3),
+    );
+    expect(screen.getByRole('combobox', { name: 'Time range' })).toHaveValue(
+      '7d',
+    );
+    const request = mockGetProjectDashboardRange.mock.calls[2][0];
+    expect(request.toDate.getSeconds() - request.fromDate.getSeconds()).toBe(
+      7 * 24 * 60 * 60,
+    );
   });
 
   it('replaces the empty dashboard when the project changes', async () => {

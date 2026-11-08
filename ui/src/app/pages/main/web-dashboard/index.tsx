@@ -69,6 +69,7 @@ import {
   Text,
   typographyClassNames,
 } from '@/app/components/ui/primitives';
+import { listAssistants } from '@/clients/assistant.client';
 import { getProjectDashboardRange } from '@/clients/dashboard.client';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useTheme } from '@/theme/theme-provider';
@@ -283,7 +284,13 @@ function DashboardCard({
   );
 }
 
-function DashboardNoActivity() {
+function DashboardNoActivity({
+  isFirstTimeWorkspace,
+  onRefresh,
+}: {
+  isFirstTimeWorkspace: boolean;
+  onRefresh: () => void;
+}) {
   const { resolvedMode } = useTheme();
 
   return (
@@ -294,7 +301,7 @@ function DashboardNoActivity() {
     >
       <div className="mx-auto w-full max-w-[640px] border border-border-subtle bg-surface px-6 py-10 md:px-10 md:py-12">
         <Text as="p" variant="label-01" className="text-primary">
-          Getting started
+          {isFirstTimeWorkspace ? 'Getting started' : 'Selected time range'}
         </Text>
         <Text
           as="h2"
@@ -302,15 +309,18 @@ function DashboardNoActivity() {
           variant="heading-05"
           className="mt-2 text-foreground"
         >
-          Build your first dashboard insights
+          {isFirstTimeWorkspace
+            ? 'Build your first dashboard insights'
+            : 'No activity in this time range'}
         </Text>
         <Text
           as="p"
           variant="body-02"
           className="mt-4 max-w-[520px] text-muted"
         >
-          Complete these steps to generate workspace performance data. Metrics
-          will appear after an assistant completes its first test conversation.
+          {isFirstTimeWorkspace
+            ? 'Complete these steps to generate workspace performance data. Metrics will appear after an assistant completes its first test conversation.'
+            : 'No sessions or component usage were recorded during the selected time range.'}
         </Text>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -321,56 +331,65 @@ function DashboardNoActivity() {
           >
             Open assistants
           </PrimaryButton>
-          <SecondaryButton
-            size="md"
-            href="/deployment/assistant/create-assistant"
-          >
-            Create assistant
-          </SecondaryButton>
+          {isFirstTimeWorkspace ? (
+            <SecondaryButton
+              size="md"
+              href="/deployment/assistant/create-assistant"
+            >
+              Create assistant
+            </SecondaryButton>
+          ) : (
+            <SecondaryButton size="md" onClick={onRefresh}>
+              Refresh dashboard
+            </SecondaryButton>
+          )}
         </div>
       </div>
 
-      <Checklist
-        chartLabel="25% complete"
-        chartValue={0.25}
-        checklistAriaLabel="Dashboard setup checklist"
-        checklistToggleAriaLabel="Toggle dashboard setup checklist"
-        className="app-onboarding-checklist fixed bottom-4 right-4 z-30 max-h-[calc(100vh-2rem)] w-[calc(100%_-_5rem)] max-w-[400px] overflow-auto border border-border-strong shadow-xl"
-        onClickViewAll={() => window.location.assign('/deployment/assistant')}
-        taskLists={[
-          {
-            title: 'Recommended steps',
-            tasks: [
-              {
-                kind: checkedChecklistTask,
-                label: 'Workspace created',
-              },
-              {
-                kind: uncheckedChecklistTask,
-                label: 'Create an assistant',
-                onClick: () =>
-                  window.location.assign(
-                    '/deployment/assistant/create-assistant',
-                  ),
-              },
-              {
-                kind: uncheckedChecklistTask,
-                label: 'Configure and test your assistant',
-                onClick: () => window.location.assign('/deployment/assistant'),
-              },
-              {
-                kind: uncheckedChecklistTask,
-                label: 'Return here to review performance',
-                onClick: () => window.location.assign('/dashboard'),
-              },
-            ],
-          },
-        ]}
-        title="Set up your dashboard"
-        theme={resolvedMode as ChecklistTheme}
-        toggleLabel="Collapse or expand dashboard setup"
-        viewAllLabel="View all assistants"
-      />
+      {isFirstTimeWorkspace && (
+        <Checklist
+          chartLabel="25% complete"
+          chartValue={0.25}
+          checklistAriaLabel="Dashboard setup checklist"
+          checklistToggleAriaLabel="Toggle dashboard setup checklist"
+          className="app-onboarding-checklist app-dashboard-onboarding-checklist border border-border-strong shadow-xl"
+          onClickViewAll={() => window.location.assign('/deployment/assistant')}
+          taskLists={[
+            {
+              title: 'Recommended steps',
+              tasks: [
+                {
+                  kind: checkedChecklistTask,
+                  label: 'Workspace created',
+                },
+                {
+                  kind: uncheckedChecklistTask,
+                  label: 'Create an assistant',
+                  onClick: () =>
+                    window.location.assign(
+                      '/deployment/assistant/create-assistant',
+                    ),
+                },
+                {
+                  kind: uncheckedChecklistTask,
+                  label: 'Configure and test your assistant',
+                  onClick: () =>
+                    window.location.assign('/deployment/assistant'),
+                },
+                {
+                  kind: uncheckedChecklistTask,
+                  label: 'Return here to review performance',
+                  onClick: onRefresh,
+                },
+              ],
+            },
+          ]}
+          title="Set up your dashboard"
+          theme={resolvedMode as ChecklistTheme}
+          toggleLabel="Collapse or expand dashboard setup"
+          viewAllLabel="View all assistants"
+        />
+      )}
     </section>
   );
 }
@@ -379,7 +398,7 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
   return (
     <article
       data-dashboard-kpi
-      className="flex h-[156px] flex-col border border-border-subtle bg-surface"
+      className="flex min-h-[156px] flex-col border border-border-subtle bg-surface"
     >
       <header
         data-dashboard-kpi-header
@@ -392,7 +411,7 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
         >
           {metric.label}
         </Text>
-        <Toggletip align="bottom-end">
+        <Toggletip align="bottom-end" autoAlign>
           <ToggletipButton label={`${metric.label} information`}>
             <Information aria-hidden="true" className="text-muted" size={16} />
           </ToggletipButton>
@@ -405,7 +424,7 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
       </header>
       <div
         data-dashboard-kpi-body
-        className="flex h-[116px] flex-col justify-between p-4"
+        className="flex min-h-[116px] flex-1 flex-col justify-between p-4"
       >
         <Text
           as="p"
@@ -915,7 +934,7 @@ function DashboardLoading() {
           <div
             data-dashboard-loading-card
             data-dashboard-loading-kpi
-            className="flex h-[156px] flex-col border border-border-subtle bg-surface"
+            className="flex min-h-[156px] flex-col border border-border-subtle bg-surface"
             key={item}
             aria-hidden="true"
           >
@@ -927,7 +946,7 @@ function DashboardLoading() {
             </div>
             <div
               data-dashboard-kpi-body
-              className="flex h-[116px] flex-col justify-between p-4"
+              className="flex min-h-[116px] flex-1 flex-col justify-between p-4"
             >
               <SkeletonText className="!mb-0" width="70%" heading />
               <SkeletonText className="!mb-0" width="80%" />
@@ -1019,7 +1038,7 @@ function buildMetrics(analytics: ProjectDashboardAnalytics) {
     {
       label: 'Average Latency',
       description:
-        'Average end-to-end response latency across project sessions during the selected time range.',
+        'Average of the available speech-to-text, end-of-speech, text-to-speech, and agent time-to-first-token averages during the selected time range.',
       value: latency?.hasValuems()
         ? numberFormatter.format(latency.getValuems())
         : 'Not available',
@@ -1062,6 +1081,7 @@ export const HomePage = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [refreshError, setRefreshError] = useState(false);
+  const [hasAssistants, setHasAssistants] = useState<boolean | null>(null);
   const requestId = useRef(0);
   const dashboardContextKey = useRef('');
   const dashboardRef = useRef<{
@@ -1149,6 +1169,33 @@ export const HomePage = () => {
     analyticsSection?.getState() ===
       DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY &&
     usage?.getState() === DashboardSectionState.DASHBOARD_SECTION_STATE_EMPTY;
+
+  useEffect(() => {
+    if (!isDashboardActivityEmpty || !authId || !projectId || !token) {
+      setHasAssistants(null);
+      return undefined;
+    }
+
+    let isCurrent = true;
+    setHasAssistants(null);
+    listAssistants({
+      page: 1,
+      pageSize: 1,
+      criteria: [],
+      auth: { projectId, token, userId: authId },
+    })
+      .then(response => {
+        if (!isCurrent || !response?.getSuccess()) return;
+        setHasAssistants(response.getDataList().length > 0);
+      })
+      .catch(() => {
+        if (isCurrent) setHasAssistants(null);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [authId, isDashboardActivityEmpty, projectId, token]);
   const metrics = useMemo(
     () => (analytics ? buildMetrics(analytics) : []),
     [analytics],
@@ -1232,7 +1279,10 @@ export const HomePage = () => {
                 <DashboardLoading />
               ) : dashboard && isDashboardActivityEmpty ? (
                 <div className="col-span-full">
-                  <DashboardNoActivity />
+                  <DashboardNoActivity
+                    isFirstTimeWorkspace={hasAssistants === false}
+                    onRefresh={fetchDashboard}
+                  />
                 </div>
               ) : dashboard ? (
                 <>

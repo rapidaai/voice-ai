@@ -76,8 +76,9 @@ const dashboardStates = [
       await expect(
         page.getByLabel('Dashboard setup checklist'),
       ).toBeVisible();
-      await expect(page.getByLabel('Dashboard setup checklist')).toHaveClass(
-        /fixed/,
+      await expect(page.getByLabel('Dashboard setup checklist')).toHaveCSS(
+        'position',
+        'fixed',
       );
       await expect(
         page.getByText('25% complete', { exact: true }),
@@ -133,6 +134,60 @@ test('dashboard empty state links to assistant creation', async ({ page }) => {
     await expect(checklistToggle).toHaveAttribute('aria-expanded', 'false');
     await checklistToggle.click();
     await expect(checklistToggle).toHaveAttribute('aria-expanded', 'true');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('dashboard checklist actions open their intended assistant destinations', async ({
+  page,
+}) => {
+  const actions = [
+    ['Create an assistant', '/deployment/assistant/create-assistant'],
+    ['Configure and test your assistant', '/deployment/assistant'],
+    ['View all assistants', '/deployment/assistant'],
+  ];
+
+  for (const [name, destination] of actions) {
+    const cleanup = await installEmptyDashboardClientMock(page);
+    try {
+      await gotoJourney(page, {
+        ...dashboardJourney,
+        expectText: 'Build your first dashboard insights',
+        readyText: undefined,
+      });
+      await page.getByRole('button', { name }).click();
+      await expect(page).toHaveURL(new RegExp(`${destination}$`));
+    } finally {
+      await cleanup();
+    }
+  }
+});
+
+test('dashboard checklist stays in page flow on a short viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 600 });
+  const cleanup = await installEmptyDashboardClientMock(page);
+
+  try {
+    await gotoJourney(page, {
+      ...dashboardJourney,
+      expectText: 'Build your first dashboard insights',
+      readyText: undefined,
+    });
+    const emptyCard = page.locator('[data-dashboard-empty] > div').first();
+    const checklist = page.getByLabel('Dashboard setup checklist');
+    await expect(checklist).toHaveCSS('position', 'static');
+    const [emptyCardBounds, checklistBounds] = await Promise.all([
+      emptyCard.boundingBox(),
+      checklist.boundingBox(),
+    ]);
+    expect(emptyCardBounds).not.toBeNull();
+    expect(checklistBounds).not.toBeNull();
+    expect(checklistBounds.y).toBeGreaterThanOrEqual(
+      emptyCardBounds.y + emptyCardBounds.height,
+    );
   } finally {
     await cleanup();
   }
@@ -210,6 +265,10 @@ for (const colorMode of COLOR_MODES) {
         page.getByRole('link', { name: 'Open assistants' }),
       ).toBeVisible();
       await expect(page.getByLabel('Dashboard setup checklist')).toBeVisible();
+      await expect(page.getByLabel('Dashboard setup checklist')).toHaveCSS(
+        'position',
+        'static',
+      );
       await page.evaluate(() => document.fonts.ready);
       await expandDashboardForScreenshot(page);
 
