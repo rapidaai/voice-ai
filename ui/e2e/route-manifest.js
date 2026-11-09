@@ -402,7 +402,8 @@ const routeJourneys = [
     id: 'integration.projectCredential',
     path: '/integration/project-credential',
     auth: true,
-    expectText: 'Project Developer Keys',
+    expectText: 'Project API keys',
+    readyText: 'Web widget',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {

@@ -5,9 +5,6 @@ import {
   ListPermissions,
   ListRoles,
   ReduceCustomRolePermissions,
-  RoleDefinitionType,
-  RoleScope,
-  RoleSubject,
   UpdateCustomRole,
 } from '@rapidaai/react';
 import {
@@ -54,10 +51,12 @@ describe('access management client', () => {
     await listAccessRoles({
       page: 2,
       pageSize: 50,
-      query: 'support',
-      scope: 'ROLE_SCOPE_PROJECT',
-      subject: 'ROLE_SUBJECT_USER',
-      definitionType: 'ROLE_DEFINITION_TYPE_CUSTOM',
+      criteria: [
+        { key: 'name', value: 'support', logic: 'contains' },
+        { key: 'scope', value: 'PROJECT', logic: '=' },
+        { key: 'subject', value: 'USER', logic: '=' },
+        { key: 'type', value: 'CUSTOM', logic: '=' },
+      ],
       auth,
     });
 
@@ -66,12 +65,18 @@ describe('access management client', () => {
     ).mock.calls[0].slice(1);
     expect(request.getPaginate().getPage()).toBe(2);
     expect(request.getPaginate().getPagesize()).toBe(50);
-    expect(request.getQuery()).toBe('support');
-    expect(request.getScope()).toBe(RoleScope.ROLE_SCOPE_PROJECT);
-    expect(request.getSubject()).toBe(RoleSubject.ROLE_SUBJECT_USER);
-    expect(request.getDefinitiontype()).toBe(
-      RoleDefinitionType.ROLE_DEFINITION_TYPE_CUSTOM,
-    );
+    expect(
+      request.getCriteriasList().map((criteria: any) => ({
+        key: criteria.getKey(),
+        value: criteria.getValue(),
+        logic: criteria.getLogic(),
+      })),
+    ).toEqual([
+      { key: 'name', value: 'support', logic: 'contains' },
+      { key: 'scope', value: 'PROJECT', logic: '=' },
+      { key: 'subject', value: 'USER', logic: '=' },
+      { key: 'type', value: 'CUSTOM', logic: '=' },
+    ]);
     expect(requestMetadata).toEqual(metadata);
   });
 
@@ -79,7 +84,7 @@ describe('access management client', () => {
     await listAccessPermissions({
       page: 3,
       pageSize: 100,
-      scope: 'ROLE_SCOPE_ORGANIZATION',
+      criteria: [{ key: 'scope', value: 'ORGANIZATION', logic: '=' }],
       auth,
     });
 
@@ -88,7 +93,10 @@ describe('access management client', () => {
     ).mock.calls[0].slice(1);
     expect(request.getPaginate().getPage()).toBe(3);
     expect(request.getPaginate().getPagesize()).toBe(100);
-    expect(request.getScope()).toBe(RoleScope.ROLE_SCOPE_ORGANIZATION);
+    expect(request.getCriteriasList()).toHaveLength(1);
+    expect(request.getCriteriasList()[0].getKey()).toBe('scope');
+    expect(request.getCriteriasList()[0].getValue()).toBe('ORGANIZATION');
+    expect(request.getCriteriasList()[0].getLogic()).toBe('=');
     expect(requestMetadata).toEqual(metadata);
   });
 
@@ -152,10 +160,7 @@ describe('access management client', () => {
       listAccessRoles({
         page: 1,
         pageSize: 25,
-        query: '',
-        scope: 'ROLE_SCOPE_UNSPECIFIED',
-        subject: 'ROLE_SUBJECT_UNSPECIFIED',
-        definitionType: 'ROLE_DEFINITION_TYPE_UNSPECIFIED',
+        criteria: [],
         auth,
       }),
     ).rejects.toEqual({ code: 14, message: 'unavailable' });

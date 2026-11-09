@@ -61,7 +61,7 @@ export function ConfirmDeleteDialog({
     >
       <ModalHeader label="Confirm action" title={title} onClose={closeDialog} />
       <ModalBody hasForm>
-        <p className="text-sm text-foreground">{content}</p>
+        <p className="mb-4 text-sm text-foreground">{content}</p>
         <TextInput
           id="confirm-delete-input"
           labelText={`Type "${objectName}" to confirm`}

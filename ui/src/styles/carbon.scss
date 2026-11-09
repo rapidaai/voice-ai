@@ -64,6 +64,27 @@
 @use '@carbon/ibm-products/scss/components/EmptyStates';
 @use '@carbon/ibm-products/scss/components/SidePanel';
 
+.project-api-key-modal .cds--inline-loading {
+  min-block-size: 3rem;
+}
+
+.project-api-key-modal__messaging {
+  display: flex;
+  margin-block-start: 0.5rem;
+  padding-inline-end: calc(20% - 1rem);
+}
+
+.project-api-key-modal__messaging-text {
+  flex: 1;
+  margin-inline-start: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.project-api-key-modal__checkmark-icon {
+  fill: var(--cds-button-primary);
+}
+
 .debugger-configuration-accordion > .cds--accordion__item:first-child {
   border-block-start: 0;
 }

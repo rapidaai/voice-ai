@@ -1,4 +1,3 @@
-import { RoleDefinitionType, RoleScope, RoleSubject } from '@rapidaai/react';
 import {
   QuerySearch,
   parseQuerySearchFilters,
@@ -8,40 +7,46 @@ import type {
   QuerySearchOption,
 } from '@/app/components/ui/composites';
 
-export type RoleSearchState = {
-  definitionType: keyof typeof RoleDefinitionType;
-  query: string;
-  scope: keyof typeof RoleScope;
-  subject: keyof typeof RoleSubject;
+export type RoleSearchCriteria = {
+  key: 'key' | 'name' | 'scope' | 'subject' | 'type';
+  logic: string;
+  value: string;
 };
 
 type RoleQuerySearchProps = {
-  onApply: (filters: RoleSearchState) => void;
+  onApply: (filters: RoleSearchCriteria[]) => void;
   onChange: (value: string) => void;
   value: string;
 };
 
 const SCOPE_OPTIONS: QuerySearchOption[] = [
-  { id: 'ROLE_SCOPE_ORGANIZATION', text: 'organization' },
-  { id: 'ROLE_SCOPE_PROJECT', text: 'project' },
+  { id: 'ORGANIZATION', text: 'organization' },
+  { id: 'PROJECT', text: 'project' },
 ];
 
 const SUBJECT_OPTIONS: QuerySearchOption[] = [
-  { id: 'ROLE_SUBJECT_USER', text: 'user' },
-  { id: 'ROLE_SUBJECT_PROJECT_TOKEN', text: 'project token' },
+  { id: 'USER', text: 'user' },
+  { id: 'PROJECT_TOKEN', text: 'project token' },
 ];
 
 const TYPE_OPTIONS: QuerySearchOption[] = [
-  { id: 'ROLE_DEFINITION_TYPE_BUILT_IN', text: 'built-in' },
-  { id: 'ROLE_DEFINITION_TYPE_CUSTOM', text: 'custom' },
+  { id: 'BUILT_IN', text: 'built-in' },
+  { id: 'CUSTOM', text: 'custom' },
 ];
 
 const ROLE_SEARCH_FIELDS: QuerySearchField[] = [
   {
     logicLabel: 'contains',
     logicOptions: [{ label: 'contains', logic: 'contains' }],
-    queryKey: 'query',
+    queryKey: 'name',
     text: 'name',
+    type: 'string',
+  },
+  {
+    logicLabel: 'contains',
+    logicOptions: [{ label: 'contains', logic: 'contains' }],
+    queryKey: 'key',
+    text: 'key',
     type: 'string',
   },
   {
@@ -64,38 +69,23 @@ const ROLE_SEARCH_FIELDS: QuerySearchField[] = [
   },
 ];
 
-export const getRoleSearchState = (value: string): RoleSearchState => {
-  const state: RoleSearchState = {
-    definitionType: 'ROLE_DEFINITION_TYPE_UNSPECIFIED',
-    query: '',
-    scope: 'ROLE_SCOPE_UNSPECIFIED',
-    subject: 'ROLE_SUBJECT_UNSPECIFIED',
-  };
-
-  parseQuerySearchFilters(ROLE_SEARCH_FIELDS, value).forEach(filter => {
-    if (filter.key === 'query') state.query = filter.value;
-    if (
-      filter.key === 'scope' &&
-      SCOPE_OPTIONS.some(option => option.id === filter.value)
-    ) {
-      state.scope = filter.value as keyof typeof RoleScope;
-    }
-    if (
-      filter.key === 'subject' &&
-      SUBJECT_OPTIONS.some(option => option.id === filter.value)
-    ) {
-      state.subject = filter.value as keyof typeof RoleSubject;
-    }
-    if (
-      filter.key === 'type' &&
-      TYPE_OPTIONS.some(option => option.id === filter.value)
-    ) {
-      state.definitionType = filter.value as keyof typeof RoleDefinitionType;
-    }
-  });
-
-  return state;
-};
+export const getRoleSearchCriteria = (value: string): RoleSearchCriteria[] =>
+  parseQuerySearchFilters(ROLE_SEARCH_FIELDS, value)
+    .filter(filter => {
+      if (filter.key === 'name' || filter.key === 'key') return true;
+      if (filter.key === 'scope')
+        return SCOPE_OPTIONS.some(option => option.id === filter.value);
+      if (filter.key === 'subject')
+        return SUBJECT_OPTIONS.some(option => option.id === filter.value);
+      if (filter.key === 'type')
+        return TYPE_OPTIONS.some(option => option.id === filter.value);
+      return false;
+    })
+    .map(filter => ({
+      key: filter.key as RoleSearchCriteria['key'],
+      logic: filter.logic,
+      value: filter.value,
+    }));
 
 export function RoleQuerySearch({
   onApply,
@@ -107,9 +97,9 @@ export function RoleQuerySearch({
       fields={ROLE_SEARCH_FIELDS}
       value={value}
       maxOptions={ROLE_SEARCH_FIELDS.length}
-      placeholder="Search for name, scope, subject, type"
+      placeholder="Search for name, key, scope, subject, type"
       onChange={onChange}
-      onApply={nextValue => onApply(getRoleSearchState(nextValue))}
+      onApply={nextValue => onApply(getRoleSearchCriteria(nextValue))}
     />
   );
 }

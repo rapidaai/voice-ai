@@ -132,7 +132,7 @@ test('organization role actions update and delete a custom role', async ({
     name: 'Delete role',
   });
   await expect(deleteDialog).toContainText(
-    'Roles with active assignments cannot be deleted.',
+    'Deleting a role removes it from the active roles. Its key cannot be reused, and roles assigned to users cannot be deleted.',
   );
   await checkA11y(page, journey('roles'));
   await expect(deleteDialog.getByPlaceholder('Support lead')).toBeVisible();

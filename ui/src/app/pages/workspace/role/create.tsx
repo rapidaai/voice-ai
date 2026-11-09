@@ -120,7 +120,16 @@ export function CreateRoleModal({
         const response = await listAccessPermissions({
           page,
           pageSize: 100,
-          scope,
+          criteria: [
+            {
+              key: 'scope',
+              logic: '=',
+              value:
+                scope === 'ROLE_SCOPE_ORGANIZATION'
+                  ? 'ORGANIZATION'
+                  : 'PROJECT',
+            },
+          ],
           auth: { token, userId },
         });
         if (requestId !== permissionRequestSequence.current) return;

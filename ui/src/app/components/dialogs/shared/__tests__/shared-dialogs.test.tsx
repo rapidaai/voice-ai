@@ -251,6 +251,7 @@ describe('shared dialogs', () => {
     expect(
       screen.getByRole('dialog', { name: 'Delete project' }),
     ).toBeInTheDocument();
+    expect(screen.getByText('Delete this project.')).toHaveClass('mb-4');
     const deleteButton = screen.getByRole('button', { name: 'Delete' });
     expect(deleteButton).toBeDisabled();
 

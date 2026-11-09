@@ -1,6 +1,7 @@
 import {
   ArchiveCustomRole,
   ArchiveCustomRoleRequest,
+  Criteria,
   CreateCustomRole,
   CreateCustomRoleRequest,
   GetRole,
@@ -25,15 +26,21 @@ export type AccessManagementAuth = {
   userId: string;
 };
 
+export type AccessManagementCriteria = {
+  key: string;
+  value: string;
+  logic: string;
+};
+
 export const listAccessPermissions = ({
   page,
   pageSize,
-  scope,
+  criteria,
   auth,
 }: {
   page: number;
   pageSize: number;
-  scope: keyof typeof RoleScope;
+  criteria: AccessManagementCriteria[];
   auth: AccessManagementAuth;
 }) => {
   const request = new ListPermissionsRequest();
@@ -41,7 +48,13 @@ export const listAccessPermissions = ({
   paginate.setPage(page);
   paginate.setPagesize(pageSize);
   request.setPaginate(paginate);
-  request.setScope(RoleScope[scope]);
+  criteria.forEach(({ key, value, logic }) => {
+    const filter = new Criteria();
+    filter.setKey(key);
+    filter.setValue(value);
+    filter.setLogic(logic);
+    request.addCriterias(filter);
+  });
   return withConnection(ListPermissions)(request, {
     authorization: auth.token,
     'x-auth-id': auth.userId,
@@ -51,18 +64,12 @@ export const listAccessPermissions = ({
 export const listAccessRoles = ({
   page,
   pageSize,
-  query,
-  scope,
-  subject,
-  definitionType,
+  criteria,
   auth,
 }: {
   page: number;
   pageSize: number;
-  query: string;
-  scope: keyof typeof RoleScope;
-  subject: keyof typeof RoleSubject;
-  definitionType: keyof typeof RoleDefinitionType;
+  criteria: AccessManagementCriteria[];
   auth: AccessManagementAuth;
 }) => {
   const request = new ListRolesRequest();
@@ -70,10 +77,13 @@ export const listAccessRoles = ({
   paginate.setPage(page);
   paginate.setPagesize(pageSize);
   request.setPaginate(paginate);
-  request.setQuery(query);
-  request.setScope(RoleScope[scope]);
-  request.setSubject(RoleSubject[subject]);
-  request.setDefinitiontype(RoleDefinitionType[definitionType]);
+  criteria.forEach(({ key, value, logic }) => {
+    const filter = new Criteria();
+    filter.setKey(key);
+    filter.setValue(value);
+    filter.setLogic(logic);
+    request.addCriterias(filter);
+  });
   return withConnection(ListRoles)(request, {
     authorization: auth.token,
     'x-auth-id': auth.userId,

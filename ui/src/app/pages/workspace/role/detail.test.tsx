@@ -189,6 +189,11 @@ describe('role action dialogs', () => {
     });
     expect(deleteButton).toBeDisabled();
     expect(
+      within(dialog).getByText(
+        'Deleting a role removes it from the active roles. Its key cannot be reused, and roles assigned to users cannot be deleted.',
+      ),
+    ).toBeInTheDocument();
+    expect(
       within(dialog).getByPlaceholderText('Support manager'),
     ).toBeInTheDocument();
     await user.type(

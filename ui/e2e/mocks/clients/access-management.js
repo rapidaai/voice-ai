@@ -13,6 +13,7 @@ const {
   GetRoleRequest,
   GetRoleResponse,
   ListPermissionsResponse,
+  ListRolesRequest,
   ListRolesResponse,
   Paginated,
   PermissionDefinition,
@@ -128,6 +129,24 @@ const CREATED_ROLE = role({
   description: 'Coordinates incident response.',
   definitionType: RoleDefinitionType.ROLE_DEFINITION_TYPE_CUSTOM,
   permissions: [PROJECT_READ],
+});
+const RUNTIME_TOKEN_ROLE = role({
+  id: '514',
+  key: 'runtime_invoker',
+  name: 'Runtime Invoker',
+  description: 'Invokes project runtime operations.',
+  definitionType: RoleDefinitionType.ROLE_DEFINITION_TYPE_BUILT_IN,
+  subject: RoleSubject.ROLE_SUBJECT_PROJECT_TOKEN,
+  permissions: [PROJECT_READ],
+});
+const OBSERVER_TOKEN_ROLE = role({
+  id: '516',
+  key: 'observer_client',
+  name: 'Observer Client',
+  description: 'Reads project runtime and observability data.',
+  definitionType: RoleDefinitionType.ROLE_DEFINITION_TYPE_BUILT_IN,
+  subject: RoleSubject.ROLE_SUBJECT_PROJECT_TOKEN,
+  permissions: [PROJECT_READ, PROJECT_UPDATE],
 });
 
 function paginated(total) {
@@ -253,6 +272,7 @@ async function installAccessManagementClientMock(page) {
 
   await page.route(ACCESS_MANAGEMENT_PATHS.listRoles, route => {
     if (route.request().method() !== 'POST') return route.fallback();
+    const request = deserializeRequest(route, ListRolesRequest);
     const customRoleSummary = role({
       id: currentCustomRole.getId(),
       key: currentCustomRole.getKey(),
@@ -261,9 +281,17 @@ async function installAccessManagementClientMock(page) {
       definitionType: RoleDefinitionType.ROLE_DEFINITION_TYPE_CUSTOM,
       permissions: [],
     });
-    const roles = isCustomRoleArchived
-      ? [BUILT_IN_ROLE]
-      : [customRoleSummary, BUILT_IN_ROLE];
+    const roles = request
+      .getCriteriasList()
+      .some(
+        criteria =>
+          criteria.getKey() === 'subject' &&
+          criteria.getValue() === 'PROJECT_TOKEN',
+      )
+      ? [RUNTIME_TOKEN_ROLE, OBSERVER_TOKEN_ROLE]
+      : isCustomRoleArchived
+        ? [BUILT_IN_ROLE]
+        : [customRoleSummary, BUILT_IN_ROLE];
     return fulfillGrpcWeb(route, buildRoleListResponse(roles));
   });
 
@@ -273,9 +301,13 @@ async function installAccessManagementClientMock(page) {
     const currentRole =
       request.getRoledefinitionid() === CREATED_ROLE.getId()
         ? CREATED_ROLE
-        : request.getRoledefinitionid() === BUILT_IN_ROLE.getId()
-          ? BUILT_IN_ROLE
-          : currentCustomRole;
+        : request.getRoledefinitionid() === RUNTIME_TOKEN_ROLE.getId()
+          ? RUNTIME_TOKEN_ROLE
+          : request.getRoledefinitionid() === OBSERVER_TOKEN_ROLE.getId()
+            ? OBSERVER_TOKEN_ROLE
+            : request.getRoledefinitionid() === BUILT_IN_ROLE.getId()
+              ? BUILT_IN_ROLE
+              : currentCustomRole;
     return fulfillGrpcWeb(route, buildRoleDetailResponse(currentRole));
   });
 

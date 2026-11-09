@@ -1,7 +1,6 @@
-import { useState, useContext, useCallback, useEffect, FC } from 'react';
+import { useState, useContext, useEffect, useRef } from 'react';
 import { useCredential, useCurrentCredential } from '@/hooks/use-credential';
 import {
-  CreateProjectCredentialResponse,
   GetAllProjectCredentialResponse,
   ProjectCredential,
 } from '@rapidaai/react';
@@ -9,16 +8,35 @@ import toast from 'react-hot-toast/headless';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { EmptyState } from '@/app/components/ui/feedback';
 import { AuthContext } from '@/context/auth-context';
-import { PageHeader } from '@/app/components/layout/page-header';
+import {
+  PageHeader,
+  PageHeaderStickyToolbar,
+} from '@/app/components/layout/page-header';
 import {
   Add,
+  ApiKey,
+  Checkmark,
+  Copy,
   Renew,
+  Unlink,
   View,
   ViewOff,
-  Copy,
-  Checkmark,
 } from '@carbon/icons-react';
-import { toHumanReadableDate } from '@/utils/date';
+import {
+  Button,
+  DataTable,
+  DataTableSkeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableToolbar,
+  TableToolbarContent,
+  Tag,
+} from '@carbon/react';
+import { toHumanReadableDateTime } from '@/utils/date';
 import { DocNoticeBlock } from '@/app/components/layout/container/message/notice-block/doc-notice-block';
 import { FieldSet } from '@/app/components/ui/primitives';
 import { FormLabel } from '@/app/components/ui/primitives';
@@ -26,238 +44,427 @@ import { CopyButton } from '@/app/components/ui/primitives';
 import { GhostButton } from '@/app/components/ui/primitives';
 import { IconOnlyButton } from '@/app/components/ui/primitives';
 import { BaseCard } from '@/app/components/ui/primitives';
-import { PrimaryButton } from '@/app/components/ui/primitives';
+import { Pagination } from '@/app/components/ui/primitives';
 import { Text } from '@/app/components/ui/primitives';
 import {
-  createProjectPublishableCredential,
-  listProjectCredentials,
-} from '@/clients';
+  ScrollableTableSection,
+  TableSection,
+} from '@/app/components/layout/sections/table-section';
+import { ConfirmDeleteDialog } from '@/app/components/dialogs/shared';
+import { listProjectCredentials, revokeProjectCredential } from '@/clients';
+import { CreateProjectToken } from '@/app/components/domain/project-credentials/create-project-token';
+import {
+  ProjectAPIKeyQuerySearch,
+  type ProjectAPIKeySearchCriteria,
+} from './project-api-key-query-search';
 
-/**
- *
- * @returns
- */
+const projectAPIKeyHeaders = [
+  { key: 'name', header: 'Name' },
+  { key: 'apiKey', header: 'API key' },
+  { key: 'role', header: 'Access role' },
+  { key: 'created', header: 'Created' },
+  { key: 'actions', header: 'Actions' },
+];
+
 export function ProjectCredentialPage() {
-  /**
-   * all the result
-   */
-  const [ourKeys, setOurKeys] = useState<ProjectCredential[]>([]);
-
-  /**
-   * Current project credential
-   */
-  const { currentProjectRole } = useContext(AuthContext);
-
-  /**
-   * authentication
-   */
+  const [credentials, setCredentials] = useState<ProjectCredential[]>([]);
+  const [querySearchValue, setQuerySearchValue] = useState('');
+  const [criteria, setCriteria] = useState<ProjectAPIKeySearchCriteria[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalItems, setTotalItems] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
+  const [error, setError] = useState('');
+  const [refresh, setRefresh] = useState(0);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [visibleCredentialIds, setVisibleCredentialIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [copiedCredentialId, setCopiedCredentialId] = useState<string | null>(
+    null,
+  );
+  const [credentialPendingRevoke, setCredentialPendingRevoke] =
+    useState<ProjectCredential | null>(null);
+  const requestSequence = useRef(0);
+  const { currentProjectRole, organizationRole } = useContext(AuthContext);
   const [userId, token] = useCredential();
+  const canRevoke =
+    organizationRole?.role === 'owner' || organizationRole?.role === 'admin';
 
-  /**
-   * on create project credential
-   */
-  const onCreateProjectCredential = () => {
-    if (!currentProjectRole) return;
-    createProjectPublishableCredential({
-      projectId: currentProjectRole.projectid,
-      name: 'publishable key',
-      auth: { token, userId },
-      callback: afterCreateProjectCredential,
-    });
-  };
-
-  /**
-   * after create project credential
-   */
-  const afterCreateProjectCredential = useCallback(
-    (err, data: CreateProjectCredentialResponse | null) => {
-      if (data?.getSuccess()) {
-        getAllProjectCredential();
-      } else {
-        let errorMessage = data?.getError();
-        if (errorMessage) {
-          toast.error(errorMessage.getHumanmessage());
-        } else {
-          toast.error(
-            'Unable to process your request. please try again later.',
-          );
-        }
-      }
-    },
-    [],
-  );
-
-  /**
-   * after get all the project credentials
-   */
-  const afterGetAllProjectCredential = useCallback(
-    (err, data: GetAllProjectCredentialResponse | null) => {
-      if (data?.getSuccess()) {
-        setOurKeys(data.getDataList());
-      } else {
-        let errorMessage = data?.getError();
-        if (errorMessage) {
-          toast.error(errorMessage.getHumanmessage());
-        } else {
-          toast.error(
-            'Unable to process your request. please try again later.',
-          );
-        }
-      }
-    },
-    [],
-  );
-  //   getting all the publishable keys
-  // load all the project credentials call it publishable key
   useEffect(() => {
-    getAllProjectCredential();
-  }, [currentProjectRole]);
+    if (!currentProjectRole) return;
+    const requestId = ++requestSequence.current;
+    setIsLoading(true);
+    setError('');
+    listProjectCredentials({
+      projectId: currentProjectRole.projectid,
+      page,
+      pageSize,
+      criteria,
+      auth: { token, userId },
+      callback: (
+        requestError,
+        response: GetAllProjectCredentialResponse | null,
+      ) => {
+        if (requestId !== requestSequence.current) return;
+        setIsLoading(false);
+        setHasCompletedInitialLoad(true);
+        if (requestError || !response?.getSuccess()) {
+          setError('Try again. No API keys were changed.');
+          toast.error('API keys could not be refreshed. Try again.');
+          return;
+        }
+        setCredentials(response.getDataList());
+        setTotalItems(response.getPaginated()?.getTotalitem() || 0);
+      },
+    });
+    return () => {
+      requestSequence.current += 1;
+    };
+  }, [criteria, currentProjectRole, page, pageSize, refresh, token, userId]);
 
-  //   when someone add things then reload the state
-  const shouldReload = () => {
-    getAllProjectCredential();
-  };
+  const rows = credentials.map(credential => ({
+    id: credential.getId(),
+    name: credential.getName(),
+    apiKey: '',
+    role: credential.getRolename(),
+    created: credential.getCreateddate()
+      ? toHumanReadableDateTime(credential.getCreateddate()!)
+      : '-',
+    actions: '',
+  }));
 
-  const getAllProjectCredential = () => {
-    if (currentProjectRole)
-      listProjectCredentials({
-        projectId: currentProjectRole.projectid,
-        auth: { token, userId },
-        callback: afterGetAllProjectCredential,
-      });
-  };
-  /**
-   *
-   */
   return (
     <div
       data-page-scroll
-      className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-surface"
     >
-      <Helmet title="Providers and Models" />
+      <Helmet title="Project API keys" />
       <PageHeader
         eyebrow={
           <Text variant="label-01" className="text-primary">
             Integrations
           </Text>
         }
-        title="Project Developer Keys"
-        description="Create and manage project-scoped keys used to authenticate platform service requests."
+        title="Project API keys"
+        description="Manage API keys used by applications and tools to access this project."
         contextualActions={
           <Text variant="label-01" className="text-muted tabular-nums">
-            {ourKeys.length}
+            {credentials.length} of {totalItems}
           </Text>
         }
         pageActions={
-          <div className="flex w-full items-stretch md:w-auto">
-            <IconOnlyButton
-              kind="ghost"
-              size="md"
-              renderIcon={Renew}
-              iconDescription="Refresh credentials"
-              onClick={shouldReload}
-              className="h-full"
-            />
-            <PrimaryButton
-              size="md"
-              type="button"
-              onClick={onCreateProjectCredential}
-              className="h-full whitespace-nowrap"
-              renderIcon={Add}
-            >
-              Create credential
-            </PrimaryButton>
-          </div>
+          <Button
+            className="w-full md:w-auto"
+            size="md"
+            renderIcon={Add}
+            onClick={() => setIsCreateOpen(true)}
+          >
+            Create API key
+          </Button>
         }
       />
-      <DocNoticeBlock docPath="/integrations/rapida-credentials">
-        These are project-specific keys. They are used to authenticate and
-        interact with the platform service for this particular project.
-      </DocNoticeBlock>
-      {ourKeys && ourKeys.length > 0 ? (
-        <section className="grid content-start grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 grow shrink-0 m-4">
-          {ourKeys.map((pc, idx) => (
-            <CredentialCard key={idx} credential={pc} />
-          ))}
-        </section>
-      ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <EmptyState
-            title="No credentials"
-            subtitle="There are no SDK Authentication Credential found to display"
-            action="Create new credential"
-            onAction={onCreateProjectCredential}
+      {isLoading && !hasCompletedInitialLoad ? (
+        <TableSection className="min-h-0 overflow-hidden bg-surface">
+          <DataTableSkeleton
+            headers={projectAPIKeyHeaders}
+            columnCount={projectAPIKeyHeaders.length}
+            rowCount={5}
+            showHeader={false}
+            showToolbar
+            size="lg"
+            className="w-full"
           />
-        </div>
+        </TableSection>
+      ) : (
+        <TableSection className="min-h-0 bg-surface">
+          <PageHeaderStickyToolbar>
+            <TableToolbar>
+              <TableToolbarContent className="flex-col items-stretch md:flex-row md:items-center">
+                <ProjectAPIKeyQuerySearch
+                  value={querySearchValue}
+                  onChange={setQuerySearchValue}
+                  onApply={nextCriteria => {
+                    setPage(1);
+                    setCriteria(nextCriteria);
+                  }}
+                />
+                <Button
+                  hasIconOnly
+                  renderIcon={Renew}
+                  iconDescription="Refresh API keys"
+                  kind="ghost"
+                  tooltipPosition="bottom"
+                  onClick={() => setRefresh(value => value + 1)}
+                />
+              </TableToolbarContent>
+            </TableToolbar>
+          </PageHeaderStickyToolbar>
+
+          {error && credentials.length === 0 ? (
+            <EmptyState
+              icon={ApiKey}
+              title="API keys could not be loaded"
+              subtitle={error}
+              action="Try again"
+              actionIcon={Renew}
+              onAction={() => setRefresh(value => value + 1)}
+            />
+          ) : rows.length === 0 ? (
+            <EmptyState
+              icon={ApiKey}
+              title={
+                criteria.length > 0
+                  ? 'No API keys match your search.'
+                  : 'No project API keys'
+              }
+              subtitle={
+                criteria.length > 0
+                  ? undefined
+                  : 'Create an API key for an application or tool that needs access to this project.'
+              }
+              action={criteria.length > 0 ? undefined : 'Create API key'}
+              actionIcon={criteria.length > 0 ? undefined : Add}
+              onAction={
+                criteria.length > 0 ? undefined : () => setIsCreateOpen(true)
+              }
+            />
+          ) : (
+            <>
+              <ScrollableTableSection className="shrink-0">
+                <DataTable rows={rows} headers={projectAPIKeyHeaders}>
+                  {({
+                    rows: tableRows,
+                    headers,
+                    getHeaderProps,
+                    getRowProps,
+                    getTableProps,
+                  }) => (
+                    <Table {...getTableProps()} className="min-w-[60rem]">
+                      <TableHead>
+                        <TableRow>
+                          {headers.map(header => (
+                            <TableHeader
+                              {...getHeaderProps({ header })}
+                              key={header.key}
+                              className="whitespace-nowrap"
+                            >
+                              {header.header}
+                            </TableHeader>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {tableRows.map(row => {
+                          const credential = credentials.find(
+                            current => current.getId() === row.id,
+                          );
+                          if (!credential) return null;
+                          const isVisible = visibleCredentialIds.has(row.id);
+                          return (
+                            <TableRow {...getRowProps({ row })} key={row.id}>
+                              {row.cells.map(cell => (
+                                <TableCell key={cell.id} className="text-sm">
+                                  {cell.info.header === 'name' ? (
+                                    credential.getName()
+                                  ) : cell.info.header === 'apiKey' ? (
+                                    <div className="flex w-80 items-center gap-1">
+                                      <code
+                                        id={`project-api-key-${row.id}`}
+                                        className="w-64 shrink-0 truncate font-mono text-[13px]"
+                                      >
+                                        {isVisible
+                                          ? credential.getKey()
+                                          : `${credential.getKey().slice(0, 6)}${'•'.repeat(24)}`}
+                                      </code>
+                                      <Button
+                                        hasIconOnly
+                                        renderIcon={isVisible ? ViewOff : View}
+                                        iconDescription={`${isVisible ? 'Hide' : 'Show'} ${credential.getName()} API key`}
+                                        aria-expanded={isVisible}
+                                        aria-controls={`project-api-key-${row.id}`}
+                                        kind="ghost"
+                                        size="sm"
+                                        className="!min-h-0 !shrink-0 !p-1"
+                                        onClick={() =>
+                                          setVisibleCredentialIds(current => {
+                                            const next = new Set(current);
+                                            if (next.has(row.id))
+                                              next.delete(row.id);
+                                            else next.add(row.id);
+                                            return next;
+                                          })
+                                        }
+                                      />
+                                      <Button
+                                        hasIconOnly
+                                        renderIcon={
+                                          copiedCredentialId === row.id
+                                            ? Checkmark
+                                            : Copy
+                                        }
+                                        iconDescription={`Copy ${credential.getName()} API key`}
+                                        kind="ghost"
+                                        size="sm"
+                                        className="!min-h-0 !shrink-0 !p-1"
+                                        onClick={async () => {
+                                          try {
+                                            await navigator.clipboard.writeText(
+                                              credential.getKey(),
+                                            );
+                                            setCopiedCredentialId(row.id);
+                                            window.setTimeout(
+                                              () =>
+                                                setCopiedCredentialId(
+                                                  current =>
+                                                    current === row.id
+                                                      ? null
+                                                      : current,
+                                                ),
+                                              2000,
+                                            );
+                                            toast.success('API key copied.');
+                                          } catch {
+                                            toast.error(
+                                              'API key could not be copied. Copy it manually after showing it.',
+                                            );
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                  ) : cell.info.header === 'role' ? (
+                                    <Tag size="sm" type="cool-gray">
+                                      {credential.getRolename()}
+                                    </Tag>
+                                  ) : cell.info.header === 'actions' ? (
+                                    <div className="flex items-center gap-0">
+                                      {canRevoke && (
+                                        <IconOnlyButton
+                                          size="md"
+                                          kind="ghost"
+                                          renderIcon={Unlink}
+                                          iconDescription={`Revoke ${credential.getName()}`}
+                                          tooltipPosition="bottom"
+                                          onClick={() =>
+                                            setCredentialPendingRevoke(
+                                              credential,
+                                            )
+                                          }
+                                        />
+                                      )}
+                                    </div>
+                                  ) : (
+                                    cell.value
+                                  )}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </DataTable>
+              </ScrollableTableSection>
+              <Pagination
+                sticky
+                page={page}
+                pageSize={pageSize}
+                pageSizes={[10, 25, 50, 100]}
+                totalItems={totalItems}
+                onChange={value => {
+                  setPage(value.page);
+                  setPageSize(value.pageSize);
+                }}
+              />
+            </>
+          )}
+        </TableSection>
+      )}
+
+      {currentProjectRole && (
+        <CreateProjectToken
+          open={isCreateOpen}
+          projectId={currentProjectRole.projectid}
+          auth={{ token, userId }}
+          onClose={() => setIsCreateOpen(false)}
+          onCreated={() => {
+            setPage(1);
+            setRefresh(value => value + 1);
+          }}
+        />
+      )}
+      {credentialPendingRevoke && currentProjectRole && (
+        <ConfirmDeleteDialog
+          showing
+          title="Revoke API key"
+          content={`Applications using "${credentialPendingRevoke.getName()}" will lose access immediately.`}
+          confirmText="Revoke API key"
+          objectName={credentialPendingRevoke.getName()}
+          onClose={() => setCredentialPendingRevoke(null)}
+          onCancel={() => setCredentialPendingRevoke(null)}
+          onConfirm={() => {
+            const revokedCredential = credentialPendingRevoke;
+            revokeProjectCredential({
+              projectId: currentProjectRole.projectid,
+              credentialId: revokedCredential.getId(),
+              auth: { token, userId },
+              callback: (revokeError, response) => {
+                if (response?.getSuccess()) {
+                  setCredentialPendingRevoke(null);
+                  toast.success('API key was revoked.');
+                  if (credentials.length === 1 && page > 1) {
+                    setPage(value => value - 1);
+                  } else {
+                    setRefresh(value => value + 1);
+                  }
+                  return;
+                }
+                if (!revokeError) {
+                  toast.error(
+                    response?.getError()?.getHumanmessage() ||
+                      'API key could not be revoked. Try again.',
+                  );
+                  return;
+                }
+                listProjectCredentials({
+                  projectId: currentProjectRole.projectid,
+                  page,
+                  pageSize,
+                  criteria,
+                  auth: { token, userId },
+                  callback: (_, listResponse) => {
+                    if (listResponse?.getSuccess()) {
+                      const nextCredentials = listResponse.getDataList();
+                      setCredentials(nextCredentials);
+                      setTotalItems(
+                        listResponse.getPaginated()?.getTotalitem() || 0,
+                      );
+                      if (
+                        !nextCredentials.some(
+                          current =>
+                            current.getId() === revokedCredential.getId(),
+                        )
+                      ) {
+                        setCredentialPendingRevoke(null);
+                        toast.success('API key was revoked.');
+                        return;
+                      }
+                    }
+                    toast.error(
+                      'API key revocation could not be confirmed. Try again.',
+                    );
+                  },
+                });
+              },
+            });
+          }}
+        />
       )}
     </div>
   );
 }
-
-// CredentialCard Component - Contains all card-specific logic
-const CredentialCard: FC<{ credential: ProjectCredential }> = ({
-  credential,
-}) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
-
-  const copyToClipboard = async text => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
-  const maskCredential = credential => {
-    return credential.substring(0, 6) + '•'.repeat(36);
-  };
-
-  return (
-    <BaseCard>
-      {/* Card header */}
-      <div className="px-4 pt-4 pb-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium text-foreground truncate">
-            {credential.getName()}
-          </span>
-          <span className="text-xs tabular-nums text-muted shrink-0">
-            {toHumanReadableDate(credential.getCreateddate()!)}
-          </span>
-        </div>
-      </div>
-
-      {/* Key row */}
-      <div className="px-4 pb-4 border-t border-border-subtle pt-3">
-        <div className="flex items-center gap-2">
-          <code className="flex-1 bg-layer px-3 py-2 font-mono text-xs min-w-0 overflow-hidden truncate">
-            {isVisible
-              ? credential.getKey()
-              : maskCredential(credential.getKey())}
-          </code>
-          <div className="flex shrink-0 border border-border-subtle divide-x divide-border-subtle ">
-            <GhostButton
-              size="md"
-              onClick={() => setIsVisible(!isVisible)}
-              title={isVisible ? 'Hide' : 'Show'}
-            >
-              {isVisible ? <ViewOff size={16} /> : <View size={16} />}
-            </GhostButton>
-            <GhostButton
-              size="md"
-              onClick={() => copyToClipboard(credential.getKey())}
-              title="Copy"
-            >
-              {isCopied ? <Checkmark size={16} /> : <Copy size={16} />}
-            </GhostButton>
-          </div>
-        </div>
-      </div>
-    </BaseCard>
-  );
-};
 
 export function PersonalCredentialPage() {
   /**

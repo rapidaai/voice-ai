@@ -339,7 +339,7 @@ describe('RoleCatalogPage', () => {
       );
 
     const search = screen.getByPlaceholderText(
-      'Search for name, scope, subject, type',
+      'Search for name, key, scope, subject, type',
     );
     await user.click(search);
     await user.click(screen.getByRole('button', { name: 'name contains' }));
@@ -350,8 +350,10 @@ describe('RoleCatalogPage', () => {
     expect(mockListAccessRoles).toHaveBeenLastCalledWith(
       expect.objectContaining({
         page: 1,
-        query: 'n',
-        scope: 'ROLE_SCOPE_PROJECT',
+        criteria: [
+          { key: 'name', logic: 'contains', value: 'n' },
+          { key: 'scope', logic: '=', value: 'PROJECT' },
+        ],
       }),
     );
     resolveFilter(response([role('3', 'New role')]));

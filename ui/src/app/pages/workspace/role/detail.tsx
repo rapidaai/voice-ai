@@ -297,7 +297,7 @@ export function DeleteRoleDialog({
     <ConfirmDeleteDialog
       showing={open}
       title="Delete role"
-      content={`This removes "${role.getName()}" from active roles. Roles with active assignments cannot be deleted. This role key cannot be reused. Type the role name to confirm.`}
+      content="Deleting a role removes it from the active roles. Its key cannot be reused, and roles assigned to users cannot be deleted."
       objectName={role.getName()}
       confirmText={isDeleting ? 'Deleting...' : 'Delete role'}
       onConfirm={deleteRole}

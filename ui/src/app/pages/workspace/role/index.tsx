@@ -52,7 +52,7 @@ import { toHumanReadableDateTime } from '@/utils/date';
 import { CreateRoleModal } from './create';
 import { DeleteRoleDialog, EditRoleModal } from './detail';
 import { RoleDetailsSidePanel } from './role-details-side-panel';
-import { RoleQuerySearch } from './role-query-search';
+import { RoleQuerySearch, type RoleSearchCriteria } from './role-query-search';
 
 const headers = [
   { key: 'name', header: 'Name' },
@@ -84,16 +84,7 @@ export function RoleCatalogPage() {
   const [userId, token] = useCredential();
   const [roles, setRoles] = useState<RoleDefinition[]>([]);
   const [querySearchValue, setQuerySearchValue] = useState('');
-  const [query, setQuery] = useState('');
-  const [scope, setScope] = useState<keyof typeof RoleScope>(
-    'ROLE_SCOPE_UNSPECIFIED',
-  );
-  const [subject, setSubject] = useState<keyof typeof RoleSubject>(
-    'ROLE_SUBJECT_UNSPECIFIED',
-  );
-  const [definitionType, setDefinitionType] = useState<
-    keyof typeof RoleDefinitionType
-  >('ROLE_DEFINITION_TYPE_UNSPECIFIED');
+  const [criteria, setCriteria] = useState<RoleSearchCriteria[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [totalItems, setTotalItems] = useState(0);
@@ -130,10 +121,7 @@ export function RoleCatalogPage() {
     listAccessRoles({
       page,
       pageSize,
-      query,
-      scope,
-      subject,
-      definitionType,
+      criteria,
       auth: { token, userId },
     })
       .then(response => {
@@ -162,17 +150,7 @@ export function RoleCatalogPage() {
     return () => {
       requestSequence.current += 1;
     };
-  }, [
-    definitionType,
-    page,
-    pageSize,
-    query,
-    refresh,
-    scope,
-    subject,
-    token,
-    userId,
-  ]);
+  }, [criteria, page, pageSize, refresh, token, userId]);
 
   const rows = roles.map(role => ({
     id: role.getId(),
@@ -210,10 +188,7 @@ export function RoleCatalogPage() {
             onChange={setQuerySearchValue}
             onApply={filters => {
               setPage(1);
-              setQuery(filters.query);
-              setScope(filters.scope);
-              setSubject(filters.subject);
-              setDefinitionType(filters.definitionType);
+              setCriteria(filters);
             }}
           />
           <Button

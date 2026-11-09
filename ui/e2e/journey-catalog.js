@@ -360,10 +360,10 @@ const journeySubjourneys = [
     'organization.projects',
     'journeys/organization/listings.spec.js',
   ),
-  deferred(
+  covered(
     'integration.credentials.create',
     'integration.projectCredential',
-    'The dialog needs deterministic credential mutation fixtures.',
+    'journeys/integration/project-credential.spec.js',
   ),
   covered(
     'account.notifications',
