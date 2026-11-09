@@ -34,6 +34,12 @@ const {
   installWorkspaceClientMock,
   mockWorkspaceCreation,
 } = require('./mocks/clients/workspace');
+const {
+  ACCESS_MANAGEMENT_PATHS,
+  installAccessManagementClientMock,
+  mockRoleListFailureAfterInitialLoad,
+  mockRoleNotFound,
+} = require('./mocks/clients/access-management');
 
 const COLOR_MODES = ['light', 'dark'];
 const SCREENSHOT_VIEWPORTS = [
@@ -96,6 +102,7 @@ async function installBrowserFixtures(page) {
   await installActivityClientMock(page);
   await installCredentialClientMock(page);
   await installWorkspaceClientMock(page);
+  await installAccessManagementClientMock(page);
   await installGrpcWebPreflightMock(page);
 }
 
@@ -223,6 +230,7 @@ module.exports = {
   expect,
   COLOR_MODES,
   SCREENSHOT_VIEWPORTS,
+  ACCESS_MANAGEMENT_PATHS,
   ASSISTANT_LIST_PATH,
   ASSISTANT_DETAIL_PATH,
   ACTIVITY_LIST_PATHS,
@@ -238,6 +246,8 @@ module.exports = {
   expandDashboardForScreenshot,
   gotoJourney,
   mockAuthenticationOperation,
+  mockRoleListFailureAfterInitialLoad,
+  mockRoleNotFound,
   mockWorkspaceCreation,
   setColorMode,
   screenshotBaselinePath,

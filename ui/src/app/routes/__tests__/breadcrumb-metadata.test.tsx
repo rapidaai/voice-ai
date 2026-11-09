@@ -45,6 +45,7 @@ describe('workspace route breadcrumb metadata', () => {
   it.each([
     ['/dashboard', ['Dashboard']],
     ['/organization/users', ['Organization', 'Users']],
+    ['/organization/roles/role-1', ['Organization', 'Role detail']],
     [
       '/integration/project-credential',
       ['Integrations', 'Project credentials'],

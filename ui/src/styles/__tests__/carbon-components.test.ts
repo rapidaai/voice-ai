@@ -32,6 +32,9 @@ describe('Carbon component styles', () => {
     expect(carbonStyles).toContain(
       "@use '@carbon/react/scss/components/data-table/skeleton';",
     );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/ibm-products/scss/components/SidePanel';",
+    );
     expect(carbonStyles).toContain('.debugger-configuration-accordion');
     expect(carbonStyles).toContain('border-block-start: 0;');
     expect(carbonStyles).toContain('margin-inline-start: 0;');
@@ -54,5 +57,23 @@ describe('Carbon component styles', () => {
     expect(carbonStyles).toMatch(
       /\.text-provider-combo-row\s*\{\s*\.cds--combo-box \.cds--text-input\s*\{\s*border-block-end: none;/,
     );
+  });
+
+  it('loads the Carbon tearsheet without role-specific geometry', () => {
+    const carbonStyles = readFileSync(
+      resolve(process.cwd(), 'src/styles/carbon.scss'),
+      'utf8',
+    );
+
+    expect(carbonStyles).toContain(
+      "@use '@carbon/ibm-products/scss/components/Tearsheet';",
+    );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/ibm-products/scss/components/AddSelect';",
+    );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/ibm-products/scss/components/EmptyStates';",
+    );
+    expect(carbonStyles).not.toContain('.role-create-modal');
   });
 });

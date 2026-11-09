@@ -211,4 +211,29 @@ describe('UserPage', () => {
     );
     expect(pagination?.previousElementSibling).not.toHaveClass('flex-1');
   });
+
+  it('uses field-aware search to filter loaded users', async () => {
+    const interaction = userEvent.setup();
+    render(<UserPage />);
+
+    const search = await screen.findByPlaceholderText(
+      'Search for name, email, role, status',
+    );
+    await interaction.click(search);
+    await interaction.click(
+      screen.getByRole('button', { name: 'email contains' }),
+    );
+    await interaction.type(
+      screen.getByRole('textbox'),
+      'missing@example.test{Enter}',
+    );
+
+    expect(screen.queryByText('Ada Lovelace')).not.toBeInTheDocument();
+    expect(screen.getByText('No users found')).toBeInTheDocument();
+
+    await interaction.click(
+      screen.getByRole('button', { name: 'Remove email filter' }),
+    );
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+  });
 });

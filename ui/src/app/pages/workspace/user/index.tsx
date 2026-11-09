@@ -26,7 +26,6 @@ import {
   TableBatchAction,
   TableBatchActions,
   TableToolbarContent,
-  TableToolbarSearch,
   Button,
   DataTable,
   DataTableSkeleton,
@@ -40,6 +39,10 @@ import { TableSection } from '@/app/components/layout/sections/table-section';
 import { ConfirmDeleteDialog } from '@/app/components/dialogs/shared';
 import { deleteOrganizationUser, updateOrganizationUserRole } from '@/clients';
 import { EmptyState } from '@/app/components/ui/feedback';
+import {
+  UserQuerySearch,
+  type OrganizationUserSearchFilter,
+} from './user-query-search';
 
 const headers = [
   { key: 'id', header: 'ID' },
@@ -63,6 +66,10 @@ export function UserPage() {
     useState<User | null>(null);
   const [userPendingDelete, setUserPendingDelete] = useState<User | null>(null);
   const [isFetching, setIsFetching] = useState(true);
+  const [querySearchValue, setQuerySearchValue] = useState('');
+  const [searchFilters, setSearchFilters] = useState<
+    OrganizationUserSearchFilter[]
+  >([]);
   const { projectId, authId, token } = useCurrentCredential();
   const userActions = useUserPageStore();
 
@@ -153,6 +160,15 @@ export function UserPage() {
     createdDate: user.getCreateddate()?.toString() || '',
     status: user.getStatus?.() || '',
   }));
+  const visibleTableRows = tableRows.filter(row =>
+    searchFilters.every(filter => {
+      const currentValue = String(row[filter.key] || '').toLowerCase();
+      const expectedValue = filter.value.toLowerCase();
+      return filter.logic === 'contains'
+        ? currentValue.includes(expectedValue)
+        : currentValue === expectedValue;
+    }),
+  );
 
   return (
     <div
@@ -170,7 +186,7 @@ export function UserPage() {
         description="Manage organization access, roles, and project collaboration for your team."
         contextualActions={
           <Text variant="label-01" className="text-muted tabular-nums">
-            {userActions.users.length} of {userActions.totalCount}
+            {visibleTableRows.length} of {userActions.totalCount}
           </Text>
         }
         pageActions={
@@ -198,7 +214,7 @@ export function UserPage() {
         </TableSection>
       ) : (
         <TableSection className="min-h-0 bg-surface">
-          <DataTable rows={tableRows} headers={headers} radio>
+          <DataTable rows={visibleTableRows} headers={headers} radio>
             {({
               rows,
               headers: tableHeaders,
@@ -209,7 +225,6 @@ export function UserPage() {
               getSelectionProps,
               getTableProps,
               getToolbarProps,
-              onInputChange,
             }) => {
               const batchActionProps = getBatchActionProps();
               const selectedUser = selectedRows[0]
@@ -280,9 +295,13 @@ export function UserPage() {
                         </TableBatchActions>
                       )}
                       <TableToolbarContent>
-                        <TableToolbarSearch
-                          placeholder="Search users..."
-                          onChange={onInputChange}
+                        <UserQuerySearch
+                          value={querySearchValue}
+                          onChange={setQuerySearchValue}
+                          onApply={filters => {
+                            userActions.setPage(1);
+                            setSearchFilters(filters);
+                          }}
                         />
                         <Button
                           hasIconOnly
@@ -296,7 +315,7 @@ export function UserPage() {
                     </TableToolbar>
                   </PageHeaderStickyToolbar>
 
-                  {userActions.users.length > 0 ? (
+                  {visibleTableRows.length > 0 ? (
                     <>
                       <div className="shrink-0 overflow-x-auto">
                         <Table {...getTableProps()} className="min-w-max">
@@ -354,8 +373,16 @@ export function UserPage() {
                     <div className="flex flex-1 items-center justify-center">
                       <EmptyState
                         icon={UserMultiple}
-                        title="No organization users"
-                        subtitle="Invite teammates to collaborate on projects and manage organization access."
+                        title={
+                          searchFilters.length > 0
+                            ? 'No users found'
+                            : 'No organization users'
+                        }
+                        subtitle={
+                          searchFilters.length > 0
+                            ? 'No users match your current filters.'
+                            : 'Invite teammates to collaborate on projects and manage organization access.'
+                        }
                         action="Invite user"
                         actionIcon={Add}
                         onAction={() => setInviteOrganizationModalOpen(true)}

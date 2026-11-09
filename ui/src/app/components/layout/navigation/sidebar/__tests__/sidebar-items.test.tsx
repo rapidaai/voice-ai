@@ -8,6 +8,7 @@ import { ExternalTool } from '../external-tools';
 import { Knowledge } from '../knowledge';
 import { Observability } from '../observability';
 import { Project } from '../project';
+import { Roles } from '../roles';
 import { Team } from '../team';
 import { Vault } from '../vault';
 
@@ -45,6 +46,7 @@ describe('sidebar navigation items', () => {
         <ExternalTool />
         <Team />
         <Project />
+        <Roles />
       </>,
     );
 
@@ -77,6 +79,9 @@ describe('sidebar navigation items', () => {
       'href',
       '/organization/projects',
     );
+    expect(
+      screen.getByRole('link', { name: /Roles & Permissions/i }),
+    ).toHaveAttribute('href', '/organization/roles');
     expect(
       screen.getByRole('link', { name: /Assistants/i }).firstChild,
     ).toHaveClass('text-foreground');

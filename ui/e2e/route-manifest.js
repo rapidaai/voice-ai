@@ -472,6 +472,15 @@ const routeJourneys = [
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {
+    id: 'organization.roles',
+    path: '/organization/roles',
+    auth: true,
+    expectText: 'Roles & Permissions',
+    checks: ['smoke', 'a11y'],
+    screenshotDeferredReason:
+      'Role catalog screenshots need access-management list fixtures.',
+  },
+  {
     id: 'organization.security',
     path: '/organization/security',
     auth: true,
@@ -854,6 +863,12 @@ const sourceRouteInventory = {
     { path: '/', journey: 'organization.overview' },
     { path: 'users', journey: 'organization.users' },
     { path: 'projects', journey: 'organization.projects' },
+    { path: 'roles', journey: 'organization.roles' },
+    {
+      path: 'roles/:roleDefinitionId',
+      deferredReason:
+        'Role detail browser coverage needs an access-management role fixture.',
+    },
     { path: 'security', journey: 'organization.security' },
   ],
   'preview.tsx': [

@@ -59,6 +59,10 @@
 @use '@carbon/react/scss/components/structured-list';
 @use '@carbon/react/scss/components/accordion';
 @use '@carbon/ibm-products/scss/components/Checklist';
+@use '@carbon/ibm-products/scss/components/Tearsheet';
+@use '@carbon/ibm-products/scss/components/AddSelect';
+@use '@carbon/ibm-products/scss/components/EmptyStates';
+@use '@carbon/ibm-products/scss/components/SidePanel';
 
 .debugger-configuration-accordion > .cds--accordion__item:first-child {
   border-block-start: 0;
