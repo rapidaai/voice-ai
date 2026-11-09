@@ -7,6 +7,8 @@ global.window = global;
 global.self = global;
 const {
   AuditActor,
+  ArchiveCustomRoleRequest,
+  ArchiveCustomRoleResponse,
   CreateCustomRoleResponse,
   GetRoleRequest,
   GetRoleResponse,
@@ -18,6 +20,8 @@ const {
   RoleDefinitionType,
   RoleScope,
   RoleSubject,
+  UpdateCustomRoleRequest,
+  UpdateCustomRoleResponse,
 } = require('@rapidaai/react');
 if (previousWindow === undefined) delete global.window;
 else global.window = previousWindow;
@@ -25,10 +29,12 @@ if (previousSelf === undefined) delete global.self;
 else global.self = previousSelf;
 
 const ACCESS_MANAGEMENT_PATHS = Object.freeze({
+  archiveRole: '**/web_api.AccessManagementService/ArchiveCustomRole',
   createRole: '**/web_api.AccessManagementService/CreateCustomRole',
   getRole: '**/web_api.AccessManagementService/GetRole',
   listPermissions: '**/web_api.AccessManagementService/ListPermissions',
   listRoles: '**/web_api.AccessManagementService/ListRoles',
+  updateRole: '**/web_api.AccessManagementService/UpdateCustomRole',
 });
 
 function timestamp(seconds) {
@@ -45,7 +51,13 @@ function auditActor(id, name) {
   return actor;
 }
 
-function permission(id, key, name, description, scope = RoleScope.ROLE_SCOPE_PROJECT) {
+function permission(
+  id,
+  key,
+  name,
+  description,
+  scope = RoleScope.ROLE_SCOPE_PROJECT,
+) {
   const value = new PermissionDefinition();
   value.setId(id);
   value.setKey(key);
@@ -125,12 +137,12 @@ function paginated(total) {
   return value;
 }
 
-function buildRoleListResponse() {
+function buildRoleListResponse(roles = [CUSTOM_ROLE, BUILT_IN_ROLE]) {
   const response = new ListRolesResponse();
   response.setCode(200);
   response.setSuccess(true);
-  response.setRolesList([CUSTOM_ROLE, BUILT_IN_ROLE]);
-  response.setPaginated(paginated(2));
+  response.setRolesList(roles);
+  response.setPaginated(paginated(roles.length));
   return Buffer.from(response.serializeBinary());
 }
 
@@ -157,6 +169,30 @@ function buildCreateRoleResponse() {
   response.setSuccess(true);
   response.setRole(CREATED_ROLE);
   return Buffer.from(response.serializeBinary());
+}
+
+function buildUpdateRoleResponse(currentRole) {
+  const response = new UpdateCustomRoleResponse();
+  response.setCode(200);
+  response.setSuccess(true);
+  response.setRole(currentRole);
+  return Buffer.from(response.serializeBinary());
+}
+
+function buildArchiveRoleResponse(roleDefinitionId) {
+  const response = new ArchiveCustomRoleResponse();
+  response.setCode(200);
+  response.setSuccess(true);
+  response.setRoledefinitionid(roleDefinitionId);
+  return Buffer.from(response.serializeBinary());
+}
+
+function deserializeRequest(route, RequestType) {
+  const body = route.request().postDataBuffer();
+  const messageLength = body?.readUInt32BE(1) || 0;
+  return RequestType.deserializeBinary(
+    body?.subarray(5, 5 + messageLength) || Buffer.alloc(0),
+  );
 }
 
 function fulfillGrpcWebError(route, code, message) {
@@ -195,8 +231,15 @@ async function mockRoleListFailureAfterInitialLoad(page) {
 }
 
 async function installAccessManagementClientMock(page) {
+  let currentCustomRole = role({
+    id: CUSTOM_ROLE.getId(),
+    key: CUSTOM_ROLE.getKey(),
+    name: CUSTOM_ROLE.getName(),
+    description: CUSTOM_ROLE.getDescription(),
+    definitionType: RoleDefinitionType.ROLE_DEFINITION_TYPE_CUSTOM,
+  });
+  let isCustomRoleArchived = false;
   const responses = new Map([
-    [ACCESS_MANAGEMENT_PATHS.listRoles, buildRoleListResponse()],
     [ACCESS_MANAGEMENT_PATHS.listPermissions, buildPermissionListResponse()],
     [ACCESS_MANAGEMENT_PATHS.createRole, buildCreateRoleResponse()],
   ]);
@@ -208,20 +251,53 @@ async function installAccessManagementClientMock(page) {
     });
   }
 
+  await page.route(ACCESS_MANAGEMENT_PATHS.listRoles, route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    const customRoleSummary = role({
+      id: currentCustomRole.getId(),
+      key: currentCustomRole.getKey(),
+      name: currentCustomRole.getName(),
+      description: currentCustomRole.getDescription(),
+      definitionType: RoleDefinitionType.ROLE_DEFINITION_TYPE_CUSTOM,
+      permissions: [],
+    });
+    const roles = isCustomRoleArchived
+      ? [BUILT_IN_ROLE]
+      : [customRoleSummary, BUILT_IN_ROLE];
+    return fulfillGrpcWeb(route, buildRoleListResponse(roles));
+  });
+
   await page.route(ACCESS_MANAGEMENT_PATHS.getRole, route => {
     if (route.request().method() !== 'POST') return route.fallback();
-    const body = route.request().postDataBuffer();
-    const messageLength = body?.readUInt32BE(1) || 0;
-    const request = GetRoleRequest.deserializeBinary(
-      body?.subarray(5, 5 + messageLength) || Buffer.alloc(0),
-    );
+    const request = deserializeRequest(route, GetRoleRequest);
     const currentRole =
       request.getRoledefinitionid() === CREATED_ROLE.getId()
         ? CREATED_ROLE
         : request.getRoledefinitionid() === BUILT_IN_ROLE.getId()
           ? BUILT_IN_ROLE
-          : CUSTOM_ROLE;
+          : currentCustomRole;
     return fulfillGrpcWeb(route, buildRoleDetailResponse(currentRole));
+  });
+
+  await page.route(ACCESS_MANAGEMENT_PATHS.updateRole, route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    const request = deserializeRequest(route, UpdateCustomRoleRequest);
+    currentCustomRole.setName(request.getName());
+    currentCustomRole.setDescription(request.getDescription());
+    return fulfillGrpcWeb(route, buildUpdateRoleResponse(currentCustomRole));
+  });
+
+  await page.route(ACCESS_MANAGEMENT_PATHS.archiveRole, route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    const request = deserializeRequest(route, ArchiveCustomRoleRequest);
+    if (!request.getReason()) {
+      return fulfillGrpcWebError(route, 3, 'deletion reason is required');
+    }
+    isCustomRoleArchived = true;
+    return fulfillGrpcWeb(
+      route,
+      buildArchiveRoleResponse(request.getRoledefinitionid()),
+    );
   });
 }
 

@@ -27,10 +27,16 @@ test('organization roles expose inline actions and complete read-only details', 
     page.getByRole('button', { name: 'Edit Support manager' }),
   ).toBeEnabled();
   await expect(
+    page.getByRole('button', { name: 'Delete Support manager' }),
+  ).toBeEnabled();
+  await expect(
     page.getByRole('button', { name: 'View Project viewer' }),
   ).toBeEnabled();
   await expect(
     page.getByRole('button', { name: 'Edit Project viewer' }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Delete Project viewer' }),
   ).toBeDisabled();
 
   const catalogUrl = page.url();
@@ -85,14 +91,57 @@ test('organization roles show terminal not-found without Retry', async ({
   await expect(page.getByRole('button', { name: 'Close' })).toBeVisible();
 });
 
-test('organization roles preserve custom Edit routing', async ({ page }) => {
+test('organization roles keep custom Edit in a modal', async ({ page }) => {
   await gotoJourney(page, journey('roles'));
+  const catalogUrl = page.url();
   await page.getByRole('button', { name: 'Edit Support manager' }).click();
 
-  await expect(page).toHaveURL(/\/organization\/roles\/501$/);
+  await expect(page).toHaveURL(catalogUrl);
+  const editDialog = page.getByRole('dialog', { name: 'Edit role' });
+  await expect(editDialog).toBeVisible();
+  await expect(editDialog.getByLabel('Name', { exact: true })).toHaveValue(
+    'Support manager',
+  );
+  await expect(editDialog.getByLabel('Description')).toHaveValue(
+    'Manages support workflows across assigned projects.',
+  );
+  await expect(editDialog.getByRole('tab')).toHaveCount(0);
+  await expect(editDialog.getByRole('checkbox')).toHaveCount(0);
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Support manager' }),
-  ).toBeVisible();
+    editDialog.getByRole('button', { name: 'Remove permissions' }),
+  ).toHaveCount(0);
+  await checkA11y(page, journey('roles'));
+});
+
+test('organization role actions update and delete a custom role', async ({
+  page,
+}) => {
+  await gotoJourney(page, journey('roles'));
+  const catalogUrl = page.url();
+
+  await page.getByRole('button', { name: 'Edit Support manager' }).click();
+  const editDialog = page.getByRole('dialog', { name: 'Edit role' });
+  await expect(editDialog).toBeVisible();
+  await editDialog.getByLabel('Name', { exact: true }).fill('Support lead');
+  await editDialog.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByText('Support lead', { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(catalogUrl);
+
+  await page.getByRole('button', { name: 'Delete Support lead' }).click();
+  const deleteDialog = page.getByRole('dialog', {
+    name: 'Delete role',
+  });
+  await expect(deleteDialog).toContainText(
+    'Roles with active assignments cannot be deleted.',
+  );
+  await checkA11y(page, journey('roles'));
+  await expect(deleteDialog.getByPlaceholder('Support lead')).toBeVisible();
+  await deleteDialog.getByPlaceholder('Support lead').fill('Support lead');
+  await deleteDialog.getByRole('button', { name: 'Delete role' }).click();
+
+  await expect(page).toHaveURL(catalogUrl);
+  await expect(page.getByText('Support lead', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Project viewer', { exact: true })).toBeVisible();
 });
 
 test('organization role creation stays on the catalog URL', async ({
@@ -255,6 +304,36 @@ test('created-role handoff opens details when catalog refresh fails', async ({
 });
 
 for (const colorMode of ['light', 'dark']) {
+  test(`organization.roles edit modal screenshot in ${colorMode} mode`, async ({
+    page,
+  }) => {
+    await setColorMode(page, colorMode);
+    await gotoJourney(page, journey('roles'));
+    await page.getByRole('button', { name: 'Edit Support manager' }).click();
+    const editDialog = page.getByRole('dialog', { name: 'Edit role' });
+    await expect(editDialog.getByLabel('Name', { exact: true })).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute(
+      'data-color-mode',
+      colorMode,
+    );
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await Promise.all(
+        document
+          .getAnimations()
+          .filter(animation =>
+            Number.isFinite(animation.effect?.getComputedTiming().endTime),
+          )
+          .map(animation => animation.finished.catch(() => {})),
+      );
+    });
+
+    await expect(page).toHaveScreenshot(
+      ['organization', `roles-edit-modal-${colorMode}.png`],
+      { fullPage: true, maxDiffPixelRatio: 0.01 },
+    );
+  });
+
   test(`organization.roles details panel screenshot in ${colorMode} mode`, async ({
     page,
   }) => {

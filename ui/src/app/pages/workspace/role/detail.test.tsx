@@ -1,13 +1,18 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
-import { RoleDefinitionType, RoleScope, RoleSubject } from '@rapidaai/react';
-import { RoleDetailPage } from './detail';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import {
+  PermissionDefinition,
+  RoleDefinition,
+  RoleDefinitionType,
+} from '@rapidaai/react';
+import { DeleteRoleDialog, EditRoleModal, RoleDetailPage } from './detail';
 
-const mockGetAccessRole = jest.fn();
 const mockUpdateAccessRole = jest.fn();
 const mockReduceAccessRolePermissions = jest.fn();
 const mockArchiveAccessRole = jest.fn();
+const mockGetAccessRole = jest.fn();
+const mockToastError = jest.fn();
 
 jest.mock('@/hooks/use-credential', () => ({
   useCredential: () => ['user-1', 'token-1'],
@@ -21,201 +26,286 @@ jest.mock('@/clients', () => ({
   archiveAccessRole: (...args: unknown[]) => mockArchiveAccessRole(...args),
 }));
 
-jest.mock('@/app/components/app-shell/helmet', () => ({ Helmet: () => null }));
+jest.mock('react-hot-toast/headless', () => ({
+  __esModule: true,
+  default: { error: (...args: unknown[]) => mockToastError(...args) },
+}));
 
-const permission = {
-  getId: () => '34',
-  getName: () => 'Project Read',
-  getKey: () => 'project.read',
-};
+function role(
+  definitionType: Parameters<
+    RoleDefinition['setDefinitiontype']
+  >[0] = RoleDefinitionType.ROLE_DEFINITION_TYPE_CUSTOM,
+) {
+  const permission = new PermissionDefinition();
+  permission.setId('34');
+  permission.setName('Project Read');
+  permission.setKey('project.read');
 
-const role = (definitionType: number) => ({
-  getId: () => '101',
-  getName: () => 'Support manager',
-  getDescription: () => 'Manages support',
-  getKey: () => 'support_manager',
-  getScope: () => RoleScope.ROLE_SCOPE_PROJECT,
-  getSubject: () => RoleSubject.ROLE_SUBJECT_USER,
-  getDefinitiontype: () => definitionType,
-  getCreateddate: () => undefined,
-  getUpdateddate: () => undefined,
-  getCreatedactor: () => undefined,
-  getUpdatedactor: () => undefined,
-  getPermissionsList: () => [permission],
-});
-
-const response = (definitionType: number) => ({
-  getSuccess: () => true,
-  getRole: () => role(definitionType),
-});
-
-function renderPage() {
-  return render(
-    <MemoryRouter initialEntries={['/organization/roles/101']}>
-      <Link to="/outside">Leave page</Link>
-      <Routes>
-        <Route
-          path="/organization/roles/:roleDefinitionId"
-          element={<RoleDetailPage />}
-        />
-        <Route path="/organization/roles" element={<div>Role catalog</div>} />
-        <Route path="/outside" element={<div>Outside role management</div>} />
-      </Routes>
-    </MemoryRouter>,
-  );
+  const value = new RoleDefinition();
+  value.setId('101');
+  value.setName('Support manager');
+  value.setDescription('Manages support');
+  value.setDefinitiontype(definitionType);
+  value.setPermissionsList([permission]);
+  return value;
 }
 
-describe('RoleDetailPage', () => {
+describe('role action dialogs', () => {
+  beforeAll(() => {
+    HTMLElement.prototype.scrollIntoView = jest.fn();
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: jest.fn().mockReturnValue({
+        matches: false,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+      }),
+    });
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetAccessRole.mockResolvedValue(
-      response(RoleDefinitionType.ROLE_DEFINITION_TYPE_CUSTOM),
-    );
     mockUpdateAccessRole.mockResolvedValue({ getSuccess: () => true });
     mockReduceAccessRolePermissions.mockResolvedValue({
       getSuccess: () => true,
     });
     mockArchiveAccessRole.mockResolvedValue({ getSuccess: () => true });
+    mockGetAccessRole.mockResolvedValue({
+      getSuccess: () => true,
+      getRole: () => role(),
+    });
   });
 
-  it('renders built-in roles as read-only with audit fallbacks', async () => {
-    mockGetAccessRole.mockResolvedValue(
-      response(RoleDefinitionType.ROLE_DEFINITION_TYPE_BUILT_IN),
-    );
-    renderPage();
+  it('loads the complete custom role without exposing permission editing', async () => {
+    const summaryRole = role();
+    summaryRole.clearPermissionsList();
 
-    expect(await screen.findByText('Built-in role')).toBeInTheDocument();
-    expect(screen.getByLabelText('Name')).toBeDisabled();
-    expect(screen.getByText('System')).toBeInTheDocument();
-    expect(screen.getByText('Unknown')).toBeInTheDocument();
+    render(
+      <EditRoleModal
+        open
+        role={summaryRole}
+        onClose={jest.fn()}
+        onUpdated={jest.fn()}
+      />,
+    );
+
+    expect(mockGetAccessRole).toHaveBeenCalledWith({
+      roleDefinitionId: '101',
+      auth: { token: 'token-1', userId: 'user-1' },
+    });
+    const dialog = screen.getByRole('dialog', { name: 'Edit role' });
+    const name = await within(dialog).findByLabelText('Name');
+    expect(name).toHaveValue('Support manager');
+    expect(name).toHaveFocus();
     expect(
-      screen.queryByRole('button', { name: 'Archive role' }),
+      within(dialog).queryByRole('tab', { name: 'Permissions' }),
+    ).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole('button', { name: /Remove permissions/i }),
     ).not.toBeInTheDocument();
   });
 
-  it('updates metadata and refetches the role after success', async () => {
+  it('updates custom-role metadata in the edit modal', async () => {
     const user = userEvent.setup();
-    renderPage();
-    const name = await screen.findByLabelText('Name');
+    const onClose = jest.fn();
+    const onUpdated = jest.fn();
+    render(
+      <EditRoleModal
+        open
+        role={role()}
+        onClose={onClose}
+        onUpdated={onUpdated}
+      />,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Edit role' });
+    const name = await within(dialog).findByLabelText('Name');
     await user.clear(name);
     await user.type(name, 'Support lead');
-    await user.click(screen.getByRole('button', { name: 'Save details' }));
-
-    await waitFor(() =>
-      expect(mockUpdateAccessRole).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Support lead',
-          roleDefinitionId: '101',
-        }),
-      ),
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Save changes' }),
     );
-    await waitFor(() => expect(mockGetAccessRole).toHaveBeenCalledTimes(2));
-  });
 
-  it('renders stored audit actors and dates', async () => {
-    mockGetAccessRole.mockResolvedValueOnce({
-      getSuccess: () => true,
-      getRole: () => ({
-        ...role(RoleDefinitionType.ROLE_DEFINITION_TYPE_CUSTOM),
-        getCreateddate: () => ({ getSeconds: () => 1, getNanos: () => 0 }),
-        getUpdateddate: () => ({ getSeconds: () => 2, getNanos: () => 0 }),
-        getCreatedactor: () => ({
-          getDisplayname: () => 'Ada Lovelace',
-          getType: () => 'user',
-          getId: () => '1',
-        }),
-        getUpdatedactor: () => ({
-          getDisplayname: () => 'Grace Hopper',
-          getType: () => 'user',
-          getId: () => '2',
-        }),
-      }),
+    expect(mockUpdateAccessRole).toHaveBeenCalledWith({
+      roleDefinitionId: '101',
+      name: 'Support lead',
+      description: 'Manages support',
+      auth: { token: 'token-1', userId: 'user-1' },
     });
-    renderPage();
-
-    expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
-    expect(screen.getByText(/by Grace Hopper/)).toBeInTheDocument();
-    expect(screen.getAllByText(/1970/)).toHaveLength(2);
+    await waitFor(() => expect(onUpdated).toHaveBeenCalledTimes(1));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps permission removal usable after a metadata failure', async () => {
+  it('keeps permission controls unavailable after a metadata failure', async () => {
     const user = userEvent.setup();
+    const onClose = jest.fn();
+    const onUpdated = jest.fn();
     mockUpdateAccessRole.mockResolvedValueOnce({
       getSuccess: () => false,
       getError: () => ({ getHumanmessage: () => 'Metadata rejected' }),
     });
-    renderPage();
-    await screen.findByRole('heading', { level: 1, name: 'Support manager' });
-    await user.click(screen.getByRole('button', { name: 'Save details' }));
-    expect(await screen.findByText('Metadata rejected')).toBeInTheDocument();
+    render(
+      <EditRoleModal
+        open
+        role={role()}
+        onClose={onClose}
+        onUpdated={onUpdated}
+      />,
+    );
 
+    const dialog = screen.getByRole('dialog', { name: 'Edit role' });
+    await within(dialog).findByLabelText('Name');
     await user.click(
-      screen.getByRole('checkbox', { name: 'Remove Project Read' }),
+      within(dialog).getByRole('button', { name: 'Save changes' }),
     );
-    await user.type(
-      screen.getByLabelText('Reason for removal'),
-      'No longer needed',
-    );
-    await user.click(screen.getByRole('button', { name: 'Remove selected' }));
-    await waitFor(() =>
-      expect(mockReduceAccessRolePermissions).toHaveBeenCalledTimes(1),
-    );
+    expect(
+      await within(dialog).findByText('Metadata rejected'),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(mockReduceAccessRolePermissions).not.toHaveBeenCalled();
+    expect(onUpdated).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('requires reasons, removes selected permissions, and archives independently', async () => {
+  it('uses the shared name confirmation before archiving from Delete', async () => {
     const user = userEvent.setup();
-    renderPage();
-    await screen.findByRole('heading', { level: 1, name: 'Support manager' });
+    const onClose = jest.fn();
+    const onDeleted = jest.fn();
+    render(
+      <DeleteRoleDialog
+        open
+        role={role()}
+        onClose={onClose}
+        onDeleted={onDeleted}
+      />,
+    );
 
-    await user.click(screen.getByRole('button', { name: 'Remove selected' }));
+    const dialog = screen.getByRole('dialog', {
+      name: 'Delete role',
+    });
+    const deleteButton = within(dialog).getByRole('button', {
+      name: 'Delete role',
+    });
+    expect(deleteButton).toBeDisabled();
     expect(
-      await screen.findByText('Select at least one permission to remove.'),
+      within(dialog).getByPlaceholderText('Support manager'),
     ).toBeInTheDocument();
-    await user.click(
-      screen.getByRole('checkbox', { name: 'Remove Project Read' }),
-    );
     await user.type(
-      screen.getByLabelText('Reason for removal'),
-      'No longer needed',
+      within(dialog).getByPlaceholderText('Support manager'),
+      'Support manager',
     );
-    await user.click(screen.getByRole('button', { name: 'Remove selected' }));
+    await user.click(deleteButton);
+
+    expect(mockArchiveAccessRole).toHaveBeenCalledWith({
+      roleDefinitionId: '101',
+      reason: 'Deleted from Roles & Permissions.',
+      auth: { token: 'token-1', userId: 'user-1' },
+    });
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the Delete dialog open when archive is rejected', async () => {
+    const user = userEvent.setup();
+    mockArchiveAccessRole.mockResolvedValueOnce({
+      getSuccess: () => false,
+      getError: () => ({
+        getHumanmessage: () => 'Move active assignments before deleting.',
+      }),
+    });
+    render(
+      <DeleteRoleDialog
+        open
+        role={role()}
+        onClose={jest.fn()}
+        onDeleted={jest.fn()}
+      />,
+    );
+
+    const dialog = screen.getByRole('dialog', {
+      name: 'Delete role',
+    });
+    await user.type(
+      within(dialog).getByPlaceholderText('Support manager'),
+      'Support manager',
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Delete role' }),
+    );
+
     await waitFor(() =>
-      expect(mockReduceAccessRolePermissions).toHaveBeenCalledWith(
-        expect.objectContaining({
-          permissionDefinitionIds: ['34'],
-          reason: 'No longer needed',
-        }),
+      expect(mockToastError).toHaveBeenCalledWith(
+        'Move active assignments before deleting.',
       ),
     );
-
-    await user.click(screen.getByRole('button', { name: 'Archive role' }));
-    expect(
-      await screen.findByText('A reason is required.'),
-    ).toBeInTheDocument();
-    await user.type(screen.getByLabelText('Reason for archive'), 'Replaced');
-    await user.click(screen.getByRole('button', { name: 'Archive role' }));
-    expect(await screen.findByText('Role catalog')).toBeInTheDocument();
+    expect(dialog).toBeInTheDocument();
   });
 
-  it('does not redirect when archive finishes after leaving the page', async () => {
+  it('fails closed when a built-in role reaches a mutation dialog', async () => {
     const user = userEvent.setup();
-    let resolveArchive: (value: unknown) => void = () => undefined;
-    mockArchiveAccessRole.mockImplementationOnce(
-      () => new Promise(resolve => (resolveArchive = resolve)),
+    mockGetAccessRole.mockResolvedValueOnce({
+      getSuccess: () => true,
+      getRole: () => role(RoleDefinitionType.ROLE_DEFINITION_TYPE_BUILT_IN),
+    });
+    render(
+      <EditRoleModal
+        open
+        role={role(RoleDefinitionType.ROLE_DEFINITION_TYPE_BUILT_IN)}
+        onClose={jest.fn()}
+        onUpdated={jest.fn()}
+      />,
     );
-    renderPage();
-    await screen.findByRole('heading', { level: 1, name: 'Support manager' });
-    await user.type(screen.getByLabelText('Reason for archive'), 'Replaced');
-    await user.click(screen.getByRole('button', { name: 'Archive role' }));
-    await user.click(screen.getByRole('link', { name: 'Leave page' }));
-    expect(
-      await screen.findByText('Outside role management'),
-    ).toBeInTheDocument();
 
-    resolveArchive({ getSuccess: () => true });
-    await waitFor(() =>
-      expect(screen.getByText('Outside role management')).toBeInTheDocument(),
+    expect(
+      await screen.findByText('Built-in roles cannot be edited.'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(mockUpdateAccessRole).not.toHaveBeenCalled();
+  });
+
+  it('shows a load error and retries the complete role request', async () => {
+    const user = userEvent.setup();
+    mockGetAccessRole
+      .mockRejectedValueOnce({ message: 'Role service unavailable' })
+      .mockResolvedValueOnce({
+        getSuccess: () => true,
+        getRole: () => role(),
+      });
+
+    render(
+      <EditRoleModal
+        open
+        role={role()}
+        onClose={jest.fn()}
+        onUpdated={jest.fn()}
+      />,
     );
-    expect(screen.queryByText('Role catalog')).not.toBeInTheDocument();
+
+    expect(
+      await screen.findByText('Role service unavailable'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByLabelText('Name')).toHaveValue('Support manager');
+    expect(mockGetAccessRole).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('RoleDetailPage', () => {
+  it('redirects legacy detail URLs to the role catalog', async () => {
+    render(
+      <MemoryRouter initialEntries={['/organization/roles/101']}>
+        <Routes>
+          <Route
+            path="/organization/roles/:roleDefinitionId"
+            element={<RoleDetailPage />}
+          />
+          <Route path="/organization/roles" element={<div>Role catalog</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Role catalog')).toBeInTheDocument();
   });
 });

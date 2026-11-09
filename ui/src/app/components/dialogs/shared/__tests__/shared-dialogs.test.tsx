@@ -39,9 +39,21 @@ jest.mock('@/app/components/ui/primitives', () => ({
       {children}
     </fieldset>
   ),
-  Modal: ({ open, children, onClose, danger, size }: any) =>
+  Modal: ({
+    open,
+    children,
+    onClose,
+    danger,
+    size,
+    'aria-label': label,
+  }: any) =>
     open ? (
-      <div data-danger={String(Boolean(danger))} data-size={size}>
+      <div
+        aria-label={label}
+        data-danger={String(Boolean(danger))}
+        data-size={size}
+        role="dialog"
+      >
         <button type="button" onClick={onClose}>
           Modal close
         </button>
@@ -236,6 +248,9 @@ describe('shared dialogs', () => {
       />,
     );
 
+    expect(
+      screen.getByRole('dialog', { name: 'Delete project' }),
+    ).toBeInTheDocument();
     const deleteButton = screen.getByRole('button', { name: 'Delete' });
     expect(deleteButton).toBeDisabled();
 

@@ -160,6 +160,16 @@ const journeySubjourneys = [
     'organization.projects',
     'journeys/organization/listings.spec.js',
   ),
+  covered(
+    'organization.roles.update',
+    'organization.roles',
+    'journeys/organization/roles.spec.js',
+  ),
+  covered(
+    'organization.roles.delete',
+    'organization.roles',
+    'journeys/organization/roles.spec.js',
+  ),
 
   covered(
     'deployment.assistant.overview',

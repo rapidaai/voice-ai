@@ -13,6 +13,7 @@ import {
   Edit,
   Renew,
   Security,
+  TrashCan,
   User,
   View,
 } from '@carbon/icons-react';
@@ -49,6 +50,7 @@ import { listAccessRoles } from '@/clients';
 import { useCredential } from '@/hooks/use-credential';
 import { toHumanReadableDateTime } from '@/utils/date';
 import { CreateRoleModal } from './create';
+import { DeleteRoleDialog, EditRoleModal } from './detail';
 import { RoleDetailsSidePanel } from './role-details-side-panel';
 import { RoleQuerySearch } from './role-query-search';
 
@@ -67,7 +69,7 @@ const roleColumnClassName: Record<string, string> = {
   scope: 'min-w-36 whitespace-nowrap',
   subject: 'min-w-40 whitespace-nowrap',
   type: 'min-w-28 whitespace-nowrap',
-  actions: 'w-28 min-w-28 whitespace-nowrap',
+  actions: 'w-36 min-w-36 whitespace-nowrap',
   created: 'min-w-36 whitespace-nowrap',
   updated: 'min-w-36 whitespace-nowrap',
 };
@@ -102,6 +104,8 @@ export function RoleCatalogPage() {
   const [selectedRoleDefinitionId, setSelectedRoleDefinitionId] = useState<
     string | null
   >(null);
+  const [editingRole, setEditingRole] = useState<RoleDefinition | null>(null);
+  const [deletingRole, setDeletingRole] = useState<RoleDefinition | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const requestSequence = useRef(0);
   const launcherButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -320,9 +324,9 @@ export function RoleCatalogPage() {
                             role => role.getId() === row.id,
                           );
                           if (!currentRole) return null;
-                          const isBuiltIn =
+                          const isCustomRole =
                             currentRole.getDefinitiontype() ===
-                            RoleDefinitionType.ROLE_DEFINITION_TYPE_BUILT_IN;
+                            RoleDefinitionType.ROLE_DEFINITION_TYPE_CUSTOM;
 
                           return (
                             <TableRow {...getRowProps({ row })} key={row.id}>
@@ -358,11 +362,20 @@ export function RoleCatalogPage() {
                                         renderIcon={Edit}
                                         iconDescription={`Edit ${currentRole.getName()}`}
                                         tooltipPosition="bottom"
-                                        disabled={isBuiltIn}
+                                        disabled={!isCustomRole}
                                         onClick={() =>
-                                          navigate(
-                                            `/organization/roles/${currentRole.getId()}`,
-                                          )
+                                          setEditingRole(currentRole)
+                                        }
+                                      />
+                                      <IconOnlyButton
+                                        size="md"
+                                        kind="ghost"
+                                        renderIcon={TrashCan}
+                                        iconDescription={`Delete ${currentRole.getName()}`}
+                                        tooltipPosition="bottom"
+                                        disabled={!isCustomRole}
+                                        onClick={() =>
+                                          setDeletingRole(currentRole)
                                         }
                                       />
                                     </div>
@@ -429,6 +442,22 @@ export function RoleCatalogPage() {
         open={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
       />
+      {editingRole && (
+        <EditRoleModal
+          open
+          role={editingRole}
+          onClose={() => setEditingRole(null)}
+          onUpdated={() => setRefresh(value => value + 1)}
+        />
+      )}
+      {deletingRole && (
+        <DeleteRoleDialog
+          open
+          role={deletingRole}
+          onClose={() => setDeletingRole(null)}
+          onDeleted={() => setRefresh(value => value + 1)}
+        />
+      )}
     </div>
   );
 }

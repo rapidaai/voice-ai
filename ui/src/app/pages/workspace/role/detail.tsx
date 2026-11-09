@@ -1,451 +1,312 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import {
   RoleDefinition,
   RoleDefinitionType,
-  RoleScope,
-  RoleSubject,
   ServiceError,
 } from '@rapidaai/react';
-import { Button, InlineLoading } from '@carbon/react';
-import { Renew, Security } from '@carbon/icons-react';
-import { Helmet } from '@/app/components/app-shell/helmet';
-import { PageHeader } from '@/app/components/layout/page-header';
-import { EmptyState } from '@/app/components/ui/feedback';
+import { InlineLoading } from '@carbon/react';
 import {
-  FieldSet,
-  FormLabel,
-  Input,
-  InputCheckbox,
-  Text,
-  Textarea,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  PrimaryButton,
+  SecondaryButton,
+  Stack,
+  TextArea,
+  TextInput,
+  TertiaryButton,
 } from '@/app/components/ui/primitives';
-import {
-  archiveAccessRole,
-  getAccessRole,
-  reduceAccessRolePermissions,
-  updateAccessRole,
-} from '@/clients';
+import { ConfirmDeleteDialog } from '@/app/components/dialogs/shared';
+import { Notification } from '@/app/components/ui/feedback';
+import { archiveAccessRole, getAccessRole, updateAccessRole } from '@/clients';
 import { useCredential } from '@/hooks/use-credential';
-import { toHumanReadableDateTime } from '@/utils/date';
+import toast from 'react-hot-toast/headless';
 
-export function RoleDetailPage() {
-  const navigate = useNavigate();
-  const { roleDefinitionId = '' } = useParams();
+interface RoleActionModalProps {
+  open: boolean;
+  role: RoleDefinition;
+  onClose: () => void;
+  onUpdated: () => void;
+}
+
+interface DeleteRoleDialogProps {
+  open: boolean;
+  role: RoleDefinition;
+  onClose: () => void;
+  onDeleted: () => void;
+}
+
+const roleDeletionReason = 'Deleted from Roles & Permissions.';
+
+function isCustomRole(role: RoleDefinition) {
+  return (
+    role.getDefinitiontype() === RoleDefinitionType.ROLE_DEFINITION_TYPE_CUSTOM
+  );
+}
+
+export function EditRoleModal({
+  open,
+  role,
+  onClose,
+  onUpdated,
+}: RoleActionModalProps) {
   const [userId, token] = useCredential();
-  const [role, setRole] = useState<RoleDefinition | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedPermissionIds, setSelectedPermissionIds] = useState<string[]>(
-    [],
-  );
-  const [reductionReason, setReductionReason] = useState('');
-  const [archiveReason, setArchiveReason] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
   const [metadataError, setMetadataError] = useState('');
-  const [reductionError, setReductionError] = useState('');
-  const [archiveError, setArchiveError] = useState('');
   const [activeAction, setActiveAction] = useState('');
-  const roleRequestSequence = useRef(0);
-  const isMounted = useRef(true);
-
-  const loadRole = useCallback(async () => {
-    const requestId = ++roleRequestSequence.current;
-    setIsLoading(true);
-    setLoadError('');
-    try {
-      const response = await getAccessRole({
-        roleDefinitionId,
-        auth: { token, userId },
-      });
-      if (requestId !== roleRequestSequence.current) return;
-      if (!response.getSuccess() || !response.getRole()) {
-        setLoadError(
-          response.getError()?.getHumanmessage() || 'Unable to load role.',
-        );
-        return;
-      }
-      const nextRole = response.getRole()!;
-      setRole(nextRole);
-      setName(nextRole.getName());
-      setDescription(nextRole.getDescription());
-      setSelectedPermissionIds([]);
-    } catch (requestError) {
-      if (requestId !== roleRequestSequence.current) return;
-      const serviceError = requestError as ServiceError;
-      setLoadError(
-        serviceError.code === 7
-          ? 'You do not have permission to view this role.'
-          : serviceError.message || 'Unable to load role.',
-      );
-    } finally {
-      if (requestId === roleRequestSequence.current) setIsLoading(false);
-    }
-  }, [roleDefinitionId, token, userId]);
+  const [loadedRole, setLoadedRole] = useState<RoleDefinition | null>(null);
+  const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>(
+    'loading',
+  );
+  const [loadError, setLoadError] = useState('');
+  const [loadCycle, setLoadCycle] = useState(0);
+  const requestSequence = useRef(0);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    isMounted.current = true;
-    loadRole();
+    if (!open) {
+      requestSequence.current += 1;
+      return;
+    }
+    const requestId = ++requestSequence.current;
+    setLoadedRole(null);
+    setLoadStatus('loading');
+    setLoadError('');
+    setName('');
+    setDescription('');
+    setMetadataError('');
+    setActiveAction('');
+    getAccessRole({
+      roleDefinitionId: role.getId(),
+      auth: { token, userId },
+    })
+      .then(response => {
+        if (requestId !== requestSequence.current) return;
+        const completeRole = response.getRole();
+        if (!response.getSuccess() || !completeRole) {
+          setLoadError(
+            response.getError()?.getHumanmessage() || 'Unable to load role.',
+          );
+          setLoadStatus('error');
+          return;
+        }
+        if (!isCustomRole(completeRole)) {
+          setLoadError('Built-in roles cannot be edited.');
+          setLoadStatus('error');
+          return;
+        }
+        setLoadedRole(completeRole);
+        setName(completeRole.getName());
+        setDescription(completeRole.getDescription());
+        setLoadStatus('ready');
+      })
+      .catch((requestError: ServiceError) => {
+        if (requestId !== requestSequence.current) return;
+        setLoadError(requestError.message || 'Unable to load role.');
+        setLoadStatus('error');
+      });
     return () => {
-      isMounted.current = false;
-      roleRequestSequence.current += 1;
+      requestSequence.current += 1;
     };
-  }, [loadRole]);
+  }, [loadCycle, open, role, token, userId]);
 
-  const updateMetadata = async (event: FormEvent) => {
-    event.preventDefault();
+  useEffect(() => {
+    if (open && loadStatus === 'ready') nameInputRef.current?.focus();
+  }, [loadStatus, open]);
+
+  const close = () => {
+    if (activeAction) return;
+    requestSequence.current += 1;
+    onClose();
+  };
+
+  const updateMetadata = async () => {
+    if (!loadedRole || !isCustomRole(loadedRole)) return;
     setMetadataError('');
     if (!name.trim()) {
       setMetadataError('Role name is required.');
       return;
     }
+    const requestId = ++requestSequence.current;
     setActiveAction('metadata');
     try {
       const response = await updateAccessRole({
-        roleDefinitionId,
+        roleDefinitionId: loadedRole.getId(),
         name: name.trim(),
         description: description.trim(),
         auth: { token, userId },
       });
-      if (!isMounted.current) return;
+      if (requestId !== requestSequence.current) return;
       if (!response.getSuccess()) {
         setMetadataError(
           response.getError()?.getHumanmessage() || 'Unable to update role.',
         );
         return;
       }
-      await loadRole();
+      onUpdated();
+      requestSequence.current += 1;
+      onClose();
     } catch (requestError) {
-      if (!isMounted.current) return;
+      if (requestId !== requestSequence.current) return;
       setMetadataError(
         (requestError as ServiceError).message || 'Unable to update role.',
       );
     } finally {
-      if (isMounted.current) setActiveAction('');
+      if (requestId === requestSequence.current) setActiveAction('');
     }
   };
-
-  const removePermissions = async (event: FormEvent) => {
-    event.preventDefault();
-    setReductionError('');
-    if (selectedPermissionIds.length === 0) {
-      setReductionError('Select at least one permission to remove.');
-      return;
-    }
-    if (!reductionReason.trim()) {
-      setReductionError('A reason is required.');
-      return;
-    }
-    setActiveAction('permissions');
-    try {
-      const response = await reduceAccessRolePermissions({
-        roleDefinitionId,
-        permissionDefinitionIds: selectedPermissionIds,
-        reason: reductionReason.trim(),
-        auth: { token, userId },
-      });
-      if (!isMounted.current) return;
-      if (!response.getSuccess()) {
-        setReductionError(
-          response.getError()?.getHumanmessage() ||
-            'Unable to remove permissions.',
-        );
-        return;
-      }
-      setReductionReason('');
-      await loadRole();
-    } catch (requestError) {
-      if (!isMounted.current) return;
-      setReductionError(
-        (requestError as ServiceError).message ||
-          'Unable to remove permissions.',
-      );
-    } finally {
-      if (isMounted.current) setActiveAction('');
-    }
-  };
-
-  const archiveRole = async (event: FormEvent) => {
-    event.preventDefault();
-    setArchiveError('');
-    if (!archiveReason.trim()) {
-      setArchiveError('A reason is required.');
-      return;
-    }
-    setActiveAction('archive');
-    try {
-      const response = await archiveAccessRole({
-        roleDefinitionId,
-        reason: archiveReason.trim(),
-        auth: { token, userId },
-      });
-      if (!isMounted.current) return;
-      if (!response.getSuccess()) {
-        setArchiveError(
-          response.getError()?.getHumanmessage() || 'Unable to archive role.',
-        );
-        return;
-      }
-      navigate('/organization/roles');
-    } catch (requestError) {
-      if (!isMounted.current) return;
-      setArchiveError(
-        (requestError as ServiceError).message || 'Unable to archive role.',
-      );
-    } finally {
-      if (isMounted.current) setActiveAction('');
-    }
-  };
-
-  if (isLoading && !role) {
-    return <InlineLoading description="Loading role" className="m-8" />;
-  }
-
-  if (loadError || !role) {
-    return (
-      <EmptyState
-        icon={Security}
-        title={loadError || 'Role not found.'}
-        action="Try again"
-        actionIcon={Renew}
-        onAction={loadRole}
-      />
-    );
-  }
-
-  const isBuiltIn =
-    role.getDefinitiontype() ===
-    RoleDefinitionType.ROLE_DEFINITION_TYPE_BUILT_IN;
-  const createdActor = role.getCreatedactor();
-  const updatedActor = role.getUpdatedactor();
-  const createdBy = createdActor
-    ? createdActor.getDisplayname() ||
-      `${createdActor.getType()} ${createdActor.getId()}`
-    : 'System';
-  const updatedBy = updatedActor
-    ? updatedActor.getDisplayname() ||
-      `${updatedActor.getType()} ${updatedActor.getId()}`
-    : 'Not updated';
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface">
-      <Helmet title={role.getName()} />
-      <PageHeader
-        eyebrow={<Text className="text-primary">Roles & Permissions</Text>}
-        title={role.getName()}
-        description={role.getDescription() || 'No description provided.'}
-        contextualActions={
-          <Text className="text-muted">
-            {isBuiltIn ? 'Built-in role' : 'Custom role'}
-          </Text>
-        }
+    <Modal
+      aria-label="Edit role"
+      open={open}
+      onClose={close}
+      preventCloseOnClickOutside
+      selectorPrimaryFocus="#role-name"
+      size="sm"
+    >
+      <ModalHeader
+        label="Roles & Permissions"
+        title="Edit role"
+        onClose={close}
       />
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-6 md:p-8">
-        <section className="grid gap-4 border border-border-subtle bg-layer p-5 md:grid-cols-3">
-          <div>
-            <Text className="text-muted">Key</Text>
-            <p className="mt-1 font-medium">{role.getKey()}</p>
-          </div>
-          <div>
-            <Text className="text-muted">Scope</Text>
-            <p className="mt-1 font-medium">
-              {role.getScope() === RoleScope.ROLE_SCOPE_ORGANIZATION
-                ? 'Organization'
-                : 'Project'}
-            </p>
-          </div>
-          <div>
-            <Text className="text-muted">Subject</Text>
-            <p className="mt-1 font-medium">
-              {role.getSubject() === RoleSubject.ROLE_SUBJECT_PROJECT_TOKEN
-                ? 'Project token'
-                : 'User'}
-            </p>
-          </div>
-          <div>
-            <Text className="text-muted">Created by</Text>
-            <p className="mt-1 font-medium">{createdBy}</p>
-          </div>
-          <div>
-            <Text className="text-muted">Created</Text>
-            <p className="mt-1 font-medium">
-              {role.getCreateddate()
-                ? toHumanReadableDateTime(role.getCreateddate()!)
-                : 'Unknown'}
-            </p>
-          </div>
-          <div>
-            <Text className="text-muted">Last updated</Text>
-            <p className="mt-1 font-medium">
-              {role.getUpdateddate()
-                ? `${toHumanReadableDateTime(role.getUpdateddate()!)} by ${updatedBy}`
-                : 'Never'}
-            </p>
-          </div>
-        </section>
-
-        <form
-          className="border border-border-subtle bg-layer p-5"
-          onSubmit={updateMetadata}
-        >
-          <h2 className="text-base font-semibold">Role details</h2>
-          {isBuiltIn && (
-            <p className="mt-1 text-sm text-muted">
-              Built-in role details cannot be changed.
-            </p>
-          )}
-          {metadataError && (
-            <p role="alert" className="mt-3 text-sm text-support-error">
-              {metadataError}
-            </p>
-          )}
-          <div className="mt-5 grid gap-5">
-            <FieldSet>
-              <FormLabel htmlFor="role-name">Name</FormLabel>
-              <Input
-                id="role-name"
-                value={name}
-                disabled={isBuiltIn}
-                onChange={event => setName(event.target.value)}
-              />
-            </FieldSet>
-            <FieldSet>
-              <FormLabel htmlFor="role-description">Description</FormLabel>
-              <Textarea
-                id="role-description"
-                value={description}
-                disabled={isBuiltIn}
-                onChange={event => setDescription(event.target.value)}
-              />
-            </FieldSet>
-          </div>
-          {!isBuiltIn && (
-            <div className="mt-5 flex justify-end">
-              <Button type="submit" disabled={activeAction !== ''}>
-                {activeAction === 'metadata' ? 'Saving...' : 'Save details'}
-              </Button>
-            </div>
-          )}
-        </form>
-
-        <form
-          className="border border-border-subtle bg-layer"
-          onSubmit={removePermissions}
-        >
-          <div className="border-b border-border-subtle p-5">
-            <h2 className="text-base font-semibold">Permissions</h2>
-            <p className="mt-1 text-sm text-muted">
-              {isBuiltIn
-                ? 'Built-in permissions are read-only.'
-                : 'Select permissions that should no longer be granted by this role.'}
-            </p>
-            {reductionError && (
-              <p role="alert" className="mt-3 text-sm text-support-error">
-                {reductionError}
-              </p>
-            )}
-          </div>
-          {role.getPermissionsList().length === 0 ? (
-            <p className="p-5 text-sm text-muted">
-              This role has no permissions.
-            </p>
-          ) : (
-            <div className="grid gap-px bg-border-subtle md:grid-cols-2">
-              {role.getPermissionsList().map(permission => (
-                <div
-                  key={permission.getId()}
-                  className="flex gap-3 bg-surface p-4"
-                >
-                  {!isBuiltIn && (
-                    <InputCheckbox
-                      aria-label={`Remove ${permission.getName()}`}
-                      checked={selectedPermissionIds.includes(
-                        permission.getId(),
-                      )}
-                      onChange={event =>
-                        setSelectedPermissionIds(current =>
-                          event.target.checked
-                            ? [...current, permission.getId()]
-                            : current.filter(id => id !== permission.getId()),
-                        )
-                      }
-                    />
-                  )}
-                  <span>
-                    <span className="block text-sm font-medium">
-                      {permission.getName()}
-                    </span>
-                    <span className="block text-xs text-muted">
-                      {permission.getKey()}
-                    </span>
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-          {!isBuiltIn && role.getPermissionsList().length > 0 && (
-            <div className="grid gap-4 border-t border-border-subtle p-5 md:grid-cols-[1fr_auto] md:items-end">
-              <FieldSet>
-                <FormLabel htmlFor="reduction-reason">
-                  Reason for removal
-                </FormLabel>
-                <Input
-                  id="reduction-reason"
-                  value={reductionReason}
-                  onChange={event => setReductionReason(event.target.value)}
-                />
-              </FieldSet>
-              <Button
-                kind="danger--tertiary"
-                type="submit"
-                disabled={activeAction !== ''}
-              >
-                {activeAction === 'permissions'
-                  ? 'Removing...'
-                  : 'Remove selected'}
-              </Button>
-            </div>
-          )}
-        </form>
-
-        {!isBuiltIn && (
-          <form
-            className="border border-support-error p-5"
-            onSubmit={archiveRole}
-          >
-            <h2 className="text-base font-semibold">Archive role</h2>
-            <p className="mt-1 text-sm text-muted">
-              Archive this role when it is no longer required. This action
-              removes it from the active catalog.
-            </p>
-            {archiveError && (
-              <p role="alert" className="mt-3 text-sm text-support-error">
-                {archiveError}
-              </p>
-            )}
-            <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
-              <FieldSet>
-                <FormLabel htmlFor="archive-reason">
-                  Reason for archive
-                </FormLabel>
-                <Input
-                  id="archive-reason"
-                  value={archiveReason}
-                  onChange={event => setArchiveReason(event.target.value)}
-                />
-              </FieldSet>
-              <Button
-                kind="danger"
-                type="submit"
-                disabled={activeAction !== ''}
-              >
-                {activeAction === 'archive' ? 'Archiving...' : 'Archive role'}
-              </Button>
-            </div>
-          </form>
+      <ModalBody hasForm hasScrollingContent>
+        {loadStatus === 'loading' && (
+          <InlineLoading description="Loading role" />
         )}
-      </div>
-    </div>
+        {loadStatus === 'error' && (
+          <Stack gap={5}>
+            <Notification kind="error" title="Error" subtitle={loadError} />
+            <TertiaryButton
+              size="md"
+              onClick={() => setLoadCycle(value => value + 1)}
+            >
+              Retry
+            </TertiaryButton>
+          </Stack>
+        )}
+        {loadStatus === 'ready' && loadedRole && (
+          <Stack gap={6}>
+            <TextInput
+              ref={nameInputRef}
+              id="role-name"
+              labelText="Name"
+              value={name}
+              invalid={Boolean(metadataError)}
+              invalidText={metadataError}
+              onChange={event => {
+                setName(event.target.value);
+                setMetadataError('');
+              }}
+            />
+            <TextArea
+              id="role-description"
+              labelText="Description"
+              rows={4}
+              value={description}
+              onChange={event => {
+                setDescription(event.target.value as string);
+                setMetadataError('');
+              }}
+            />
+          </Stack>
+        )}
+      </ModalBody>
+      <ModalFooter>
+        <SecondaryButton
+          size="lg"
+          type="button"
+          disabled={Boolean(activeAction)}
+          onClick={close}
+        >
+          Cancel
+        </SecondaryButton>
+        <PrimaryButton
+          size="lg"
+          type="button"
+          disabled={Boolean(activeAction) || loadStatus !== 'ready'}
+          isLoading={activeAction === 'metadata'}
+          onClick={updateMetadata}
+        >
+          Save changes
+        </PrimaryButton>
+      </ModalFooter>
+    </Modal>
   );
+}
+
+export function DeleteRoleDialog({
+  open,
+  role,
+  onClose,
+  onDeleted,
+}: DeleteRoleDialogProps) {
+  const [userId, token] = useCredential();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const requestSequence = useRef(0);
+
+  useEffect(() => {
+    requestSequence.current += 1;
+    if (!open) return;
+    setIsDeleting(false);
+    return () => {
+      requestSequence.current += 1;
+    };
+  }, [open, role]);
+
+  const close = () => {
+    if (isDeleting) return;
+    requestSequence.current += 1;
+    onClose();
+  };
+
+  const deleteRole = async () => {
+    if (!isCustomRole(role)) return;
+    const requestId = ++requestSequence.current;
+    setIsDeleting(true);
+    try {
+      const response = await archiveAccessRole({
+        roleDefinitionId: role.getId(),
+        reason: roleDeletionReason,
+        auth: { token, userId },
+      });
+      if (requestId !== requestSequence.current) return;
+      if (!response.getSuccess()) {
+        toast.error(
+          response.getError()?.getHumanmessage() || 'Unable to delete role.',
+        );
+        return;
+      }
+      onDeleted();
+      requestSequence.current += 1;
+      onClose();
+    } catch (requestError) {
+      if (requestId !== requestSequence.current) return;
+      toast.error(
+        (requestError as ServiceError).message || 'Unable to delete role.',
+      );
+    } finally {
+      if (requestId === requestSequence.current) setIsDeleting(false);
+    }
+  };
+
+  return (
+    <ConfirmDeleteDialog
+      showing={open}
+      title="Delete role"
+      content={`This removes "${role.getName()}" from active roles. Roles with active assignments cannot be deleted. This role key cannot be reused. Type the role name to confirm.`}
+      objectName={role.getName()}
+      confirmText={isDeleting ? 'Deleting...' : 'Delete role'}
+      onConfirm={deleteRole}
+      onCancel={close}
+      onClose={close}
+    />
+  );
+}
+
+export function RoleDetailPage() {
+  return <Navigate to="/organization/roles" replace />;
 }

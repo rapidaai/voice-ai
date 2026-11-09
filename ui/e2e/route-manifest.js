@@ -864,11 +864,7 @@ const sourceRouteInventory = {
     { path: 'users', journey: 'organization.users' },
     { path: 'projects', journey: 'organization.projects' },
     { path: 'roles', journey: 'organization.roles' },
-    {
-      path: 'roles/:roleDefinitionId',
-      deferredReason:
-        'Role detail browser coverage needs an access-management role fixture.',
-    },
+    { path: 'roles/:roleDefinitionId', journey: 'organization.roles' },
     { path: 'security', journey: 'organization.security' },
   ],
   'preview.tsx': [

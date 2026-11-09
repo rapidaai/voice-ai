@@ -52,7 +52,13 @@ export function ConfirmDeleteDialog({
   };
 
   return (
-    <Modal danger open={showing} onClose={closeDialog} size="sm">
+    <Modal
+      aria-label={title}
+      danger
+      open={showing}
+      onClose={closeDialog}
+      size="sm"
+    >
       <ModalHeader label="Confirm action" title={title} onClose={closeDialog} />
       <ModalBody hasForm>
         <p className="text-sm text-foreground">{content}</p>

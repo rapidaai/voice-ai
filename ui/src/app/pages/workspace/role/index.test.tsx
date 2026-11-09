@@ -5,13 +5,19 @@ import { RoleDefinitionType, RoleScope, RoleSubject } from '@rapidaai/react';
 import { RoleCatalogPage } from './index';
 
 const mockListAccessRoles = jest.fn();
+const mockUpdateAccessRole = jest.fn();
+const mockArchiveAccessRole = jest.fn();
+const mockGetAccessRole = jest.fn();
 
 jest.mock('@/hooks/use-credential', () => ({
   useCredential: () => ['user-1', 'token-1'],
 }));
 
 jest.mock('@/clients', () => ({
+  getAccessRole: (...args: unknown[]) => mockGetAccessRole(...args),
   listAccessRoles: (...args: unknown[]) => mockListAccessRoles(...args),
+  updateAccessRole: (...args: unknown[]) => mockUpdateAccessRole(...args),
+  archiveAccessRole: (...args: unknown[]) => mockArchiveAccessRole(...args),
 }));
 
 jest.mock('@/app/components/app-shell/helmet', () => ({ Helmet: () => null }));
@@ -66,12 +72,20 @@ const role = (
 ) => ({
   getId: () => id,
   getName: () => name,
+  getDescription: () => `${name} description`,
   getKey: () => name.toLowerCase().replace(' ', '_'),
   getScope: () => RoleScope.ROLE_SCOPE_PROJECT,
   getSubject: () => subject,
   getDefinitiontype: () => definitionType,
   getCreateddate: () => ({ getSeconds: () => 1, getNanos: () => 0 }),
   getUpdateddate: () => undefined,
+  getPermissionsList: () => [
+    {
+      getId: () => '34',
+      getName: () => 'Project Read',
+      getKey: () => 'project.read',
+    },
+  ],
 });
 
 const response = (roles: ReturnType<typeof role>[]) => ({
@@ -98,18 +112,38 @@ function renderPage(
       <LocationPath />
       <Routes>
         <Route path="/organization/roles" element={<RoleCatalogPage />} />
-        <Route
-          path="/organization/roles/:roleDefinitionId"
-          element={<div>Role detail route</div>}
-        />
       </Routes>
     </MemoryRouter>,
   );
 }
 
 describe('RoleCatalogPage', () => {
+  beforeAll(() => {
+    HTMLElement.prototype.scrollIntoView = jest.fn();
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: jest.fn().mockReturnValue({
+        matches: false,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+      }),
+    });
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUpdateAccessRole.mockResolvedValue({ getSuccess: () => true });
+    mockArchiveAccessRole.mockResolvedValue({ getSuccess: () => true });
+    mockGetAccessRole.mockResolvedValue({
+      getSuccess: () => true,
+      getRole: () =>
+        role(
+          '1',
+          'Support manager',
+          RoleDefinitionType.ROLE_DEFINITION_TYPE_CUSTOM,
+          RoleSubject.ROLE_SUBJECT_PROJECT_TOKEN,
+        ),
+    });
     mockListAccessRoles.mockResolvedValue(
       response([
         role(
@@ -189,7 +223,7 @@ describe('RoleCatalogPage', () => {
     );
   });
 
-  it('renders role-qualified inline actions and routes only custom Edit', async () => {
+  it('keeps custom Edit and Delete actions in catalog modals', async () => {
     const user = userEvent.setup();
     renderPage();
 
@@ -205,6 +239,12 @@ describe('RoleCatalogPage', () => {
     ).toBeEnabled();
     expect(
       screen.getByRole('button', { name: 'Edit Organization owner' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Delete Support manager' }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Delete Organization owner' }),
     ).toBeDisabled();
     expect(
       screen.getByRole('button', { name: 'View Support manager' }),
@@ -226,7 +266,24 @@ describe('RoleCatalogPage', () => {
     await user.click(
       screen.getByRole('button', { name: 'Edit Support manager' }),
     );
-    expect(await screen.findByText('Role detail route')).toBeInTheDocument();
+    expect(
+      screen.getByRole('dialog', { name: 'Edit role' }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('location-path')).toHaveTextContent(
+      '/organization/roles',
+    );
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await user.click(
+      screen.getByRole('button', { name: 'Delete Support manager' }),
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Delete role' }),
+    ).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Support manager')).toBeInTheDocument();
+    expect(screen.getByTestId('location-path')).toHaveTextContent(
+      '/organization/roles',
+    );
   });
 
   it('keeps the catalog URL while locally controlling role creation', async () => {
