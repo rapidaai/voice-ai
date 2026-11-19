@@ -4,22 +4,10 @@ import type {
   RoleDefinition,
   ServiceError,
 } from '@rapidaai/react';
+import { InlineLoading, PasswordInput } from '@carbon/react';
+import { CheckmarkFilled, Copy, InformationFilled } from '@carbon/icons-react';
 import {
-  Button,
   ComboBox,
-  InlineLoading,
-  PasswordInput,
-  Toggletip,
-  ToggletipButton,
-  ToggletipContent,
-} from '@carbon/react';
-import {
-  CheckmarkFilled,
-  Copy,
-  Information,
-  InformationFilled,
-} from '@carbon/icons-react';
-import {
   FieldSet,
   FormLabel,
   Input,
@@ -27,10 +15,19 @@ import {
   ModalBody,
   ModalFooter,
   ModalHeader,
+  PrimaryButton,
+  SecondaryButton,
+  TertiaryButton,
+  Text,
 } from '@/app/components/ui/primitives';
+import { HelpToggletip } from '@/app/components/ui/composites';
 import { createProjectPublishableCredential, listAccessRoles } from '@/clients';
 
-type CredentialAuth = { token: string; userId: string };
+type CredentialAuth = {
+  organizationId: string;
+  token: string;
+  userId: string;
+};
 
 interface CreateProjectTokenProps {
   open: boolean;
@@ -227,13 +224,7 @@ export function CreateProjectToken({
   };
 
   return (
-    <Modal
-      open={open}
-      onClose={close}
-      size="sm"
-      preventCloseOnClickOutside
-      className="project-api-key-modal"
-    >
+    <Modal open={open} onClose={close} size="sm" preventCloseOnClickOutside>
       <ModalHeader
         label="Project Access"
         title="Create API key"
@@ -242,25 +233,20 @@ export function CreateProjectToken({
       <ModalBody hasScrollingContent>
         {generatedKey === null ? (
           <div className="flex flex-col gap-4 py-2">
-            <p className="text-sm text-foreground">
+            <Text as="p" variant="body-compact-01" className="text-foreground">
               Create a project-scoped API key for an application or service.
               Access is governed by the assigned project role.
-            </p>
+            </Text>
             <FieldSet>
               <Input
                 id="project-api-key-application-name"
                 labelText="Application Name"
                 hideLabel={false}
                 decorator={
-                  <Toggletip align="right">
-                    <ToggletipButton label="Application name information">
-                      <Information size={14} />
-                    </ToggletipButton>
-                    <ToggletipContent>
-                      Use a name that identifies the application, service, or
-                      integration that will use this key.
-                    </ToggletipContent>
-                  </Toggletip>
+                  <HelpToggletip
+                    label="Application name"
+                    helpText="Use a name that identifies the application, service, or integration that will use this key."
+                  />
                 }
                 placeholder="Application name"
                 value={applicationName}
@@ -271,26 +257,34 @@ export function CreateProjectToken({
               />
             </FieldSet>
             {listStatus === 'loading' && (
-              <InlineLoading description="Loading project roles" />
+              <InlineLoading
+                className="min-h-12"
+                description="Loading project roles"
+              />
             )}
             {listStatus === 'error' && (
               <div className="flex flex-col gap-3">
-                <p role="alert" className="text-sm text-support-error">
+                <Text
+                  as="p"
+                  variant="label-01"
+                  role="alert"
+                  className="text-support-error"
+                >
                   {error}
-                </p>
-                <Button
-                  kind="tertiary"
+                </Text>
+                <TertiaryButton
+                  size="md"
                   type="button"
                   onClick={() => setListCycle(value => value + 1)}
                 >
                   Retry
-                </Button>
+                </TertiaryButton>
               </div>
             )}
             {listStatus === 'empty' && (
-              <p className="text-sm text-muted">
+              <Text as="p" variant="body-compact-01" className="text-muted">
                 No active project roles are available for API access.
-              </p>
+              </Text>
             )}
             {listStatus === 'ready' && (
               <ComboBox
@@ -310,11 +304,21 @@ export function CreateProjectToken({
               />
             )}
             {error && listStatus !== 'error' && (
-              <p role="alert" className="text-sm text-support-error">
+              <Text
+                as="p"
+                variant="label-01"
+                role="alert"
+                className="text-support-error"
+              >
                 {error}
-              </p>
+              </Text>
             )}
-            {isSubmitting && <InlineLoading description="Creating API key" />}
+            {isSubmitting && (
+              <InlineLoading
+                className="min-h-12"
+                description="Creating API key"
+              />
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-4 py-2">
@@ -328,16 +332,10 @@ export function CreateProjectToken({
                     >
                       API Key
                     </FormLabel>
-                    <Toggletip align="right">
-                      <ToggletipButton label="API key security information">
-                        <Information size={14} />
-                      </ToggletipButton>
-                      <ToggletipContent>
-                        Store this key in an approved secrets manager. For
-                        security, it cannot be retrieved after this dialog is
-                        closed.
-                      </ToggletipContent>
-                    </Toggletip>
+                    <HelpToggletip
+                      label="API key security"
+                      helpText="Store this key in an approved secrets manager. For security, it cannot be retrieved after this dialog is closed."
+                    />
                   </div>
                   <PasswordInput
                     id="generated-project-api-key"
@@ -351,36 +349,45 @@ export function CreateProjectToken({
                     tooltipPosition="left"
                   />
                 </FieldSet>
-                <div className="project-api-key-modal__messaging">
+                <div className="mt-2 flex gap-2 pr-[calc(20%-1rem)]">
                   <InformationFilled size={16} />
-                  <p className="project-api-key-modal__messaging-text">
+                  <Text as="p" variant="label-01" className="flex-1">
                     This API key grants the access defined by the assigned
                     project role.
-                  </p>
+                  </Text>
                 </div>
-                <div className="project-api-key-modal__messaging">
-                  <CheckmarkFilled
-                    size={16}
-                    className="project-api-key-modal__checkmark-icon"
-                  />
-                  <p
-                    className="project-api-key-modal__messaging-text"
+                <div className="mt-2 flex gap-2 pr-[calc(20%-1rem)]">
+                  <CheckmarkFilled size={16} className="text-primary" />
+                  <Text
+                    as="p"
+                    variant="label-01"
+                    className="flex-1"
                     role="status"
                     aria-live="polite"
                   >
                     API key created
-                  </p>
+                  </Text>
                 </div>
               </>
             ) : (
-              <p role="alert" className="text-sm text-support-error">
+              <Text
+                as="p"
+                variant="label-01"
+                role="alert"
+                className="text-support-error"
+              >
                 {error}
-              </p>
+              </Text>
             )}
             {generatedKey && error && (
-              <p role="alert" className="text-sm text-support-error">
+              <Text
+                as="p"
+                variant="label-01"
+                role="alert"
+                className="text-support-error"
+              >
                 {error}
-              </p>
+              </Text>
             )}
           </div>
         )}
@@ -388,11 +395,11 @@ export function CreateProjectToken({
       <ModalFooter>
         {generatedKey === null ? (
           <>
-            <Button kind="secondary" type="button" onClick={close}>
+            <SecondaryButton size="lg" type="button" onClick={close}>
               Close
-            </Button>
-            <Button
-              kind="primary"
+            </SecondaryButton>
+            <PrimaryButton
+              size="lg"
               type="button"
               disabled={
                 isSubmitting || !applicationName.trim() || !selectedRole
@@ -400,15 +407,15 @@ export function CreateProjectToken({
               onClick={submit}
             >
               Create API key
-            </Button>
+            </PrimaryButton>
           </>
         ) : (
           <>
-            <Button kind="secondary" type="button" onClick={close}>
+            <SecondaryButton size="lg" type="button" onClick={close}>
               Close
-            </Button>
-            <Button
-              kind="primary"
+            </SecondaryButton>
+            <PrimaryButton
+              size="lg"
               type="button"
               disabled={!generatedKey}
               onClick={copyGeneratedKey}
@@ -416,7 +423,7 @@ export function CreateProjectToken({
               iconDescription="Copy"
             >
               {isCopied ? 'Copied' : 'Copy'}
-            </Button>
+            </PrimaryButton>
           </>
         )}
       </ModalFooter>

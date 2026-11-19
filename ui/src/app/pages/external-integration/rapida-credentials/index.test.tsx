@@ -12,7 +12,7 @@ jest.mock('@/clients', () => ({
 }));
 
 jest.mock('@/hooks/use-credential', () => ({
-  useCredential: () => ['user-1', 'token-1'],
+  useCredential: () => ['user-1', 'token-1', 'project-1', 'organization-1'],
   useCurrentCredential: jest.fn(),
 }));
 
@@ -63,13 +63,13 @@ const response = (
   getPaginated: () => ({ getTotalitem: () => total }),
 });
 
-function renderPage(role = 'admin') {
+function renderPage() {
+  const currentProject = { id: 'project-1' };
   return render(
     <AuthContext.Provider
       value={
         {
-          currentProjectRole: { projectid: 'project-1' },
-          organizationRole: { role },
+          getCurrentProject: () => currentProject,
         } as any
       }
     >
@@ -118,6 +118,11 @@ describe('ProjectCredentialPage', () => {
     ).not.toBeInTheDocument();
     expect(listProjectCredentials).toHaveBeenLastCalledWith(
       expect.objectContaining({
+        auth: {
+          organizationId: 'organization-1',
+          token: 'token-1',
+          userId: 'user-1',
+        },
         projectId: 'project-1',
         page: 1,
         pageSize: 25,
@@ -288,16 +293,9 @@ describe('ProjectCredentialPage', () => {
     );
   });
 
-  it('hides revoke from members and lets an admin confirm by name', async () => {
-    const { unmount } = renderPage('member');
-    expect(await screen.findByText('Web widget')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Revoke Web widget' }),
-    ).not.toBeInTheDocument();
-    unmount();
-
+  it('shows revoke without a console permission projection and confirms by name', async () => {
     const user = userEvent.setup();
-    renderPage('admin');
+    renderPage();
     await user.click(
       await screen.findByRole('button', { name: 'Revoke Web widget' }),
     );
@@ -314,12 +312,17 @@ describe('ProjectCredentialPage', () => {
 
     expect(revokeProjectCredential).toHaveBeenCalledWith(
       expect.objectContaining({
+        auth: {
+          organizationId: 'organization-1',
+          token: 'token-1',
+          userId: 'user-1',
+        },
         projectId: 'project-1',
         credentialId: '31',
       }),
     );
     await waitFor(() =>
-      expect(listProjectCredentials).toHaveBeenCalledTimes(3),
+      expect(listProjectCredentials).toHaveBeenCalledTimes(2),
     );
   });
 
@@ -328,7 +331,7 @@ describe('ProjectCredentialPage', () => {
       callback({ message: 'connection lost' }, null),
     );
     const user = userEvent.setup();
-    renderPage('admin');
+    renderPage();
 
     await user.click(
       await screen.findByRole('button', { name: 'Revoke Web widget' }),

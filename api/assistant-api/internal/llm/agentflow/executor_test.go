@@ -13,13 +13,13 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/llm/agentflow/internal/schema"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	endpoint_client "github.com/rapidaai/pkg/clients/endpoint"
 	integration_client "github.com/rapidaai/pkg/clients/integration"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -107,7 +107,7 @@ func (f *fakeCommunication) DeploymentCaller() endpoint_client.DeploymentService
 	return nil
 }
 
-func (f *fakeCommunication) Auth() *types.Authentication { return &types.Authentication{} }
+func (f *fakeCommunication) Auth() authentication.Principal { return authentication.Principal{} }
 
 func (f *fakeCommunication) GetSource() utils.RapidaSource { return utils.PhoneCall }
 

@@ -7,6 +7,8 @@
 package config
 
 import (
+	"bytes"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,11 +18,11 @@ import (
 )
 
 const baseIntegrationYAML = `
-service_name: "Integration_Service"
+service_name: "integration-api"
 service_id: 9004
 host: "0.0.0.0"
 port: 9004
-secret: "rpd_pks"
+secret: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
 log_level: "debug"
 env: "development"
 
@@ -61,6 +63,26 @@ document:
 ui:
   host: "http://localhost:3000"
 `
+
+func TestInitConfigDoesNotExposeMalformedAuthenticationSecret(t *testing.T) {
+	const secret = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+	path := filepath.Join(t.TempDir(), "integration.yaml")
+	if err := os.WriteFile(path, []byte("secret: *"+secret+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ENV_PATH", path)
+	var output bytes.Buffer
+	previous := log.Writer()
+	log.SetOutput(&output)
+	defer log.SetOutput(previous)
+	_, err := InitConfig()
+	if err == nil {
+		t.Fatal("InitConfig() error = nil")
+	}
+	if strings.Contains(err.Error(), secret) || strings.Contains(output.String(), secret) {
+		t.Fatal("InitConfig() exposed the authentication secret")
+	}
+}
 
 func TestInitConfig(t *testing.T) {
 	configPath := filepath.Join(os.TempDir(), "integration_test.yaml")
@@ -152,5 +174,66 @@ func TestGetApplicationConfigRejectsMissingServiceID(t *testing.T) {
 	}
 	if _, err := GetApplicationConfig(vConfig); err == nil {
 		t.Fatal("GetApplicationConfig() error = nil")
+	}
+}
+
+func TestGetApplicationConfigRejectsInvalidAuthenticationSecret(t *testing.T) {
+	vConfig := viper.New()
+	vConfig.SetConfigType("yaml")
+	configYAML := strings.Replace(baseIntegrationYAML, `secret: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="`, `secret: "rpd_pks"`, 1)
+	if err := vConfig.ReadConfig(strings.NewReader(configYAML)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := GetApplicationConfig(vConfig); err == nil {
+		t.Fatal("GetApplicationConfig() accepted an invalid authentication secret")
+	}
+}
+
+func TestGetApplicationConfigDoesNotExposeMalformedAuthenticationSecret(t *testing.T) {
+	const secret = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+	vConfig := viper.New()
+	vConfig.SetConfigType("yaml")
+	configYAML := strings.Replace(baseIntegrationYAML, `secret: "`+secret+`"`, "secret:\n  - \""+secret+"\"", 1)
+	if err := vConfig.ReadConfig(strings.NewReader(configYAML)); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	previous := log.Writer()
+	log.SetOutput(&output)
+	defer log.SetOutput(previous)
+	_, err := GetApplicationConfig(vConfig)
+	if err == nil {
+		t.Fatal("GetApplicationConfig() error = nil")
+	}
+	if strings.Contains(err.Error(), secret) || strings.Contains(output.String(), secret) {
+		t.Fatal("GetApplicationConfig() exposed the authentication secret")
+	}
+}
+
+func TestGetApplicationConfigRejectsLegacyServiceAssertionConfig(t *testing.T) {
+	for name, serviceAssertion := range map[string]string{
+		"empty": `service_assertion: {}`,
+		"null":  `service_assertion: null`,
+		"old only": `service_assertion:
+  private_key_file: "/run/secrets/integration-service-assertion-key"
+  trusted_public_keys: ["legacy"]`,
+		"mixed": `service_assertion:
+  key_file: "/run/secrets/internal-service-assertion-key"
+  trusted_public_keys: ["legacy"]`,
+		"unknown": `service_assertion:
+  key_file: "/run/secrets/internal-service-assertion-key"
+  unexpected: true`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			vConfig := viper.New()
+			vConfig.SetConfigType("yaml")
+			configYAML := baseIntegrationYAML + "\n" + serviceAssertion
+			if err := vConfig.ReadConfig(strings.NewReader(configYAML)); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := GetApplicationConfig(vConfig); err == nil {
+				t.Fatal("GetApplicationConfig() accepted legacy service assertion configuration")
+			}
+		})
 	}
 }

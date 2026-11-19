@@ -11,8 +11,11 @@ import (
 	"google.golang.org/grpc/status"
 
 	internal_callers "github.com/rapidaai/api/integration-api/internal/type"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
+	pkg_errors "github.com/rapidaai/pkg/errors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/pkg/validator"
 	integration_api "github.com/rapidaai/protos"
 )
 
@@ -23,17 +26,16 @@ func (iApi *integrationApi) Embedding(c context.Context,
 	caller internal_callers.EmbeddingCaller,
 ) (*integration_api.EmbeddingResponse, error) {
 	iApi.logger.Infof("request for embedding %s", tag)
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	iAuth, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, (pkg_errors.AuthenticationFailureError{}).Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	if !validator.OneOf(iAuth.Subject().Type, authentication.IdentityUser, authentication.IdentityProjectCredential, authentication.IdentityService) {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
-	projectContext, projectErr := iAuth.ProjectContext()
-	if projectErr != nil {
-		return nil, status.Error(codes.PermissionDenied, projectErr.Error())
+	projectContext := iAuth.Tenant()
+	if projectContext.OrganizationID == 0 || projectContext.ProjectID == 0 {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
 	requestId := iApi.RequestId()
 	if irRequest.AdditionalData == nil {

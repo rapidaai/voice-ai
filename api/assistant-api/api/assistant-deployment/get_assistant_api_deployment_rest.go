@@ -6,20 +6,20 @@
 package assistant_deployment_api
 
 import (
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/openapi"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 )
 
 func (deploymentApi *AssistantDeploymentApi) GetAssistantApiDeploymentRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		c.JSON(pkg_errors.GetAssistantApiDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAssistantApiDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -27,19 +27,6 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantApiDeploymentRest(c *gi
 				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.GetAssistantApiDeploymentUnauthenticated.CodeString())),
 				ErrorMessage: utils.Ptr(pkg_errors.GetAssistantApiDeploymentUnauthenticated.Error),
 				HumanMessage: utils.Ptr(pkg_errors.GetAssistantApiDeploymentUnauthenticated.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		c.JSON(pkg_errors.GetAssistantApiDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(pkg_errors.GetAssistantApiDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.GetAssistantApiDeploymentMissingAuthScope.CodeString())),
-				ErrorMessage: utils.Ptr(pkg_errors.GetAssistantApiDeploymentMissingAuthScope.Error),
-				HumanMessage: utils.Ptr(pkg_errors.GetAssistantApiDeploymentMissingAuthScope.ErrorMessage),
 			},
 		})
 		return

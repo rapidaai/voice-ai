@@ -1,36 +1,43 @@
 package assistant_deployment_api
 
 import (
-	"context"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 )
 
-func attachTestAuthentication(ginContext *gin.Context, auth *types.Authentication) {
-	ginContext.Request = ginContext.Request.WithContext(context.WithValue(ginContext.Request.Context(), types.CTX_, auth))
+func attachTestAuthentication(ginContext *gin.Context, auth authentication.Principal) {
+	ctx, err := middleware_authentication.ContextWithPrincipal(ginContext.Request.Context(), auth)
+	if err != nil {
+		panic(err)
+	}
+	ginContext.Request = ginContext.Request.WithContext(ctx)
 }
 
-func testUserAuthentication(userID, organizationID, projectID uint64) *types.Authentication {
-	actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: userID}
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		ActorValue:        &actor,
-		UserValue:         &types.UserContext{UserID: userID},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+func testUserAuthentication(userID, organizationID, projectID uint64) authentication.Principal {
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: userID},
+		authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID},
+		authentication.Proof{Method: authentication.AuthenticationUserSession, Reference: authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: strconv.FormatUint(userID, 10)}},
+		nil,
+	)
+	if err != nil {
+		panic(err)
 	}
-	if projectID != 0 {
-		auth.ProjectValue = &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID}
-	}
-	return auth
+	return principal
 }
 
-func testProjectAuthentication(organizationID, projectID uint64) *types.Authentication {
-	actor := types.ActorIdentity{Type: types.ActorTypeProject, ID: projectID}
-	return &types.Authentication{
-		AuthType:          types.AuthTypeProject,
-		ActorValue:        &actor,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
+func testProjectAuthentication(organizationID, projectID uint64) authentication.Principal {
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityProjectCredential, ID: projectID},
+		authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID},
+		authentication.Proof{Method: authentication.AuthenticationProjectCredential, Audience: authentication.AudienceManagement, Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: strconv.FormatUint(projectID, 10)}},
+		nil,
+	)
+	if err != nil {
+		panic(err)
 	}
+	return principal
 }

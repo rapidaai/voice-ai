@@ -8,11 +8,14 @@ package config
 import (
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	validator "github.com/go-playground/validator/v10"
 	"github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/configs"
+	pkg_errors "github.com/rapidaai/pkg/errors"
+	pkg_validator "github.com/rapidaai/pkg/validator"
 	"github.com/spf13/viper"
 )
 
@@ -103,8 +106,9 @@ func InitConfig() (*viper.Viper, error) {
 
 	if err := vConfig.ReadInConfig(); err != nil {
 		if !os.IsNotExist(err) {
-			log.Printf("Error while reading the config: %v", err)
+			log.Printf("application configuration could not be read")
 		}
+		return nil, pkg_errors.ApplicationConfigurationInvalidError{}
 	}
 
 	return vConfig, nil
@@ -112,19 +116,30 @@ func InitConfig() (*viper.Viper, error) {
 
 // Getting application config from viper
 func GetApplicationConfig(v *viper.Viper) (*AssistantConfig, error) {
+	if v.IsSet("service_assertion") {
+		return nil, pkg_errors.ApplicationConfigurationInvalidError{}
+	}
+	for _, key := range v.AllKeys() {
+		if key == "service_assertion" || strings.HasPrefix(key, "service_assertion.") {
+			return nil, pkg_errors.ApplicationConfigurationInvalidError{}
+		}
+	}
 	var config AssistantConfig
 	err := v.Unmarshal(&config)
 	if err != nil {
-		log.Printf("%+v\n", err)
-		return nil, err
+		log.Printf("application configuration could not be decoded")
+		return nil, pkg_errors.ApplicationConfigurationInvalidError{}
 	}
 
 	// valdating the app config
 	validate := validator.New()
 	err = validate.Struct(&config)
 	if err != nil {
-		log.Printf("%+v\n", err)
-		return nil, err
+		log.Printf("application configuration validation failed")
+		return nil, pkg_errors.ApplicationConfigurationInvalidError{}
+	}
+	if !pkg_validator.AuthenticationSecret(config.Secret) {
+		return nil, pkg_errors.ApplicationConfigurationInvalidError{}
 	}
 	return &config, nil
 }

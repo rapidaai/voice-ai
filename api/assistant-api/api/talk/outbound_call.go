@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -17,7 +18,6 @@ import (
 	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/pkg/preset"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
@@ -27,13 +27,9 @@ import (
 // Thin controller — pipeline handles: validate, load assistant, create conversation,
 // save context, create observer, dispatch. Controller just validates input and waits.
 func (cApi *ConversationGrpcApi) CreatePhoneCall(ctx context.Context, ir *protos.CreatePhoneCallRequest) (*protos.CreatePhoneCallResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
 	observer := cApi.Observability(ctx, iAuth, observability.WithGracePeriod())
@@ -254,13 +250,9 @@ func (cApi *ConversationGrpcApi) CreatePhoneCall(ctx context.Context, ir *protos
 
 // InitiateBulkAssistantTalk implements protos.TalkServiceServer.
 func (cApi *ConversationGrpcApi) CreateBulkPhoneCall(ctx context.Context, ir *protos.CreateBulkPhoneCallRequest) (*protos.CreateBulkPhoneCallResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
 	if len(ir.GetPhoneCalls()) == 0 {

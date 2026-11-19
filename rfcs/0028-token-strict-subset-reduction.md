@@ -1,12 +1,14 @@
 # RFC 0028: Token Reduction and Recovery Separation
 
-- Status: Accepted
+- Status: Superseded
 - Owner: Platform team
 - Approved by: Repository owner
 - Date: 2026-11-07
 - Supersedes: RFC 0027
 
 ## Context
+
+Superseded by [RFC 0029](0029-access-management-role-api.md).
 
 RFC 0027 adopts RFC 0026 and adds recovery approver separation. Independent persistence review
 found conflicting incorporated rules for changing an assigned Project token's role: one permits

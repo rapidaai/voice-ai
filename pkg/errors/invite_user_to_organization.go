@@ -52,13 +52,13 @@ var (
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           InviteUserToOrganizationInvalidOrganizationRoleCode,
 		Error:          "invalid organization role",
-		ErrorMessage:   "Please select a valid organization role.",
+		ErrorMessage:   "Please select one or more valid organization roles.",
 	}
 	InviteUserToOrganizationInvalidProjectRole = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           InviteUserToOrganizationInvalidProjectRoleCode,
 		Error:          "invalid project role",
-		ErrorMessage:   "Please select a valid project role for every selected project.",
+		ErrorMessage:   "Please select one or more valid roles for every selected project.",
 	}
 	InviteUserToOrganizationInvalidProjects = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,

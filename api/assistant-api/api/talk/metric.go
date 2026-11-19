@@ -7,24 +7,20 @@ package assistant_talk_api
 
 import (
 	"context"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/exceptions"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	assistant_api "github.com/rapidaai/protos"
 	protos "github.com/rapidaai/protos"
 )
 
 func (cApi *ConversationApi) CreateMessageMetric(ctx context.Context, cer *assistant_api.CreateMessageMetricRequest) (*assistant_api.CreateMessageMetricResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 	val, err := cApi.assistantConversationService.CreateOrUpdateMessageMetrics(
 		ctx,
@@ -44,13 +40,9 @@ func (cApi *ConversationApi) CreateMessageMetric(ctx context.Context, cer *assis
 
 // ConversationFeedback implements protos.TalkServiceServer.
 func (cApi *ConversationGrpcApi) CreateConversationMetric(ctx context.Context, cfr *assistant_api.CreateConversationMetricRequest) (*assistant_api.CreateConversationMetricResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 	val, err := cApi.assistantConversationService.CreateCustomConversationMetric(
 		ctx,

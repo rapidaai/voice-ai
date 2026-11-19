@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	modelOptionCredentialID        = "rapida.credential_id"
+	modelOptionCredentialID        = "rapida.credential_id" // #nosec G101, this is a metadata key, not a secret.
 	modelOptionConnectionPrefix    = "connection."
 	modelOptionConnectionTransport = "connection.transport"
 	modelOptionConnectionEndpoint  = "connection.endpoint"

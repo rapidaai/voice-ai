@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from starlette.requests import Request
 import uvicorn
 
+from app.authentication import ServiceAssertionIssuer
 from app.config import get_settings
 from app.configs.log_config import LogConfig
 from app.connectors import Connector
@@ -25,13 +26,21 @@ from app.routers import add_all_routers
 from app.storage.connector_factory import attach_storage
 from app.vars import service_name
 
-# setting up service name which will be available throughout the application context
-service_name.set(get_settings().service_name)
-
-# initialize the app
+settings = get_settings()
+dictConfig(LogConfig(level=settings.log_level).model_dump())
 _log = logging.getLogger("app")
+# setting up service name which will be available throughout the application context
+service_name.set(settings.service_name)
 
-dictConfig(LogConfig(level=get_settings().log_level).model_dump())
+# Load destination-bound issuers before the request listener opens.
+web_service_assertion_issuer = ServiceAssertionIssuer(
+    destination="web-api",
+    secret=settings.secret,
+)
+integration_service_assertion_issuer = ServiceAssertionIssuer(
+    destination="integration-api",
+    secret=settings.secret,
+)
 
 APP_STORAGE = {}
 
@@ -61,6 +70,8 @@ app = FastAPI(
     openapi_url=get_settings().openapi_url,
     version="0.1.0",
 )
+app.state.web_service_assertion_issuer = web_service_assertion_issuer
+app.state.integration_service_assertion_issuer = integration_service_assertion_issuer
 
 # Add all enabled middleware
 add_all_enabled_middleware(app=app, setting=get_settings())

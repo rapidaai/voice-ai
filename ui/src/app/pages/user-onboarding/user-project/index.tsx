@@ -28,7 +28,7 @@ export function CreateProjectPage() {
   const navigate = useNavigate();
   const { loading, showLoader, hideLoader } = useRapidaStore();
   const { authorize } = useContext(AuthContext);
-  const { authId, token, user } = useCurrentCredential();
+  const { authId, organizationId, token, user } = useCurrentCredential();
   const profileName = user?.name?.trim();
   const {
     register,
@@ -85,7 +85,7 @@ export function CreateProjectPage() {
     createWorkspaceProject({
       name: data.projectName,
       description: data.projectDescription.trim(),
-      auth: { token, userId: authId },
+      auth: { organizationId, token, userId: authId },
       callback: afterCreateProject,
     });
   };

@@ -16,9 +16,20 @@ import (
 	"github.com/rapidaai/pkg/utils"
 )
 
+type CTX_KEY string
+
 var (
-	CLIENT_CTX_KEY CTX_KEY = "__client"
-	REQUEST_ID_KEY         = "x-request-id"
+	CLIENT_CTX_KEY     CTX_KEY = "__client"
+	REQUEST_ID_KEY             = "x-request-id"
+	AUTHORIZATION_KEY          = "authorization"
+	AUTH_KEY                   = "x-auth-id"
+	ORGANIZATION_KEY           = "x-organization-id"
+	PROJECT_KEY                = "x-project-id"
+	SERVICE_SCOPE_KEY          = "x-internal-service-key"
+	PROJECT_SCOPE_KEY          = "x-api-key"
+	ORG_SCOPE_KEY              = "x-org-key"
+	ORG_KEY_PREFIX             = "rpd-org-"
+	PROJECT_KEY_PREFIX         = "rpd-prj-"
 )
 
 type ClientInfo struct {

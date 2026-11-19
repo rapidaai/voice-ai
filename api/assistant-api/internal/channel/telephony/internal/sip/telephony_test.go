@@ -10,6 +10,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -55,7 +56,7 @@ func TestStatusCallback_NormalizesCompletedJSONPayload(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	c.Request = req
 
-	info, err := telephony.StatusCallback(c, nil, 42, 99)
+	info, err := telephony.StatusCallback(c, authentication.Principal{}, 42, 99)
 	if err != nil {
 		t.Fatalf("StatusCallback() error = %v", err)
 	}
@@ -94,7 +95,7 @@ func TestStatusCallback_NormalizesFailedFormPayload(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	c.Request = req
 
-	info, err := telephony.StatusCallback(c, nil, 42, 99)
+	info, err := telephony.StatusCallback(c, authentication.Principal{}, 42, 99)
 	if err != nil {
 		t.Fatalf("StatusCallback() error = %v", err)
 	}
@@ -122,7 +123,7 @@ func TestStatusCallback_NormalizesCancelledQueryPayload(t *testing.T) {
 	req := httptest.NewRequest("GET", "/?event=cancelled&call_id=sip-call-3", nil)
 	c.Request = req
 
-	info, err := telephony.StatusCallback(c, nil, 42, 99)
+	info, err := telephony.StatusCallback(c, authentication.Principal{}, 42, 99)
 	if err != nil {
 		t.Fatalf("StatusCallback() error = %v", err)
 	}

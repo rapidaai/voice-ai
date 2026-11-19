@@ -14,7 +14,7 @@ import (
 	config "github.com/rapidaai/api/web-api/config"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 )
 
 type webEndpointApi struct {
@@ -44,16 +44,11 @@ func NewEndpointGRPC(config *config.WebAppConfig, logger commons.Logger, postgre
 }
 
 func (endpoint *webEndpointGRPCApi) GetEndpoint(c context.Context, iRequest *protos.GetEndpointRequest) (*protos.GetEndpointResponse, error) {
-	// endpoint.logger.Debugf("GetEndpoint from grpc with requestPayload %v, %v", iRequest, c)
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	_endpoint, err := endpoint.endpointClient.GetEndpoint(c, iAuth, iRequest)
+	_endpoint, err := endpoint.endpointClient.GetEndpoint(c, principal, iRequest)
 	if err != nil {
 		return utils.Error[protos.GetEndpointResponse](
 			err,
@@ -66,17 +61,12 @@ func (endpoint *webEndpointGRPCApi) GetEndpoint(c context.Context, iRequest *pro
 /*
  */
 func (endpoint *webEndpointGRPCApi) GetAllEndpoint(c context.Context, iRequest *protos.GetAllEndpointRequest) (*protos.GetAllEndpointResponse, error) {
-	// endpoint.logger.Debugf("GetAllEndpoint from grpc with requestPayload %v, %v", iRequest, c)
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	_page, _endpoint, err := endpoint.endpointClient.GetAllEndpoint(c, iAuth, iRequest.GetCriterias(), iRequest.GetPaginate())
+	_page, _endpoint, err := endpoint.endpointClient.GetAllEndpoint(c, principal, iRequest.GetCriterias(), iRequest.GetPaginate())
 	if err != nil {
 		return utils.Error[protos.GetAllEndpointResponse](
 			err,
@@ -89,30 +79,19 @@ func (endpoint *webEndpointGRPCApi) GetAllEndpoint(c context.Context, iRequest *
 }
 
 func (endpoint *webEndpointGRPCApi) CreateEndpoint(c context.Context, iRequest *protos.CreateEndpointRequest) (*protos.CreateEndpointResponse, error) {
-	// endpoint.logger.Debugf("Create endpoint from grpc with requestPayload %v, %v", iRequest, c)
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return endpoint.endpointClient.CreateEndpoint(c, iAuth, iRequest)
+	return endpoint.endpointClient.CreateEndpoint(c, principal, iRequest)
 }
 
 func (endpointGRPCApi *webEndpointGRPCApi) GetAllEndpointProviderModel(ctx context.Context, iRequest *protos.GetAllEndpointProviderModelRequest) (*protos.GetAllEndpointProviderModelResponse, error) {
-	endpointGRPCApi.logger.Debugf("Create endpoint from grpc with requestPayload %v, %v", iRequest, ctx)
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-
-	_page, _endpoints, err := endpointGRPCApi.endpointClient.GetAllEndpointProviderModel(ctx, iAuth, iRequest.GetEndpointId(), iRequest.GetCriterias(), iRequest.GetPaginate())
+	_page, _endpoints, err := endpointGRPCApi.endpointClient.GetAllEndpointProviderModel(ctx, principal, iRequest.GetEndpointId(), iRequest.GetCriterias(), iRequest.GetPaginate())
 	if err != nil {
 		return utils.Error[protos.GetAllEndpointProviderModelResponse](
 			err,
@@ -125,110 +104,77 @@ func (endpointGRPCApi *webEndpointGRPCApi) GetAllEndpointProviderModel(ctx conte
 }
 
 func (endpointGRPCApi *webEndpointGRPCApi) UpdateEndpointVersion(ctx context.Context, iRequest *protos.UpdateEndpointVersionRequest) (*protos.UpdateEndpointVersionResponse, error) {
-	endpointGRPCApi.logger.Debugf("Update endpoint from grpc with requestPayload %v, %v", iRequest, ctx)
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return endpointGRPCApi.endpointClient.UpdateEndpointVersion(ctx, iAuth, iRequest.GetEndpointId(), iRequest.GetEndpointProviderModelId())
+	return endpointGRPCApi.endpointClient.UpdateEndpointVersion(ctx, principal, iRequest.GetEndpointId(), iRequest.GetEndpointProviderModelId())
 }
 
 func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointProviderModel(ctx context.Context, iRequest *protos.CreateEndpointProviderModelRequest) (*protos.CreateEndpointProviderModelResponse, error) {
-	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return endpointGRPCApi.endpointClient.CreateEndpointProviderModel(ctx, iAuth, iRequest)
+	return endpointGRPCApi.endpointClient.CreateEndpointProviderModel(ctx, principal, iRequest)
 }
 
 // CreateEndpointCacheConfiguration implements protos.EndpointServiceServer.
 func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointCacheConfiguration(ctx context.Context, iRequest *protos.CreateEndpointCacheConfigurationRequest) (*protos.CreateEndpointCacheConfigurationResponse, error) {
-	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return endpointGRPCApi.endpointClient.CreateEndpointCacheConfiguration(ctx, iAuth, iRequest)
+	return endpointGRPCApi.endpointClient.CreateEndpointCacheConfiguration(ctx, principal, iRequest)
 }
 
 // CreateEndpointRetryConfiguration implements protos.EndpointServiceServer.
 func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointRetryConfiguration(ctx context.Context, iRequest *protos.CreateEndpointRetryConfigurationRequest) (*protos.CreateEndpointRetryConfigurationResponse, error) {
-	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return endpointGRPCApi.endpointClient.CreateEndpointRetryConfiguration(ctx, iAuth, iRequest)
+	return endpointGRPCApi.endpointClient.CreateEndpointRetryConfiguration(ctx, principal, iRequest)
 }
 
 // CreateEndpointTag implements protos.EndpointServiceServer.
 func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointTag(ctx context.Context, iRequest *protos.CreateEndpointTagRequest) (*protos.GetEndpointResponse, error) {
-	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return endpointGRPCApi.endpointClient.CreateEndpointTag(ctx, iAuth, iRequest)
+	return endpointGRPCApi.endpointClient.CreateEndpointTag(ctx, principal, iRequest)
 }
 func (endpointGRPCApi *webEndpointGRPCApi) UpdateEndpointDetail(ctx context.Context, iRequest *protos.UpdateEndpointDetailRequest) (*protos.GetEndpointResponse, error) {
-	endpointGRPCApi.logger.Debugf("update endpoint details request %v, %v", iRequest, ctx)
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return endpointGRPCApi.endpointClient.UpdateEndpointDetail(ctx, iAuth, iRequest)
+	return endpointGRPCApi.endpointClient.UpdateEndpointDetail(ctx, principal, iRequest)
 }
 
 // ForkEndpoint implements protos.EndpointServiceServer.
 func (endpointGRPCApi *webEndpointGRPCApi) ForkEndpoint(ctx context.Context, iRequest *protos.ForkEndpointRequest) (*protos.BaseResponse, error) {
-	// endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	//
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return endpointGRPCApi.endpointClient.ForkEndpoint(ctx, iAuth, iRequest)
+	return endpointGRPCApi.endpointClient.ForkEndpoint(ctx, principal, iRequest)
 }
 
 func (endpoint *webEndpointGRPCApi) GetEndpointLog(c context.Context, iRequest *protos.GetEndpointLogRequest) (*protos.GetEndpointLogResponse, error) {
 	// endpoint.logger.Debugf("GetEndpoint from grpc with requestPayload %v, %v", iRequest, c)
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return endpoint.endpointClient.GetEndpointLog(c, iAuth, iRequest)
+	return endpoint.endpointClient.GetEndpointLog(c, principal, iRequest)
 }
 
 /*
@@ -236,16 +182,12 @@ func (endpoint *webEndpointGRPCApi) GetEndpointLog(c context.Context, iRequest *
 
 func (endpoint *webEndpointGRPCApi) GetAllEndpointLog(c context.Context, iRequest *protos.GetAllEndpointLogRequest) (*protos.GetAllEndpointLogResponse, error) {
 	// endpoint.logger.Debugf("GetAllEndpoint from grpc with requestPayload %v, %v", iRequest, c)
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	_page, _deployments, err := endpoint.endpointClient.GetAllEndpointLog(c, iAuth, iRequest.GetEndpointId(), iRequest.GetCriterias(), iRequest.GetPaginate())
+	_page, _deployments, err := endpoint.endpointClient.GetAllEndpointLog(c, principal, iRequest.GetEndpointId(), iRequest.GetCriterias(), iRequest.GetPaginate())
 	if err != nil {
 		return utils.Error[protos.GetAllEndpointLogResponse](
 			err,

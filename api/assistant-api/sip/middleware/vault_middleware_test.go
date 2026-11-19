@@ -14,9 +14,9 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/authentication"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,11 +33,7 @@ func TestVaultMiddleware_ResolvesSIPConfig(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeService,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
-	}
+	auth := newVaultTestPrincipal(t, organizationID, projectID)
 	assistant := &internal_assistant_entity.Assistant{
 		AssistantPhoneDeployment: &internal_assistant_entity.AssistantPhoneDeployment{
 			AssistantDeploymentTelephony: internal_assistant_entity.AssistantDeploymentTelephony{
@@ -72,7 +68,7 @@ func TestVaultMiddleware_ResolvesSIPConfig(t *testing.T) {
 
 func TestVaultMiddleware_ReturnsCredentialIDError(t *testing.T) {
 	ctx := &sip_runtime.SIPRequestContext{
-		Auth: &types.Authentication{},
+		Auth: newVaultTestPrincipal(t, 10, 9),
 		Assistant: &internal_assistant_entity.Assistant{
 			AssistantPhoneDeployment: &internal_assistant_entity.AssistantPhoneDeployment{},
 		},
@@ -90,7 +86,7 @@ func TestVaultMiddleware_ReturnsCredentialIDError(t *testing.T) {
 
 func TestVaultMiddleware_DoesNotMutateContextWhenVaultConfigIsInvalid(t *testing.T) {
 	ctx := &sip_runtime.SIPRequestContext{
-		Auth: &types.Authentication{},
+		Auth: newVaultTestPrincipal(t, 10, 9),
 		Assistant: &internal_assistant_entity.Assistant{
 			AssistantPhoneDeployment: &internal_assistant_entity.AssistantPhoneDeployment{
 				AssistantDeploymentTelephony: internal_assistant_entity.AssistantDeploymentTelephony{
@@ -112,18 +108,37 @@ func TestVaultMiddleware_DoesNotMutateContextWhenVaultConfigIsInvalid(t *testing
 	assert.Nil(t, ctx.Config)
 }
 
+func newVaultTestPrincipal(t *testing.T, organizationID, projectID uint64) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityService, ID: 9007, Issuer: "assistant-api"},
+		authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID},
+		authentication.Proof{
+			Method:   authentication.AuthenticationServiceAssertion,
+			Audience: authentication.AudienceRapidaInternal,
+			Reference: authentication.ProofReference{
+				Type:  authentication.ProofReferenceSigningKey,
+				Value: "assistant-test-1",
+			},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+	return principal
+}
+
 type routeTestVault struct {
 	requestedVaultID uint64
 	credential       *protos.VaultCredential
 	err              error
 }
 
-func (v *routeTestVault) GetCredential(_ context.Context, _ *types.Authentication, vaultID uint64) (*protos.VaultCredential, error) {
+func (v *routeTestVault) GetCredential(_ context.Context, _ authentication.Principal, vaultID uint64) (*protos.VaultCredential, error) {
 	v.requestedVaultID = vaultID
 	return v.credential, v.err
 }
 
-func (v *routeTestVault) GetOauth2Credential(_ context.Context, _ *types.Authentication, vaultID uint64) (*protos.VaultCredential, error) {
+func (v *routeTestVault) GetOauth2Credential(_ context.Context, _ authentication.Principal, vaultID uint64) (*protos.VaultCredential, error) {
 	v.requestedVaultID = vaultID
 	return v.credential, v.err
 }

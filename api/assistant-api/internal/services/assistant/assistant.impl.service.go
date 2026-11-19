@@ -8,6 +8,7 @@ package internal_assistant_service
 import (
 	"context"
 	"fmt"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"sort"
 	"sync"
 	"time"
@@ -15,11 +16,11 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -44,7 +45,7 @@ func NewAssistantService(cfg *config.AssistantConfig, logger commons.Logger, pos
 }
 
 func (eService *assistantService) CreateAssistantProviderWebsocket(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	description string,
 	url string,
@@ -57,8 +58,8 @@ func (eService *assistantService) CreateAssistantProviderWebsocket(ctx context.C
 	epm := &internal_assistant_entity.AssistantProviderWebsocket{
 		AssistantProvider: internal_assistant_entity.AssistantProvider{
 			ActorAudit: gorm_models.ActorAudit{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 			Description: description,
 			AssistantId: assistantId,
@@ -78,7 +79,7 @@ func (eService *assistantService) CreateAssistantProviderWebsocket(ctx context.C
 }
 
 func (eService *assistantService) CreateAssistantProviderAgentkit(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	description string,
 	url string,
@@ -99,8 +100,8 @@ func (eService *assistantService) CreateAssistantProviderAgentkit(ctx context.Co
 	epm := &internal_assistant_entity.AssistantProviderAgentkit{
 		AssistantProvider: internal_assistant_entity.AssistantProvider{
 			ActorAudit: gorm_models.ActorAudit{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 			Description: description,
 			AssistantId: assistantId,
@@ -128,7 +129,7 @@ func (eService *assistantService) CreateAssistantProviderAgentkit(ctx context.Co
 }
 
 func (eService *assistantService) CreateAssistantProviderAgentflow(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	description string,
 	schemaVersion string,
@@ -140,8 +141,8 @@ func (eService *assistantService) CreateAssistantProviderAgentflow(ctx context.C
 	epm := &internal_assistant_entity.AssistantProviderAgentflow{
 		AssistantProvider: internal_assistant_entity.AssistantProvider{
 			ActorAudit: gorm_models.ActorAudit{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 			Description: description,
 			AssistantId: assistantId,
@@ -159,10 +160,10 @@ func (eService *assistantService) CreateAssistantProviderAgentflow(ctx context.C
 	return epm, nil
 }
 
-func (eService *assistantService) DeleteAssistant(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.Assistant, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+func (eService *assistantService) DeleteAssistant(ctx context.Context, auth authentication.Principal, assistantId uint64) (*internal_assistant_entity.Assistant, error) {
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
@@ -170,8 +171,8 @@ func (eService *assistantService) DeleteAssistant(ctx context.Context, auth *typ
 	ed := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
 			Status:           type_enums.RECORD_ARCHIEVE,
-			UpdatedActorType: auth.Actor().Type.String(),
-			UpdatedActorID:   auth.Actor().ID,
+			UpdatedActorType: string(auth.Caller().Type),
+			UpdatedActorID:   auth.Caller().ID,
 		},
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", assistantId,
@@ -187,10 +188,10 @@ func (eService *assistantService) DeleteAssistant(ctx context.Context, auth *typ
 	return ed, nil
 }
 
-func (eService *assistantService) GetAllAssistantTool(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return 0, nil, err
+func (eService *assistantService) GetAllAssistantTool(ctx context.Context, auth authentication.Principal, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error) {
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return 0, nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
@@ -285,13 +286,13 @@ func (eService *assistantService) GetAssistantWithPhoneDeploymentById(
 }
 
 func (eService *assistantService) Get(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	assistantProviderId *uint64,
 	opts *internal_services.GetAssistantOption) (*internal_assistant_entity.Assistant, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	if opts == nil {
@@ -627,21 +628,21 @@ func (eService *assistantService) Get(ctx context.Context,
 }
 
 func (eService *assistantService) UpdateAssistantVersion(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	assistantProvider type_enums.AssistantProvider,
 	assistantProviderId uint64) (*internal_assistant_entity.Assistant, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	ed := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
-			UpdatedActorType: auth.Actor().Type.String(),
-			UpdatedActorID:   auth.Actor().ID,
+			UpdatedActorType: string(auth.Caller().Type),
+			UpdatedActorID:   auth.Caller().ID,
 		},
 		AssistantProvider:   assistantProvider,
 		AssistantProviderId: assistantProviderId,
@@ -659,10 +660,10 @@ func (eService *assistantService) UpdateAssistantVersion(ctx context.Context,
 	return ed, nil
 }
 
-func (eService *assistantService) GetAll(ctx context.Context, auth *types.Authentication, criterias []*protos.Criteria, paginate *protos.Paginate, opts *internal_services.GetAssistantOption) (int64, []*internal_assistant_entity.Assistant, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return 0, nil, err
+func (eService *assistantService) GetAll(ctx context.Context, auth authentication.Principal, criterias []*protos.Criteria, paginate *protos.Paginate, opts *internal_services.GetAssistantOption) (int64, []*internal_assistant_entity.Assistant, error) {
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return 0, nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
@@ -759,7 +760,7 @@ func (eService *assistantService) GetAll(ctx context.Context, auth *types.Authen
 
 func (eService *assistantService) GetAllAssistantProviderModel(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64, criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderModel, error) {
 
@@ -801,7 +802,7 @@ func (eService *assistantService) GetAllAssistantProviderModel(
 
 func (eService *assistantService) GetAllAssistantProviderAgentkit(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64, criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderAgentkit, error) {
 
@@ -842,7 +843,7 @@ func (eService *assistantService) GetAllAssistantProviderAgentkit(
 
 func (eService *assistantService) GetAllAssistantProviderAgentflow(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64, criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderAgentflow, error) {
 
@@ -882,7 +883,7 @@ func (eService *assistantService) GetAllAssistantProviderAgentflow(
 
 func (eService *assistantService) GetAllAssistantProviderWebsocket(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64, criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderWebsocket, error) {
 
@@ -922,15 +923,15 @@ func (eService *assistantService) GetAllAssistantProviderWebsocket(
 }
 
 func (eService *assistantService) CreateAssistant(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	name, description string,
 	visibility string,
 	source string,
 	sourceIdentifier *uint64,
 	language string) (*internal_assistant_entity.Assistant, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
@@ -938,8 +939,8 @@ func (eService *assistantService) CreateAssistant(ctx context.Context,
 	ep := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
 			Status:           type_enums.RECORD_ACTIVE,
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(auth.Caller().Type),
+			CreatedActorID:   auth.Caller().ID,
 		},
 		Organizational: gorm_models.Organizational{
 			ProjectId:      projectContext.ProjectID,
@@ -966,20 +967,20 @@ func (eService *assistantService) CreateAssistant(ctx context.Context,
 }
 
 func (eService *assistantService) UpdateAssistantDetail(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	name, description string) (*internal_assistant_entity.Assistant, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	ed := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
-			UpdatedActorType: auth.Actor().Type.String(),
-			UpdatedActorID:   auth.Actor().ID,
+			UpdatedActorType: string(auth.Caller().Type),
+			UpdatedActorID:   auth.Caller().ID,
 		},
 		Name:        name,
 		Description: description,
@@ -999,7 +1000,7 @@ func (eService *assistantService) UpdateAssistantDetail(ctx context.Context,
 
 func (eService *assistantService) CreateAssistantProviderModel(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	description string,
 	promptRequest string,
@@ -1013,8 +1014,8 @@ func (eService *assistantService) CreateAssistantProviderModel(
 	epm := &internal_assistant_entity.AssistantProviderModel{
 		AssistantProvider: internal_assistant_entity.AssistantProvider{
 			ActorAudit: gorm_models.ActorAudit{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 			Description: description,
 		},
@@ -1038,8 +1039,8 @@ func (eService *assistantService) CreateAssistantProviderModel(
 			AssistantProviderModelId: epm.Id,
 			Mutable: gorm_models.Mutable{
 				Status:           type_enums.RECORD_ACTIVE,
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -1052,8 +1053,8 @@ func (eService *assistantService) CreateAssistantProviderModel(
 		DoUpdates: append(clause.AssignmentColumns([]string{
 			"value",
 		}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Caller().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Caller().ID},
 		),
 	}).Create(modelOptions)
 	if tx.Error != nil {
@@ -1066,21 +1067,21 @@ func (eService *assistantService) CreateAssistantProviderModel(
 }
 
 func (eService *assistantService) AttachProviderModelToAssistant(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	providerType type_enums.AssistantProvider,
 	assistantProviderId uint64) (*internal_assistant_entity.Assistant, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	ed := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
-			UpdatedActorType: auth.Actor().Type.String(),
-			UpdatedActorID:   auth.Actor().ID,
+			UpdatedActorType: string(auth.Caller().Type),
+			UpdatedActorID:   auth.Caller().ID,
 		},
 		AssistantProvider:   providerType,
 		AssistantProviderId: assistantProviderId,
@@ -1099,7 +1100,7 @@ func (eService *assistantService) AttachProviderModelToAssistant(ctx context.Con
 }
 
 func (eService *assistantService) CreateOrUpdateAssistantTag(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	tags []string,
 ) (*internal_assistant_entity.AssistantTag, error) {
@@ -1111,8 +1112,8 @@ func (eService *assistantService) CreateOrUpdateAssistantTag(ctx context.Context
 		AssistantId: assistantId,
 		Tag:         tags,
 		ActorAudit: gorm_models.ActorAudit{
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(auth.Caller().Type),
+			CreatedActorID:   auth.Caller().ID,
 		},
 	}
 	tx := db.Clauses(clause.OnConflict{
@@ -1120,8 +1121,8 @@ func (eService *assistantService) CreateOrUpdateAssistantTag(ctx context.Context
 		DoUpdates: append(clause.AssignmentColumns([]string{
 			"tag",
 		}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Caller().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Caller().ID},
 		),
 	}).Create(&assistantTag)
 

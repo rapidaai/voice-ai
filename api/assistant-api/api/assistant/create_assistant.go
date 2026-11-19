@@ -8,13 +8,13 @@ package assistant_api
 import (
 	"context"
 	"errors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	agentkit "github.com/rapidaai/api/assistant-api/internal/llm/agentkit"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
@@ -24,13 +24,9 @@ import (
 
 // CreateAssistant implements assistant_api.AssistantServiceServer.
 func (assistantApi *assistantGrpcApi) CreateAssistant(ctx context.Context, cer *assistant_api.CreateAssistantRequest) (*assistant_api.GetAssistantResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
 	if !validator.NotBlank(cer.GetName()) {

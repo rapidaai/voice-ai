@@ -7,11 +7,11 @@ package assistant_talk_api
 
 import (
 	"context"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	protos "github.com/rapidaai/protos"
 )
@@ -28,13 +28,9 @@ Returns:
 - An error object, which will be nil if no error occurred.
 */
 func (cApi *ConversationGrpcApi) GetAllAssistantConversation(ctx context.Context, cer *protos.GetAllAssistantConversationRequest) (*protos.GetAllAssistantConversationResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 	cnt, acs, err := cApi.assistantConversationService.GetAll(ctx,
 		iAuth,
@@ -54,20 +50,20 @@ func (cApi *ConversationGrpcApi) GetAllAssistantConversation(ctx context.Context
 	if err != nil {
 		cApi.logger.Errorf("unable to cast assistant provider model %v", err)
 	}
+	totalItem, err := utils.Int64ToUint32(cnt)
+	if err != nil {
+		return nil, err
+	}
 	return utils.PaginatedSuccess[protos.GetAllAssistantConversationResponse, []*protos.AssistantConversation](
-		uint32(cnt),
+		totalItem,
 		cer.GetPaginate().GetPage(),
 		out)
 }
 
 func (cApi *ConversationGrpcApi) GetAllConversationMessage(ctx context.Context, cer *protos.GetAllConversationMessageRequest) (*protos.GetAllConversationMessageResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 	cnt, acs, err := cApi.assistantConversationService.GetAllConversationMessage(
 		ctx,
@@ -88,8 +84,12 @@ func (cApi *ConversationGrpcApi) GetAllConversationMessage(ctx context.Context, 
 		cApi.logger.Errorf("unable to cast assistant provider model %v", err)
 	}
 
+	totalItem, err := utils.Int64ToUint32(cnt)
+	if err != nil {
+		return nil, err
+	}
 	return utils.PaginatedSuccess[protos.GetAllConversationMessageResponse, []*protos.AssistantConversationMessage](
-		uint32(cnt),
+		totalItem,
 		cer.GetPaginate().GetPage(),
 		out)
 }

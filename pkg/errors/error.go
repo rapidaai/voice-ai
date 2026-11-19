@@ -5,7 +5,10 @@
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package errors
 
-import "strconv"
+import (
+	"math"
+	"strconv"
+)
 
 type ErrorCode uint64
 
@@ -17,6 +20,10 @@ type PlatformError struct {
 }
 
 func (platformError PlatformError) HTTPStatusCodeInt32() int32 {
+	if platformError.HTTPStatusCode < math.MinInt32 || platformError.HTTPStatusCode > math.MaxInt32 {
+		return 0
+	}
+	// #nosec G115, the status code range is checked above.
 	return int32(platformError.HTTPStatusCode)
 }
 

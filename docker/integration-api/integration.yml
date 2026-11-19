@@ -1,8 +1,8 @@
-service_name: "Integration_Service"
+service_name: "integration-api"
 service_id: 9004
 host: "0.0.0.0"
 port: 9004
-secret: "rpd_pks"
+secret: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
 log_level: "debug"
 env: "development"
 

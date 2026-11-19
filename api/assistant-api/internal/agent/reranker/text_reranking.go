@@ -9,11 +9,12 @@ import (
 	"context"
 
 	"github.com/rapidaai/api/assistant-api/config"
+	"github.com/rapidaai/pkg/authentication"
 	integration_client "github.com/rapidaai/pkg/clients/integration"
 	integration_client_builders "github.com/rapidaai/pkg/clients/integration/builders"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/utils"
 )
 
 type textReranker struct {
@@ -31,13 +32,17 @@ func NewTextReranker(logger commons.Logger, cfg *config.AssistantConfig, redis c
 }
 
 func (qe *textReranker) Rerank(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	config *RerankingOption,
 	in []string, query string, additionalData map[string]string) (map[int32]string, error) {
 
 	contents := make(map[int32]string)
 	for idx, s := range in {
-		contents[int32(idx)] = s
+		contentIndex, err := utils.IntToInt32(idx)
+		if err != nil {
+			return nil, err
+		}
+		contents[contentIndex] = s
 	}
 
 	res, err := qe.integrationCaller.Reranking(ctx,

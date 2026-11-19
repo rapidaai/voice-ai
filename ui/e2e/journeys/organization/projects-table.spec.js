@@ -131,7 +131,9 @@ for (const colorMode of ['light', 'dark']) {
     await expect(
       page.getByText('Customer support', { exact: true }),
     ).toBeVisible();
-    await expect(page.getByPlaceholder('Search projects...')).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Search for name, role, collaborator, status'),
+    ).toBeVisible();
     const pagination = page.locator('.cds--pagination');
     await expect(pagination).toHaveClass(/sticky/);
     await expect(pagination).toHaveClass(/bottom-0/);

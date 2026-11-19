@@ -116,12 +116,13 @@ def _changed_files(stdin_raw: str) -> list[str]:
     return []
 
 
-def _backend_dirs(changed: list[str]) -> list[str]:
+def _backend_dirs(changed: list[str], repo_root: str | None = None) -> list[str]:
+    root = Path(repo_root or _repo_root())
     dirs = set()
     for f in changed:
         if (f.startswith("api/") or f.startswith("pkg/") or f.startswith("cmd/")) and f.endswith(".go"):
             dirs.add(str(Path(f).parent))
-    return sorted(dirs)
+    return sorted(directory for directory in dirs if any((root / directory).glob("*.go")))
 
 
 def _go_test_command(directory: str, repo_root: str | None = None) -> list[str]:

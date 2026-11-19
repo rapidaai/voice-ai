@@ -13,8 +13,8 @@ import (
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	"github.com/rapidaai/pkg/authentication"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
@@ -90,7 +90,7 @@ func (m *manager) upsertOption(ctx context.Context, deploymentID uint64, key, va
 	opt := &internal_assistant_entity.AssistantDeploymentTelephonyOption{
 		AssistantDeploymentTelephonyId: deploymentID,
 		Mutable: gorm_models.Mutable{
-			CreatedActorType: types.ActorTypeService.String(),
+			CreatedActorType: string(authentication.IdentityService),
 			CreatedActorID:   m.assistantConfig.ServiceID,
 		},
 		Metadata: gorm_models.Metadata{
@@ -103,7 +103,7 @@ func (m *manager) upsertOption(ctx context.Context, deploymentID uint64, key, va
 		DoUpdates: clause.Assignments(map[string]interface{}{
 			"value":              clause.Expr{SQL: "excluded.value"},
 			"updated_date":       time.Now(),
-			"updated_actor_type": types.ActorTypeService.String(),
+			"updated_actor_type": string(authentication.IdentityService),
 			"updated_actor_id":   m.assistantConfig.ServiceID,
 		}),
 	}).Create(opt).Error; err != nil {
@@ -141,7 +141,7 @@ func (m *manager) handleTransient(ctx context.Context, rec *Record, err error) {
 		m.logger.Errorw("SIP registration unreachable after max retries — will not retry",
 			"did", rec.DID, "assistant_id", rec.AssistantID, "retries", retry, "error", err)
 		statusUpdate.Status = StatusUnreachable
-		auth := m.serviceAuthentication(rec.OrganizationID, rec.ProjectID)
+		auth := m.serviceAuthentication(ctx, rec.OrganizationID, rec.ProjectID)
 		observer := m.observer(ctx, auth)
 		defer observer.Close(context.Background())
 		attributes := observability.Attributes{
@@ -187,7 +187,7 @@ func (m *manager) handleTransient(ctx context.Context, rec *Record, err error) {
 
 	m.logger.Warnw("SIP registration failed (will retry)",
 		"did", rec.DID, "assistant_id", rec.AssistantID, "retry", retry, "error", err)
-	auth := m.serviceAuthentication(rec.OrganizationID, rec.ProjectID)
+	auth := m.serviceAuthentication(ctx, rec.OrganizationID, rec.ProjectID)
 	observer := m.observer(ctx, auth)
 	defer observer.Close(context.Background())
 	attributes := observability.Attributes{

@@ -9,6 +9,7 @@ type AuthValue = Partial<AuthenticationType>;
 
 const authenticatedValue: AuthValue = {
   isAuthenticated: () => true,
+  hasOrganizations: () => true,
   isThereOrganization: () => true,
   isThereProject: () => true,
 };
@@ -64,36 +65,39 @@ describe('ProtectedBox', () => {
     expect(screen.getByText('Sign in')).toBeInTheDocument();
   });
 
-  it('redirects users without an organization except on organization onboarding', () => {
+  it('redirects users without memberships except on organization onboarding', () => {
     renderProtectedRoute('/dashboard', {
       ...authenticatedValue,
-      isThereOrganization: () => false,
+      hasOrganizations: () => false,
     });
 
     expect(screen.getByText('Organization onboarding')).toBeInTheDocument();
 
     renderProtectedRoute('/onboarding/organization', {
       ...authenticatedValue,
-      isThereOrganization: () => false,
+      hasOrganizations: () => false,
     });
 
     expect(screen.getAllByText('Organization onboarding')).toHaveLength(2);
   });
 
-  it('redirects users without a project except on project onboarding', () => {
+  it('keeps users with memberships in the shell before tenant selection', () => {
     renderProtectedRoute('/dashboard', {
       ...authenticatedValue,
+      isThereOrganization: () => false,
       isThereProject: () => false,
     });
 
-    expect(screen.getByText('Project onboarding')).toBeInTheDocument();
+    expect(screen.getByText('Protected content')).toBeInTheDocument();
+  });
 
+  it('renders project onboarding when explicitly requested', () => {
     renderProtectedRoute('/onboarding/project', {
       ...authenticatedValue,
       isThereProject: () => false,
     });
 
-    expect(screen.getAllByText('Project onboarding')).toHaveLength(2);
+    expect(screen.getByText('Project onboarding')).toBeInTheDocument();
   });
 });
 

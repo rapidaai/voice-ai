@@ -6,21 +6,21 @@
 package assistant_deployment_api
 
 import (
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/openapi"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	assistant_api "github.com/rapidaai/protos"
 )
 
 func (deploymentApi *AssistantDeploymentApi) CreateAssistantPhoneDeploymentRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		c.JSON(pkg_errors.CreateAssistantPhoneDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantPhoneDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -28,19 +28,6 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantPhoneDeploymentRest(
 				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.CreateAssistantPhoneDeploymentUnauthenticated.CodeString())),
 				ErrorMessage: utils.Ptr(pkg_errors.CreateAssistantPhoneDeploymentUnauthenticated.Error),
 				HumanMessage: utils.Ptr(pkg_errors.CreateAssistantPhoneDeploymentUnauthenticated.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		c.JSON(pkg_errors.CreateAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(pkg_errors.CreateAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.CreateAssistantPhoneDeploymentMissingAuthScope.CodeString())),
-				ErrorMessage: utils.Ptr(pkg_errors.CreateAssistantPhoneDeploymentMissingAuthScope.Error),
-				HumanMessage: utils.Ptr(pkg_errors.CreateAssistantPhoneDeploymentMissingAuthScope.ErrorMessage),
 			},
 		})
 		return
@@ -98,7 +85,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantPhoneDeploymentRest(
 		})
 		return
 	}
-	if validator.NonNil(request.IdealTimeout) && !validator.Between(int(*request.IdealTimeout), 5, 120) {
+	if validator.NonNil(request.IdealTimeout) && !validator.Between(*request.IdealTimeout, 5, 120) {
 		c.JSON(pkg_errors.CreateAssistantPhoneDeploymentInvalidIdealTimeout.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantPhoneDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -110,7 +97,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantPhoneDeploymentRest(
 		})
 		return
 	}
-	if validator.NonNil(request.IdealTimeoutBackoff) && !validator.Between(int(*request.IdealTimeoutBackoff), 0, 5) {
+	if validator.NonNil(request.IdealTimeoutBackoff) && !validator.Between(*request.IdealTimeoutBackoff, 0, 5) {
 		c.JSON(pkg_errors.CreateAssistantPhoneDeploymentInvalidTimeoutBackoff.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantPhoneDeploymentInvalidTimeoutBackoff.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -122,7 +109,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantPhoneDeploymentRest(
 		})
 		return
 	}
-	if validator.NonNil(request.MaxSessionDuration) && !validator.Between(int(*request.MaxSessionDuration), 180, 600) {
+	if validator.NonNil(request.MaxSessionDuration) && !validator.Between(*request.MaxSessionDuration, 180, 600) {
 		c.JSON(pkg_errors.CreateAssistantPhoneDeploymentInvalidSessionDuration.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantPhoneDeploymentInvalidSessionDuration.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),

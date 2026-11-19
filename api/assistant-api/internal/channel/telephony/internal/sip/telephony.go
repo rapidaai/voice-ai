@@ -22,8 +22,8 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 )
@@ -61,7 +61,7 @@ func (t *sipTelephony) parseConfig(vaultCredential *protos.VaultCredential) (*si
 
 func (t *sipTelephony) StatusCallback(
 	c *gin.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	assistantConversationId uint64,
 ) (*internal_type.StatusInfo, error) {
@@ -104,7 +104,7 @@ func (t *sipTelephony) CatchAllStatusCallback(ctx *gin.Context) (*internal_type.
 
 func (t *sipTelephony) OutboundCall(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	toPhone string,
 	fromPhone string,
 	assistant *internal_assistant_entity.Assistant,
@@ -229,7 +229,7 @@ func (t *sipTelephony) outboundHealthGateEnabled(appCfg *config.AssistantConfig)
 
 func (t *sipTelephony) InboundCall(
 	c *gin.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	clientNumber string,
 	assistantConversationId uint64,

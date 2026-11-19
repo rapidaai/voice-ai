@@ -4,7 +4,6 @@ import { UserPage } from './index';
 
 const mockGetAllUser = jest.fn();
 const mockDeleteOrganizationUser = jest.fn();
-const mockUpdateOrganizationUserRole = jest.fn();
 const mockShowLoader = jest.fn();
 const mockHideLoader = jest.fn();
 
@@ -12,9 +11,28 @@ const user = {
   getId: () => 'user-1',
   getName: () => 'Ada Lovelace',
   getEmail: () => 'ada@example.test',
-  getRole: () => 'member',
+  getOrganizationrolesList: () => [
+    {
+      getRoledefinitionid: () => 'role-member',
+      getName: () => 'Organization Member',
+    },
+    {
+      getRoledefinitionid: () => 'role-auditor',
+      getName: () => 'Organization Auditor',
+    },
+  ],
   getCreateddate: () => undefined,
   getStatus: () => 'ACTIVE',
+};
+
+const ownerUser = {
+  ...user,
+  getOrganizationrolesList: () => [
+    {
+      getRoledefinitionid: () => '101',
+      getName: () => 'Organization Owner',
+    },
+  ],
 };
 
 const mockStore = {
@@ -55,8 +73,6 @@ jest.mock('@/stores/user', () => ({
 jest.mock('@/clients', () => ({
   deleteOrganizationUser: (...args: unknown[]) =>
     mockDeleteOrganizationUser(...args),
-  updateOrganizationUserRole: (...args: unknown[]) =>
-    mockUpdateOrganizationUserRole(...args),
 }));
 
 jest.mock('@/app/components/dialogs/workspace', () => ({
@@ -71,6 +87,16 @@ jest.mock('@/app/components/dialogs/workspace', () => ({
   }) =>
     modalOpen ? (
       <div role="dialog">Invite {user?.getEmail()} to project</div>
+    ) : null,
+  ManageOrganizationUserRolesDialog: ({
+    modalOpen,
+    user,
+  }: {
+    modalOpen: boolean;
+    user: { getEmail: () => string } | null;
+  }) =>
+    modalOpen ? (
+      <div role="dialog">Manage roles for {user?.getEmail()}</div>
     ) : null,
 }));
 
@@ -93,12 +119,6 @@ jest.mock('@/app/components/dialogs/shared', () => ({
         <button onClick={onConfirm}>Confirm</button>
       </div>
     ) : null,
-}));
-
-jest.mock('@/app/components/domain/indicators/organization-role', () => ({
-  OrganizationRoleIndicator: ({ role }: { role?: string }) => (
-    <span>{role}</span>
-  ),
 }));
 
 jest.mock('@/app/components/ui/feedback', () => ({
@@ -134,7 +154,9 @@ describe('UserPage', () => {
     const batchActions = container.querySelector('.cds--batch-actions');
     expect(batchActions).toHaveAttribute('aria-hidden', 'false');
     expect(batchActions).toHaveTextContent('1 item selected');
-    expect(batchActions).toHaveTextContent('Make admin');
+    expect(batchActions).not.toHaveTextContent('Make admin');
+    expect(screen.getByText('Organization Member')).toBeInTheDocument();
+    expect(screen.getByText('Organization Auditor')).toBeInTheDocument();
 
     await interaction.click(
       within(batchActions as HTMLElement).getByRole('button', {
@@ -162,6 +184,53 @@ describe('UserPage', () => {
     expect(mockDeleteOrganizationUser).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog')).toHaveTextContent('Delete user');
     expect(screen.getByRole('dialog')).toHaveTextContent('ada@example.test');
+  });
+
+  it('opens multi-role management for a non-owner user', async () => {
+    const interaction = userEvent.setup();
+    const { container } = render(<UserPage />);
+
+    await interaction.click(
+      await screen.findByRole('radio', { name: 'Select row' }),
+    );
+    await interaction.click(
+      within(
+        container.querySelector('.cds--batch-actions') as HTMLElement,
+      ).getByRole('button', { name: 'Manage roles' }),
+    );
+
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      'Manage roles for ada@example.test',
+    );
+  });
+
+  it('does not expose owner mutation actions', async () => {
+    mockStore.users = [ownerUser];
+    const interaction = userEvent.setup();
+    const { container } = render(<UserPage />);
+
+    await interaction.click(
+      await screen.findByRole('radio', { name: 'Select row' }),
+    );
+    const batchActions = container.querySelector('.cds--batch-actions');
+    expect(batchActions).not.toHaveTextContent('Manage roles');
+    expect(batchActions).not.toHaveTextContent('Delete');
+  });
+
+  it('keeps access actions available without a console permission projection', async () => {
+    const interaction = userEvent.setup();
+    const { container } = render(<UserPage />);
+
+    expect(await screen.findByText('Organization Member')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Invite user' }),
+    ).toBeInTheDocument();
+
+    await interaction.click(screen.getByRole('radio', { name: 'Select row' }));
+    const batchActions = container.querySelector('.cds--batch-actions');
+    expect(batchActions).toHaveTextContent('Invite to project');
+    expect(batchActions).toHaveTextContent('Manage roles');
+    expect(batchActions).toHaveTextContent('Delete');
   });
 
   it('keeps an in-place Carbon table skeleton while users load', async () => {

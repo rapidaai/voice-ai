@@ -126,6 +126,7 @@ jest.mock('google-protobuf/google/protobuf/struct_pb', () => ({
 }));
 
 const auth = {
+  organizationId: 'org-1',
   projectId: 'project-1',
   token: 'token-1',
   userId: 'user-1',
@@ -134,6 +135,7 @@ const auth = {
 const headers = {
   authorization: 'token-1',
   'x-auth-id': 'user-1',
+  'x-organization-id': 'org-1',
 };
 
 describe('credential client', () => {
@@ -165,6 +167,7 @@ describe('credential client', () => {
     );
     expect(ConnectionConfig.WithDebugger).toHaveBeenCalledWith({
       authorization: 'token-1',
+      organizationId: 'org-1',
       userId: 'user-1',
       projectId: 'project-1',
     });
@@ -273,7 +276,32 @@ describe('credential client', () => {
       'project-1',
       'credential-1',
       callback,
-      headers,
+      {
+        ...headers,
+        'x-project-id': 'project-1',
+      },
+    );
+  });
+
+  it('selects the revoke request project instead of stale auth state', () => {
+    const callback = jest.fn();
+
+    revokeProjectCredential({
+      projectId: 'project-2',
+      credentialId: 'credential-1',
+      auth,
+      callback,
+    });
+
+    expect(RevokeProjectCredential).toHaveBeenCalledWith(
+      { endpoint: 'test-endpoint' },
+      'project-2',
+      'credential-1',
+      callback,
+      {
+        ...headers,
+        'x-project-id': 'project-2',
+      },
     );
   });
 });

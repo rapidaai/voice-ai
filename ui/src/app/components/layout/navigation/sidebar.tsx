@@ -16,11 +16,9 @@ import { cn } from '@/utils';
 import { useRapidaStore } from '@/stores/app';
 import { Text } from '@/app/components/ui/primitives';
 import { useWorkspace } from '@/workspace';
-import { useAuth } from '@/hooks/use-credential';
 
 export function SidebarNavigation() {
   const workspace = useWorkspace();
-  const { organizationRole } = useAuth();
   const { locked, setLocked, open } = useSidebar();
   const { loading, loadingType } = useRapidaStore();
   const isLoading = loading && loadingType === 'block';
@@ -128,10 +126,7 @@ export function SidebarNavigation() {
           <ul>
             <Team isLoading={isLoading} />
             <Project isLoading={isLoading} />
-            {(organizationRole?.role === 'owner' ||
-              organizationRole?.role === 'admin') && (
-              <Roles isLoading={isLoading} />
-            )}
+            <Roles isLoading={isLoading} />
           </ul>
         </div>
       </nav>

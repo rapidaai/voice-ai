@@ -8,6 +8,7 @@ package assistant_talk_api
 import (
 	"context"
 	"errors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -26,12 +27,12 @@ import (
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_assistant_service "github.com/rapidaai/api/assistant-api/internal/services/assistant"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/authentication"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/storages"
 	storage_files "github.com/rapidaai/pkg/storages/file-storage"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	assistant_api "github.com/rapidaai/protos"
 )
@@ -60,7 +61,7 @@ type ConversationGrpcApi struct {
 	ConversationApi
 }
 
-func (cApi *ConversationApi) Observability(ctx context.Context, auth *types.Authentication, options ...observability.Option) observability.Recorder {
+func (cApi *ConversationApi) Observability(ctx context.Context, auth authentication.Principal, options ...observability.Option) observability.Recorder {
 	configuredCollectors := []observability.Collector{
 		observability_collector_conversationmetric.New(observability_collector_conversationmetric.Config{
 			Logger:              cApi.logger,
@@ -199,13 +200,9 @@ func NewConversationApi(config *config.AssistantConfig, logger commons.Logger,
 // Returns:
 // - An error if any error occurs during the processing of the request.
 func (cApi *ConversationGrpcApi) AssistantTalk(stream assistant_api.TalkService_AssistantTalkServer) error {
-	auth, authErr := types.Authorize(stream.Context())
-	if authErr != nil {
-		return status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(stream.Context())
+	if !ok {
+		return status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
 	source, ok := utils.GetClientSource(stream.Context())
@@ -256,13 +253,9 @@ func (cApi *ConversationGrpcApi) AssistantTalk(stream assistant_api.TalkService_
 }
 
 func (cApi *ConversationGrpcApi) WebTalk(stream assistant_api.WebRTC_WebTalkServer) error {
-	auth, authErr := types.Authorize(stream.Context())
-	if authErr != nil {
-		return status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(stream.Context())
+	if !ok {
+		return status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
 	source, ok := utils.GetClientSource(stream.Context())

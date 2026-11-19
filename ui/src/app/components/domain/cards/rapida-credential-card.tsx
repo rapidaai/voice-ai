@@ -15,7 +15,7 @@ export const RapidaCredentialCard = () => {
   const [ourKeys, setOurKeys] = useState<ProjectCredential[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [error, setError] = useState('');
-  const { authId, token, projectId } = useCurrentCredential();
+  const { authId, organizationId, token, projectId } = useCurrentCredential();
   const { loading, showLoader, hideLoader } = useRapidaStore();
 
   const onCreateProjectCredential = () => {
@@ -37,7 +37,7 @@ export const RapidaCredentialCard = () => {
         page,
         pageSize: 100,
         criteria: [],
-        auth: { token, userId: authId },
+        auth: { organizationId, token, userId: authId },
         callback: (_err, data: GetAllProjectCredentialResponse | null) => {
           if (!data?.getSuccess()) {
             hideLoader();
@@ -136,7 +136,7 @@ export const RapidaCredentialCard = () => {
       <CreateProjectToken
         open={isCreateOpen}
         projectId={projectId}
-        auth={{ token, userId: authId }}
+        auth={{ organizationId, token, userId: authId }}
         onClose={() => setIsCreateOpen(false)}
         onCreated={getAllProjectCredential}
       />

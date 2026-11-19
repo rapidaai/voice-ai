@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
@@ -32,6 +32,20 @@ describe('PrimaryButton', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toHaveClass(
       'app-primary-button',
       'w-full!',
+    );
+  });
+
+  it('forwards the launcher reference to the Carbon button', () => {
+    const buttonRef = createRef<HTMLButtonElement>();
+
+    render(
+      <PrimaryButton ref={buttonRef} size="md">
+        Create role
+      </PrimaryButton>,
+    );
+
+    expect(buttonRef.current).toBe(
+      screen.getByRole('button', { name: 'Create role' }),
     );
   });
 

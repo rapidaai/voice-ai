@@ -7,23 +7,19 @@ package knowledge_api
 
 import (
 	"context"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	knowledge_api "github.com/rapidaai/protos"
 )
 
 // GetAllKnowledgeDocument implements knowledge_api.KnowledgeServiceServer.
 func (knowledgeApi *knowledgeGrpcApi) GetAllKnowledgeDocument(ctx context.Context, cer *knowledge_api.GetAllKnowledgeDocumentRequest) (*knowledge_api.GetAllKnowledgeDocumentResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
 	cnt, _kns, err := knowledgeApi.knowledgeDocumentService.GetAll(ctx, iAuth, cer.GetKnowledgeId(), cer.GetCriterias(), cer.GetPaginate())
@@ -39,8 +35,12 @@ func (knowledgeApi *knowledgeGrpcApi) GetAllKnowledgeDocument(ctx context.Contex
 	if err != nil {
 		knowledgeApi.logger.Errorf("unable to cast knowledge document %v", err)
 	}
+	totalItem, err := utils.Int64ToUint32(cnt)
+	if err != nil {
+		return nil, err
+	}
 	return utils.PaginatedSuccess[knowledge_api.GetAllKnowledgeDocumentResponse](
-		uint32(cnt),
+		totalItem,
 		cer.GetPaginate().GetPage(),
 		out)
 }

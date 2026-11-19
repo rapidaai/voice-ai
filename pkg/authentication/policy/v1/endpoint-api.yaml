@@ -1,0 +1,398 @@
+# Copyright (c) 2023-2025 RapidaAI
+# Author: Prashant Srivastav <prashant@rapida.ai>
+#
+# Licensed under GPL-2.0 with Rapida Additional Terms.
+# See LICENSE.md or contact sales@rapida.ai for commercial usage.
+
+version: 1
+deployable: endpoint-api
+
+grpc:
+  /endpoint_api.Deployment/Invoke:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.runtime.invoke
+  /endpoint_api.Deployment/Probe:
+    authorization: disabled
+  /endpoint_api.Deployment/Update:
+    authorization: disabled
+  /endpoint_api.EndpointService/CreateEndpoint:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.create
+  /endpoint_api.EndpointService/CreateEndpointCacheConfiguration:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  /endpoint_api.EndpointService/CreateEndpointProviderModel:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  /endpoint_api.EndpointService/CreateEndpointRetryConfiguration:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  /endpoint_api.EndpointService/CreateEndpointTag:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  /endpoint_api.EndpointService/ForkEndpoint:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.create
+  /endpoint_api.EndpointService/GetAllEndpoint:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /endpoint_api.EndpointService/GetAllEndpointLog:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.observability.read
+  /endpoint_api.EndpointService/GetAllEndpointProviderModel:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /endpoint_api.EndpointService/GetEndpoint:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /endpoint_api.EndpointService/GetEndpointLog:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.observability.read
+  /endpoint_api.EndpointService/UpdateEndpointDetail:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  /endpoint_api.EndpointService/UpdateEndpointVersion:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+
+http:
+  GET /healthz/:
+    authorization: public
+  GET /readiness/:
+    authorization: public

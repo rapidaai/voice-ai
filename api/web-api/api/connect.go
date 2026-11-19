@@ -16,7 +16,7 @@ import (
 	internal_vault_service "github.com/rapidaai/api/web-api/internal/service/vault"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/pkg/utils"
 	protos "github.com/rapidaai/protos"
 )
@@ -84,20 +84,15 @@ const (
 )
 
 func (wConnectApi *webConnectGRPCApi) GeneralConnect(ctx context.Context, kcr *protos.GeneralConnectRequest) (*protos.GeneralConnectResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	projectContext, err := iAuth.ProjectContext()
-	if err != nil {
-		wConnectApi.logger.Errorf("unable to resolve project context for connector callback: %v", err)
+	tenant := principal.Tenant()
+	if tenant.ProjectID == 0 {
 		return utils.AuthenticateError[protos.GeneralConnectResponse]()
 	}
-	decodedState, err := wConnectApi.googleDriveConnect.DecodeState(ctx, iAuth, kcr.State)
+	decodedState, err := wConnectApi.googleDriveConnect.DecodeState(ctx, principal, kcr.State)
 	if err != nil {
 		wConnectApi.logger.Errorf("illegal state for oauth %v", err)
 		return utils.Error[protos.GeneralConnectResponse](err, "illegal state for oauth")
@@ -128,7 +123,7 @@ func (wConnectApi *webConnectGRPCApi) GeneralConnect(ctx context.Context, kcr *p
 	}
 
 	_, err = wConnectApi.vaultService.Create(
-		ctx, iAuth, projectContext, decodedState.Provider, "connected-org-tool", credential)
+		ctx, principal, decodedState.Provider, "connected-org-tool", credential)
 	if err != nil {
 		return utils.Error[protos.GeneralConnectResponse](err, "Unable to store the generated token")
 	}
@@ -398,23 +393,18 @@ func (connectApi *webConnectGRPCApi) GetConnectorFiles(ctx context.Context,
 	r *protos.GetConnectorFilesRequest) (*protos.GetConnectorFilesResponse, error) {
 	//
 	// toolId uint64, q *string, pageToken *string
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	organizationContext, err := iAuth.OrganizationContext()
-	if err != nil {
-		connectApi.logger.Errorf("unable to resolve organization context for connector files: %v", err)
+	tenant := principal.Tenant()
+	if tenant.OrganizationID == 0 {
 		return utils.AuthenticateError[protos.GetConnectorFilesResponse]()
 	}
 
 	// need to modify
 	crd, err := connectApi.vaultService.GetProviderCredential(
-		ctx, organizationContext.OrganizationID, r.GetProvider())
+		ctx, tenant.OrganizationID, r.GetProvider())
 	if err != nil {
 		connectApi.logger.Errorf("unable to get tool credentials %v", err)
 		return utils.Error[protos.GetConnectorFilesResponse](err, "Unable to get tool credential to get list of files.")

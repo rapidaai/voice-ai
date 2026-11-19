@@ -7,6 +7,7 @@ package assistant_api
 
 import (
 	"encoding/json"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"net/http"
 	"strconv"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/rapidaai/openapi"
 	pkg_errors "github.com/rapidaai/pkg/errors"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
@@ -23,8 +23,8 @@ import (
 )
 
 func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		c.JSON(pkg_errors.CreateAssistantUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -32,19 +32,6 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.CreateAssistantUnauthenticated.CodeString())),
 				ErrorMessage: utils.Ptr(pkg_errors.CreateAssistantUnauthenticated.Error),
 				HumanMessage: utils.Ptr(pkg_errors.CreateAssistantUnauthenticated.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		c.JSON(pkg_errors.CreateAssistantMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(pkg_errors.CreateAssistantMissingAuthScope.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.CreateAssistantMissingAuthScope.CodeString())),
-				ErrorMessage: utils.Ptr(pkg_errors.CreateAssistantMissingAuthScope.Error),
-				HumanMessage: utils.Ptr(pkg_errors.CreateAssistantMissingAuthScope.ErrorMessage),
 			},
 		})
 		return

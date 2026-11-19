@@ -9,7 +9,7 @@ package sip_pipeline
 import (
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/protos"
 )
 
@@ -26,7 +26,7 @@ type SessionEstablishedPipeline struct {
 	VaultCredential *protos.VaultCredential
 	Direction       sip_runtime.CallDirection
 	AssistantID     uint64
-	Auth            *types.Authentication
+	Auth            authentication.Principal
 	RequestURI      string
 	CallAddress     sip_runtime.CallAddress
 	ConversationID  uint64

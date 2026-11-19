@@ -5,17 +5,17 @@ import (
 	"errors"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	clients "github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 type ProjectDashboardAnalyticsClient interface {
-	GetProjectDashboardAnalytics(context.Context, *types.Authentication, *protos.GetProjectDashboardAnalyticsRequest) (*protos.ProjectDashboardAnalytics, error)
+	GetProjectDashboardAnalytics(context.Context, authentication.Principal, *protos.GetProjectDashboardAnalyticsRequest) (*protos.ProjectDashboardAnalytics, error)
 }
 
 type projectDashboardAnalyticsClient struct {
@@ -29,12 +29,12 @@ func NewProjectDashboardAnalyticsClientGRPC(cfg *config.AppConfig, logger common
 		logger.Errorf("unable to create dashboard analytics connection: %v", err)
 	}
 	return &projectDashboardAnalyticsClient{
-		InternalClient: clients.NewInternalClient(cfg, logger, redis),
+		InternalClient: clients.NewInternalClient(cfg, "workflow-api", logger, redis),
 		client:         protos.NewProjectDashboardAnalyticsServiceClient(connection),
 	}
 }
 
-func (client *projectDashboardAnalyticsClient) GetProjectDashboardAnalytics(ctx context.Context, auth *types.Authentication, request *protos.GetProjectDashboardAnalyticsRequest) (*protos.ProjectDashboardAnalytics, error) {
+func (client *projectDashboardAnalyticsClient) GetProjectDashboardAnalytics(ctx context.Context, auth authentication.Principal, request *protos.GetProjectDashboardAnalyticsRequest) (*protos.ProjectDashboardAnalytics, error) {
 	authContext, err := client.WithAuth(ctx, auth)
 	if err != nil {
 		return nil, err

@@ -15,17 +15,18 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	clients "github.com/rapidaai/pkg/clients"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/pkg/utils"
 	vault_api "github.com/rapidaai/protos"
 )
 
 type VaultClient interface {
-	GetCredential(ctx context.Context, auth *types.Authentication, vaultId uint64) (*vault_api.VaultCredential, error)
-	GetOauth2Credential(ctx context.Context, auth *types.Authentication, vaultId uint64) (*vault_api.VaultCredential, error)
+	GetCredential(ctx context.Context, auth authentication.Principal, vaultId uint64) (*vault_api.VaultCredential, error)
+	GetOauth2Credential(ctx context.Context, auth authentication.Principal, vaultId uint64) (*vault_api.VaultCredential, error)
 }
 
 type vaultServiceClient struct {
@@ -46,7 +47,7 @@ func NewVaultClientGRPC(cfg *config.AppConfig, logger commons.Logger, redis conn
 // NewVaultClientWithClient creates a vault client using the provided gRPC client.
 func NewVaultClientWithClient(cfg *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, vaultClient vault_api.VaultServiceClient) VaultClient {
 	return &vaultServiceClient{
-		clients.NewInternalClient(cfg, logger, redis),
+		clients.NewWebInternalClient(cfg, logger, redis),
 		cfg,
 		logger,
 		vaultClient,
@@ -54,7 +55,7 @@ func NewVaultClientWithClient(cfg *config.AppConfig, logger commons.Logger, redi
 }
 
 func (client *vaultServiceClient) GetOauth2Credential(c context.Context,
-	auth *types.Authentication, vaultId uint64) (*vault_api.VaultCredential, error) {
+	auth authentication.Principal, vaultId uint64) (*vault_api.VaultCredential, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -92,17 +93,17 @@ func (client *vaultServiceClient) GetOauth2Credential(c context.Context,
 	return data, nil
 }
 
-func (client *vaultServiceClient) GetCredential(c context.Context, auth *types.Authentication, vaultId uint64) (*vault_api.VaultCredential, error) {
+func (client *vaultServiceClient) GetCredential(c context.Context, auth authentication.Principal, vaultId uint64) (*vault_api.VaultCredential, error) {
 	start := time.Now()
-	organizationContext, err := auth.OrganizationContext()
-	if err != nil {
-		return nil, fmt.Errorf("vault credential requires organization context: %w", err)
+	tenant := auth.Tenant()
+	if tenant.OrganizationID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	bgCtx, err := client.WithAuth(context.Background(), auth)
 	if err != nil {
 		return nil, err
 	}
-	cacheKey := client.CacheKey(c, "GetCredential", fmt.Sprintf("%d", organizationContext.OrganizationID), fmt.Sprintf("vlt__%d", vaultId))
+	cacheKey := client.CacheKey(c, "GetCredential", fmt.Sprintf("%d", tenant.OrganizationID), fmt.Sprintf("vlt__%d", vaultId))
 	cachedValue := client.Retrieve(c, cacheKey)
 	if cachedValue.HasError() {
 		client.logger.Errorf("Cache missed for the request: %v", cachedValue.Err)

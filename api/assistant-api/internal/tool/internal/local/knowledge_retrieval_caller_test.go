@@ -14,10 +14,10 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/entity/knowledges"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,11 +36,11 @@ type knowledgeCallerVault struct {
 	err error
 }
 
-func (vault *knowledgeCallerVault) GetCredential(context.Context, *types.Authentication, uint64) (*protos.VaultCredential, error) {
+func (vault *knowledgeCallerVault) GetCredential(context.Context, authentication.Principal, uint64) (*protos.VaultCredential, error) {
 	return nil, vault.err
 }
 
-func (vault *knowledgeCallerVault) GetOauth2Credential(context.Context, *types.Authentication, uint64) (*protos.VaultCredential, error) {
+func (vault *knowledgeCallerVault) GetOauth2Credential(context.Context, authentication.Principal, uint64) (*protos.VaultCredential, error) {
 	return nil, vault.err
 }
 
@@ -58,8 +58,8 @@ func (communication *knowledgeCallerCommunication) VaultCaller() web_client.Vaul
 	return communication.vault
 }
 
-func (communication *knowledgeCallerCommunication) Auth() *types.Authentication {
-	return &types.Authentication{}
+func (communication *knowledgeCallerCommunication) Auth() authentication.Principal {
+	return authentication.Principal{}
 }
 
 func TestNewKnowledgeRetrievalToolCaller_LogsEmbeddingProviderOnCredentialFailure(t *testing.T) {

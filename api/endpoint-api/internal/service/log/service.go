@@ -12,8 +12,10 @@ import (
 
 	internal_gorm "github.com/rapidaai/api/endpoint-api/internal/entity"
 	internal_service "github.com/rapidaai/api/endpoint-api/internal/service"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
@@ -35,15 +37,15 @@ func NewEndpointLogService(logger commons.Logger, postgres connectors.PostgresCo
 
 func (els *endpointLogService) CreateEndpointLog(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	source utils.RapidaSource,
 	endpointId, endpointProviderModelId uint64,
 	logId uint64,
 	arguments, metadata, options map[string]interface{},
 ) (*internal_gorm.EndpointLog, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.OrganizationID == 0 || projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	db := els.postgres.DB(ctx)
 	endpointLog := &internal_gorm.EndpointLog{
@@ -62,8 +64,8 @@ func (els *endpointLogService) CreateEndpointLog(
 	tx := db.Model(&internal_gorm.EndpointLog{}).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "id"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
-			"updated_actor_type": auth.Actor().Type.String(),
-			"updated_actor_id":   auth.Actor().ID,
+			"updated_actor_type": string(auth.Subject().Type),
+			"updated_actor_id":   auth.Subject().ID,
 			"updated_date":       time.Now(),
 		}),
 	}).Create(map[string]interface{}{
@@ -74,8 +76,8 @@ func (els *endpointLogService) CreateEndpointLog(
 		"project_id":                 endpointLog.ProjectId,
 		"organization_id":            endpointLog.OrganizationId,
 		"status":                     endpointLog.Status,
-		"created_actor_type":         auth.Actor().Type.String(),
-		"created_actor_id":           auth.Actor().ID,
+		"created_actor_type":         string(auth.Subject().Type),
+		"created_actor_id":           auth.Subject().ID,
 	})
 	if tx.Error != nil {
 		return nil, tx.Error
@@ -95,14 +97,14 @@ func (els *endpointLogService) CreateEndpointLog(
 
 func (els *endpointLogService) UpdateEndpointLog(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	logId uint64,
 	metrics []*endpoint_grpc_api.Metric,
 	timeTaken uint64,
 ) (*internal_gorm.EndpointLog, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.OrganizationID == 0 || projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	db := els.postgres.DB(ctx)
 	endpointLog := &internal_gorm.EndpointLog{
@@ -121,8 +123,8 @@ func (els *endpointLogService) UpdateEndpointLog(
 		Updates(map[string]interface{}{
 			"time_taken":         endpointLog.TimeTaken,
 			"status":             endpointLog.Status,
-			"updated_actor_type": auth.Actor().Type.String(),
-			"updated_actor_id":   auth.Actor().ID,
+			"updated_actor_type": string(auth.Subject().Type),
+			"updated_actor_id":   auth.Subject().ID,
 		})
 	if tx.Error != nil {
 		return nil, tx.Error
@@ -137,7 +139,7 @@ func (els *endpointLogService) UpdateEndpointLog(
 
 func (els *endpointLogService) ApplyMetadata(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	logId uint64,
 	metadata map[string]interface{},
 ) ([]*internal_gorm.EndpointLogMetadata, error) {
@@ -152,8 +154,8 @@ func (els *endpointLogService) ApplyMetadata(
 		_meta := &internal_gorm.EndpointLogMetadata{
 			EndpointLogId: logId,
 			Mutable: gorm_models.Mutable{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Subject().Type),
+				CreatedActorID:   auth.Subject().ID,
 			},
 			Metadata: gorm_models.Metadata{
 				Key: k,
@@ -166,8 +168,8 @@ func (els *endpointLogService) ApplyMetadata(
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "endpoint_log_id"}, {Name: "key"}},
 		DoUpdates: append(clause.AssignmentColumns([]string{"value", "updated_date"}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Subject().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Subject().ID},
 		),
 	}).Create(&_metadatas)
 	if tx.Error != nil {
@@ -180,7 +182,7 @@ func (els *endpointLogService) ApplyMetadata(
 }
 
 func (els *endpointLogService) ApplyOption(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	logId uint64,
 	opts map[string]interface{}) ([]*internal_gorm.EndpointLogOption, error) {
 	start := time.Now()
@@ -194,8 +196,8 @@ func (els *endpointLogService) ApplyOption(ctx context.Context,
 		option := &internal_gorm.EndpointLogOption{
 			EndpointLogId: logId,
 			Mutable: gorm_models.Mutable{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Subject().Type),
+				CreatedActorID:   auth.Subject().ID,
 			},
 			Metadata: gorm_models.Metadata{
 				Key: k,
@@ -208,8 +210,8 @@ func (els *endpointLogService) ApplyOption(ctx context.Context,
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "endpoint_log_id"}, {Name: "key"}},
 		DoUpdates: append(clause.AssignmentColumns([]string{"value", "updated_date"}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Subject().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Subject().ID},
 		),
 	}).Create(&options)
 	if tx.Error != nil {
@@ -222,7 +224,7 @@ func (els *endpointLogService) ApplyOption(ctx context.Context,
 }
 
 func (els *endpointLogService) ApplyArgument(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	logId uint64,
 	arguments map[string]interface{},
 ) ([]*internal_gorm.EndpointLogArgument, error) {
@@ -238,8 +240,8 @@ func (els *endpointLogService) ApplyArgument(ctx context.Context,
 		ag := &internal_gorm.EndpointLogArgument{
 			EndpointLogId: logId,
 			Mutable: gorm_models.Mutable{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Subject().Type),
+				CreatedActorID:   auth.Subject().ID,
 			},
 			Argument: gorm_models.Argument{
 				Name: k,
@@ -252,8 +254,8 @@ func (els *endpointLogService) ApplyArgument(ctx context.Context,
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "endpoint_log_id"}, {Name: "name"}},
 		DoUpdates: append(clause.AssignmentColumns([]string{"value", "updated_date"}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Subject().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Subject().ID},
 		),
 	}).Create(&_arguments)
 	if tx.Error != nil {
@@ -273,7 +275,7 @@ func (els *endpointLogService) ApplyArgument(ctx context.Context,
 **/
 func (els *endpointLogService) ApplyMetrics(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	logId uint64,
 	metrics []*types.Metric,
 ) ([]*internal_gorm.EndpointLogMetric, error) {
@@ -283,8 +285,8 @@ func (els *endpointLogService) ApplyMetrics(
 	for _, mtr := range metrics {
 		_mtr := &internal_gorm.EndpointLogMetric{
 			Mutable: gorm_models.Mutable{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Subject().Type),
+				CreatedActorID:   auth.Subject().ID,
 			},
 			Metric: gorm_models.Metric{
 				Name:        mtr.GetName(),
@@ -300,8 +302,8 @@ func (els *endpointLogService) ApplyMetrics(
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "endpoint_log_id"}, {Name: "name"}},
 		DoUpdates: append(clause.AssignmentColumns([]string{"value", "description", "updated_date"}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Subject().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Subject().ID},
 		),
 	}).Create(&mtrs)
 	if tx.Error != nil {
@@ -314,12 +316,12 @@ func (els *endpointLogService) ApplyMetrics(
 }
 
 func (els *endpointLogService) GetAllEndpointLog(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	endpointId uint64,
 	criteria []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*internal_gorm.EndpointLog, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return 0, nil, err
+	projectContext := auth.Tenant()
+	if projectContext.OrganizationID == 0 || projectContext.ProjectID == 0 {
+		return 0, nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	start := time.Now()
 	db := els.postgres.DB(ctx)
@@ -357,10 +359,10 @@ func (els *endpointLogService) GetAllEndpointLog(ctx context.Context,
 	els.logger.Benchmark("EndpointLogService.GetAllLog", time.Since(start))
 	return cnt, endpointLogs, nil
 }
-func (els *endpointLogService) GetEndpointLog(ctx context.Context, auth *types.Authentication, logId, endpointId uint64) (*internal_gorm.EndpointLog, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+func (els *endpointLogService) GetEndpointLog(ctx context.Context, auth authentication.Principal, logId, endpointId uint64) (*internal_gorm.EndpointLog, error) {
+	projectContext := auth.Tenant()
+	if projectContext.OrganizationID == 0 || projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	start := time.Now()
 	db := els.postgres.DB(ctx)
@@ -381,7 +383,7 @@ func (els *endpointLogService) GetEndpointLog(ctx context.Context, auth *types.A
 	return wkg, nil
 }
 
-func (els *endpointLogService) GetAggregatedEndpointAnalytics(ctx context.Context, auth *types.Authentication, endpointId uint64) *endpoint_grpc_api.AggregatedEndpointAnalytics {
+func (els *endpointLogService) GetAggregatedEndpointAnalytics(ctx context.Context, auth authentication.Principal, endpointId uint64) *endpoint_grpc_api.AggregatedEndpointAnalytics {
 	criteria := []*endpoint_grpc_api.Criteria{{
 		Key:   "created_date",
 		Logic: ">=",
@@ -398,9 +400,14 @@ func (els *endpointLogService) GetAggregatedEndpointAnalytics(ctx context.Contex
 			PageSize: 100,
 		},
 	)
+	countValue, conversionErr := utils.Int64ToUint64(count)
+	if conversionErr != nil {
+		els.logger.Errorf("unable to convert endpoint analytics count: %v", conversionErr)
+		countValue = 0
+	}
 	if err != nil {
 		return &endpoint_grpc_api.AggregatedEndpointAnalytics{
-			Count:        uint64(count),
+			Count:        countValue,
 			LastActivity: nil,
 		}
 	}
@@ -456,7 +463,7 @@ func (els *endpointLogService) GetAggregatedEndpointAnalytics(ctx context.Contex
 	}
 
 	return &endpoint_grpc_api.AggregatedEndpointAnalytics{
-		Count:           uint64(count),
+		Count:           countValue,
 		TotalInputCost:  totalInputCost,
 		TotalOutputCost: totalOutputCost,
 		TotalToken:      totalToken,

@@ -9,7 +9,6 @@ import {
   Google,
   Linkedin,
   RegisterUser,
-  VerifyToken,
 } from '@rapidaai/react';
 
 import { ConnectionConfig } from '@rapidaai/react';
@@ -24,7 +23,6 @@ export type ChangeAccountPasswordParams = {
 export const authenticateUser = withConnection(AuthenticateUser);
 export const authorizeUser = withConnection(AuthorizeUser);
 export const registerUser = withConnection(RegisterUser);
-export const verifyToken = withConnection(VerifyToken);
 export const forgotPassword = withConnection(ForgotPassword);
 export const createPassword = withConnection(CreatePassword);
 export const changePassword = withConnection(ChangePassword);

@@ -7,9 +7,9 @@ import {
   ServiceError,
 } from '@rapidaai/react';
 import { ApiKey, User } from '@carbon/icons-react';
-import { Button, InlineLoading, Tag } from '@carbon/react';
+import { InlineLoading, Tag } from '@carbon/react';
 import { OverviewRow, RightSideModal } from '@/app/components/dialogs/shared';
-import { Tabs } from '@/app/components/ui/primitives';
+import { PrimaryButton, Tabs, Text } from '@/app/components/ui/primitives';
 import { getAccessRole } from '@/clients';
 import { useCredential } from '@/hooks/use-credential';
 import { toHumanReadableDateTime } from '@/utils/date';
@@ -55,7 +55,7 @@ export function RoleDetailsSidePanel({
   launcherButtonRef,
   onClose,
 }: RoleDetailsSidePanelProps) {
-  const [userId, token] = useCredential();
+  const [userId, token, , organizationId] = useCredential();
   const [role, setRole] = useState<RoleDefinition | null>(null);
   const [status, setStatus] = useState<PanelStatus>('idle');
   const [error, setError] = useState('');
@@ -79,7 +79,7 @@ export function RoleDetailsSidePanel({
     setSelectedTab(0);
     getAccessRole({
       roleDefinitionId,
-      auth: { token, userId },
+      auth: { organizationId, token, userId },
     })
       .then(response => {
         if (requestId !== requestSequence.current) return;
@@ -152,35 +152,51 @@ export function RoleDetailsSidePanel({
         {status === 'not-found' && (
           <div className="p-5">
             <div>
-              <h2 className="text-lg font-semibold">Role unavailable</h2>
-              <p className="mt-2 text-sm text-muted">
+              <Text as="h2" variant="heading-03">
+                Role unavailable
+              </Text>
+              <Text
+                as="p"
+                variant="body-compact-01"
+                className="mt-2 text-muted"
+              >
                 This role is no longer available. It may have been archived or
                 removed from your organization.
-              </p>
+              </Text>
             </div>
           </div>
         )}
 
         {status === 'denied' && (
           <div className="p-5">
-            <p role="alert" className="text-sm text-support-error">
+            <Text
+              as="p"
+              variant="label-01"
+              role="alert"
+              className="text-support-error"
+            >
               You do not have permission to view this role.
-            </p>
+            </Text>
           </div>
         )}
 
         {status === 'error' && (
           <div className="flex flex-col gap-4 p-5">
-            <p role="alert" className="text-sm text-support-error">
+            <Text
+              as="p"
+              variant="label-01"
+              role="alert"
+              className="text-support-error"
+            >
               {error}
-            </p>
-            <Button
-              kind="primary"
+            </Text>
+            <PrimaryButton
+              size="md"
               type="button"
               onClick={() => setLoadCycle(value => value + 1)}
             >
               Retry
-            </Button>
+            </PrimaryButton>
           </div>
         )}
 
@@ -200,14 +216,17 @@ export function RoleDetailsSidePanel({
                 label="Description"
                 className="h-auto min-h-12 items-start py-3"
               >
-                <span className="max-w-[20rem] text-right text-sm text-foreground">
+                <Text
+                  variant="body-compact-01"
+                  className="max-w-[20rem] text-right text-foreground"
+                >
                   {role.getDescription() || 'No role description.'}
-                </span>
+                </Text>
               </OverviewRow>
               <OverviewRow label="Key">
-                <span className="font-mono text-sm text-foreground">
+                <Text as="code" variant="code-02" className="text-foreground">
                   {role.getKey()}
-                </span>
+                </Text>
               </OverviewRow>
               <OverviewRow label="Type">
                 <Tag size="sm" type={isBuiltIn ? 'cool-gray' : 'purple'}>
@@ -215,11 +234,11 @@ export function RoleDetailsSidePanel({
                 </Tag>
               </OverviewRow>
               <OverviewRow label="Scope">
-                <span className="text-sm text-foreground">
+                <Text variant="body-compact-01" className="text-foreground">
                   {role.getScope() === RoleScope.ROLE_SCOPE_ORGANIZATION
                     ? 'Organization'
                     : 'Project'}
-                </span>
+                </Text>
               </OverviewRow>
               <OverviewRow label="Subject">
                 <Tag
@@ -237,49 +256,61 @@ export function RoleDetailsSidePanel({
                 </Tag>
               </OverviewRow>
               <OverviewRow label="Created by">
-                <span className="text-sm text-foreground">
+                <Text variant="body-compact-01" className="text-foreground">
                   {actorName(role.getCreatedactor(), 'System')}
-                </span>
+                </Text>
               </OverviewRow>
               <OverviewRow label="Created">
-                <span className="text-sm text-foreground">
+                <Text variant="body-compact-01" className="text-foreground">
                   {role.getCreateddate()
                     ? toHumanReadableDateTime(role.getCreateddate()!)
                     : 'Unknown'}
-                </span>
+                </Text>
               </OverviewRow>
               <OverviewRow label="Updated by">
-                <span className="text-sm text-foreground">
+                <Text variant="body-compact-01" className="text-foreground">
                   {actorName(role.getUpdatedactor(), 'Not updated')}
-                </span>
+                </Text>
               </OverviewRow>
               <OverviewRow label="Updated">
-                <span className="text-sm text-foreground">
+                <Text variant="body-compact-01" className="text-foreground">
                   {role.getUpdateddate()
                     ? toHumanReadableDateTime(role.getUpdateddate()!)
                     : 'Never'}
-                </span>
+                </Text>
               </OverviewRow>
             </div>
             <div className="w-full divide-y divide-border-subtle">
               {permissions.length === 0 ? (
-                <p className="p-4 text-sm text-muted">
+                <Text
+                  as="p"
+                  variant="body-compact-01"
+                  className="p-4 text-muted"
+                >
                   No permissions assigned.
-                </p>
+                </Text>
               ) : (
                 <ul className="divide-y divide-border-subtle">
                   {permissions.map(permission => (
                     <li key={permission.getId()} className="px-4 py-4">
-                      <p className="text-sm font-medium">
+                      <Text as="p" variant="heading-compact-01">
                         {permission.getName()}
-                      </p>
-                      <p className="mt-1 font-mono text-xs text-muted">
+                      </Text>
+                      <Text
+                        as="code"
+                        variant="code-01"
+                        className="mt-1 block text-muted"
+                      >
                         {permission.getKey()}
-                      </p>
-                      <p className="mt-2 text-sm text-muted">
+                      </Text>
+                      <Text
+                        as="p"
+                        variant="body-compact-01"
+                        className="mt-2 text-muted"
+                      >
                         {permission.getDescription() ||
                           'No permission description.'}
-                      </p>
+                      </Text>
                     </li>
                   ))}
                 </ul>

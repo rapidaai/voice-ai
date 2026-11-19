@@ -219,7 +219,8 @@ describe('RoleCatalogPage', () => {
     expect(screen.getAllByText('date:1')[0].closest('td')).toHaveClass(
       'min-w-36',
       'whitespace-nowrap',
-      'text-[13px]',
+      'font-sans',
+      'text-[0.875rem]',
     );
   });
 
@@ -252,7 +253,8 @@ describe('RoleCatalogPage', () => {
     expect(screen.getAllByText('-')[0].closest('td')).toHaveClass(
       'min-w-36',
       'whitespace-nowrap',
-      'text-[13px]',
+      'font-sans',
+      'text-[0.875rem]',
     );
 
     await user.click(

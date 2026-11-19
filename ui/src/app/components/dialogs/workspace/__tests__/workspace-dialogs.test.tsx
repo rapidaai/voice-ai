@@ -7,12 +7,14 @@ import {
   AddUserToProjects,
   CreateProject,
   InviteUserToOrganization,
+  UpdateUserOrganizationRole,
   UpdateProject,
 } from '@rapidaai/react';
 import {
   CreateProjectDialog,
   InviteOrganizationUserDialog,
   InviteProjectUserDialog,
+  ManageOrganizationUserRolesDialog,
   UpdateProjectDialog,
 } from '..';
 
@@ -28,10 +30,17 @@ const mockRapidaStore = {
 };
 
 const mockGetAllUser = jest.fn();
+const mockListAccessRoles = jest.fn();
 const mockAvailableUser = {
   getId: () => 'user-2',
   getName: () => 'Priyanka Iyer',
   getEmail: () => 'p_iyer@outlook.com',
+  getOrganizationrolesList: () => [
+    {
+      getRoledefinitionid: () => 'role-org-admin',
+      getName: () => 'Organization Admin',
+    },
+  ],
 };
 let mockUsers = [mockAvailableUser];
 
@@ -39,28 +48,28 @@ jest.mock('@rapidaai/react', () => ({
   ...(() => {
     class ProjectRoleAssignment {
       projectId = '';
-      projectRole = '';
+      roleDefinitionIds: string[] = [];
 
       setProjectid(projectId: string) {
         this.projectId = projectId;
       }
 
-      setProjectrole(projectRole: string) {
-        this.projectRole = projectRole;
+      setRoledefinitionidsList(roleDefinitionIds: string[]) {
+        this.roleDefinitionIds = roleDefinitionIds;
       }
     }
 
     class InviteUserToOrganizationRequest {
       email = '';
-      organizationRole = '';
+      organizationRoleDefinitionIds: string[] = [];
       projectRoles: ProjectRoleAssignment[] = [];
 
       setEmail(email: string) {
         this.email = email;
       }
 
-      setOrganizationrole(organizationRole: string) {
-        this.organizationRole = organizationRole;
+      setOrganizationroledefinitionidsList(roleDefinitionIds: string[]) {
+        this.organizationRoleDefinitionIds = roleDefinitionIds;
       }
 
       setProjectrolesList(projectRoles: ProjectRoleAssignment[]) {
@@ -81,6 +90,19 @@ jest.mock('@rapidaai/react', () => ({
       }
     }
 
+    class UpdateUserOrganizationRoleRequest {
+      userId = '';
+      roleDefinitionIds: string[] = [];
+
+      setUserid(userId: string) {
+        this.userId = userId;
+      }
+
+      setRoledefinitionidsList(roleDefinitionIds: string[]) {
+        this.roleDefinitionIds = roleDefinitionIds;
+      }
+    }
+
     return {
       AddUserToProjects: jest.fn(),
       AddUserToProjectsRequest,
@@ -88,9 +110,27 @@ jest.mock('@rapidaai/react', () => ({
       InviteUserToOrganization: jest.fn(),
       InviteUserToOrganizationRequest,
       ProjectRoleAssignment,
+      RoleDefinitionType: {
+        ROLE_DEFINITION_TYPE_BUILT_IN: 1,
+        ROLE_DEFINITION_TYPE_CUSTOM: 2,
+      },
+      RoleScope: {
+        ROLE_SCOPE_ORGANIZATION: 1,
+        ROLE_SCOPE_PROJECT: 2,
+      },
+      RoleSubject: {
+        ROLE_SUBJECT_PROJECT_TOKEN: 2,
+        ROLE_SUBJECT_USER: 1,
+      },
       UpdateProject: jest.fn(),
+      UpdateUserOrganizationRole: jest.fn(),
+      UpdateUserOrganizationRoleRequest,
     };
   })(),
+}));
+
+jest.mock('@/clients/access-management.client', () => ({
+  listAccessRoles: (...args: unknown[]) => mockListAccessRoles(...args),
 }));
 
 jest.mock('react-hot-toast/headless', () => ({
@@ -106,6 +146,7 @@ jest.mock('@/hooks/use-credential', () => ({
   useCredential: () => ['auth-1', 'token-1', 'project-1', 'org-1'],
   useCurrentCredential: () => ({
     authId: 'auth-1',
+    organizationId: 'org-1',
     projectId: 'project-1',
     token: 'token-1',
   }),
@@ -127,6 +168,16 @@ jest.mock('@/app/components/ui/feedback', () => ({
     message ? <div role="alert">{message}</div> : null,
 }));
 
+jest.mock('@/app/components/ui/composites', () => ({
+  HelpToggletip: ({ helpText, label }: any) =>
+    helpText ? (
+      <span>
+        <button aria-label={`${label} information`} type="button" />
+        {helpText}
+      </span>
+    ) : null,
+}));
+
 jest.mock('@/app/components/ui/primitives', () => {
   const React = jest.requireActual('react');
   const { typographyClassNames } = jest.requireActual(
@@ -134,6 +185,26 @@ jest.mock('@/app/components/ui/primitives', () => {
   );
 
   return {
+    ComboBox: ({
+      itemToString,
+      items,
+      onChange,
+      placeholder,
+      selectedItem,
+      titleText,
+    }: any) => {
+      itemToString?.(null);
+      return (
+        <button
+          type="button"
+          data-label={titleText}
+          data-items={items.map((item: any) => itemToString(item)).join(',')}
+          onClick={() => onChange({ selectedItem: selectedItem || items[0] })}
+        >
+          {placeholder}
+        </button>
+      );
+    },
     Form: ({ children, onSubmit }: any) => (
       <form onSubmit={onSubmit}>{children}</form>
     ),
@@ -163,6 +234,30 @@ jest.mock('@/app/components/ui/primitives', () => {
         </button>
       </header>
     ),
+    MultiSelect: ({
+      autoAlign,
+      disabled,
+      helperText,
+      itemToString,
+      items,
+      label,
+      onChange,
+      titleText,
+    }: any) => (
+      <>
+        <button
+          type="button"
+          disabled={disabled}
+          data-auto-align={autoAlign || undefined}
+          data-label={titleText}
+          data-items={items.map((item: any) => itemToString(item)).join(',')}
+          onClick={() => onChange({ selectedItems: items.slice(0, 1) })}
+        >
+          {label}
+        </button>
+        <span>{helperText}</span>
+      </>
+    ),
     PrimaryButton: ({ children, isLoading, ...props }: any) => (
       <button data-loading={String(Boolean(isLoading))} {...props}>
         {children}
@@ -172,6 +267,12 @@ jest.mock('@/app/components/ui/primitives', () => {
       <button {...props}>{children}</button>
     ),
     Stack: ({ children }: any) => <div>{children}</div>,
+    Text: ({
+      as: Tag = 'span',
+      children,
+      variant: _variant,
+      ...props
+    }: any) => <Tag {...props}>{children}</Tag>,
     typographyClassNames,
     TextArea: React.forwardRef(
       (
@@ -212,6 +313,7 @@ jest.mock('@carbon/react', () => ({
       <button
         type="button"
         data-label={titleText}
+        data-items={items.map((item: any) => itemToString(item)).join(',')}
         onClick={() => onChange({ selectedItem: selectedItem || items[0] })}
       >
         {placeholder}
@@ -249,6 +351,7 @@ jest.mock('@/app/components/domain/project-role-table', () => ({
       <p>
         {title} ({rows.length})
       </p>
+      <span>{roleOptions.length} roles available</span>
       <button
         type="button"
         onClick={() =>
@@ -256,7 +359,7 @@ jest.mock('@/app/components/domain/project-role-table', () => ({
             ...rows,
             {
               projectId: defaultProjectId || projectOptions[0]?.value || '',
-              projectRole: '',
+              roleDefinitionIds: [],
             },
           ])
         }
@@ -269,7 +372,7 @@ jest.mock('@/app/components/domain/project-role-table', () => ({
           onChange([
             {
               projectId: defaultProjectId || projectOptions[0]?.value || '',
-              projectRole: roleOptions[0]?.value || '',
+              roleDefinitionIds: roleOptions[0] ? [roleOptions[0].value] : [],
             },
           ])
         }
@@ -280,8 +383,8 @@ jest.mock('@/app/components/domain/project-role-table', () => ({
         type="button"
         onClick={() =>
           onChange([
-            { projectId: 'project-1', projectRole: 'admin' },
-            { projectId: 'project-1', projectRole: 'reader' },
+            { projectId: 'project-1', roleDefinitionIds: ['role-admin'] },
+            { projectId: 'project-1', roleDefinitionIds: ['role-reader'] },
           ])
         }
       >
@@ -289,7 +392,7 @@ jest.mock('@/app/components/domain/project-role-table', () => ({
       </button>
       <button
         type="button"
-        onClick={() => onChange([{ projectId: '', projectRole: '' }])}
+        onClick={() => onChange([{ projectId: '', roleDefinitionIds: [] }])}
       >
         Set incomplete project role
       </button>
@@ -301,6 +404,7 @@ const mockCreateProject = CreateProject as jest.Mock;
 const mockUpdateProject = UpdateProject as jest.Mock;
 const mockInviteUserToOrganization = InviteUserToOrganization as jest.Mock;
 const mockAddUserToProjects = AddUserToProjects as jest.Mock;
+const mockUpdateUserOrganizationRole = UpdateUserOrganizationRole as jest.Mock;
 
 const successResponse = () => ({
   getError: () => null,
@@ -319,11 +423,44 @@ const mockAuthorize = jest.fn<
   [onSuccess: () => void, onFailure?: () => void]
 >((onSuccess: () => void) => onSuccess());
 
+const organizationRole = {
+  getDefinitiontype: () => 1,
+  getId: () => 'role-org-admin',
+  getKey: () => 'organization_admin',
+  getName: () => 'Organization Admin',
+  getScope: () => 1,
+  getSubject: () => 1,
+};
+const organizationOwnerRole = {
+  getDefinitiontype: () => 1,
+  getId: () => '101',
+  getKey: () => 'organization_owner',
+  getName: () => 'Organization Owner',
+  getScope: () => 1,
+  getSubject: () => 1,
+};
+const projectRole = {
+  getDefinitiontype: () => 1,
+  getId: () => 'role-project-admin',
+  getKey: () => 'project_admin',
+  getName: () => 'Project Admin',
+  getScope: () => 2,
+  getSubject: () => 1,
+};
+const projectTokenRole = {
+  getDefinitiontype: () => 1,
+  getId: () => 'role-automation-client',
+  getKey: () => 'automation_client',
+  getName: () => 'Automation Client',
+  getScope: () => 2,
+  getSubject: () => 2,
+};
+
 const authContextValue = {
   authorize: mockAuthorize,
-  projectRoles: [
-    { projectid: 'project-1', projectname: 'Support operations' },
-    { projectid: 'project-2', projectname: 'Sales enablement' },
+  getProjects: () => [
+    { id: 'project-1', name: 'Support operations' },
+    { id: 'project-2', name: 'Sales enablement' },
   ],
 };
 
@@ -353,13 +490,28 @@ function renderOrganizationInviteDialog() {
 async function enterOrganizationInviteEmail(
   user: ReturnType<typeof userEvent.setup>,
 ) {
-  await user.click(screen.getByLabelText('Email address'));
+  await user.click(screen.getByLabelText('Email Address'));
   await user.paste(String('member@example.com'));
 }
 
 describe('workspace dialogs', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockListAccessRoles.mockImplementation(() => {
+      return Promise.resolve({
+        getError: () => null,
+        getPaginated: () => ({
+          getTotalitem: () => 4,
+        }),
+        getRolesList: () => [
+          organizationOwnerRole,
+          organizationRole,
+          projectRole,
+          projectTokenRole,
+        ],
+        getSuccess: () => true,
+      });
+    });
     mockAuthorize.mockImplementation((onSuccess: () => void) => onSuccess());
     mockUsers = [mockAvailableUser];
     mockRapidaStore.loading = false;
@@ -398,6 +550,7 @@ describe('workspace dialogs', () => {
         {
           authorization: 'token-1',
           'x-auth-id': 'auth-1',
+          'x-organization-id': 'org-1',
         },
         expect.any(Function),
       );
@@ -538,7 +691,7 @@ describe('workspace dialogs', () => {
 
     render(
       <AuthContext.Provider
-        value={{ projectRoles: authContextValue.projectRoles } as never}
+        value={{ getProjects: authContextValue.getProjects } as never}
       >
         <CreateProjectDialog
           modalOpen
@@ -600,6 +753,7 @@ describe('workspace dialogs', () => {
         {
           authorization: 'token-1',
           'x-auth-id': 'auth-1',
+          'x-organization-id': 'org-1',
         },
         'Updated project',
         'Updated description',
@@ -701,7 +855,7 @@ describe('workspace dialogs', () => {
 
     render(
       <AuthContext.Provider
-        value={{ projectRoles: authContextValue.projectRoles } as never}
+        value={{ getProjects: authContextValue.getProjects } as never}
       >
         <UpdateProjectDialog
           modalOpen
@@ -735,10 +889,16 @@ describe('workspace dialogs', () => {
       ),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Project access' }),
-    ).toContainHTML(
-      'data-definition="Optional. Assign project roles now, or invite the user with organization access only."',
-    );
+      screen.getByRole('heading', { name: 'Project Access' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Project access information' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Optional. Assign project roles now, or invite the user with organization access only.',
+      ),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Invite user' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
@@ -754,9 +914,95 @@ describe('workspace dialogs', () => {
     await enterOrganizationInviteEmail(user);
     await user.click(screen.getByRole('button', { name: 'Invite user' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Please select an organization role.',
+      'Select at least one organization role.',
     );
     expect(mockInviteUserToOrganization).not.toHaveBeenCalled();
+  });
+
+  it('offers only assignable user roles for each scope', async () => {
+    renderOrganizationInviteDialog();
+
+    const selector = await screen.findByRole('button', {
+      name: 'Select roles',
+    });
+    await waitFor(() =>
+      expect(selector).toHaveAttribute('data-items', 'Organization Admin'),
+    );
+    expect(selector.getAttribute('data-items')).not.toContain(
+      'Organization Owner',
+    );
+    expect(selector.getAttribute('data-items')).not.toContain('Project Admin');
+    expect(selector.getAttribute('data-items')).not.toContain(
+      'Automation Client',
+    );
+    expect(selector).toHaveAttribute('data-auto-align', 'true');
+    expect(screen.getByText('1 roles available')).toBeInTheDocument();
+    expect(screen.queryByText('Built-in')).not.toBeInTheDocument();
+  });
+
+  it('clears stale roles and disables invitation after a failed reload', async () => {
+    const setModalOpen = jest.fn();
+    const dialog = (modalOpen: boolean) => (
+      <AuthContext.Provider value={authContextValue as never}>
+        <InviteOrganizationUserDialog
+          modalOpen={modalOpen}
+          setModalOpen={setModalOpen}
+        />
+      </AuthContext.Provider>
+    );
+    const { rerender } = render(dialog(true));
+
+    const selector = await screen.findByRole('button', {
+      name: 'Select roles',
+    });
+    await waitFor(() =>
+      expect(selector).toHaveAttribute('data-items', 'Organization Admin'),
+    );
+
+    rerender(dialog(false));
+    mockListAccessRoles.mockRejectedValue(new Error('Catalog unavailable'));
+    rerender(dialog(true));
+
+    await waitFor(() =>
+      expect(mockToast.error).toHaveBeenCalledWith('Catalog unavailable'),
+    );
+    const reloadedSelector = screen.getByRole('button', {
+      name: 'Select roles',
+    });
+    expect(reloadedSelector).toHaveAttribute('data-items', '');
+    expect(reloadedSelector).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Invite user' })).toBeDisabled();
+  });
+
+  it('replaces a user organization role set with role-definition IDs', async () => {
+    const interaction = userEvent.setup({ writeToClipboard: false });
+    const setModalOpen = jest.fn();
+    const onSuccess = jest.fn();
+    mockUpdateUserOrganizationRole.mockResolvedValue(successResponse());
+
+    renderWithAuth(
+      <ManageOrganizationUserRolesDialog
+        modalOpen
+        setModalOpen={setModalOpen}
+        user={mockAvailableUser as any}
+        onSuccess={onSuccess}
+      />,
+    );
+
+    const saveButton = await screen.findByRole('button', {
+      name: 'Save Roles',
+    });
+    await waitFor(() => expect(saveButton).toBeEnabled());
+    await interaction.click(saveButton);
+
+    await waitFor(() => expect(setModalOpen).toHaveBeenCalledWith(false));
+    const request = mockUpdateUserOrganizationRole.mock.calls[0][1];
+    expect(request.userId).toBe('user-2');
+    expect(request.roleDefinitionIds).toEqual(['role-org-admin']);
+    expect(mockToast.success).toHaveBeenCalledWith(
+      'Organization roles updated.',
+    );
+    expect(onSuccess).toHaveBeenCalledTimes(1);
   });
 
   it('rejects incomplete project roles on organization invitations', async () => {
@@ -764,15 +1010,13 @@ describe('workspace dialogs', () => {
     renderOrganizationInviteDialog();
 
     await enterOrganizationInviteEmail(user);
-    await user.click(
-      screen.getByRole('button', { name: 'Select organization role' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Select roles' }));
     await user.click(
       screen.getByRole('button', { name: 'Set incomplete project role' }),
     );
     await user.click(screen.getByRole('button', { name: 'Invite user' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Select both project and role for each project role row.',
+      'Select a project and at least one role for each row.',
     );
     expect(mockInviteUserToOrganization).not.toHaveBeenCalled();
   });
@@ -782,9 +1026,7 @@ describe('workspace dialogs', () => {
     renderOrganizationInviteDialog();
 
     await enterOrganizationInviteEmail(user);
-    await user.click(
-      screen.getByRole('button', { name: 'Select organization role' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Select roles' }));
     await user.click(
       screen.getByRole('button', { name: 'Set duplicate project roles' }),
     );
@@ -809,12 +1051,10 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    await user.click(screen.getByLabelText('Email address'));
+    await user.click(screen.getByLabelText('Email Address'));
     await user.keyboard('{Control>}a{/Control}');
     await user.paste(String('member@example.com'));
-    await user.click(
-      screen.getByRole('button', { name: 'Select organization role' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Select roles' }));
     await user.click(
       screen.getByRole('button', { name: 'Set valid project role' }),
     );
@@ -823,9 +1063,12 @@ describe('workspace dialogs', () => {
     await waitFor(() => expect(setModalOpen).toHaveBeenCalledWith(false));
     const request = mockInviteUserToOrganization.mock.calls[0][1];
     expect(request.email).toBe('member@example.com');
-    expect(request.organizationRole).toBe('admin');
+    expect(request.organizationRoleDefinitionIds).toEqual(['role-org-admin']);
     expect(request.projectRoles).toEqual([
-      { projectId: 'project-1', projectRole: 'super admin' },
+      {
+        projectId: 'project-1',
+        roleDefinitionIds: ['role-project-admin'],
+      },
     ]);
     expect(mockInviteUserToOrganization).toHaveBeenCalledWith(
       { endpoint: 'test-endpoint' },
@@ -833,6 +1076,7 @@ describe('workspace dialogs', () => {
       {
         authorization: 'token-1',
         'x-auth-id': 'auth-1',
+        'x-organization-id': 'org-1',
       },
     );
     expect(mockRapidaStore.hideLoader).toHaveBeenCalledTimes(1);
@@ -856,17 +1100,13 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    await user.click(screen.getByLabelText('Email address'));
+    await user.click(screen.getByLabelText('Email Address'));
     await user.keyboard('{Control>}a{/Control}');
     await user.paste(String('member@example.com'));
-    await user.click(
-      screen.getByRole('button', { name: 'Select organization role' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Select roles' }));
     await user.click(screen.getByRole('button', { name: 'Invite user' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Invitation failed',
-    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(mockToast.error).toHaveBeenCalledWith('Invitation failed');
   });
 
@@ -884,21 +1124,17 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    await user.click(screen.getByLabelText('Email address'));
+    await user.click(screen.getByLabelText('Email Address'));
     await user.keyboard('{Control>}a{/Control}');
     await user.paste(String('member@example.com'));
-    await user.click(
-      screen.getByRole('button', { name: 'Select organization role' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Select roles' }));
     await user.click(screen.getByRole('button', { name: 'Invite user' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Transport failed',
-    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(mockToast.error).toHaveBeenCalledWith('Transport failed');
   });
 
-  it('loads users when a project invite opens without a fixed user', () => {
+  it('loads users when a project invite opens without a fixed user', async () => {
     mockUsers = [];
 
     renderWithAuth(
@@ -912,16 +1148,19 @@ describe('workspace dialogs', () => {
     expect(mockGetAllUser).toHaveBeenCalledWith(
       'token-1',
       'auth-1',
+      'org-1',
       'project-1',
       expect.any(Function),
       expect.any(Function),
     );
+    await waitFor(() => expect(mockListAccessRoles).toHaveBeenCalled());
   });
 
-  it('shows user loading errors when project invite opens', () => {
+  it('reports user loading errors through the global toast', async () => {
     mockUsers = [];
     mockGetAllUser.mockImplementationOnce(
-      (_token, _authId, _projectId, onError) => onError('Unable to load users'),
+      (_token, _authId, _organizationId, _projectId, onError) =>
+        onError('Unable to load users'),
     );
 
     renderWithAuth(
@@ -932,7 +1171,44 @@ describe('workspace dialogs', () => {
       />,
     );
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Unable to load users');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(mockToast.error).toHaveBeenCalledWith('Unable to load users');
+    await waitFor(() => expect(mockListAccessRoles).toHaveBeenCalled());
+  });
+
+  it('loads every page of project roles for selection', async () => {
+    mockListAccessRoles.mockImplementation(({ page }) => {
+      const offset = page === 1 ? 0 : 100;
+      const roleCount = page === 1 ? 100 : 1;
+      return Promise.resolve({
+        getError: () => null,
+        getPaginated: () => ({ getTotalitem: () => 101 }),
+        getRolesList: () =>
+          Array.from({ length: roleCount }, (_, index) => ({
+            getDefinitiontype: () => 1,
+            getId: () => `role-${offset + index + 1}`,
+            getKey: () => `project_role_${offset + index + 1}`,
+            getName: () => `Project Role ${offset + index + 1}`,
+            getScope: () => 2,
+            getSubject: () => 1,
+          })),
+        getSuccess: () => true,
+      });
+    });
+
+    renderWithAuth(
+      <InviteProjectUserDialog
+        modalOpen
+        setModalOpen={jest.fn()}
+        user={mockAvailableUser as any}
+        onSuccess={jest.fn()}
+      />,
+    );
+
+    expect(await screen.findByText('101 roles available')).toBeInTheDocument();
+    expect(mockListAccessRoles).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 2, pageSize: 100 }),
+    );
   });
 
   it('validates project invitations before calling the API', async () => {
@@ -961,7 +1237,7 @@ describe('workspace dialogs', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Invite user' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Please select project and role.',
+      'Select a project and at least one role.',
     );
 
     await user.click(
@@ -998,7 +1274,10 @@ describe('workspace dialogs', () => {
     const request = mockAddUserToProjects.mock.calls[0][1];
     expect(request.userId).toBe('user-2');
     expect(request.projectRoles).toEqual([
-      { projectId: 'project-1', projectRole: 'super admin' },
+      {
+        projectId: 'project-1',
+        roleDefinitionIds: ['role-project-admin'],
+      },
     ]);
     expect(mockToast.success).toHaveBeenCalledWith(
       'The user was added to the project successfully.',
@@ -1034,7 +1313,10 @@ describe('workspace dialogs', () => {
     const request = mockAddUserToProjects.mock.calls[0][1];
     expect(request.userId).toBe('user-2');
     expect(request.projectRoles).toEqual([
-      { projectId: 'project-2', projectRole: 'super admin' },
+      {
+        projectId: 'project-2',
+        roleDefinitionIds: ['role-project-admin'],
+      },
     ]);
   });
 
@@ -1057,7 +1339,7 @@ describe('workspace dialogs', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Invite user' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Access failed');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(mockToast.error).toHaveBeenCalledWith('Access failed');
   });
 
@@ -1080,9 +1362,7 @@ describe('workspace dialogs', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Invite user' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Project access failed',
-    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(mockToast.error).toHaveBeenCalledWith('Project access failed');
   });
 });

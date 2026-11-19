@@ -24,6 +24,7 @@ import (
 	internal_vonage "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/vonage/internal"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -241,7 +242,7 @@ func TestStatusCallback_QueryPayload(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(http.MethodGet, "/?"+queryValues.Encode(), nil)
 
-	statusInfo, err := telephony.StatusCallback(c, nil, 1, 1)
+	statusInfo, err := telephony.StatusCallback(c, authentication.Principal{}, 1, 1)
 
 	require.NoError(t, err)
 	require.NotNil(t, statusInfo)
@@ -275,7 +276,7 @@ func TestStatusCallback_JSONNumericZeroDuration(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 
-	statusInfo, err := telephony.StatusCallback(c, nil, 1, 1)
+	statusInfo, err := telephony.StatusCallback(c, authentication.Principal{}, 1, 1)
 
 	require.NoError(t, err)
 	require.NotNil(t, statusInfo)

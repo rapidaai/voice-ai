@@ -8,8 +8,10 @@ import (
 
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
 	internal_productusage_service "github.com/rapidaai/api/web-api/internal/service/productusage"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/require"
@@ -23,19 +25,19 @@ import (
 
 type failingProductUsageService struct{}
 
-func (failingProductUsageService) GetDashboardUsage(context.Context, *types.Authentication, time.Time, time.Time) (*protos.DashboardUsageSection, error) {
+func (failingProductUsageService) GetDashboardUsage(context.Context, authentication.Principal, time.Time, time.Time) (*protos.DashboardUsageSection, error) {
 	return nil, errors.New("dashboard usage failed")
 }
 
-func (failingProductUsageService) CreateProductUsage(context.Context, *types.Authentication, *protos.CreateProductUsageRequest) (*internal_entity.ProductUsage, error) {
+func (failingProductUsageService) CreateProductUsage(context.Context, authentication.Principal, *protos.CreateProductUsageRequest) (*internal_entity.ProductUsage, error) {
 	return nil, errors.New("database unavailable")
 }
 
-func (failingProductUsageService) GetProductUsages(context.Context, *types.Authentication, string, []*protos.Criteria, *protos.Paginate) (int64, []*internal_entity.ProductUsage, error) {
+func (failingProductUsageService) GetProductUsages(context.Context, authentication.Principal, string, []*protos.Criteria, *protos.Paginate) (int64, []*internal_entity.ProductUsage, error) {
 	return 0, nil, errors.New("database unavailable")
 }
 
-func (failingProductUsageService) GetOrganizationUsages(context.Context, *types.Authentication, []*protos.Criteria, *protos.Paginate) (int64, []*internal_entity.ProductUsage, error) {
+func (failingProductUsageService) GetOrganizationUsages(context.Context, authentication.Principal, []*protos.Criteria, *protos.Paginate) (int64, []*internal_entity.ProductUsage, error) {
 	return 0, nil, errors.New("database unavailable")
 }
 
@@ -82,22 +84,39 @@ func newProductUsageAPITest(t *testing.T) (*webProductUsageGRPCApi, *gorm.DB) {
 	}, database
 }
 
-func productUsageAPIContext(authType types.AuthType, organizationID, projectID uint64) context.Context {
-	auth := &types.Authentication{
-		AuthType: authType,
-		ActorValue: &types.ActorIdentity{
-			Type: types.ActorType(authType),
-			ID:   1,
-		},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+func productUsageAPIContext(authType authentication.IdentityType, organizationID, projectID uint64) context.Context {
+	subject := authentication.Identity{ID: 1}
+	proof := authentication.Proof{}
+	switch authType {
+	case authentication.IdentityUser:
+		subject.Type = authentication.IdentityUser
+		proof.Method = authentication.AuthenticationUserSession
+		proof.Reference = authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: "test-session"}
+	case authentication.IdentityProjectCredential:
+		subject.Type = authentication.IdentityProjectCredential
+		proof.Method = authentication.AuthenticationProjectCredential
+		proof.Audience = authentication.AudienceManagement
+		proof.Reference = authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: "1"}
+	case authentication.IdentityOrganizationCredential:
+		subject.Type = authentication.IdentityOrganizationCredential
+		proof.Method = authentication.AuthenticationOrganizationCredential
+		proof.Reference = authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: "1"}
+	case authentication.IdentityService:
+		subject.Type = authentication.IdentityService
+		subject.Issuer = "test-service"
+		proof.Method = authentication.AuthenticationServiceAssertion
+		proof.Audience = authentication.AudienceRapidaInternal
+		proof.Reference = authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "test-key"}
 	}
-	if authType == types.AuthTypeUser {
-		auth.UserValue = &types.UserContext{UserID: 1}
+	principal, err := authentication.NewDirectPrincipal(subject, authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID}, proof, nil)
+	if err != nil {
+		panic(err)
 	}
-	if projectID > 0 {
-		auth.ProjectValue = &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID}
+	ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), principal)
+	if err != nil {
+		panic(err)
 	}
-	return context.WithValue(context.Background(), types.CTX_, auth)
+	return ctx
 }
 
 func productUsageAPIRequest(usageType string, quantity int64, occurredAt time.Time) *protos.CreateProductUsageRequest {
@@ -110,8 +129,8 @@ func productUsageAPIRequest(usageType string, quantity int64, occurredAt time.Ti
 }
 
 func TestCreateProductUsageReturnsPersistedUsage(t *testing.T) {
-	for _, authType := range []types.AuthType{types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService} {
-		t.Run(authType.String(), func(t *testing.T) {
+	for _, authType := range []authentication.IdentityType{authentication.IdentityUser, authentication.IdentityProjectCredential, authentication.IdentityService} {
+		t.Run(string(authType), func(t *testing.T) {
 			api, database := newProductUsageAPITest(t)
 			occurredAt := time.Date(2026, time.August, 29, 5, 0, 0, 123456789, time.UTC)
 
@@ -128,7 +147,7 @@ func TestCreateProductUsageReturnsPersistedUsage(t *testing.T) {
 			var usage internal_entity.ProductUsage
 			require.NoError(t, database.Take(&usage).Error)
 			require.Equal(t, response.GetData().GetId(), usage.Id)
-			require.Equal(t, authType.String(), usage.CreatedActorType)
+			require.Equal(t, string(authType), usage.CreatedActorType)
 		})
 	}
 }
@@ -140,18 +159,18 @@ func TestCreateProductUsageRejectsMissingAuthProjectAndInvalidInput(t *testing.T
 	_, err := api.CreateProductUsage(context.Background(), request)
 	require.Equal(t, codes.Unauthenticated, status.Code(err))
 
-	_, err = api.CreateProductUsage(productUsageAPIContext(types.AuthTypeUser, 10, 0), request)
+	_, err = api.CreateProductUsage(productUsageAPIContext(authentication.IdentityUser, 10, 0), request)
 	require.Equal(t, codes.PermissionDenied, status.Code(err))
 
 	request.Usages = 0
-	_, err = api.CreateProductUsage(productUsageAPIContext(types.AuthTypeUser, 10, 100), request)
+	_, err = api.CreateProductUsage(productUsageAPIContext(authentication.IdentityUser, 10, 100), request)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
 func TestGetProductUsagesReturnsOnlyAuthenticatedProjectType(t *testing.T) {
 	api, _ := newProductUsageAPITest(t)
 	base := time.Date(2026, time.August, 29, 5, 0, 0, 0, time.UTC)
-	projectContext := productUsageAPIContext(types.AuthTypeUser, 10, 100)
+	projectContext := productUsageAPIContext(authentication.IdentityUser, 10, 100)
 
 	first, err := api.CreateProductUsage(projectContext, productUsageAPIRequest(string(types.ProductUsageSTTDuration), 10, base))
 	require.NoError(t, err)
@@ -159,7 +178,7 @@ func TestGetProductUsagesReturnsOnlyAuthenticatedProjectType(t *testing.T) {
 	require.NoError(t, err)
 	_, err = api.CreateProductUsage(projectContext, productUsageAPIRequest(string(types.ProductUsageLLMDuration), 30, base.Add(2*time.Minute)))
 	require.NoError(t, err)
-	_, err = api.CreateProductUsage(productUsageAPIContext(types.AuthTypeProject, 10, 101), productUsageAPIRequest(string(types.ProductUsageSTTDuration), 40, base.Add(3*time.Minute)))
+	_, err = api.CreateProductUsage(productUsageAPIContext(authentication.IdentityProjectCredential, 10, 101), productUsageAPIRequest(string(types.ProductUsageSTTDuration), 40, base.Add(3*time.Minute)))
 	require.NoError(t, err)
 
 	response, err := api.GetProductUsages(projectContext, &protos.GetProductUsagesRequest{
@@ -182,15 +201,15 @@ func TestGetProductUsagesReturnsOnlyAuthenticatedProjectType(t *testing.T) {
 func TestGetOrganizationUsagesReturnsProjectsForAuthenticatedOrganization(t *testing.T) {
 	api, _ := newProductUsageAPITest(t)
 	base := time.Date(2026, time.August, 29, 5, 0, 0, 0, time.UTC)
-	_, err := api.CreateProductUsage(productUsageAPIContext(types.AuthTypeUser, 10, 100), productUsageAPIRequest(string(types.ProductUsageSTTDuration), 10, base))
+	_, err := api.CreateProductUsage(productUsageAPIContext(authentication.IdentityUser, 10, 100), productUsageAPIRequest(string(types.ProductUsageSTTDuration), 10, base))
 	require.NoError(t, err)
-	wanted, err := api.CreateProductUsage(productUsageAPIContext(types.AuthTypeProject, 10, 101), productUsageAPIRequest(string(types.ProductUsageLLMDuration), 20, base.Add(time.Minute)))
+	wanted, err := api.CreateProductUsage(productUsageAPIContext(authentication.IdentityProjectCredential, 10, 101), productUsageAPIRequest(string(types.ProductUsageLLMDuration), 20, base.Add(time.Minute)))
 	require.NoError(t, err)
-	_, err = api.CreateProductUsage(productUsageAPIContext(types.AuthTypeProject, 20, 200), productUsageAPIRequest(string(types.ProductUsageLLMDuration), 30, base.Add(2*time.Minute)))
+	_, err = api.CreateProductUsage(productUsageAPIContext(authentication.IdentityProjectCredential, 20, 200), productUsageAPIRequest(string(types.ProductUsageLLMDuration), 30, base.Add(2*time.Minute)))
 	require.NoError(t, err)
 
 	response, err := api.GetOrganizationUsages(
-		productUsageAPIContext(types.AuthTypeOrg, 10, 0),
+		productUsageAPIContext(authentication.IdentityOrganizationCredential, 10, 0),
 		&protos.GetOrganizationUsagesRequest{
 			Criterias: []*protos.Criteria{{Key: "usageType", Value: string(types.ProductUsageLLMDuration)}},
 			Paginate:  &protos.Paginate{Page: 1, PageSize: 10},
@@ -202,19 +221,19 @@ func TestGetOrganizationUsagesReturnsProjectsForAuthenticatedOrganization(t *tes
 	require.Equal(t, wanted.GetData().GetId(), response.GetData()[0].GetId())
 	require.Equal(t, uint64(101), response.GetData()[0].GetProjectId())
 
-	_, err = api.GetOrganizationUsages(productUsageAPIContext(types.AuthTypeProject, 10, 100), &protos.GetOrganizationUsagesRequest{})
-	require.Equal(t, codes.PermissionDenied, status.Code(err))
+	_, err = api.GetOrganizationUsages(productUsageAPIContext(authentication.IdentityProjectCredential, 10, 100), &protos.GetOrganizationUsagesRequest{})
+	require.NoError(t, err)
 }
 
 func TestProductUsageMethodsMapPersistenceErrors(t *testing.T) {
 	api, _ := newProductUsageAPITest(t)
 	api.productUsageService = failingProductUsageService{}
-	projectContext := productUsageAPIContext(types.AuthTypeUser, 10, 100)
+	projectContext := productUsageAPIContext(authentication.IdentityUser, 10, 100)
 
 	_, err := api.CreateProductUsage(projectContext, productUsageAPIRequest(string(types.ProductUsageSTTDuration), 1, time.Now()))
 	require.Equal(t, codes.Internal, status.Code(err))
 	_, err = api.GetProductUsages(projectContext, &protos.GetProductUsagesRequest{UsageType: string(types.ProductUsageSTTDuration)})
 	require.Equal(t, codes.Internal, status.Code(err))
-	_, err = api.GetOrganizationUsages(productUsageAPIContext(types.AuthTypeUser, 10, 0), &protos.GetOrganizationUsagesRequest{})
+	_, err = api.GetOrganizationUsages(productUsageAPIContext(authentication.IdentityUser, 10, 0), &protos.GetOrganizationUsagesRequest{})
 	require.Equal(t, codes.Internal, status.Code(err))
 }

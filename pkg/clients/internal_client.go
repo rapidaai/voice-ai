@@ -17,6 +17,8 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
+	authentication_jwt "github.com/rapidaai/pkg/authentication/jwt"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/types"
@@ -24,9 +26,9 @@ import (
 )
 
 type InternalClient interface {
-	WithPlatform(ctx context.Context, auth *types.Authentication) (context.Context, error)
-	WithAuth(ctx context.Context, auth *types.Authentication) (context.Context, error)
-	WithHttpAuth(c context.Context, auth *types.Authentication, req *http.Request) (*http.Request, error)
+	WithPlatform(ctx context.Context, principal authentication.Principal) (context.Context, error)
+	WithAuth(ctx context.Context, principal authentication.Principal) (context.Context, error)
+	WithHttpAuth(c context.Context, principal authentication.Principal, req *http.Request) (*http.Request, error)
 
 	WithToken(ctx context.Context, token string, userId uint64) context.Context
 	WithScopeToken(c context.Context, token string, scope string) context.Context
@@ -37,18 +39,33 @@ type InternalClient interface {
 	CacheKey(c context.Context, funcName string, key ...string) string
 }
 
-type internalClient struct {
-	cfg    *config.AppConfig
-	logger commons.Logger
-	redis  connectors.RedisConnector
+// ServiceInternalClient can authenticate the local Service without delegation.
+type ServiceInternalClient interface {
+	InternalClient
+	WithService(ctx context.Context) (context.Context, error)
 }
 
-func NewInternalClient(cfg *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector) InternalClient {
-	return &internalClient{
-		cfg:    cfg,
-		logger: logger,
-		redis:  redis,
-	}
+type internalClient struct {
+	issuer    *authentication_jwt.Issuer
+	issuerErr error
+	logger    commons.Logger
+	redis     connectors.RedisConnector
+}
+
+// NewInternalClient constructs an outbound client for exactly one destination.
+func NewInternalClient(cfg *config.AppConfig, destination string, logger commons.Logger, redis connectors.RedisConnector) ServiceInternalClient {
+	issuer, err := authentication_jwt.NewIssuer(destination, cfg.ServiceAuthenticationKey())
+	return &internalClient{issuer: issuer, issuerErr: err, logger: logger, redis: redis}
+}
+
+// NewInternalClientWithIssuer constructs an outbound client from a command-owned issuer.
+func NewInternalClientWithIssuer(issuer *authentication_jwt.Issuer, logger commons.Logger, redis connectors.RedisConnector) ServiceInternalClient {
+	return &internalClient{issuer: issuer, logger: logger, redis: redis}
+}
+
+// NewWebInternalClient constructs an outbound client bound to Web API.
+func NewWebInternalClient(cfg *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector) ServiceInternalClient {
+	return NewInternalClient(cfg, "web-api", logger, redis)
 }
 
 func (ic *internalClient) WithToken(c context.Context, token string, userId uint64) context.Context {
@@ -72,8 +89,8 @@ func (ic *internalClient) WithScopeToken(c context.Context, token string, scope 
 	return metadata.NewOutgoingContext(c, md)
 }
 
-func (ic *internalClient) WithAuth(c context.Context, auth *types.Authentication) (context.Context, error) {
-	token, err := ic.createServiceScopeToken(auth)
+func (ic *internalClient) WithAuth(c context.Context, principal authentication.Principal) (context.Context, error) {
+	token, err := ic.createServiceAssertion(principal)
 	if err != nil {
 		return nil, err
 	}
@@ -81,8 +98,20 @@ func (ic *internalClient) WithAuth(c context.Context, auth *types.Authentication
 	return metadata.NewOutgoingContext(c, md), nil
 }
 
-func (ic *internalClient) WithPlatform(c context.Context, auth *types.Authentication) (context.Context, error) {
-	token, err := ic.createServiceScopeToken(auth)
+// WithService authenticates the local direct Service identity without delegated tenant facts.
+func (ic *internalClient) WithService(c context.Context) (context.Context, error) {
+	if ic.issuerErr != nil {
+		return nil, ic.issuerErr
+	}
+	token, err := ic.issuer.IssueService(authentication.Tenant{})
+	if err != nil {
+		return nil, err
+	}
+	return metadata.NewOutgoingContext(c, metadata.New(map[string]string{types.SERVICE_SCOPE_KEY: token})), nil
+}
+
+func (ic *internalClient) WithPlatform(c context.Context, principal authentication.Principal) (context.Context, error) {
+	token, err := ic.createServiceAssertion(principal)
 	if err != nil {
 		return nil, err
 	}
@@ -108,67 +137,20 @@ func (ic *internalClient) WithPlatform(c context.Context, auth *types.Authentica
 	return metadata.NewOutgoingContext(c, metadata.New(_platform)), nil
 }
 
-func (ic *internalClient) WithHttpAuth(c context.Context, auth *types.Authentication, req *http.Request) (*http.Request, error) {
-	token, err := ic.createServiceScopeToken(auth)
+func (ic *internalClient) WithHttpAuth(c context.Context, principal authentication.Principal, req *http.Request) (*http.Request, error) {
+	token, err := ic.createServiceAssertion(principal)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", token)
+	req.Header.Set(types.SERVICE_SCOPE_KEY, token)
 	return req.WithContext(c), nil
 }
 
-func (ic *internalClient) createServiceScopeToken(auth *types.Authentication) (string, error) {
-	if _, err := auth.Scope(
-		types.AuthTypeUser,
-		types.AuthTypeProject,
-		types.AuthTypeOrg,
-		types.AuthTypeService,
-		types.AuthTypeSystem,
-	); err != nil {
-		return "", err
+func (ic *internalClient) createServiceAssertion(principal authentication.Principal) (string, error) {
+	if ic.issuerErr != nil {
+		return "", ic.issuerErr
 	}
-	organizationContext, err := auth.OrganizationContext()
-	if err != nil {
-		return "", err
-	}
-	delegatedContext := types.DelegatedContext{OrganizationID: organizationContext.OrganizationID}
-	if projectContext, projectErr := auth.ProjectContext(); projectErr == nil {
-		if projectContext.OrganizationID != organizationContext.OrganizationID {
-			return "", types.ErrAuthenticationContextMismatch
-		}
-		delegatedContext.ProjectID = &projectContext.ProjectID
-	} else if !errors.Is(projectErr, types.ErrProjectContextUnavailable) {
-		return "", projectErr
-	}
-	if ic.cfg == nil || strings.TrimSpace(ic.cfg.Name) == "" {
-		return "", types.ErrServiceNameUnavailable
-	}
-	ServiceID := ic.cfg.ServiceID
-	if ServiceID == 0 {
-		return "", types.ErrServiceActorUnavailable
-	}
-	if strings.TrimSpace(ic.cfg.Secret) == "" {
-		return "", types.ErrServiceSecretUnavailable
-	}
-	assertion := types.ServiceAssertion{
-		ActorID: ServiceID,
-		Issuer:  ic.cfg.Name,
-		TTL:     5 * time.Minute,
-	}
-	if auth.Type() == types.AuthTypeUser {
-		userContext, userErr := auth.UserContext()
-		if userErr != nil {
-			return "", userErr
-		}
-		if userContext.UserID != auth.Actor().ID {
-			return "", types.ErrAuthenticationContextMismatch
-		}
-	}
-	assertion.DelegatedActor = &types.ActorIdentity{
-		Type: auth.Actor().Type,
-		ID:   auth.Actor().ID,
-	}
-	return types.CreateServiceScopeToken(delegatedContext, assertion, ic.cfg.Secret)
+	return ic.issuer.Issue(principal.Subject(), principal.Tenant(), principal.Authorities())
 }
 
 func (client *internalClient) Cache(c context.Context, key string, value interface{}) *connectors.RedisResponse {

@@ -5,22 +5,20 @@ import (
 	"testing"
 
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/protos"
 )
 
 type normalizedVaultService struct {
-	createdAuth    *types.Authentication
-	createdProject types.ProjectContext
+	createdAuth authentication.Principal
 }
 
-func (s *normalizedVaultService) Create(_ context.Context, auth *types.Authentication, projectContext types.ProjectContext, _ string, _ string, _ map[string]interface{}) (*internal_entity.Vault, error) {
+func (s *normalizedVaultService) Create(_ context.Context, auth authentication.Principal, _ string, _ string, _ map[string]interface{}) (*internal_entity.Vault, error) {
 	s.createdAuth = auth
-	s.createdProject = projectContext
 	return &internal_entity.Vault{}, nil
 }
 
-func (s *normalizedVaultService) Get(context.Context, types.ProjectContext, uint64) (*internal_entity.Vault, error) {
+func (s *normalizedVaultService) Get(context.Context, authentication.Tenant, uint64) (*internal_entity.Vault, error) {
 	return &internal_entity.Vault{}, nil
 }
 
@@ -28,11 +26,11 @@ func (s *normalizedVaultService) GetProviderCredential(context.Context, uint64, 
 	return &internal_entity.Vault{}, nil
 }
 
-func (s *normalizedVaultService) Delete(context.Context, *types.Authentication, types.ProjectContext, uint64) (*internal_entity.Vault, error) {
+func (s *normalizedVaultService) Delete(context.Context, authentication.Principal, uint64) (*internal_entity.Vault, error) {
 	return &internal_entity.Vault{}, nil
 }
 
-func (s *normalizedVaultService) GetAllOrganizationCredential(context.Context, types.ProjectContext, []*protos.Criteria, *protos.Paginate) (int64, []*internal_entity.Vault, error) {
+func (s *normalizedVaultService) GetAllOrganizationCredential(context.Context, authentication.Principal, []*protos.Criteria, *protos.Paginate) (int64, []*internal_entity.Vault, error) {
 	return 0, nil, nil
 }
 
@@ -40,14 +38,19 @@ var _ VaultService = (*normalizedVaultService)(nil)
 
 func TestVaultServiceContractUsesNormalizedIdentityInputs(t *testing.T) {
 	service := &normalizedVaultService{}
-	projectContext := types.ProjectContext{OrganizationID: 11, ProjectID: 22}
-	actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 7}
-	auth := &types.Authentication{AuthType: types.AuthTypeUser, ActorValue: &actor}
+	auth, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: 7},
+		authentication.Tenant{OrganizationID: 11, ProjectID: 22},
+		authentication.Proof{Method: authentication.AuthenticationUserSession, Reference: authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: "vault-contract-test"}}, nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if _, err := service.Create(context.Background(), auth, projectContext, "provider", "name", nil); err != nil {
+	if _, err := service.Create(context.Background(), auth, "provider", "name", nil); err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if service.createdAuth != auth || service.createdProject != projectContext {
-		t.Fatalf("Create() identity inputs = auth:%p project:%+v", service.createdAuth, service.createdProject)
+	if service.createdAuth.Subject() != auth.Subject() || service.createdAuth.Tenant() != auth.Tenant() {
+		t.Fatalf("Create() identity input = %+v", service.createdAuth)
 	}
 }

@@ -55,7 +55,7 @@ export function SignInPage() {
     (err: ServiceError | null, auth: AuthenticateResponse | null) => {
       hideLoader();
       if (auth?.getSuccess()) {
-        setAuthentication?.(auth.getData(), () => {
+        setAuthentication?.(auth.getAuthentication(), auth.getToken(), () => {
           if (next && externalValidation) {
             window.location.replace(next);
             return;

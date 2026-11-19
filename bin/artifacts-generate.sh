@@ -7,7 +7,8 @@ OPENAPI_ARTIFACT_DIR="./openapi/artifacts"
 OPENAPI_OUT_DIR="./openapi"
 OAPI_CODEGEN_VERSION="${OAPI_CODEGEN_VERSION:-v2.4.1}"
 
-rm -rf ./protos/*.go
+rm -f ./protos/*.pb.go
+rm -f ./protos/authentication/*.pb.go
 rm -f "${OPENAPI_OUT_DIR}"/*.gen.go
 
 find ./api/document-api/app/bridges/artifacts/protos -name "*_pb2.py" -delete

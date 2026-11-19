@@ -16,17 +16,17 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/configs"
 	storage_files "github.com/rapidaai/pkg/storages/file-storage"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
 )
 
 const (
-	awsOptionCredentialIDKey      = "rapida.credential_id"
+	awsOptionCredentialIDKey      = "rapida.credential_id" // #nosec G101, this is a metadata key, not a secret.
 	awsOptionBucketKey            = "s3_bucket_name"
 	awsOptionPrefixKey            = "prefix"
 	awsOptionTimeoutSecondsKey    = "timeout_seconds"
@@ -38,7 +38,7 @@ type awsExecutor struct {
 	logger        commons.Logger
 	configuration *internal_assistant_entity.AssistantConfiguration
 	caller        internal_type.InternalCaller
-	auth          *types.Authentication
+	auth          authentication.Principal
 	onPacket      func(context.Context, ...internal_type.Packet) error
 }
 
@@ -68,7 +68,7 @@ func WithAWSCaller(caller internal_type.InternalCaller) AWSOption {
 	}
 }
 
-func WithAWSAuth(auth *types.Authentication) AWSOption {
+func WithAWSAuth(auth authentication.Principal) AWSOption {
 	return func(executor *awsExecutor) {
 		executor.auth = auth
 	}
@@ -102,7 +102,7 @@ func NewAWS(opts ...AWSOption) (internal_type.ArtifactPushExecutor, error) {
 		if executor.caller == nil {
 			return nil, fmt.Errorf("artifact push storage aws: caller is required when rapida.credential_id is configured")
 		}
-		if executor.auth == nil {
+		if executor.auth.Subject().ID == 0 {
 			return nil, fmt.Errorf("artifact push storage aws: auth is required when rapida.credential_id is configured")
 		}
 	}

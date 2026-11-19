@@ -233,12 +233,13 @@ describe('Authentication pages', () => {
 
   it('sign-in submits credentials and navigates to dashboard on success', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
-    const setAuthentication = jest.fn((_auth, cb) => cb());
+    const setAuthentication = jest.fn((_auth, _token, callback) => callback());
     (AuthenticateUser as jest.Mock).mockImplementation(
       (_cfg, _email, _password, callback) => {
         callback(null, {
           getSuccess: () => true,
-          getData: () => ({ id: 'auth-1' }),
+          getAuthentication: () => ({ id: 'auth-1' }),
+          getToken: () => ({ token: 'token-1' }),
         });
       },
     );
@@ -427,12 +428,13 @@ describe('Authentication pages', () => {
     mockLocationState = { email: 'prefilled@example.com' };
     mockParams = { next: '/workspace/overview' };
 
-    const setAuthentication = jest.fn((_auth, cb) => cb());
+    const setAuthentication = jest.fn((_auth, _token, callback) => callback());
     (RegisterUser as jest.Mock).mockImplementation(
       (_cfg, _email, _password, _name, callback) => {
         callback(null, {
           getSuccess: () => true,
-          getData: () => ({ id: 'auth-2' }),
+          getAuthentication: () => ({ id: 'auth-2' }),
+          getToken: () => ({ token: 'token-2' }),
         });
       },
     );

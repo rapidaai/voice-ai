@@ -1,9 +1,6 @@
 from hashlib import sha256
 import importlib
 import re
-from typing import Union
-
-import jwt
 import tiktoken
 
 
@@ -18,32 +15,6 @@ def generate_text_hash(text: str) -> str:
     """
     hash_text = str(text) + "None"
     return sha256(hash_text.encode()).hexdigest()
-
-
-def generate_jwt_token(
-    project_id: Union[int, None],
-    organization_id: int,
-    user_id: Union[int, None] = None,
-    key: str = "rpd_pks",
-    algo: str = "HS256",
-) -> str:
-    """
-
-    Returns:
-
-    """
-    payload = {"organizationId": str(organization_id)}
-    if user_id:
-        payload["userId"] = str(user_id)
-
-    if project_id:
-        payload["projectId"] = str(project_id)
-
-    return jwt.encode(
-        payload=payload,
-        key=key,
-        algorithm=algo,
-    )
 
 
 def count_string_token(prompt: str, model: str = None) -> int:

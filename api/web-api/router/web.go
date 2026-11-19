@@ -5,7 +5,6 @@ import (
 	"google.golang.org/grpc"
 
 	webApi "github.com/rapidaai/api/web-api/api"
-	webDashboardApi "github.com/rapidaai/api/web-api/api/dashboard"
 	webProxyApi "github.com/rapidaai/api/web-api/api/proxy"
 	"github.com/rapidaai/api/web-api/config"
 	"github.com/rapidaai/pkg/commons"
@@ -15,6 +14,7 @@ import (
 
 func WebApiRoute(
 	Cfg *config.WebAppConfig,
+	organizationCredentialKey []byte,
 	E *gin.Engine,
 	S *grpc.Server,
 	Logger commons.Logger,
@@ -47,14 +47,15 @@ func WebApiRoute(
 	apiv1.GET("/connect-action/slack/", connectApi.SlackActionConnect)
 	apiv1.GET("/connect-crm/hubspot/", connectApi.HubspotCRMConnect)
 
-	protos.RegisterAuthenticationServiceServer(S, webApi.NewAuthGRPC(Cfg, &Cfg.OAuthConfig, Logger, Postgres))
+	protos.RegisterAuthenticationServiceServer(S, webApi.NewAuthGRPC(Cfg, &Cfg.OAuthConfig, organizationCredentialKey, Logger, Postgres))
 	protos.RegisterVaultServiceServer(S, webApi.NewVaultGRPC(Cfg, &Cfg.OAuthConfig, Logger, Postgres, Redis))
 	protos.RegisterOrganizationServiceServer(S, webApi.NewOrganizationGRPC(Cfg, Logger, Postgres, Redis))
 	protos.RegisterProjectServiceServer(S, webApi.NewProjectGRPC(Cfg, Logger, Postgres, Redis))
 	protos.RegisterConnectServiceServer(S, webApi.NewConnectGRPC(Cfg, &Cfg.OAuthConfig, Logger, Postgres))
 	protos.RegisterNotificationServiceServer(S, webApi.NewNotificationGRPC(Cfg, Logger, Postgres, Redis))
 	protos.RegisterProductUsageServiceServer(S, webApi.NewProductUsageGRPC(Logger, Postgres))
-	protos.RegisterDashboardServiceServer(S, webDashboardApi.NewDashboardGRPC(Cfg, Logger, Postgres, Redis))
+	protos.RegisterAccessManagementServiceServer(S, webApi.NewAccessManagementGRPC(Logger, Postgres))
+	protos.RegisterDashboardServiceServer(S, webApi.NewDashboardGRPC(Cfg, Logger, Postgres, Redis))
 }
 
 func ProxyApiRoute(Cfg *config.WebAppConfig,

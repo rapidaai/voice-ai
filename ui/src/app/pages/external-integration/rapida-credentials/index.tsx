@@ -23,7 +23,6 @@ import {
   ViewOff,
 } from '@carbon/icons-react';
 import {
-  Button,
   DataTable,
   DataTableSkeleton,
   Table,
@@ -38,14 +37,18 @@ import {
 } from '@carbon/react';
 import { toHumanReadableDateTime } from '@/utils/date';
 import { DocNoticeBlock } from '@/app/components/layout/container/message/notice-block/doc-notice-block';
-import { FieldSet } from '@/app/components/ui/primitives';
-import { FormLabel } from '@/app/components/ui/primitives';
-import { CopyButton } from '@/app/components/ui/primitives';
-import { GhostButton } from '@/app/components/ui/primitives';
-import { IconOnlyButton } from '@/app/components/ui/primitives';
-import { BaseCard } from '@/app/components/ui/primitives';
-import { Pagination } from '@/app/components/ui/primitives';
-import { Text } from '@/app/components/ui/primitives';
+import {
+  BaseCard,
+  CopyButton,
+  FieldSet,
+  FormLabel,
+  GhostButton,
+  IconOnlyButton,
+  Pagination,
+  PrimaryButton,
+  Text,
+  typographyClassNames,
+} from '@/app/components/ui/primitives';
 import {
   ScrollableTableSection,
   TableSection,
@@ -87,22 +90,21 @@ export function ProjectCredentialPage() {
   const [credentialPendingRevoke, setCredentialPendingRevoke] =
     useState<ProjectCredential | null>(null);
   const requestSequence = useRef(0);
-  const { currentProjectRole, organizationRole } = useContext(AuthContext);
-  const [userId, token] = useCredential();
-  const canRevoke =
-    organizationRole?.role === 'owner' || organizationRole?.role === 'admin';
+  const { getCurrentProject } = useContext(AuthContext);
+  const currentProject = getCurrentProject?.();
+  const [userId, token, , organizationId] = useCredential();
 
   useEffect(() => {
-    if (!currentProjectRole) return;
+    if (!currentProject?.id) return;
     const requestId = ++requestSequence.current;
     setIsLoading(true);
     setError('');
     listProjectCredentials({
-      projectId: currentProjectRole.projectid,
+      projectId: currentProject.id,
       page,
       pageSize,
       criteria,
-      auth: { token, userId },
+      auth: { organizationId, token, userId },
       callback: (
         requestError,
         response: GetAllProjectCredentialResponse | null,
@@ -122,7 +124,7 @@ export function ProjectCredentialPage() {
     return () => {
       requestSequence.current += 1;
     };
-  }, [criteria, currentProjectRole, page, pageSize, refresh, token, userId]);
+  }, [criteria, currentProject, page, pageSize, refresh, token, userId]);
 
   const rows = credentials.map(credential => ({
     id: credential.getId(),
@@ -155,14 +157,14 @@ export function ProjectCredentialPage() {
           </Text>
         }
         pageActions={
-          <Button
+          <PrimaryButton
             className="w-full md:w-auto"
             size="md"
             renderIcon={Add}
             onClick={() => setIsCreateOpen(true)}
           >
             Create API key
-          </Button>
+          </PrimaryButton>
         }
       />
       {isLoading && !hasCompletedInitialLoad ? (
@@ -190,8 +192,8 @@ export function ProjectCredentialPage() {
                     setCriteria(nextCriteria);
                   }}
                 />
-                <Button
-                  hasIconOnly
+                <IconOnlyButton
+                  size="md"
                   renderIcon={Renew}
                   iconDescription="Refresh API keys"
                   kind="ghost"
@@ -265,21 +267,27 @@ export function ProjectCredentialPage() {
                           return (
                             <TableRow {...getRowProps({ row })} key={row.id}>
                               {row.cells.map(cell => (
-                                <TableCell key={cell.id} className="text-sm">
+                                <TableCell
+                                  key={cell.id}
+                                  className={
+                                    typographyClassNames['body-compact-01']
+                                  }
+                                >
                                   {cell.info.header === 'name' ? (
                                     credential.getName()
                                   ) : cell.info.header === 'apiKey' ? (
                                     <div className="flex w-80 items-center gap-1">
-                                      <code
+                                      <Text
+                                        as="code"
+                                        variant="code-02"
                                         id={`project-api-key-${row.id}`}
-                                        className="w-64 shrink-0 truncate font-mono text-[13px]"
+                                        className="w-64 shrink-0 truncate"
                                       >
                                         {isVisible
                                           ? credential.getKey()
                                           : `${credential.getKey().slice(0, 6)}${'•'.repeat(24)}`}
-                                      </code>
-                                      <Button
-                                        hasIconOnly
+                                      </Text>
+                                      <IconOnlyButton
                                         renderIcon={isVisible ? ViewOff : View}
                                         iconDescription={`${isVisible ? 'Hide' : 'Show'} ${credential.getName()} API key`}
                                         aria-expanded={isVisible}
@@ -297,8 +305,7 @@ export function ProjectCredentialPage() {
                                           })
                                         }
                                       />
-                                      <Button
-                                        hasIconOnly
+                                      <IconOnlyButton
                                         renderIcon={
                                           copiedCredentialId === row.id
                                             ? Checkmark
@@ -339,20 +346,16 @@ export function ProjectCredentialPage() {
                                     </Tag>
                                   ) : cell.info.header === 'actions' ? (
                                     <div className="flex items-center gap-0">
-                                      {canRevoke && (
-                                        <IconOnlyButton
-                                          size="md"
-                                          kind="ghost"
-                                          renderIcon={Unlink}
-                                          iconDescription={`Revoke ${credential.getName()}`}
-                                          tooltipPosition="bottom"
-                                          onClick={() =>
-                                            setCredentialPendingRevoke(
-                                              credential,
-                                            )
-                                          }
-                                        />
-                                      )}
+                                      <IconOnlyButton
+                                        size="md"
+                                        kind="ghost"
+                                        renderIcon={Unlink}
+                                        iconDescription={`Revoke ${credential.getName()}`}
+                                        tooltipPosition="bottom"
+                                        onClick={() =>
+                                          setCredentialPendingRevoke(credential)
+                                        }
+                                      />
                                     </div>
                                   ) : (
                                     cell.value
@@ -383,11 +386,11 @@ export function ProjectCredentialPage() {
         </TableSection>
       )}
 
-      {currentProjectRole && (
+      {currentProject?.id && (
         <CreateProjectToken
           open={isCreateOpen}
-          projectId={currentProjectRole.projectid}
-          auth={{ token, userId }}
+          projectId={currentProject.id}
+          auth={{ organizationId, token, userId }}
           onClose={() => setIsCreateOpen(false)}
           onCreated={() => {
             setPage(1);
@@ -395,7 +398,7 @@ export function ProjectCredentialPage() {
           }}
         />
       )}
-      {credentialPendingRevoke && currentProjectRole && (
+      {credentialPendingRevoke && currentProject?.id && (
         <ConfirmDeleteDialog
           showing
           title="Revoke API key"
@@ -407,9 +410,9 @@ export function ProjectCredentialPage() {
           onConfirm={() => {
             const revokedCredential = credentialPendingRevoke;
             revokeProjectCredential({
-              projectId: currentProjectRole.projectid,
+              projectId: currentProject.id,
               credentialId: revokedCredential.getId(),
-              auth: { token, userId },
+              auth: { organizationId, token, userId },
               callback: (revokeError, response) => {
                 if (response?.getSuccess()) {
                   setCredentialPendingRevoke(null);
@@ -429,11 +432,11 @@ export function ProjectCredentialPage() {
                   return;
                 }
                 listProjectCredentials({
-                  projectId: currentProjectRole.projectid,
+                  projectId: currentProject.id,
                   page,
                   pageSize,
                   criteria,
-                  auth: { token, userId },
+                  auth: { organizationId, token, userId },
                   callback: (_, listResponse) => {
                     if (listResponse?.getSuccess()) {
                       const nextCredentials = listResponse.getDataList();
@@ -515,9 +518,9 @@ export function PersonalCredentialPage() {
         <BaseCard>
           {/* Card header */}
           <div className="px-4 pt-4 pb-3">
-            <span className="text-sm font-medium text-foreground ">
+            <Text variant="heading-compact-01" className="text-foreground">
               Personal Token
-            </span>
+            </Text>
           </div>
 
           {/* Fields */}
@@ -525,9 +528,13 @@ export function PersonalCredentialPage() {
             <FieldSet>
               <FormLabel>Authorization</FormLabel>
               <div className="flex items-center gap-2">
-                <code className="flex-1 bg-layer px-3 py-2 font-mono text-xs min-w-0 overflow-hidden truncate">
+                <Text
+                  as="code"
+                  variant="code-01"
+                  className="min-w-0 flex-1 truncate bg-layer px-3 py-2"
+                >
                   {isVisible ? token : maskCredential(token)}
-                </code>
+                </Text>
                 <div className="flex shrink-0 border border-border-subtle divide-x divide-border-subtle ">
                   <GhostButton
                     size="md"
@@ -549,9 +556,13 @@ export function PersonalCredentialPage() {
             <FieldSet>
               <FormLabel>x-auth-id</FormLabel>
               <div className="flex items-center gap-2">
-                <code className="flex-1 bg-layer px-3 py-2 font-mono text-xs min-w-0 overflow-hidden truncate">
+                <Text
+                  as="code"
+                  variant="code-01"
+                  className="min-w-0 flex-1 truncate bg-layer px-3 py-2"
+                >
                   {isVisible ? authId : maskCredential(authId)}
-                </code>
+                </Text>
                 <div className="flex shrink-0 border border-border-subtle divide-x divide-border-subtle ">
                   <CopyButton className="h-8 w-8">{authId}</CopyButton>
                 </div>
@@ -560,9 +571,13 @@ export function PersonalCredentialPage() {
             <FieldSet>
               <FormLabel>Project ID</FormLabel>
               <div className="flex items-center gap-2">
-                <code className="flex-1 bg-layer px-3 py-2 font-mono text-xs min-w-0 overflow-hidden truncate">
+                <Text
+                  as="code"
+                  variant="code-01"
+                  className="min-w-0 flex-1 truncate bg-layer px-3 py-2"
+                >
                   {isVisible ? projectId : maskCredential(projectId)}
-                </code>
+                </Text>
                 <div className="flex shrink-0 border border-border-subtle divide-x divide-border-subtle ">
                   <CopyButton className="h-8 w-8">{projectId}</CopyButton>
                 </div>

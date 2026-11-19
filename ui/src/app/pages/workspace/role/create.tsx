@@ -1,6 +1,5 @@
 import { RefObject, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Information } from '@carbon/icons-react';
 import {
   PermissionDefinition,
   RoleScope,
@@ -12,9 +11,6 @@ import {
   ProgressIndicator,
   ProgressStep,
   Search,
-  Toggletip,
-  ToggletipButton,
-  ToggletipContent,
 } from '@carbon/react';
 import {
   NoDataEmptyState,
@@ -33,6 +29,7 @@ import {
   Textarea,
 } from '@/app/components/ui/primitives';
 import { createAccessRole, listAccessPermissions } from '@/clients';
+import { HelpToggletip } from '@/app/components/ui/composites';
 import { useCredential } from '@/hooks/use-credential';
 
 const roleKeyPattern = /^[a-z][a-z0-9_]{2,63}$/;
@@ -49,7 +46,7 @@ export function CreateRoleModal({
   onClose,
 }: CreateRoleModalProps) {
   const navigate = useNavigate();
-  const [userId, token] = useCredential();
+  const [userId, token, , organizationId] = useCredential();
   const [key, setKey] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -130,7 +127,7 @@ export function CreateRoleModal({
                   : 'PROJECT',
             },
           ],
-          auth: { token, userId },
+          auth: { organizationId, token, userId },
         });
         if (requestId !== permissionRequestSequence.current) return;
         if (!response.getSuccess()) {
@@ -208,7 +205,7 @@ export function CreateRoleModal({
         scope,
         subject,
         permissionDefinitionIds: selectedPermissionIds,
-        auth: { token, userId },
+        auth: { organizationId, token, userId },
       });
       if (!isMounted.current) return { preventClose: true as const };
       if (!response.getSuccess() || !response.getRole()) {
@@ -361,15 +358,10 @@ export function CreateRoleModal({
                     <FieldSet>
                       <div className="flex items-center gap-1">
                         <FormLabel htmlFor="role-key">Role key</FormLabel>
-                        <Toggletip align="right">
-                          <ToggletipButton label="Role key information">
-                            <Information size={14} />
-                          </ToggletipButton>
-                          <ToggletipContent>
-                            Lowercase letters, numbers, and underscores. The key
-                            cannot be changed later.
-                          </ToggletipContent>
-                        </Toggletip>
+                        <HelpToggletip
+                          label="Role key"
+                          helpText="Lowercase letters, numbers, and underscores. The key cannot be changed later."
+                        />
                       </div>
                       <Input
                         id="role-key"
@@ -408,21 +400,22 @@ export function CreateRoleModal({
                         <FormLabel htmlFor="role-subject">
                           Access type
                         </FormLabel>
-                        <Toggletip align="right">
-                          <ToggletipButton label="Access type information">
-                            <Information size={14} />
-                          </ToggletipButton>
-                          <ToggletipContent>
-                            <p>
-                              <strong>Console access:</strong> For signed-in
-                              users at organization or project scope.
-                            </p>
-                            <p className="mt-2">
-                              <strong>API access:</strong> For API integrations
-                              using project access tokens. Project scope only.
-                            </p>
-                          </ToggletipContent>
-                        </Toggletip>
+                        <HelpToggletip
+                          label="Access type"
+                          helpText={
+                            <>
+                              <p>
+                                <strong>Console access:</strong> For signed-in
+                                users at organization or project scope.
+                              </p>
+                              <p className="mt-2">
+                                <strong>API access:</strong> For API
+                                integrations using project access tokens.
+                                Project scope only.
+                              </p>
+                            </>
+                          }
+                        />
                       </div>
                       <Select
                         id="role-subject"
@@ -473,9 +466,13 @@ export function CreateRoleModal({
                       className="p-4"
                     />
                   ) : permissionError ? null : permissions.length === 0 ? (
-                    <p className="border border-border-subtle bg-layer p-4 text-sm text-muted">
+                    <Text
+                      as="p"
+                      variant="body-compact-01"
+                      className="border border-border-subtle bg-layer p-4 text-muted"
+                    >
                       No permissions are available for this scope.
-                    </p>
+                    </Text>
                   ) : (
                     <AddSelect
                       className="h-full min-h-0 overflow-hidden"

@@ -13,10 +13,11 @@ import (
 
 	config "github.com/rapidaai/api/web-api/config"
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 )
 
 type ExternalConnectToken interface {
@@ -64,10 +65,14 @@ func (ec *ExternalConnect) EncodeState(
 	return identifier, nil
 }
 
-func (ec *ExternalConnect) DecodeState(ctx context.Context, auth *types.Authentication, identifier string) (*internal_entity.OAuthExternalConnect, error) {
+func (ec *ExternalConnect) DecodeState(ctx context.Context, principal authentication.Principal, identifier string) (*internal_entity.OAuthExternalConnect, error) {
+	tenant := principal.Tenant()
+	if tenant.OrganizationID == 0 || tenant.ProjectID == 0 {
+		return nil, pkg_errors.RouteAuthorizationDeniedError{}
+	}
 	db := ec.postgres.DB(ctx)
 	var ct internal_entity.OAuthExternalConnect
-	tx := db.Last(&ct, "identifier = ?", identifier)
+	tx := db.Last(&ct, "identifier = ? AND organization_id = ? AND project_id = ?", identifier, tenant.OrganizationID, tenant.ProjectID)
 	if tx.Error != nil {
 		return nil, tx.Error
 	}

@@ -13,10 +13,10 @@ import (
 	"github.com/rapidaai/api/endpoint-api/config"
 	internal_gorm "github.com/rapidaai/api/endpoint-api/internal/entity"
 	internal_service "github.com/rapidaai/api/endpoint-api/internal/service"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 )
@@ -165,25 +165,46 @@ func newEndpointServiceTest(t *testing.T) (*endpointService, *gorm.DB) {
 	}, db
 }
 
-func testAuth(userID, orgID, projectID uint64) *types.Authentication {
-	return &types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: userID},
-		UserValue:         &types.UserContext{UserID: userID},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: orgID},
-		ProjectValue:      &types.ProjectContext{OrganizationID: orgID, ProjectID: projectID},
-	}
+func testAuth(t *testing.T, userID, orgID, projectID uint64) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: userID},
+		authentication.Tenant{OrganizationID: orgID, ProjectID: projectID},
+		authentication.Proof{
+			Method: authentication.AuthenticationUserSession,
+			Reference: authentication.ProofReference{
+				Type:  authentication.ProofReferenceUserSession,
+				Value: "test-session",
+			},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+	return principal
+}
+
+func testOrganizationAuth(t *testing.T, credentialID, organizationID uint64) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityOrganizationCredential, ID: credentialID},
+		authentication.Tenant{OrganizationID: organizationID},
+		authentication.Proof{
+			Method: authentication.AuthenticationOrganizationCredential,
+			Reference: authentication.ProofReference{
+				Type:  authentication.ProofReferenceCredential,
+				Value: "1",
+			},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+	return principal
 }
 
 func TestEndpointServiceRequiresContext(t *testing.T) {
 	service, _ := newEndpointServiceTest(t)
 	organizationID := uint64(10)
-	projectlessUser := &types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: 1},
-		UserValue:         &types.UserContext{UserID: 1},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-	}
+	projectlessUser := testAuth(t, 1, organizationID, 0)
 
 	_, err := service.Get(
 		context.Background(),
@@ -196,11 +217,7 @@ func TestEndpointServiceRequiresContext(t *testing.T) {
 
 	_, _, err = service.GetAll(
 		context.Background(),
-		&types.Authentication{
-			AuthType:          types.AuthTypeOrg,
-			ActorValue:        &types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 1},
-			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-		},
+		testOrganizationAuth(t, 1, organizationID),
 		nil,
 		&protos.Paginate{},
 	)
@@ -220,7 +237,7 @@ func TestEndpointServiceInvokeLookupAllowsOrganizationForPublicEndpoint(t *testi
 
 	result, err := service.Get(
 		context.Background(),
-		&types.Authentication{AuthType: types.AuthTypeOrg, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}},
+		testOrganizationAuth(t, 1, organizationID),
 		endpoint.Id,
 		nil,
 		internal_service.NewInvokeGetEndpointOption(),
@@ -242,7 +259,7 @@ func TestEndpointServiceInvokeLookupRejectsOrganizationForPrivateEndpoint(t *tes
 
 	_, err := service.Get(
 		context.Background(),
-		&types.Authentication{AuthType: types.AuthTypeOrg, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}},
+		testOrganizationAuth(t, 1, organizationID),
 		endpoint.Id,
 		nil,
 		internal_service.NewInvokeGetEndpointOption(),
@@ -277,8 +294,8 @@ func requireAccessDenied(t *testing.T, err error) {
 func TestGetAllEndpointProviderModelEnforcesEndpointOwnership(t *testing.T) {
 	service, db := newEndpointServiceTest(t)
 	endpoint := insertEndpoint(t, db, 101, 10, 20, "private")
-	otherProjectAuth := testAuth(2, 11, 21)
-	ownerAuth := testAuth(1, endpoint.OrganizationId, endpoint.ProjectId)
+	otherProjectAuth := testAuth(t, 2, 11, 21)
+	ownerAuth := testAuth(t, 1, endpoint.OrganizationId, endpoint.ProjectId)
 	require.NoError(t, db.Create(&internal_gorm.EndpointProviderModel{
 		Audited: gorm_models.Audited{Id: 201},
 		Mutable: gorm_models.Mutable{
@@ -304,8 +321,8 @@ func TestGetAllEndpointProviderModelEnforcesEndpointOwnership(t *testing.T) {
 func TestEndpointSubresourceWritesEnforceEndpointOwnership(t *testing.T) {
 	service, db := newEndpointServiceTest(t)
 	endpoint := insertEndpoint(t, db, 102, 10, 20, "private")
-	otherProjectAuth := testAuth(2, 11, 21)
-	ownerAuth := testAuth(1, endpoint.OrganizationId, endpoint.ProjectId)
+	otherProjectAuth := testAuth(t, 2, 11, 21)
+	ownerAuth := testAuth(t, 1, endpoint.OrganizationId, endpoint.ProjectId)
 
 	_, err := service.ConfigureEndpointCaching(context.Background(), ownerAuth, endpoint.Id, internal_gorm.STANDARD_CACHE, 3600, 0.8)
 	require.NoError(t, err)
@@ -338,8 +355,8 @@ func TestEndpointSubresourceWritesEnforceEndpointOwnership(t *testing.T) {
 func TestCreateEndpointProviderModelEnforcesOwnershipForPublicEndpoint(t *testing.T) {
 	service, db := newEndpointServiceTest(t)
 	endpoint := insertEndpoint(t, db, 103, 10, 20, "public")
-	otherProjectAuth := testAuth(2, 11, 21)
-	ownerAuth := testAuth(1, endpoint.OrganizationId, endpoint.ProjectId)
+	otherProjectAuth := testAuth(t, 2, 11, 21)
+	ownerAuth := testAuth(t, 1, endpoint.OrganizationId, endpoint.ProjectId)
 
 	_, err := service.CreateEndpointProviderModel(
 		context.Background(),

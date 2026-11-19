@@ -21,9 +21,9 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/clients/rest"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
@@ -44,7 +44,7 @@ const (
 
 type Config struct {
 	Logger                        commons.Logger
-	Auth                          *types.Authentication
+	Auth                          authentication.Principal
 	AssistantID                   uint64
 	AssistantConfigurationService internal_services.AssistantConfigurationService
 	HTTPLogService                internal_services.AssistantHTTPLogService
@@ -52,7 +52,7 @@ type Config struct {
 
 type Collector struct {
 	logger                        commons.Logger
-	auth                          *types.Authentication
+	auth                          authentication.Principal
 	assistantID                   uint64
 	assistantConfigurationService internal_services.AssistantConfigurationService
 	httpLogService                internal_services.AssistantHTTPLogService
@@ -62,7 +62,7 @@ type Collector struct {
 }
 
 func New(_ context.Context, config Config) observability.Collector {
-	if !validator.NonNil(config.Auth) || !validator.NonNil(config.AssistantConfigurationService) || !validator.NonNil(config.HTTPLogService) {
+	if !validator.NonZero(config.Auth.Subject().ID) || !validator.NonNil(config.AssistantConfigurationService) || !validator.NonNil(config.HTTPLogService) {
 		return observability.NoopCollector{}
 	}
 	return &Collector{

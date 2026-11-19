@@ -1,8 +1,14 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import type { User } from '@rapidaai/react';
-import { ComboBox } from '@carbon/react';
+import {
+  RoleScope,
+  RoleSubject,
+  type RoleDefinition,
+  type ServiceError,
+  type User,
+} from '@rapidaai/react';
 import toast from 'react-hot-toast/headless';
 import {
+  ComboBox,
   Modal,
   ModalBody,
   ModalFooter,
@@ -22,17 +28,10 @@ import {
   ProjectRoleRow,
   ProjectRoleTable,
 } from '@/app/components/domain/project-role-table';
-import { addUserToProjectsByRole } from '@/clients';
+import { addUserToProjectsByRole, listAccessRoles } from '@/clients';
 
 const PROJECT_ACTION_ERROR =
   'Unable to process your request. please try again later.';
-
-const projectRoles = [
-  { name: 'Super Admin', value: 'super admin' },
-  { name: 'Admin', value: 'admin' },
-  { name: 'Writer', value: 'writer' },
-  { name: 'Reader', value: 'reader' },
-];
 
 interface InviteProjectUserDialogProps extends ModalProps {
   user?: User | null;
@@ -47,14 +46,23 @@ export function InviteProjectUserDialog({
   projectId,
   onSuccess,
 }: InviteProjectUserDialogProps) {
-  const { authId, token, projectId: currentProjectId } = useCurrentCredential();
-  const { projectRoles: availableProjects } = useContext(AuthContext);
+  const {
+    authId,
+    token,
+    organizationId,
+    projectId: currentProjectId,
+  } = useCurrentCredential();
+  const { getProjects } = useContext(AuthContext);
+  const availableProjects = getProjects?.();
   const { loading, showLoader, hideLoader } = useRapidaStore();
   const { users, getAllUser } = useUserPageStore();
+  const [projectRoles, setProjectRoles] = useState<RoleDefinition[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(user || null);
   const [projectRoleRows, setProjectRoleRows] = useState<ProjectRoleRow[]>(
-    projectId ? [{ projectId, projectRole: '' }] : [],
+    projectId ? [{ projectId, roleDefinitionIds: [] }] : [],
   );
+  const [isRoleCatalogLoading, setIsRoleCatalogLoading] = useState(false);
+  const [isRoleCatalogReady, setIsRoleCatalogReady] = useState(false);
   const [error, setError] = useState('');
 
   const closeDialog = useCallback(() => {
@@ -64,15 +72,18 @@ export function InviteProjectUserDialog({
   useEffect(() => {
     if (modalOpen) {
       setSelectedUser(user || null);
-      setProjectRoleRows(projectId ? [{ projectId, projectRole: '' }] : []);
+      setProjectRoleRows(
+        projectId ? [{ projectId, roleDefinitionIds: [] }] : [],
+      );
       setError('');
 
       if (!user && users.length === 0) {
         getAllUser(
           token,
           authId,
+          organizationId,
           currentProjectId,
-          err => setError(err),
+          err => toast.error(err),
           () => {},
         );
       }
@@ -81,12 +92,83 @@ export function InviteProjectUserDialog({
     authId,
     currentProjectId,
     modalOpen,
+    organizationId,
     projectId,
     token,
     user,
     users.length,
     getAllUser,
   ]);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+
+    let isCurrent = true;
+    setProjectRoles([]);
+    setProjectRoleRows(rows =>
+      rows.map(row => ({ ...row, roleDefinitionIds: [] })),
+    );
+    setIsRoleCatalogReady(false);
+    setIsRoleCatalogLoading(true);
+    (async () => {
+      const roles: RoleDefinition[] = [];
+      let page = 1;
+      let received = 0;
+      let total = 0;
+
+      do {
+        const response = await listAccessRoles({
+          page,
+          pageSize: 100,
+          criteria: [
+            { key: 'scope', logic: '=', value: 'PROJECT' },
+            { key: 'subject', logic: '=', value: 'USER' },
+          ],
+          auth: { organizationId, token, userId: authId },
+        });
+        if (!response.getSuccess()) {
+          throw new Error(
+            response.getError()?.getHumanmessage() ||
+              'Project roles could not be loaded.',
+          );
+        }
+        const pageRoles = response.getRolesList();
+        received += pageRoles.length;
+        roles.push(
+          ...pageRoles.filter(
+            role =>
+              role.getScope() === RoleScope.ROLE_SCOPE_PROJECT &&
+              role.getSubject() === RoleSubject.ROLE_SUBJECT_USER,
+          ),
+        );
+        total = response.getPaginated()?.getTotalitem() || received;
+        if (pageRoles.length === 0 && received < total) {
+          throw new Error('The role catalog returned an incomplete result.');
+        }
+        page += 1;
+      } while (received < total);
+
+      return roles;
+    })()
+      .then(roles => {
+        if (!isCurrent) return;
+        setProjectRoles(roles);
+        setIsRoleCatalogReady(true);
+        setIsRoleCatalogLoading(false);
+      })
+      .catch((requestError: ServiceError) => {
+        if (isCurrent) {
+          setIsRoleCatalogLoading(false);
+          toast.error(
+            requestError.message || 'Project roles could not be loaded.',
+          );
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [authId, modalOpen, token]);
 
   const submitInvite = async () => {
     if (!selectedUser) {
@@ -97,8 +179,12 @@ export function InviteProjectUserDialog({
       setError('Please add at least one project role.');
       return;
     }
-    if (projectRoleRows.some(row => !row.projectId || !row.projectRole)) {
-      setError('Please select project and role.');
+    if (
+      projectRoleRows.some(
+        row => !row.projectId || row.roleDefinitionIds.length === 0,
+      )
+    ) {
+      setError('Select a project and at least one role.');
       return;
     }
     const projectIds = projectRoleRows.map(row => row.projectId);
@@ -114,7 +200,7 @@ export function InviteProjectUserDialog({
       const response = await addUserToProjectsByRole({
         userId: selectedUser.getId(),
         projectRoles: projectRoleRows,
-        auth: { token, userId: authId },
+        auth: { organizationId, token, userId: authId },
       });
       hideLoader();
 
@@ -128,7 +214,7 @@ export function InviteProjectUserDialog({
             ? [
                 {
                   projectId,
-                  projectRole: '',
+                  roleDefinitionIds: [],
                 },
               ]
             : [],
@@ -140,12 +226,10 @@ export function InviteProjectUserDialog({
       }
 
       toast.error(message);
-      setError(message);
     } catch (err: unknown) {
       hideLoader();
       const message = err instanceof Error ? err.message : PROJECT_ACTION_ERROR;
       toast.error(message);
-      setError(message);
     }
   };
 
@@ -156,14 +240,14 @@ export function InviteProjectUserDialog({
             {
               name:
                 (availableProjects || []).find(
-                  project => project.projectid === projectId,
-                )?.projectname || projectId,
+                  project => project.id === projectId,
+                )?.name || projectId,
               value: projectId,
             },
           ]
         : (availableProjects || []).map(project => ({
-            name: project.projectname,
-            value: project.projectid,
+            name: project.name,
+            value: project.id,
           })),
     [availableProjects, projectId],
   );
@@ -177,7 +261,7 @@ export function InviteProjectUserDialog({
     >
       <ModalHeader
         label="Project Access"
-        title="Invite user to project"
+        title="Invite User to Project"
         onClose={closeDialog}
       />
       <ModalBody hasForm hasScrollingContent>
@@ -212,7 +296,10 @@ export function InviteProjectUserDialog({
               setProjectRoleRows(next);
             }}
             projectOptions={projectOptions}
-            roleOptions={projectRoles}
+            roleOptions={projectRoles.map(role => ({
+              name: role.getName(),
+              value: role.getId(),
+            }))}
             defaultProjectId={projectId || projectOptions[0]?.value || ''}
             title="Project roles"
             addButtonLabel="Add project role"
@@ -226,7 +313,12 @@ export function InviteProjectUserDialog({
         <SecondaryButton size="lg" onClick={closeDialog}>
           Cancel
         </SecondaryButton>
-        <PrimaryButton size="lg" onClick={submitInvite} isLoading={loading}>
+        <PrimaryButton
+          size="lg"
+          onClick={submitInvite}
+          disabled={!isRoleCatalogReady}
+          isLoading={loading || isRoleCatalogLoading}
+        >
           Invite user
         </PrimaryButton>
       </ModalFooter>

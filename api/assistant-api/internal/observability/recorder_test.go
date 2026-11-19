@@ -9,10 +9,12 @@ package observability
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
@@ -186,13 +188,7 @@ func TestRecorder_RecordMetric_FansOutAndInjectsGlobalScope(t *testing.T) {
 func TestRecorder_RecordInjectsAuthIntoObservationContext(t *testing.T) {
 	organizationID := uint64(7)
 	projectID := uint64(8)
-	userID := uint64(9)
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeService,
-		UserValue:         &types.UserContext{UserID: userID},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
-	}
+	auth := recorderTestPrincipal(authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID})
 	collector := &recordingCollector{key: "collector"}
 	recorder := New(
 		WithAuth(auth),
@@ -215,7 +211,7 @@ func TestRecorder_RecordInjectsAuthIntoObservationContext(t *testing.T) {
 		t.Fatalf("recorder close returned error: %v", err)
 	}
 
-	if len(collector.contexts) != 1 || collector.contexts[0].Auth != auth {
+	if len(collector.contexts) != 1 || !reflect.DeepEqual(collector.contexts[0].Auth, auth) {
 		t.Fatalf("expected recorder auth in observation context, got %+v", collector.contexts)
 	}
 	if observabilityGlobal := collector.scopes[0].GlobalScopeValue(); observabilityGlobal.OrganizationID != organizationID || observabilityGlobal.ProjectID != projectID {
@@ -225,10 +221,7 @@ func TestRecorder_RecordInjectsAuthIntoObservationContext(t *testing.T) {
 
 func TestRecorder_UsesOrganizationOnlyDelegatedContext(t *testing.T) {
 	organizationID := uint64(7)
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeService,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-	}
+	auth := recorderTestPrincipal(authentication.Tenant{OrganizationID: organizationID})
 	collector := &recordingCollector{key: "collector"}
 	recorder := New(WithAuth(auth), WithCollector(collector))
 
@@ -245,6 +238,19 @@ func TestRecorder_UsesOrganizationOnlyDelegatedContext(t *testing.T) {
 	if global.OrganizationID != organizationID || global.ProjectID != 0 {
 		t.Fatalf("global scope = %+v", global)
 	}
+}
+
+func recorderTestPrincipal(tenant authentication.Tenant) authentication.Principal {
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityService, ID: 9007, Issuer: "assistant-api"},
+		tenant,
+		authentication.Proof{Method: authentication.AuthenticationServiceAssertion, Audience: authentication.AudienceRapidaInternal, Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "assistant-test-1"}},
+		nil,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return principal
 }
 
 func TestRecorder_RecordUsesRequestIDFromRecordContext(t *testing.T) {

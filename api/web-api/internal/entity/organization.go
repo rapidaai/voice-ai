@@ -36,8 +36,11 @@ type ProjectCredential struct {
 	gorm_model.Audited
 	gorm_model.Mutable
 	gorm_model.Organizational
-	Name string `json:"name" gorm:"type:string;size:200;not null"`
-	Key  string `json:"key" gorm:"type:string;size:200;not null"`
+	Name             string          `json:"name" gorm:"type:string;size:200;not null"`
+	Key              string          `json:"key" gorm:"type:string;size:200;not null"`
+	RoleDefinitionID uint64          `json:"roleDefinitionId" gorm:"column:role_definition_id;type:bigint;not null"`
+	RoleSubjectType  string          `json:"roleSubjectType" gorm:"column:role_subject_type;type:varchar(32);not null"`
+	RoleDefinition   *RoleDefinition `json:"roleDefinition,omitempty" gorm:"foreignKey:RoleDefinitionID;references:Id"`
 }
 
 type OrganizationCredential struct {

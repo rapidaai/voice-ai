@@ -13,19 +13,22 @@ import (
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/authentication"
+	authentication_jwt "github.com/rapidaai/pkg/authentication/jwt"
+	authentication_resolver "github.com/rapidaai/pkg/authentication/resolver"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/validator"
 )
 
 type middlewareOption struct {
-	ctx              context.Context
-	logger           commons.Logger
-	assistantService internal_services.AssistantService
-	rapidaClient     *rapida_client.RapidaClient
-	sipConfig        sip_config.Resolver
-	ServiceID        uint64
+	ctx                      context.Context
+	logger                   commons.Logger
+	assistantService         internal_services.AssistantService
+	rapidaClient             *rapida_client.RapidaClient
+	sipConfig                sip_config.Resolver
+	serviceAssertionIssuer   *authentication_jwt.Issuer
+	servicePrincipalResolver *authentication_resolver.ServicePrincipalResolver
 }
 
 func WithContext(ctx context.Context) func(*middlewareOption) {
@@ -58,9 +61,10 @@ func WithSIPConfig(sipConfig sip_config.Resolver) func(*middlewareOption) {
 	}
 }
 
-func WithServiceID(ServiceID uint64) func(*middlewareOption) {
+func WithServiceAuthentication(issuer *authentication_jwt.Issuer, resolver *authentication_resolver.ServicePrincipalResolver) func(*middlewareOption) {
 	return func(m *middlewareOption) {
-		m.ServiceID = ServiceID
+		m.serviceAssertionIssuer = issuer
+		m.servicePrincipalResolver = resolver
 	}
 }
 
@@ -101,11 +105,9 @@ func (m *middlewareOption) resolveAgentCallRoute(ctx *sip_runtime.SIPRequestCont
 		return &sip_runtime.SIPError{Code: sipStatusNotFound, Message: sipMessageAssistantRouteNotFound, Err: sip_runtime.ErrAuthRequired}
 	}
 
-	ctx.Auth = &types.Authentication{
-		AuthType:          types.AuthTypeService,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeService, ID: m.ServiceID},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: assistant.OrganizationId},
-		ProjectValue:      &types.ProjectContext{OrganizationID: assistant.OrganizationId, ProjectID: assistant.ProjectId},
+	ctx.Auth, err = m.servicePrincipal(authentication.Tenant{OrganizationID: assistant.OrganizationId, ProjectID: assistant.ProjectId})
+	if err != nil {
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: err}
 	}
 	if !validator.NonNil(assistant.AssistantPhoneDeployment) {
 		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_config.ErrInvalidConfig}
@@ -140,12 +142,24 @@ func (m *middlewareOption) resolveDIDCallRoute(ctx *sip_runtime.SIPRequestContex
 		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_config.ErrInvalidConfig}
 	}
 	ctx.CallAddress.To = strings.TrimSpace(phone)
-	ctx.Auth = &types.Authentication{
-		AuthType:          types.AuthTypeService,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeService, ID: m.ServiceID},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: assistant.OrganizationId},
-		ProjectValue:      &types.ProjectContext{OrganizationID: assistant.OrganizationId, ProjectID: assistant.ProjectId},
+	ctx.Auth, err = m.servicePrincipal(authentication.Tenant{OrganizationID: assistant.OrganizationId, ProjectID: assistant.ProjectId})
+	if err != nil {
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: err}
 	}
 	ctx.Assistant = assistant
 	return nil
+}
+
+func (m *middlewareOption) servicePrincipal(tenant authentication.Tenant) (authentication.Principal, error) {
+	if m.serviceAssertionIssuer == nil || m.servicePrincipalResolver == nil {
+		return authentication.Principal{}, sip_config.ErrInvalidConfig
+	}
+	assertion, err := m.serviceAssertionIssuer.IssueService(tenant)
+	if err != nil {
+		return authentication.Principal{}, err
+	}
+	return m.servicePrincipalResolver.Resolve(
+		m.ctx,
+		authentication_resolver.ServiceAssertionCredential{Assertion: assertion},
+	)
 }

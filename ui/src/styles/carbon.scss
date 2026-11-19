@@ -57,33 +57,14 @@
 @use '@carbon/react/scss/components/date-picker';
 @use '@carbon/react/scss/components/tabs';
 @use '@carbon/react/scss/components/structured-list';
+@use '@carbon/react/scss/components/treeview';
 @use '@carbon/react/scss/components/accordion';
 @use '@carbon/ibm-products/scss/components/Checklist';
 @use '@carbon/ibm-products/scss/components/Tearsheet';
 @use '@carbon/ibm-products/scss/components/AddSelect';
 @use '@carbon/ibm-products/scss/components/EmptyStates';
+@use '@carbon/ibm-products/scss/components/FullPageError';
 @use '@carbon/ibm-products/scss/components/SidePanel';
-
-.project-api-key-modal .cds--inline-loading {
-  min-block-size: 3rem;
-}
-
-.project-api-key-modal__messaging {
-  display: flex;
-  margin-block-start: 0.5rem;
-  padding-inline-end: calc(20% - 1rem);
-}
-
-.project-api-key-modal__messaging-text {
-  flex: 1;
-  margin-inline-start: 0.5rem;
-  font-size: 0.75rem;
-  line-height: 1rem;
-}
-
-.project-api-key-modal__checkmark-icon {
-  fill: var(--cds-button-primary);
-}
 
 .debugger-configuration-accordion > .cds--accordion__item:first-child {
   border-block-start: 0;
@@ -320,70 +301,6 @@
     text-transform: capitalize;
     text-align: left;
     width: 100%;
-  }
-}
-
-// ─── Project selector dropdown in header ─────────────────────────────────────
-.project-selector-dropdown {
-  display: flex;
-  align-items: center;
-  align-self: center;
-  min-width: 180px;
-  border-inline-start: none;
-
-  position: relative;
-
-  .cds--dropdown,
-  .cds--list-box__wrapper {
-    position: static;
-  }
-
-  .cds--list-box {
-    border: none;
-    height: 3rem;
-    max-height: 3rem;
-    background-color: transparent;
-  }
-
-  .cds--list-box__menu {
-    position: absolute;
-    top: 3rem;
-    left: 0;
-    z-index: 9000;
-  }
-
-  .cds--list-box__field {
-    height: 3rem;
-    padding-inline-start: 1rem;
-    padding-inline-end: 2.5rem;
-  }
-
-  .cds--list-box__label {
-    font-size: 0.875rem;
-    font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .cds--list-box__menu-icon {
-    right: 0.75rem;
-  }
-
-  .cds--list-box__menu-item {
-    height: 2.5rem;
-  }
-
-  .cds--list-box__menu-item__option {
-    padding-block: 0.625rem;
-  }
-
-  .cds--list-box:hover {
-    background-color: var(--cds-background-hover);
-  }
-
-  .cds--list-box--expanded .cds--list-box__field {
-    border-bottom: 2px solid var(--cds-border-interactive);
   }
 }
 

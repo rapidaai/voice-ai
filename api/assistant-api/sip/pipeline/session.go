@@ -21,7 +21,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/webhook"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 )
@@ -143,17 +143,14 @@ func (d *Dispatcher) setupCall(ctx context.Context, stage SessionEstablishedPipe
 		result.AssistantID = assistant.Id
 		result.AssistantProviderId = assistant.AssistantProviderId
 	}
-	if projectContext, err := stage.Auth.ProjectContext(); err == nil {
-		result.OrganizationID = projectContext.OrganizationID
-		result.ProjectID = projectContext.ProjectID
-	} else if organizationContext, err := stage.Auth.OrganizationContext(); err == nil {
-		result.OrganizationID = organizationContext.OrganizationID
-	}
+	tenant := stage.Auth.Tenant()
+	result.OrganizationID = tenant.OrganizationID
+	result.ProjectID = tenant.ProjectID
 
 	return result, nil
 }
 
-func (d *Dispatcher) createObserver(ctx context.Context, scope *CallSetupResult, auth *types.Authentication) observability.Recorder {
+func (d *Dispatcher) createObserver(ctx context.Context, scope *CallSetupResult, auth authentication.Principal) observability.Recorder {
 	configuredCollectors := []observability.Collector{
 		observability_collector_conversationmetric.New(observability_collector_conversationmetric.Config{
 			Logger:              d.logger,

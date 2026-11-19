@@ -8,7 +8,7 @@ package internal_type
 import (
 	"context"
 
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 )
@@ -36,7 +36,7 @@ type SyncExecutor[I any, O any] interface {
 type AnalysisInput struct {
 	ContextID string
 	Arguments map[string]interface{}
-	Auth      *types.Authentication
+	Auth      authentication.Principal
 }
 
 type AnalysisOutput struct {

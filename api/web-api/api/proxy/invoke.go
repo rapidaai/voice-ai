@@ -13,7 +13,7 @@ import (
 	config "github.com/rapidaai/api/web-api/config"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 )
 
 type webInvokeGRPCApi struct {
@@ -47,14 +47,9 @@ func (*webInvokeGRPCApi) Update(context.Context, *protos.UpdateRequest) (*protos
 }
 
 func (endpointGRPCApi *webInvokeGRPCApi) Invoke(ctx context.Context, iRequest *protos.InvokeRequest) (*protos.InvokeResponse, error) {
-	endpointGRPCApi.logger.Debugf("invoking endpoint with context %v", ctx)
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return endpointGRPCApi.deployServiceClient.Invoke(ctx, iAuth, iRequest)
+	return endpointGRPCApi.deployServiceClient.Invoke(ctx, principal, iRequest)
 }

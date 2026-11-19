@@ -23,9 +23,9 @@ import (
 	sip_pipeline "github.com/rapidaai/api/assistant-api/sip/pipeline"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	app_config "github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -122,7 +122,17 @@ func TestSIPEngineUsesConfiguredServiceID(t *testing.T) {
 }
 
 func TestSessionEstablishedStagePreservesCallAddress(t *testing.T) {
-	auth := &types.Authentication{}
+	auth, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityService, ID: 1, Issuer: "internal"},
+		authentication.Tenant{},
+		authentication.Proof{
+			Method:    authentication.AuthenticationServiceAssertion,
+			Audience:  authentication.AudienceRapidaInternal,
+			Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "test-key"},
+		},
+		nil,
+	)
+	require.NoError(t, err)
 	session, err := sip_runtime.NewSession(context.Background(),
 		sip_runtime.WithSessionConfig(&sip_config.Config{
 			Server:            "127.0.0.1",

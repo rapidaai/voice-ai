@@ -8,17 +8,18 @@ package internal_knowledge_service
 import (
 	"context"
 	"fmt"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"time"
 
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/entity/knowledges"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
 	gorm_generator "github.com/rapidaai/pkg/models/gorm/generators"
 	"github.com/rapidaai/pkg/storages"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -45,12 +46,12 @@ func NewKnowledgeService(config *config.AssistantConfig,
 
 func (knowledge *knowledgeService) GetAll(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, *[]internal_knowledge_gorm.Knowledge, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return 0, nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return 0, nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	db := knowledge.postgres.DB(ctx)
 	var knowledges []internal_knowledge_gorm.Knowledge
@@ -90,10 +91,10 @@ func (knowledge *knowledgeService) GetAll(
 	return cnt, &knowledges, nil
 }
 
-func (knowledge *knowledgeService) Get(ctx context.Context, auth *types.Authentication, knowledgeId uint64) (*internal_knowledge_gorm.Knowledge, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+func (knowledge *knowledgeService) Get(ctx context.Context, auth authentication.Principal, knowledgeId uint64) (*internal_knowledge_gorm.Knowledge, error) {
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	db := knowledge.postgres.DB(ctx)
 	var _knowledge internal_knowledge_gorm.Knowledge
@@ -108,26 +109,26 @@ func (knowledge *knowledgeService) Get(ctx context.Context, auth *types.Authenti
 }
 
 func (knowledge *knowledgeService) CreateOrUpdateKnowledgeTag(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	knowledgeId uint64,
 	tags []string,
 ) (*internal_knowledge_gorm.KnowledgeTag, error) {
-	if _, err := auth.ProjectContext(); err != nil {
-		return nil, err
+	if auth.Tenant().ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	db := knowledge.postgres.DB(ctx)
 	knowledgeTag := &internal_knowledge_gorm.KnowledgeTag{
 		KnowledgeId: knowledgeId,
 		Tag:         tags,
 		ActorAudit: gorm_models.ActorAudit{
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(auth.Caller().Type),
+			CreatedActorID:   auth.Caller().ID,
 		},
 	}
 	assignments := clause.AssignmentColumns([]string{"tag"})
 	assignments = append(assignments,
-		clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-		clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Caller().Type)},
+		clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Caller().ID},
 	)
 	tx := db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "knowledge_id"}},
@@ -141,14 +142,14 @@ func (knowledge *knowledgeService) CreateOrUpdateKnowledgeTag(ctx context.Contex
 	return knowledgeTag, nil
 }
 
-func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth *types.Authentication,
+func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth authentication.Principal,
 	name string, description, visibility *string,
 	embeddingModelProviderName string,
 	embeddingModelOptions []*protos.Metadata,
 ) (*internal_knowledge_gorm.Knowledge, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	db := knowledge.postgres.DB(ctx)
 	knowledgeId := gorm_generator.ID()
@@ -157,8 +158,8 @@ func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth *ty
 			Id: knowledgeId,
 		},
 		Mutable: gorm_models.Mutable{
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(auth.Caller().Type),
+			CreatedActorID:   auth.Caller().ID,
 		},
 		Name:                       name,
 		ProjectId:                  projectContext.ProjectID,
@@ -187,8 +188,8 @@ func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth *ty
 			KnowledgeId: _knowledge.Id,
 			Mutable: gorm_models.Mutable{
 				Status:           type_enums.RECORD_ACTIVE,
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -198,8 +199,8 @@ func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth *ty
 	}
 	assignments := clause.AssignmentColumns([]string{"value"})
 	assignments = append(assignments,
-		clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-		clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Caller().Type)},
+		clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Caller().ID},
 	)
 	tx := db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "knowledge_id"}, {Name: "key"}},
@@ -215,20 +216,20 @@ func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth *ty
 }
 
 func (eService *knowledgeService) UpdateKnowledgeDetail(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	knowledgeId uint64,
 	name, description string) (*internal_knowledge_gorm.Knowledge, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	db := eService.postgres.DB(ctx)
 	ed := &internal_knowledge_gorm.Knowledge{
 		Name:        name,
 		Description: description,
 		Mutable: gorm_models.Mutable{
-			UpdatedActorType: auth.Actor().Type.String(),
-			UpdatedActorID:   auth.Actor().ID,
+			UpdatedActorType: string(auth.Caller().Type),
+			UpdatedActorID:   auth.Caller().ID,
 		},
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", knowledgeId,
@@ -244,7 +245,7 @@ func (eService *knowledgeService) UpdateKnowledgeDetail(ctx context.Context,
 
 func (eService *knowledgeService) CreateLog(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	knowledgeId uint64,
 	retrievalMethod string,
 	topK uint32,
@@ -255,9 +256,9 @@ func (eService *knowledgeService) CreateLog(
 	status type_enums.RecordState,
 	request, response []byte,
 ) (*internal_knowledge_gorm.KnowledgeLog, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
@@ -291,8 +292,8 @@ func (eService *knowledgeService) CreateLog(
 		},
 		Mutable: gorm_models.Mutable{
 			Status:           status,
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(auth.Caller().Type),
+			CreatedActorID:   auth.Caller().ID,
 		},
 	}
 	tx := db.Create(&toolLog)
@@ -307,12 +308,12 @@ func (eService *knowledgeService) CreateLog(
 
 func (eService *knowledgeService) GetLog(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	projectId uint64,
 	toolLogId uint64) (*internal_knowledge_gorm.KnowledgeLog, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	if projectId != projectContext.ProjectID {
 		return nil, fmt.Errorf("project context does not match requested project")
@@ -333,14 +334,14 @@ func (eService *knowledgeService) GetLog(
 
 func (eService *knowledgeService) GetAllLog(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	projectId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 	order *protos.Ordering) (int64, []*internal_knowledge_gorm.KnowledgeLog, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return 0, nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return 0, nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	if projectId != projectContext.ProjectID {
 		return 0, nil, fmt.Errorf("project context does not match requested project")
@@ -388,11 +389,11 @@ func (eService *knowledgeService) ObjectKey(keyPrefix string, auditId uint64, ob
 
 func (eService *knowledgeService) GetLogObject(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	toolLogId uint64) (requestData []byte, responseData []byte, err error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	keyPrefix := eService.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID)
 	responseKey := eService.ObjectKey(keyPrefix, toolLogId, "response.json")

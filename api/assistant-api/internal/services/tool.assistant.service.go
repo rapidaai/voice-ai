@@ -9,7 +9,7 @@ import (
 	"context"
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	protos "github.com/rapidaai/protos"
 	workflow_api "github.com/rapidaai/protos"
@@ -18,17 +18,17 @@ import (
 type AssistantToolService interface {
 	Get(
 		ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		assistantToolId uint64,
 		assistantId uint64) (*internal_assistant_entity.AssistantTool, error)
 
 	GetAll(ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		assistantId uint64,
 		criterias []*workflow_api.Criteria, paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error)
 
 	Create(ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		assistantId uint64,
 		name string,
 		description *string,
@@ -38,7 +38,7 @@ type AssistantToolService interface {
 	) (*internal_assistant_entity.AssistantTool, error)
 
 	Update(ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		assistantToolId uint64,
 		assistantId uint64,
 		name string,
@@ -49,13 +49,13 @@ type AssistantToolService interface {
 	) (*internal_assistant_entity.AssistantTool, error)
 
 	Delete(ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		toolId uint64,
 		assistantId uint64) (*internal_assistant_entity.AssistantTool, error)
 
 	CreateLog(
 		ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		assistantId, conversationId uint64,
 		messageId string,
 		toolCallId string,
@@ -66,7 +66,7 @@ type AssistantToolService interface {
 
 	UpdateLog(
 		ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		toolCallId string,
 		conversationId uint64,
 		status type_enums.RecordState,
@@ -75,13 +75,13 @@ type AssistantToolService interface {
 
 	GetLog(
 		ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		projectId uint64,
 		toolLogId uint64) (*internal_assistant_entity.AssistantToolLog, error)
 
 	GetAllLog(
 		ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		projectId uint64,
 		criterias []*protos.Criteria,
 		paginate *protos.Paginate,
@@ -89,6 +89,6 @@ type AssistantToolService interface {
 
 	GetLogObject(
 		ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		toolLogId uint64) (requestData []byte, responseData []byte, err error)
 }

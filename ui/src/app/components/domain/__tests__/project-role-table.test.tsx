@@ -74,6 +74,86 @@ jest.mock('@carbon/react', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives', () => ({
+  Dropdown: ({
+    autoAlign,
+    className,
+    direction,
+    id,
+    items,
+    itemToString,
+    label,
+    onChange,
+    selectedItem,
+  }: any) => (
+    <label htmlFor={id}>
+      {label}
+      <select
+        className={className}
+        data-auto-align={autoAlign || undefined}
+        data-direction={direction}
+        id={id}
+        value={selectedItem?.value || ''}
+        onChange={event =>
+          onChange({
+            selectedItem:
+              items.find((item: any) => item.value === event.target.value) ||
+              null,
+          })
+        }
+      >
+        <option value="">{label}</option>
+        {items.map((item: any) => (
+          <option key={item.value} value={item.value}>
+            {itemToString(item)}
+          </option>
+        ))}
+      </select>
+    </label>
+  ),
+  IconOnlyButton: ({ iconDescription, onClick }: any) => (
+    <button type="button" aria-label={iconDescription} onClick={onClick}>
+      {iconDescription}
+    </button>
+  ),
+  MultiSelect: ({
+    autoAlign,
+    className,
+    helperText,
+    id,
+    items,
+    itemToString,
+    label,
+    onChange,
+    selectedItems,
+  }: any) => (
+    <div>
+      <label htmlFor={id}>
+        {label}
+        <select
+          className={className}
+          data-auto-align={autoAlign || undefined}
+          id={id}
+          multiple
+          value={selectedItems.map((item: any) => item.value)}
+          onChange={event =>
+            onChange({
+              selectedItems: Array.from(event.target.selectedOptions).map(
+                (option: any) =>
+                  items.find((item: any) => item.value === option.value),
+              ),
+            })
+          }
+        >
+          {items.map((item: any) => (
+            <option key={item.value} value={item.value}>
+              {itemToString(item)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <span>{helperText}</span>
+    </div>
+  ),
   TertiaryButton: ({ children, className, onClick }: any) => (
     <button type="button" className={className} onClick={onClick}>
       {children}
@@ -87,8 +167,8 @@ const projectOptions = [
 ];
 
 const roleOptions = [
-  { name: 'Admin', value: 'admin' },
-  { name: 'Reader', value: 'reader' },
+  { name: 'Admin', value: 'role-admin' },
+  { name: 'Reader', value: 'role-reader' },
 ];
 
 describe('ProjectRoleTable', () => {
@@ -116,7 +196,7 @@ describe('ProjectRoleTable', () => {
     await user.click(screen.getByRole('button', { name: 'Add role' }));
 
     expect(onChange).toHaveBeenCalledWith([
-      { projectId: 'project-2', projectRole: '' },
+      { projectId: 'project-2', roleDefinitionIds: [] },
     ]);
   });
 
@@ -126,7 +206,7 @@ describe('ProjectRoleTable', () => {
 
     render(
       <ProjectRoleTable
-        rows={[{ projectId: 'project-1', projectRole: 'admin' }]}
+        rows={[{ projectId: 'project-1', roleDefinitionIds: ['role-admin'] }]}
         onChange={onChange}
         projectOptions={projectOptions}
         roleOptions={roleOptions}
@@ -138,22 +218,25 @@ describe('ProjectRoleTable', () => {
       String('project-2'),
     );
     expect(onChange).toHaveBeenLastCalledWith([
-      { projectId: 'project-2', projectRole: 'admin' },
+      { projectId: 'project-2', roleDefinitionIds: ['role-admin'] },
     ]);
 
-    await user.selectOptions(
-      screen.getByLabelText('Select role'),
-      String('reader'),
-    );
+    await user.selectOptions(screen.getByLabelText('Select roles'), [
+      String('role-admin'),
+      String('role-reader'),
+    ]);
     expect(onChange).toHaveBeenLastCalledWith([
-      { projectId: 'project-1', projectRole: 'reader' },
+      {
+        projectId: 'project-1',
+        roleDefinitionIds: ['role-admin', 'role-reader'],
+      },
     ]);
   });
 
   it('renders dropdown rows as a full-cell table form', () => {
     render(
       <ProjectRoleTable
-        rows={[{ projectId: 'project-1', projectRole: 'admin' }]}
+        rows={[{ projectId: 'project-1', roleDefinitionIds: ['role-admin'] }]}
         onChange={jest.fn()}
         projectOptions={projectOptions}
         roleOptions={roleOptions}
@@ -164,7 +247,11 @@ describe('ProjectRoleTable', () => {
       '![padding-block-start:0]',
       'border-border-subtle',
     );
-    expect(screen.getByLabelText('Select project')).toHaveClass('w-full');
+    expect(screen.getByRole('table')).toHaveClass('w-full', 'table-fixed');
+    expect(screen.getByLabelText('Select project')).toHaveClass(
+      'w-full',
+      'min-w-0',
+    );
     expect(screen.getByLabelText('Select project')).toHaveAttribute(
       'data-auto-align',
       'true',
@@ -172,20 +259,31 @@ describe('ProjectRoleTable', () => {
     expect(screen.getByLabelText('Select project')).not.toHaveAttribute(
       'data-direction',
     );
-    expect(screen.getByLabelText('Select role')).toHaveAttribute(
+    expect(screen.getByLabelText('Select roles')).toHaveClass(
+      'w-full',
+      'min-w-0',
+    );
+    expect(screen.getByLabelText('Select roles')).toHaveAttribute(
       'data-auto-align',
       'true',
     );
+    expect(screen.getByLabelText('Select roles')).not.toHaveClass(
+      'role-selection',
+    );
+    expect(screen.queryByText('1 role selected')).not.toBeInTheDocument();
+    expect(screen.queryByText('Built-in')).not.toBeInTheDocument();
+    expect(screen.queryByText('Custom')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Select project').closest('td')).toHaveClass(
       '!p-0',
     );
-    expect(screen.getByLabelText('Select role').closest('td')).toHaveClass(
+    expect(screen.getByLabelText('Select roles').closest('td')).toHaveClass(
       '!p-0',
     );
     expect(screen.getByRole('columnheader', { name: 'Actions' })).toHaveClass(
       '!w-10',
       '!text-center',
     );
+    expect(screen.getByText('Actions')).toHaveClass('sr-only');
     expect(
       screen.getByRole('button', { name: 'Remove project role' }).closest('td'),
     ).toHaveClass('!w-10', '!p-0', '!text-center');
@@ -204,8 +302,8 @@ describe('ProjectRoleTable', () => {
     render(
       <ProjectRoleTable
         rows={[
-          { projectId: 'project-1', projectRole: 'admin' },
-          { projectId: 'project-2', projectRole: 'reader' },
+          { projectId: 'project-1', roleDefinitionIds: ['role-admin'] },
+          { projectId: 'project-2', roleDefinitionIds: ['role-reader'] },
         ]}
         onChange={onChange}
         projectOptions={projectOptions}
@@ -220,14 +318,14 @@ describe('ProjectRoleTable', () => {
     );
 
     expect(onChange).toHaveBeenCalledWith([
-      { projectId: 'project-2', projectRole: 'reader' },
+      { projectId: 'project-2', roleDefinitionIds: ['role-reader'] },
     ]);
   });
 
   it('supports fixed project rows without add or remove actions', () => {
     render(
       <ProjectRoleTable
-        rows={[{ projectId: 'project-1', projectRole: 'reader' }]}
+        rows={[{ projectId: 'project-1', roleDefinitionIds: ['role-reader'] }]}
         onChange={jest.fn()}
         projectOptions={projectOptions}
         roleOptions={roleOptions}
@@ -260,6 +358,8 @@ describe('ProjectRoleTable', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add project role' }));
 
-    expect(onChange).toHaveBeenCalledWith([{ projectId: '', projectRole: '' }]);
+    expect(onChange).toHaveBeenCalledWith([
+      { projectId: '', roleDefinitionIds: [] },
+    ]);
   });
 });

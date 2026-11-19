@@ -8,11 +8,12 @@ import (
 	web_config "github.com/rapidaai/api/web-api/config"
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
 	app_config "github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	assistant_client "github.com/rapidaai/pkg/clients/workflow"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/require"
@@ -55,30 +56,30 @@ func (t *assistantProxyPostgresConnector) DB(ctx context.Context) *gorm.DB {
 
 type fakeAssistantServiceClient struct {
 	assistant_client.AssistantServiceClient
-	getAllAssistantFunc         func(context.Context, *types.Authentication, []*protos.Criteria, *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error)
-	getAssistantFunc            func(context.Context, *types.Authentication, *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error)
-	createAssistantFunc         func(context.Context, *types.Authentication, *protos.CreateAssistantRequest) (*protos.GetAssistantResponse, error)
-	createAssistantProviderFunc func(context.Context, *types.Authentication, *protos.CreateAssistantProviderRequest) (*protos.GetAssistantProviderResponse, error)
-	createPhoneDeploymentFunc   func(context.Context, *types.Authentication, *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error)
+	getAllAssistantFunc         func(context.Context, authentication.Principal, []*protos.Criteria, *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error)
+	getAssistantFunc            func(context.Context, authentication.Principal, *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error)
+	createAssistantFunc         func(context.Context, authentication.Principal, *protos.CreateAssistantRequest) (*protos.GetAssistantResponse, error)
+	createAssistantProviderFunc func(context.Context, authentication.Principal, *protos.CreateAssistantProviderRequest) (*protos.GetAssistantProviderResponse, error)
+	createPhoneDeploymentFunc   func(context.Context, authentication.Principal, *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error)
 }
 
-func (f *fakeAssistantServiceClient) GetAllAssistant(ctx context.Context, auth *types.Authentication, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error) {
+func (f *fakeAssistantServiceClient) GetAllAssistant(ctx context.Context, auth authentication.Principal, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error) {
 	return f.getAllAssistantFunc(ctx, auth, criteria, paginate)
 }
 
-func (f *fakeAssistantServiceClient) GetAssistant(ctx context.Context, auth *types.Authentication, request *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error) {
+func (f *fakeAssistantServiceClient) GetAssistant(ctx context.Context, auth authentication.Principal, request *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error) {
 	return f.getAssistantFunc(ctx, auth, request)
 }
 
-func (f *fakeAssistantServiceClient) CreateAssistant(ctx context.Context, auth *types.Authentication, request *protos.CreateAssistantRequest) (*protos.GetAssistantResponse, error) {
+func (f *fakeAssistantServiceClient) CreateAssistant(ctx context.Context, auth authentication.Principal, request *protos.CreateAssistantRequest) (*protos.GetAssistantResponse, error) {
 	return f.createAssistantFunc(ctx, auth, request)
 }
 
-func (f *fakeAssistantServiceClient) CreateAssistantProvider(ctx context.Context, auth *types.Authentication, request *protos.CreateAssistantProviderRequest) (*protos.GetAssistantProviderResponse, error) {
+func (f *fakeAssistantServiceClient) CreateAssistantProvider(ctx context.Context, auth authentication.Principal, request *protos.CreateAssistantProviderRequest) (*protos.GetAssistantProviderResponse, error) {
 	return f.createAssistantProviderFunc(ctx, auth, request)
 }
 
-func (f *fakeAssistantServiceClient) CreateAssistantPhoneDeployment(ctx context.Context, auth *types.Authentication, request *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error) {
+func (f *fakeAssistantServiceClient) CreateAssistantPhoneDeployment(ctx context.Context, auth authentication.Principal, request *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error) {
 	return f.createPhoneDeploymentFunc(ctx, auth, request)
 }
 
@@ -120,29 +121,42 @@ func newAssistantProxyTest(t *testing.T, client assistant_client.AssistantServic
 }
 
 func assistantProxyContext() context.Context {
-	actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 1}
-	return context.WithValue(context.Background(), types.CTX_, &types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		ActorValue:        &actor,
-		UserValue:         &types.UserContext{UserID: 1},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 10},
-	})
+	principal, _ := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: 1},
+		authentication.Tenant{OrganizationID: 10},
+		authentication.Proof{
+			Method:    authentication.AuthenticationUserSession,
+			Reference: authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: "assistant-test-session"},
+		},
+		nil,
+	)
+	ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), principal)
+	if err != nil {
+		panic(err)
+	}
+	return ctx
 }
 
-func assistantProjectProxyContext() (context.Context, *types.Authentication) {
-	actor := types.ActorIdentity{Type: types.ActorTypeProject, ID: 30}
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeProject,
-		ActorValue:        &actor,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 10},
-		ProjectValue:      &types.ProjectContext{OrganizationID: 10, ProjectID: 20},
+func assistantProjectProxyContext() (context.Context, authentication.Principal) {
+	principal, _ := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityProjectCredential, ID: 30},
+		authentication.Tenant{OrganizationID: 10, ProjectID: 20},
+		authentication.Proof{
+			Method: authentication.AuthenticationProjectCredential, Audience: authentication.AudienceManagement,
+			Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: "30"},
+		},
+		nil,
+	)
+	ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), principal)
+	if err != nil {
+		panic(err)
 	}
-	return context.WithValue(context.Background(), types.CTX_, auth), auth
+	return ctx, principal
 }
 
 func TestGetAllAssistantPreservesCreatedActor(t *testing.T) {
 	api := newAssistantProxyTest(t, &fakeAssistantServiceClient{
-		getAllAssistantFunc: func(context.Context, *types.Authentication, []*protos.Criteria, *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error) {
+		getAllAssistantFunc: func(context.Context, authentication.Principal, []*protos.Criteria, *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error) {
 			return &protos.Paginated{TotalItem: 1, CurrentPage: 1}, []*protos.Assistant{
 				{Id: 100, CreatedActor: &protos.AuditActor{Type: "user", Id: 42, DisplayName: proto.String("Assistant Owner")}, Name: "Support assistant"},
 			}, nil
@@ -161,7 +175,7 @@ func TestGetAllAssistantPreservesCreatedActor(t *testing.T) {
 
 func TestGetAssistantPreservesCreatedActor(t *testing.T) {
 	api := newAssistantProxyTest(t, &fakeAssistantServiceClient{
-		getAssistantFunc: func(context.Context, *types.Authentication, *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error) {
+		getAssistantFunc: func(context.Context, authentication.Principal, *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error) {
 			return &protos.GetAssistantResponse{
 				Code:    200,
 				Success: true,
@@ -181,8 +195,8 @@ func TestCreateAssistantAcceptsProjectScope(t *testing.T) {
 	ctx, expectedAuth := assistantProjectProxyContext()
 	request := &protos.CreateAssistantRequest{Name: "Project assistant"}
 	client := &fakeAssistantServiceClient{
-		createAssistantFunc: func(_ context.Context, auth *types.Authentication, actualRequest *protos.CreateAssistantRequest) (*protos.GetAssistantResponse, error) {
-			require.Same(t, expectedAuth, auth)
+		createAssistantFunc: func(_ context.Context, auth authentication.Principal, actualRequest *protos.CreateAssistantRequest) (*protos.GetAssistantResponse, error) {
+			require.Equal(t, expectedAuth, auth)
 			require.Same(t, request, actualRequest)
 			return &protos.GetAssistantResponse{Code: 200, Success: true}, nil
 		},
@@ -198,8 +212,8 @@ func TestCreateAssistantProviderAcceptsProjectScope(t *testing.T) {
 	ctx, expectedAuth := assistantProjectProxyContext()
 	request := &protos.CreateAssistantProviderRequest{AssistantId: 100}
 	client := &fakeAssistantServiceClient{
-		createAssistantProviderFunc: func(_ context.Context, auth *types.Authentication, actualRequest *protos.CreateAssistantProviderRequest) (*protos.GetAssistantProviderResponse, error) {
-			require.Same(t, expectedAuth, auth)
+		createAssistantProviderFunc: func(_ context.Context, auth authentication.Principal, actualRequest *protos.CreateAssistantProviderRequest) (*protos.GetAssistantProviderResponse, error) {
+			require.Equal(t, expectedAuth, auth)
 			require.Same(t, request, actualRequest)
 			return &protos.GetAssistantProviderResponse{Code: 200, Success: true}, nil
 		},
@@ -215,8 +229,8 @@ func TestCreateAssistantPhoneDeploymentAcceptsProjectScope(t *testing.T) {
 	ctx, expectedAuth := assistantProjectProxyContext()
 	request := &protos.CreateAssistantDeploymentRequest{}
 	client := &fakeAssistantServiceClient{
-		createPhoneDeploymentFunc: func(_ context.Context, auth *types.Authentication, actualRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error) {
-			require.Same(t, expectedAuth, auth)
+		createPhoneDeploymentFunc: func(_ context.Context, auth authentication.Principal, actualRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error) {
+			require.Equal(t, expectedAuth, auth)
 			require.Same(t, request, actualRequest)
 			return &protos.GetAssistantPhoneDeploymentResponse{Code: 200, Success: true}, nil
 		},

@@ -13,7 +13,7 @@ import (
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/protos"
 )
 
@@ -21,7 +21,7 @@ import (
 // It owns middleware output and the answer policy derived from that config.
 type inboundConfig struct {
 	config          *sip_config.Config
-	auth            *types.Authentication
+	auth            authentication.Principal
 	assistant       *internal_assistant_entity.Assistant
 	vaultCredential *protos.VaultCredential
 	callAddress     CallAddress
@@ -80,7 +80,7 @@ func (inboundCall *Inbound) resolveConfig() *inboundFailure {
 					statusCode:      sipErr.Code,
 					class:           inboundFailureAuthRequired,
 					responseClass:   inboundFailureAuth,
-					reason:          authErr.Error(),
+					reason:          "valid authentication is required",
 					termination:     CallTermination{Result: CallTerminationClientError, Reason: "inbound_auth_required"},
 					lifecycleReason: LifecycleReasonInboundInviteFailed,
 					err:             authErr,

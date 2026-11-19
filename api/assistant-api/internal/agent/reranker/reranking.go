@@ -8,7 +8,7 @@ package internal_agent_rerankers
 import (
 	"context"
 
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	protos "github.com/rapidaai/protos"
 )
 
@@ -34,7 +34,7 @@ type RerankingOption struct {
 }
 type Reranking[O any] interface {
 	Rerank(ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		config *RerankingOption,
 		in []O, query string, additionalData map[string]string) (map[int32]O, error)
 }

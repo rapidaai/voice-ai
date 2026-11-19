@@ -7,22 +7,18 @@ package assistant_api
 
 import (
 	"context"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	assistant_api "github.com/rapidaai/protos"
 )
 
 func (assistantApi *assistantGrpcApi) DeleteAssistantTool(ctx context.Context, cer *assistant_api.DeleteAssistantToolRequest) (*assistant_api.GetAssistantToolResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 	analysis, err := assistantApi.assistantToolService.Delete(ctx,
 		iAuth,

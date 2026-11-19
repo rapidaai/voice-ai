@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"fmt"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -16,7 +17,7 @@ import (
 	config "github.com/rapidaai/api/web-api/config"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 )
 
 type webActivityApi struct {
@@ -48,31 +49,21 @@ func NewActivityGRPC(config *config.WebAppConfig, logger commons.Logger, postgre
 }
 
 func (wActivity *webActivityGRPCApi) GetAuditLog(c context.Context, irRequest *protos.GetAuditLogRequest) (*protos.GetAuditLogResponse, error) {
-	wActivity.logger.Debugf("GetActivities from grpc with requestPayload %v, %v", irRequest, c)
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return wActivity.auditClient.GetAuditLog(c, iAuth, irRequest.GetId())
+	return wActivity.auditClient.GetAuditLog(c, principal, irRequest.GetId())
 }
 
 func (wActivity *webActivityGRPCApi) GetAllAuditLog(c context.Context, irRequest *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error) {
-	wActivity.logger.Debugf("GetActivities from grpc with requestPayload %v, %v", irRequest, c)
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
 	// check if he is already part of current organization
-	return wActivity.auditClient.GetAllAuditLog(c, iAuth, irRequest)
+	return wActivity.auditClient.GetAllAuditLog(c, principal, irRequest)
 }
 
 func (wActivity *webActivityGRPCApi) CreateMetadata(c context.Context, irRequest *protos.CreateMetadataRequest) (*protos.CreateMetadataResponse, error) {

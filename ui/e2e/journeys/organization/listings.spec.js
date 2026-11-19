@@ -104,26 +104,72 @@ test('organization user listing opens the invite subjourney and validates input'
     .first()
     .click();
   await expect(
-    page.getByRole('heading', { name: 'Invite user to organization' }),
+    page.getByRole('heading', { name: 'Invite User to Organization' }),
   ).toBeVisible();
 
   await page.getByRole('button', { name: 'Add project access' }).click();
-  await page.getByRole('combobox', { name: 'Select role' }).click();
+  const projectAccessTable = page.getByRole('table');
+  await expect(projectAccessTable).toHaveCSS('table-layout', 'fixed');
+  const projectAccessScroller = projectAccessTable.locator('xpath=..');
+  expect(
+    await projectAccessScroller.evaluate(
+      element => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  const columnWidthsBeforeSelection = await projectAccessTable
+    .locator('tbody tr')
+    .first()
+    .locator('td')
+    .evaluateAll(cells =>
+      cells.map(cell => cell.getBoundingClientRect().width),
+    );
+  const projectRoleSelector = projectAccessTable.locator(
+    '.cds--multi-select .cds--list-box__field',
+  );
+  await expect(projectRoleSelector).toBeEnabled();
+  await projectRoleSelector.click();
 
   const firstProjectRole = page.getByRole('option', {
-    name: 'Super Admin',
+    name: 'Support manager',
     exact: true,
   });
   await expect(firstProjectRole).toBeVisible();
+  await expect(page.locator('.cds--list-box__menu:visible')).toHaveCSS(
+    'position',
+    'fixed',
+  );
+  await expect(page.getByText('Custom', { exact: true })).not.toBeVisible();
+  await expect(page.getByText('Built-in', { exact: true })).not.toBeVisible();
+  await expect(
+    page.getByRole('option', { name: 'Organization Owner', exact: true }),
+  ).not.toBeVisible();
+  await expect(
+    page.getByRole('option', { name: 'Runtime Invoker', exact: true }),
+  ).not.toBeVisible();
+  await firstProjectRole.click();
+  await page
+    .getByRole('option', { name: 'Project viewer', exact: true })
+    .click();
+  await expect(page.getByText('1 role selected')).not.toBeVisible();
+  await page.keyboard.press('Escape');
+  const columnWidthsAfterSelection = await projectAccessTable
+    .locator('tbody tr')
+    .first()
+    .locator('td')
+    .evaluateAll(cells =>
+      cells.map(cell => cell.getBoundingClientRect().width),
+    );
+  expect(columnWidthsAfterSelection).toEqual(columnWidthsBeforeSelection);
+  await projectRoleSelector.focus();
+  const projectRoleField = projectRoleSelector.locator('xpath=..');
+  await expect(projectRoleField).toHaveCSS('outline-width', '2px');
   expect(
-    await firstProjectRole.evaluate(element => {
-      const bounds = element.getBoundingClientRect();
-      const hitTarget = document.elementFromPoint(
-        bounds.left + bounds.width / 2,
-        bounds.top + bounds.height / 2,
+    await projectRoleField.evaluate(element => {
+      const fieldWidth = element.getBoundingClientRect().width;
+      const listBoxWidth = element.parentElement?.getBoundingClientRect().width;
+      return (
+        listBoxWidth !== undefined && Math.abs(fieldWidth - listBoxWidth) < 1
       );
-
-      return hitTarget === element || element.contains(hitTarget);
     }),
   ).toBe(true);
 

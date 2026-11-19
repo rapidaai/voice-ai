@@ -13,7 +13,7 @@ import (
 	adapter_lifecycle "github.com/rapidaai/api/assistant-api/internal/adapters/lifecycle"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -30,7 +30,7 @@ import (
 // Shutdown relies on Recv() returning an error (EOF or context-cancelled)
 // or a ConversationDisconnection message. All streamer implementations
 // guarantee one of these when the connection ends.
-func (t *genericRequestor) Talk(_ context.Context, auth *types.Authentication) error {
+func (t *genericRequestor) Talk(_ context.Context, auth authentication.Principal) error {
 	totalTime := time.Now()
 	for {
 		req, err := t.streamer.Recv()
@@ -284,7 +284,7 @@ func (r *genericRequestor) sendOutputControl(control proto.Message) error {
 // The gRPC stream is already open by the time Connect is called; any init errors
 // are delivered to the client via InitializationFailedPacket → ConversationError
 // proto on the stream, not via this return value.
-func (r *genericRequestor) OnConnect(ctx context.Context, auth *types.Authentication, config *protos.ConversationInitialization) {
+func (r *genericRequestor) OnConnect(ctx context.Context, auth authentication.Principal, config *protos.ConversationInitialization) {
 	if err := r.sessionLifecycle.Transition(adapter_lifecycle.EventConnectRequested); err != nil {
 		r.logger.Tracef(ctx, "connect ignored due to session lifecycle transition: %v", err)
 		return

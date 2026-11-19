@@ -6,7 +6,6 @@ CREATE TABLE public.permission_definitions (
     scope_type character varying(32) NOT NULL,
     name character varying(200) NOT NULL,
     description character varying(400) NOT NULL,
-    token_eligible boolean NOT NULL,
     created_date timestamp without time zone DEFAULT now() NOT NULL,
     updated_date timestamp without time zone,
     status character varying(50) DEFAULT 'ACTIVE' NOT NULL,
@@ -15,8 +14,7 @@ CREATE TABLE public.permission_definitions (
     updated_actor_type character varying(32),
     updated_actor_id bigint,
     CONSTRAINT permission_definitions_scope_check CHECK (scope_type IN ('ORGANIZATION', 'PROJECT')),
-    CONSTRAINT permission_definitions_token_scope_check CHECK (scope_type = 'PROJECT' OR token_eligible = false),
-    CONSTRAINT permission_definitions_reference_unique UNIQUE (id, scope_type, token_eligible),
+    CONSTRAINT permission_definitions_reference_unique UNIQUE (id, scope_type),
     CONSTRAINT permission_definitions_status_check CHECK (status IN ('ACTIVE', 'ARCHIEVE')),
     CONSTRAINT permission_definitions_created_actor_check CHECK (
         (created_actor_type = 'unknown' AND created_actor_id IS NULL) OR
@@ -57,7 +55,7 @@ CREATE TABLE public.role_definitions (
         (definition_type = 'CUSTOM' AND organization_id IS NOT NULL)
     ),
     CONSTRAINT role_definitions_token_scope_check CHECK (subject_type <> 'PROJECT_TOKEN' OR scope_type = 'PROJECT'),
-    CONSTRAINT role_definitions_reference_unique UNIQUE (id, scope_type, subject_type),
+    CONSTRAINT role_definitions_reference_unique UNIQUE (id, scope_type),
     CONSTRAINT role_definitions_status_check CHECK (status IN ('ACTIVE', 'ARCHIEVE')),
     CONSTRAINT role_definitions_created_actor_check CHECK (
         (created_actor_type = 'unknown' AND created_actor_id IS NULL) OR
@@ -82,8 +80,6 @@ CREATE TABLE public.role_permissions (
     role_definition_id bigint NOT NULL,
     permission_definition_id bigint NOT NULL,
     scope_type character varying(32) NOT NULL,
-    subject_type character varying(32) NOT NULL,
-    token_eligible boolean NOT NULL,
     created_date timestamp without time zone DEFAULT now() NOT NULL,
     updated_date timestamp without time zone,
     status character varying(50) DEFAULT 'ACTIVE' NOT NULL,
@@ -91,13 +87,11 @@ CREATE TABLE public.role_permissions (
     created_actor_id bigint,
     updated_actor_type character varying(32),
     updated_actor_id bigint,
-    CONSTRAINT role_permissions_role_fk FOREIGN KEY (role_definition_id, scope_type, subject_type)
-        REFERENCES public.role_definitions (id, scope_type, subject_type) ON DELETE RESTRICT,
-    CONSTRAINT role_permissions_permission_fk FOREIGN KEY (permission_definition_id, scope_type, token_eligible)
-        REFERENCES public.permission_definitions (id, scope_type, token_eligible) ON DELETE RESTRICT,
+    CONSTRAINT role_permissions_role_fk FOREIGN KEY (role_definition_id, scope_type)
+        REFERENCES public.role_definitions (id, scope_type) ON DELETE RESTRICT,
+    CONSTRAINT role_permissions_permission_fk FOREIGN KEY (permission_definition_id, scope_type)
+        REFERENCES public.permission_definitions (id, scope_type) ON DELETE RESTRICT,
     CONSTRAINT role_permissions_scope_check CHECK (scope_type IN ('ORGANIZATION', 'PROJECT')),
-    CONSTRAINT role_permissions_subject_check CHECK (subject_type IN ('USER', 'PROJECT_TOKEN')),
-    CONSTRAINT role_permissions_token_eligibility_check CHECK (subject_type <> 'PROJECT_TOKEN' OR token_eligible = true),
     CONSTRAINT role_permissions_status_check CHECK (status IN ('ACTIVE', 'ARCHIEVE')),
     CONSTRAINT role_permissions_created_actor_check CHECK (
         (created_actor_type = 'unknown' AND created_actor_id IS NULL) OR
@@ -115,79 +109,79 @@ CREATE TABLE public.role_permissions (
 CREATE UNIQUE INDEX role_permissions_active_pair_idx
     ON public.role_permissions (role_definition_id, permission_definition_id) WHERE status = 'ACTIVE';
 
-WITH permissions(id, key, scope_type, token_eligible) AS (
+WITH permissions(id, key, scope_type) AS (
     VALUES
-        (1, 'organization.read', 'ORGANIZATION', false),
-        (2, 'organization.update', 'ORGANIZATION', false),
-        (3, 'organization.delete', 'ORGANIZATION', false),
-        (4, 'organization.ownership.manage', 'ORGANIZATION', false),
-        (5, 'organization.billing.read', 'ORGANIZATION', false),
-        (6, 'organization.billing.manage', 'ORGANIZATION', false),
-        (7, 'organization.security.read', 'ORGANIZATION', false),
-        (8, 'organization.security.manage', 'ORGANIZATION', false),
-        (9, 'organization.sessions.revoke', 'ORGANIZATION', false),
-        (10, 'organization.members.read', 'ORGANIZATION', false),
-        (11, 'organization.members.invite', 'ORGANIZATION', false),
-        (12, 'organization.members.remove', 'ORGANIZATION', false),
-        (13, 'organization.projects.read', 'ORGANIZATION', false),
-        (14, 'organization.projects.create', 'ORGANIZATION', false),
-        (15, 'organization.projects.archive', 'ORGANIZATION', false),
-        (16, 'organization.roles.read', 'ORGANIZATION', false),
-        (17, 'organization.roles.create', 'ORGANIZATION', false),
-        (18, 'organization.roles.update', 'ORGANIZATION', false),
-        (19, 'organization.roles.archive', 'ORGANIZATION', false),
-        (20, 'organization.access.read', 'ORGANIZATION', false),
-        (21, 'organization.access.manage', 'ORGANIZATION', false),
-        (22, 'organization.project_access_tokens.create', 'ORGANIZATION', false),
-        (23, 'organization.project_access_tokens.read_metadata', 'ORGANIZATION', false),
-        (24, 'organization.project_access_tokens.reduce_access', 'ORGANIZATION', false),
-        (25, 'organization.project_access_tokens.rotate', 'ORGANIZATION', false),
-        (26, 'organization.project_access_tokens.revoke', 'ORGANIZATION', false),
-        (27, 'organization.provider_credentials.read_metadata', 'ORGANIZATION', false),
-        (28, 'organization.provider_credentials.create', 'ORGANIZATION', false),
-        (29, 'organization.provider_credentials.update', 'ORGANIZATION', false),
-        (30, 'organization.provider_credentials.rotate', 'ORGANIZATION', false),
-        (31, 'organization.provider_credentials.revoke', 'ORGANIZATION', false),
-        (32, 'organization.audit.read', 'ORGANIZATION', false),
-        (33, 'organization.audit.export', 'ORGANIZATION', false),
-        (34, 'project.read', 'PROJECT', true),
-        (35, 'project.update', 'PROJECT', false),
-        (36, 'project.archive', 'PROJECT', false),
-        (37, 'project.roles.read', 'PROJECT', false),
-        (38, 'project.access.read', 'PROJECT', false),
-        (39, 'project.access.manage', 'PROJECT', false),
-        (40, 'project.resources.read', 'PROJECT', true),
-        (41, 'project.resources.create', 'PROJECT', true),
-        (42, 'project.resources.update', 'PROJECT', true),
-        (43, 'project.resources.delete', 'PROJECT', true),
-        (44, 'project.deployments.read', 'PROJECT', true),
-        (45, 'project.deployments.manage', 'PROJECT', true),
-        (46, 'project.runtime.invoke', 'PROJECT', true),
-        (47, 'project.conversations.read', 'PROJECT', true),
-        (48, 'project.conversations.delete', 'PROJECT', true),
-        (49, 'project.conversations.export', 'PROJECT', true),
-        (50, 'project.observability.read', 'PROJECT', true),
-        (51, 'project.observability.export', 'PROJECT', true),
-        (52, 'project.access_tokens.create', 'PROJECT', false),
-        (53, 'project.access_tokens.read_metadata', 'PROJECT', false),
-        (54, 'project.access_tokens.reduce_access', 'PROJECT', false),
-        (55, 'project.access_tokens.rotate', 'PROJECT', false),
-        (56, 'project.access_tokens.revoke', 'PROJECT', false),
-        (57, 'project.provider_credentials.read_metadata', 'PROJECT', true),
-        (58, 'project.provider_credentials.create', 'PROJECT', false),
-        (59, 'project.provider_credentials.update', 'PROJECT', false),
-        (60, 'project.provider_credentials.rotate', 'PROJECT', false),
-        (61, 'project.provider_credentials.revoke', 'PROJECT', false),
-        (62, 'project.provider_credentials.use', 'PROJECT', true),
-        (63, 'project.audit.read', 'PROJECT', true),
-        (64, 'project.audit.export', 'PROJECT', true)
+        (1, 'organization.read', 'ORGANIZATION'),
+        (2, 'organization.update', 'ORGANIZATION'),
+        (3, 'organization.delete', 'ORGANIZATION'),
+        (4, 'organization.ownership.manage', 'ORGANIZATION'),
+        (5, 'organization.billing.read', 'ORGANIZATION'),
+        (6, 'organization.billing.manage', 'ORGANIZATION'),
+        (7, 'organization.security.read', 'ORGANIZATION'),
+        (8, 'organization.security.manage', 'ORGANIZATION'),
+        (9, 'organization.sessions.revoke', 'ORGANIZATION'),
+        (10, 'organization.members.read', 'ORGANIZATION'),
+        (11, 'organization.members.invite', 'ORGANIZATION'),
+        (12, 'organization.members.remove', 'ORGANIZATION'),
+        (13, 'organization.projects.read', 'ORGANIZATION'),
+        (14, 'organization.projects.create', 'ORGANIZATION'),
+        (15, 'organization.projects.archive', 'ORGANIZATION'),
+        (16, 'organization.roles.read', 'ORGANIZATION'),
+        (17, 'organization.roles.create', 'ORGANIZATION'),
+        (18, 'organization.roles.update', 'ORGANIZATION'),
+        (19, 'organization.roles.archive', 'ORGANIZATION'),
+        (20, 'organization.access.read', 'ORGANIZATION'),
+        (21, 'organization.access.manage', 'ORGANIZATION'),
+        (22, 'organization.project_access_tokens.create', 'ORGANIZATION'),
+        (23, 'organization.project_access_tokens.read_metadata', 'ORGANIZATION'),
+        (24, 'organization.project_access_tokens.reduce_access', 'ORGANIZATION'),
+        (25, 'organization.project_access_tokens.rotate', 'ORGANIZATION'),
+        (26, 'organization.project_access_tokens.revoke', 'ORGANIZATION'),
+        (27, 'organization.provider_credentials.read_metadata', 'ORGANIZATION'),
+        (28, 'organization.provider_credentials.create', 'ORGANIZATION'),
+        (29, 'organization.provider_credentials.update', 'ORGANIZATION'),
+        (30, 'organization.provider_credentials.rotate', 'ORGANIZATION'),
+        (31, 'organization.provider_credentials.revoke', 'ORGANIZATION'),
+        (32, 'organization.audit.read', 'ORGANIZATION'),
+        (33, 'organization.audit.export', 'ORGANIZATION'),
+        (34, 'project.read', 'PROJECT'),
+        (35, 'project.update', 'PROJECT'),
+        (36, 'project.archive', 'PROJECT'),
+        (37, 'project.roles.read', 'PROJECT'),
+        (38, 'project.access.read', 'PROJECT'),
+        (39, 'project.access.manage', 'PROJECT'),
+        (40, 'project.resources.read', 'PROJECT'),
+        (41, 'project.resources.create', 'PROJECT'),
+        (42, 'project.resources.update', 'PROJECT'),
+        (43, 'project.resources.delete', 'PROJECT'),
+        (44, 'project.deployments.read', 'PROJECT'),
+        (45, 'project.deployments.manage', 'PROJECT'),
+        (46, 'project.runtime.invoke', 'PROJECT'),
+        (47, 'project.conversations.read', 'PROJECT'),
+        (48, 'project.conversations.delete', 'PROJECT'),
+        (49, 'project.conversations.export', 'PROJECT'),
+        (50, 'project.observability.read', 'PROJECT'),
+        (51, 'project.observability.export', 'PROJECT'),
+        (52, 'project.access_tokens.create', 'PROJECT'),
+        (53, 'project.access_tokens.read_metadata', 'PROJECT'),
+        (54, 'project.access_tokens.reduce_access', 'PROJECT'),
+        (55, 'project.access_tokens.rotate', 'PROJECT'),
+        (56, 'project.access_tokens.revoke', 'PROJECT'),
+        (57, 'project.provider_credentials.read_metadata', 'PROJECT'),
+        (58, 'project.provider_credentials.create', 'PROJECT'),
+        (59, 'project.provider_credentials.update', 'PROJECT'),
+        (60, 'project.provider_credentials.rotate', 'PROJECT'),
+        (61, 'project.provider_credentials.revoke', 'PROJECT'),
+        (62, 'project.provider_credentials.use', 'PROJECT'),
+        (63, 'project.audit.read', 'PROJECT'),
+        (64, 'project.audit.export', 'PROJECT')
 )
 INSERT INTO public.permission_definitions (
-    id, key, scope_type, name, description, token_eligible,
+    id, key, scope_type, name, description,
     status, created_actor_type, created_actor_id
 )
 SELECT
-    id, key, scope_type, initcap(translate(key, '._', '  ')), 'Allows ' || key || '.', token_eligible,
+    id, key, scope_type, initcap(translate(key, '._', '  ')), 'Allows ' || key || '.',
     'ACTIVE', 'unknown', NULL
 FROM permissions;
 
@@ -293,8 +287,6 @@ WITH role_permission_keys(role_key, permission_key) AS (
         role_definition.id AS role_id,
         permission_definition.id AS permission_id,
         role_definition.scope_type,
-        role_definition.subject_type,
-        permission_definition.token_eligible,
         role_definition.key AS role_key,
         permission_definition.key AS permission_key
     FROM role_permission_keys
@@ -302,12 +294,12 @@ WITH role_permission_keys(role_key, permission_key) AS (
     JOIN public.permission_definitions permission_definition ON permission_definition.key = role_permission_keys.permission_key
 )
 INSERT INTO public.role_permissions (
-    id, role_definition_id, permission_definition_id, scope_type, subject_type, token_eligible,
+    id, role_definition_id, permission_definition_id, scope_type,
     status, created_actor_type, created_actor_id
 )
 SELECT
     1000 + row_number() OVER (ORDER BY role_key, permission_key),
-    role_id, permission_id, scope_type, subject_type, token_eligible,
+    role_id, permission_id, scope_type,
     'ACTIVE', 'unknown', NULL
 FROM resolved;
 
@@ -323,9 +315,6 @@ BEGIN
     END IF;
     IF (SELECT count(*) FROM public.permission_definitions WHERE scope_type = 'PROJECT') <> 31 THEN
         RAISE EXCEPTION 'project permission seed count mismatch';
-    END IF;
-    IF (SELECT count(*) FROM public.permission_definitions WHERE token_eligible) <> 17 THEN
-        RAISE EXCEPTION 'token-eligible permission seed count mismatch';
     END IF;
     IF (SELECT count(*) FROM public.role_definitions) <> 16 THEN
         RAISE EXCEPTION 'role seed count mismatch';

@@ -8,6 +8,7 @@ package internal_assistant_service
 import (
 	"context"
 	"fmt"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"strconv"
 	"sync"
 	"time"
@@ -15,12 +16,12 @@ import (
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
 	gorm_generator "github.com/rapidaai/pkg/models/gorm/generators"
 	"github.com/rapidaai/pkg/storages"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
@@ -46,13 +47,13 @@ func NewAssistantConversationService(
 }
 
 func (conversationService *assistantConversationService) GetAll(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate, opts *internal_services.GetConversationOption) (int64, []*internal_conversation_entity.AssistantConversation, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return 0, nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return 0, nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	const numericMetricValuePattern = `^[0-9]+(\.[0-9]+)?$`
@@ -252,13 +253,13 @@ func (conversationService *assistantConversationService) GetAll(ctx context.Cont
 }
 func (conversationService *assistantConversationService) Get(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	assistantConversationId uint64,
 	opts *internal_services.GetConversationOption) (*internal_conversation_entity.AssistantConversation, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	conversationService.logger.Debugf("assistantConversationService.Get with options %+v", opts)
@@ -347,13 +348,13 @@ func (conversationService *assistantConversationService) Get(
 
 func (conversationService *assistantConversationService) GetConversation(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	assistantConversationId uint64,
 	opts *internal_services.GetConversationOption) (*internal_conversation_entity.AssistantConversation, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
@@ -398,14 +399,14 @@ func (conversationService *assistantConversationService) GetConversation(
 
 func (conversationService *assistantConversationService) CreateConversation(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	identifier string,
 	assistantId uint64,
 	assistantProviderModelId uint64,
 	direction type_enums.ConversationDirection, source utils.RapidaSource) (*internal_conversation_entity.AssistantConversation, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
@@ -421,8 +422,8 @@ func (conversationService *assistantConversationService) CreateConversation(
 		Source:                   source,
 		Direction:                direction,
 		Mutable: gorm_models.Mutable{
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(auth.Caller().Type),
+			CreatedActorID:   auth.Caller().ID,
 		},
 	}
 	tx := db.Create(&conversation)
@@ -437,7 +438,7 @@ func (conversationService *assistantConversationService) CreateConversation(
 
 func (conversationService *assistantConversationService) CreateOrUpdateConversationMetadata(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId,
 	assistantConversationId uint64,
 	metadata []*protos.Metadata,
@@ -461,8 +462,8 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 			},
 			AssistantId: assistantId,
 			Mutable: gorm_models.Mutable{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 		}
 		_meta.SetValue(mt.Value)
@@ -472,8 +473,8 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "key"}},
 		DoUpdates: append(clause.AssignmentColumns([]string{"value", "updated_date"}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Caller().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Caller().ID},
 		),
 	}).Create(&_metadatas)
 	if tx.Error != nil {
@@ -486,7 +487,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 }
 
 func (conversationService *assistantConversationService) CreateOrUpdateConversationOption(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId,
 	assistantConversationId uint64,
 	opts map[string]interface{}) ([]*internal_conversation_entity.AssistantConversationOption, error) {
@@ -507,8 +508,8 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 			},
 			AssistantId: assistantId,
 			Mutable: gorm_models.Mutable{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 		}
 		option.SetValue(o)
@@ -518,8 +519,8 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "key"}},
 		DoUpdates: append(clause.AssignmentColumns([]string{"value", "updated_date"}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Caller().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Caller().ID},
 		),
 	}).Create(&options)
 	if tx.Error != nil {
@@ -533,7 +534,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 }
 
 func (conversationService *assistantConversationService) CreateOrUpdateConversationArgument(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId,
 	assistantConversationId uint64,
 	arguments map[string]interface{},
@@ -554,8 +555,8 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 				Name: k,
 			},
 			Mutable: gorm_models.Mutable{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 		}
 		ag.SetValue(arg)
@@ -565,8 +566,8 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "name"}},
 		DoUpdates: append(clause.AssignmentColumns([]string{"value", "updated_date"}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Caller().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Caller().ID},
 		),
 	}).Create(&_arguments)
 	if tx.Error != nil {
@@ -586,7 +587,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 **/
 func (conversationService *assistantConversationService) CreateOrUpdateConversationMetrics(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId,
 	assistantConversationId uint64,
 	metrics []*protos.Metric,
@@ -605,8 +606,8 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 			AssistantConversationId: assistantConversationId,
 			AssistantId:             assistantId,
 			Mutable: gorm_models.Mutable{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 		}
 
@@ -616,8 +617,8 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "name"}},
 		DoUpdates: append(clause.AssignmentColumns([]string{"value", "description", "updated_date"}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Caller().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Caller().ID},
 		),
 	}).Create(&mtrs)
 	if tx.Error != nil {
@@ -631,7 +632,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 
 func (conversationService *assistantConversationService) CreateCustomConversationMetric(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	assistantConversationId uint64,
 	metrics []*protos.Metric,
@@ -650,8 +651,8 @@ func (conversationService *assistantConversationService) CreateCustomConversatio
 			AssistantId:             assistantId,
 			AssistantConversationId: assistantConversationId,
 			Mutable: gorm_models.Mutable{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 		}
 
@@ -661,8 +662,8 @@ func (conversationService *assistantConversationService) CreateCustomConversatio
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "name"}},
 		DoUpdates: append(clause.AssignmentColumns([]string{"value", "description", "updated_date"}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Caller().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Caller().ID},
 		),
 	}).Create(&mtrx)
 	if tx.Error != nil {
@@ -676,14 +677,14 @@ func (conversationService *assistantConversationService) CreateCustomConversatio
 
 func (conversationService *assistantConversationService) CreateConversationRecording(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId,
 	assistantConversationId uint64,
 	user, assistant, conversation []byte,
 ) (*internal_conversation_entity.AssistantConversationRecording, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
@@ -728,8 +729,8 @@ func (conversationService *assistantConversationService) CreateConversationRecor
 		UserRecordingUrl:         userKey,
 		ConversationRecordingUrl: conversationKey,
 		Mutable: gorm_models.Mutable{
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(auth.Caller().Type),
+			CreatedActorID:   auth.Caller().ID,
 		},
 	}
 	tx := db.Create(&conversationRecording)

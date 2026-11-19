@@ -80,12 +80,22 @@ function renderPage() {
   return render(
     <AuthContext.Provider
       value={{
-        projectRoles: [
+        getProjects: () => [
           {
-            id: 'project-role-1',
-            projectid: 'project-1',
-            projectname: 'Customer support',
-            role: 'admin',
+            id: 'project-1',
+            name: 'Customer support',
+            rolesList: [
+              {
+                id: 'role-admin',
+                key: 'project_admin',
+                name: 'Project Admin',
+                description: '',
+                scope: 'PROJECT',
+                subject: 'USER',
+                definitiontype: 'CUSTOM',
+                permissionsList: [],
+              },
+            ],
           },
         ],
       }}
@@ -108,6 +118,7 @@ describe('ProjectPage', () => {
     const { container } = renderPage();
 
     await screen.findByText('Customer support');
+    expect(screen.getByText('Project Admin')).toBeInTheDocument();
     const selection = screen.getByRole('radio', { name: 'Select row' });
     expect(selection.closest('td')).toHaveClass('cds--table-column-radio');
     expect(container.querySelector('.cds--batch-actions')).toBeNull();

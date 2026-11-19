@@ -6,25 +6,22 @@ Licensed under GPL-2.0 with Rapida Additional Terms.
 See LICENSE.md for details or contact sales@rapida.ai for commercial use.
 """
 
+import base64
 import functools
-import logging
 import os
 from typing import List, Optional
 
 import yaml
-from pydantic import Field
+from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.configs.auth_config import AuthenticationConfig
-from app.configs.celery_config import CeleryConfig
 from app.configs.elastic_search_config import ElasticSearchConfig
 from app.configs.extractor_config import ExtractorConfig
 from app.configs.internal_service_config import InternalServiceConfig
 from app.configs.postgres_config import PostgresConfig
 from app.configs.redis_config import RedisConfig
 from app.configs.storage_config import AssetStoreConfig
-
-_log = logging.getLogger("app.config")
 
 
 class ApplicationSettings(BaseSettings):
@@ -38,7 +35,9 @@ class ApplicationSettings(BaseSettings):
 
     #
     # Service name as identifiers for service
-    service_name: str = "knowledge-api"
+    service_name: str = "document-api"
+    service_id: int
+    secret: str
     # defined host for service
     host: str = "0.0.0.0"
     port: int = "7474"
@@ -103,8 +102,8 @@ class ApplicationSettings(BaseSettings):
     )
     #
 
-    authentication_config: Optional[AuthenticationConfig] = Field(
-        default=None, description="auth config for internal service " "communication"
+    authentication_config: AuthenticationConfig = Field(
+        description="authentication configuration for external and internal callers"
     )
 
     knowledge_extractor_config: Optional[ExtractorConfig] = Field(
@@ -113,11 +112,33 @@ class ApplicationSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file_encoding="utf-8", extra="ignore")
 
+    @field_validator("secret")
+    @classmethod
+    def validate_authentication_secret(cls, value: str) -> str:
+        try:
+            encoded = value.encode("ascii")
+            decoded = base64.b64decode(encoded, validate=True)
+        except (AttributeError, UnicodeEncodeError, ValueError):
+            raise ValueError("invalid authentication secret") from None
+        if len(decoded) != 32 or base64.b64encode(decoded) != encoded:
+            raise ValueError("invalid authentication secret")
+        return value
+
 
 @functools.lru_cache()
 def get_settings() -> "ApplicationSettings":
     """Get current app settings."""
-    with open("env/document.yaml", "r") as file:
-        config_data = yaml.safe_load(os.path.expandvars(file.read()))
-    config = ApplicationSettings(**config_data)
+    try:
+        with open("env/document.yaml", "r") as file:
+            config_data = yaml.safe_load(os.path.expandvars(file.read()))
+    except (OSError, yaml.YAMLError):
+        raise ValueError("application configuration is invalid") from None
+    if not isinstance(config_data, dict):
+        raise ValueError("application configuration is invalid")
+    if "service_assertion" in config_data:
+        raise ValueError("legacy service assertion configuration is not supported")
+    try:
+        config = ApplicationSettings(**config_data)
+    except (TypeError, ValidationError, ValueError):
+        raise ValueError("application configuration is invalid") from None
     return config

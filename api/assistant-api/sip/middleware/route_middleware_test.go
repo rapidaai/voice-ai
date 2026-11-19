@@ -7,7 +7,9 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"testing"
@@ -16,12 +18,27 @@ import (
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/authentication"
+	authentication_jwt "github.com/rapidaai/pkg/authentication/jwt"
+	authentication_resolver "github.com/rapidaai/pkg/authentication/resolver"
 	"github.com/rapidaai/pkg/commons"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func routeServiceAuthentication(t *testing.T) func(*middlewareOption) {
+	t.Helper()
+	key := bytes.Repeat([]byte{1}, sha256.Size)
+	issuer, err := authentication_jwt.NewIssuer("assistant-api", key)
+	require.NoError(t, err)
+	principalResolver := authentication_resolver.NewServicePrincipalResolver(
+		"assistant-api",
+		key,
+	)
+	require.NoError(t, err)
+	return WithServiceAuthentication(issuer, principalResolver)
+}
 
 func TestRouteMiddleware_AgentRoute(t *testing.T) {
 	ctx := &sip_runtime.SIPRequestContext{
@@ -38,7 +55,7 @@ func TestRouteMiddleware_AgentRoute(t *testing.T) {
 	middleware := NewRouteMiddleware(
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
-		WithServiceID(9007),
+		routeServiceAuthentication(t),
 		WithAssistantService(routeTestAssistantService{assistants: map[uint64]*internal_assistant_entity.Assistant{
 			42: newRouteTestAssistantWithPhone(7, 8, "+15551234567"),
 		}}),
@@ -48,11 +65,9 @@ func TestRouteMiddleware_AgentRoute(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, ctx.Auth)
 	assert.NotNil(t, ctx.Assistant)
-	assert.Equal(t, types.AuthTypeService, ctx.Auth.Type())
-	actor := ctx.Auth.Actor()
-	assert.Equal(t, types.ActorIdentity{Type: types.ActorTypeService, ID: 9007}, actor)
-	projectContext, authErr := ctx.Auth.ProjectContext()
-	require.NoError(t, authErr)
+	assert.Equal(t, authentication.IdentityService, ctx.Auth.Subject().Type)
+	assert.Equal(t, uint64(1), ctx.Auth.Caller().ID)
+	projectContext := ctx.Auth.Tenant()
 	assert.Equal(t, uint64(7), projectContext.ProjectID)
 	assert.Equal(t, uint64(8), projectContext.OrganizationID)
 	assert.Equal(t, "sip:caller@example.com", ctx.CallAddress.FromURI)
@@ -67,7 +82,7 @@ func TestRouteMiddleware_DIDRoute(t *testing.T) {
 	middleware := NewRouteMiddleware(
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
-		WithServiceID(9007),
+		routeServiceAuthentication(t),
 		WithAssistantService(routeTestAssistantService{
 			assistants: map[uint64]*internal_assistant_entity.Assistant{
 				43: newRouteTestAssistantWithPhone(9, 10, "+15551234567"),
@@ -88,7 +103,7 @@ func TestRouteMiddleware_PlainDIDRoute(t *testing.T) {
 	middleware := NewRouteMiddleware(
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
-		WithServiceID(9007),
+		routeServiceAuthentication(t),
 		WithAssistantService(routeTestAssistantService{
 			assistants: map[uint64]*internal_assistant_entity.Assistant{
 				44: newRouteTestAssistantWithPhone(11, 12, "+15551234568"),
@@ -117,7 +132,24 @@ func TestRouteMiddleware_DIDRouteNotFound(t *testing.T) {
 	assert.Equal(t, 404, sipErr.Code)
 	assert.Equal(t, sipMessageAssistantRouteNotFound, sipErr.Message)
 	assert.Empty(t, ctx.CallAddress.To)
-	assert.Nil(t, ctx.Auth)
+	assert.Zero(t, ctx.Auth.Subject().ID)
+}
+
+func TestRouteMiddlewareRejectsUnverifiedLocalService(t *testing.T) {
+	ctx := &sip_runtime.SIPRequestContext{CallID: "call-unverified", RequestURI: "sip:agent-42@sip.rapida.ai"}
+	err := NewRouteMiddleware(
+		WithContext(context.Background()),
+		WithLogger(newRouteTestLogger(t)),
+		WithAssistantService(routeTestAssistantService{assistants: map[uint64]*internal_assistant_entity.Assistant{
+			42: newRouteTestAssistantWithPhone(7, 8, "+15551234567"),
+		}}),
+	)(ctx)
+
+	require.Error(t, err)
+	var sipErr *sip_runtime.SIPError
+	require.ErrorAs(t, err, &sipErr)
+	assert.Equal(t, 500, sipErr.Code)
+	assert.Zero(t, ctx.Auth.Subject().ID)
 }
 
 func TestRouteMiddleware_DuplicateDIDRoutesUseFirstResolvedAssistant(t *testing.T) {
@@ -144,7 +176,7 @@ func TestRouteMiddleware_DuplicateDIDRoutesUseFirstResolvedAssistant(t *testing.
 			err := NewRouteMiddleware(
 				WithContext(context.Background()),
 				WithLogger(newRouteTestLogger(t)),
-				WithServiceID(9007),
+				routeServiceAuthentication(t),
 				WithAssistantService(routeTestAssistantService{
 					assistants: map[uint64]*internal_assistant_entity.Assistant{
 						43: newRouteTestAssistantWithPhone(9, 10, "+15551234567"),
@@ -159,7 +191,7 @@ func TestRouteMiddleware_DuplicateDIDRoutesUseFirstResolvedAssistant(t *testing.
 			require.NotNil(t, ctx.Auth)
 			require.NotNil(t, ctx.Assistant)
 			assert.Equal(t, uint64(43), ctx.Assistant.Id)
-			assert.Equal(t, uint64(10), ctx.Auth.OrganizationValue.OrganizationID)
+			assert.Equal(t, uint64(10), ctx.Auth.Tenant().OrganizationID)
 			assert.Equal(t, 1, assistantCalls)
 		})
 	}
@@ -171,7 +203,7 @@ func TestRouteMiddleware_InactiveDuplicateDIDDoesNotCreateAmbiguity(t *testing.T
 	err := NewRouteMiddleware(
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
-		WithServiceID(9007),
+		routeServiceAuthentication(t),
 		WithAssistantService(routeTestAssistantService{
 			assistants: map[uint64]*internal_assistant_entity.Assistant{
 				43: newRouteTestAssistantWithPhone(9, 10, "+15551234567"),
@@ -214,7 +246,7 @@ func TestRouteMiddleware_AgentRoutePhoneResolution(t *testing.T) {
 			err := NewRouteMiddleware(
 				WithContext(context.Background()),
 				WithLogger(newRouteTestLogger(t)),
-				WithServiceID(9007),
+				routeServiceAuthentication(t),
 				WithAssistantService(routeTestAssistantService{assistants: map[uint64]*internal_assistant_entity.Assistant{
 					42: assistant,
 				}}),
@@ -269,7 +301,7 @@ func (s routeTestAssistantService) GetAssistantWithPhoneDeploymentById(_ context
 	return s.assistant(agentId)
 }
 
-func (s routeTestAssistantService) Get(_ context.Context, _ *types.Authentication, assistantID uint64, _ *uint64, _ *internal_services.GetAssistantOption) (*internal_assistant_entity.Assistant, error) {
+func (s routeTestAssistantService) Get(_ context.Context, _ authentication.Principal, assistantID uint64, _ *uint64, _ *internal_services.GetAssistantOption) (*internal_assistant_entity.Assistant, error) {
 	return s.assistant(assistantID)
 }
 

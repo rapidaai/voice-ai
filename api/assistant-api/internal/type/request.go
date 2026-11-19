@@ -8,10 +8,10 @@ package internal_type
 import (
 	"context"
 
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 )
 
 type Talking interface {
 	Communication
-	Talk(ctx context.Context, auth *types.Authentication) error
+	Talk(ctx context.Context, auth authentication.Principal) error
 }

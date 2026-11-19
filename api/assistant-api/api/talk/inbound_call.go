@@ -7,6 +7,7 @@ package assistant_talk_api
 
 import (
 	"context"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -17,7 +18,6 @@ import (
 	channel_pipeline "github.com/rapidaai/api/assistant-api/internal/channel/pipeline"
 	channel_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 )
 
@@ -37,14 +37,9 @@ func (cApi *ConversationApi) CallReciever(c *gin.Context) {
 		}
 	}
 
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": authErr.Error()})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": scopeErr.Error()})
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "valid authentication is required"})
 		return
 	}
 

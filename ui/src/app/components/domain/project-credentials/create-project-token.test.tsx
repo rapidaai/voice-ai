@@ -92,6 +92,36 @@ jest.mock('@carbon/react', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives', () => ({
+  ComboBox: function MockComboBox({
+    disabled,
+    items,
+    itemToString,
+    onChange,
+    placeholder,
+    selectedItem,
+    titleText,
+  }: any) {
+    return (
+      <label>
+        {titleText}
+        <input
+          role="combobox"
+          aria-label={titleText}
+          disabled={disabled}
+          placeholder={placeholder}
+          defaultValue={selectedItem ? itemToString(selectedItem) : ''}
+          onChange={event => {
+            const nextValue = event.target.value;
+            onChange({
+              selectedItem:
+                items.find((item: any) => itemToString(item) === nextValue) ||
+                null,
+            });
+          }}
+        />
+      </label>
+    );
+  },
   FieldSet: ({ children }: { children: React.ReactNode }) => (
     <fieldset>{children}</fieldset>
   ),
@@ -143,6 +173,36 @@ jest.mock('@/app/components/ui/primitives', () => ({
       <input id={id} {...props} />
     </>
   ),
+  PrimaryButton: ({
+    children,
+    iconDescription: _iconDescription,
+    renderIcon: Icon,
+    ...props
+  }: any) => (
+    <button {...props}>
+      {children}
+      {Icon ? <Icon /> : null}
+    </button>
+  ),
+  SecondaryButton: ({ children, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
+  TertiaryButton: ({ children, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
+  Text: ({ as: Tag = 'span', children, variant: _variant, ...props }: any) => (
+    <Tag {...props}>{children}</Tag>
+  ),
+}));
+
+jest.mock('@/app/components/ui/composites', () => ({
+  HelpToggletip: ({ helpText, label }: any) =>
+    helpText ? (
+      <span>
+        <button aria-label={`${label} information`} type="button" />
+        {helpText}
+      </span>
+    ) : null,
 }));
 
 const role = (id: string, name: string, key: string) => ({
@@ -191,7 +251,11 @@ describe('CreateProjectToken', () => {
       <CreateProjectToken
         open
         projectId="project-1"
-        auth={{ token: 'token', userId: 'user-1' }}
+        auth={{
+          organizationId: 'organization-1',
+          token: 'token',
+          userId: 'user-1',
+        }}
         onCreated={onCreated}
         onClose={onClose}
       />,
@@ -279,7 +343,11 @@ describe('CreateProjectToken', () => {
       <CreateProjectToken
         open
         projectId="project-1"
-        auth={{ token: 'token', userId: 'user-1' }}
+        auth={{
+          organizationId: 'organization-1',
+          token: 'token',
+          userId: 'user-1',
+        }}
         onCreated={jest.fn()}
         onClose={jest.fn()}
       />,
@@ -308,7 +376,11 @@ describe('CreateProjectToken', () => {
       <CreateProjectToken
         open
         projectId="project-1"
-        auth={{ token: 'token', userId: 'user-1' }}
+        auth={{
+          organizationId: 'organization-1',
+          token: 'token',
+          userId: 'user-1',
+        }}
         onCreated={jest.fn()}
         onClose={jest.fn()}
       />,
@@ -331,7 +403,11 @@ describe('CreateProjectToken', () => {
       <CreateProjectToken
         open
         projectId="project-1"
-        auth={{ token: 'token', userId: 'user-1' }}
+        auth={{
+          organizationId: 'organization-1',
+          token: 'token',
+          userId: 'user-1',
+        }}
         onCreated={jest.fn()}
         onClose={jest.fn()}
       />,
@@ -377,7 +453,11 @@ describe('CreateProjectToken', () => {
         <CreateProjectToken
           open
           projectId="project-1"
-          auth={{ token: 'token', userId: 'user-1' }}
+          auth={{
+            organizationId: 'organization-1',
+            token: 'token',
+            userId: 'user-1',
+          }}
           onCreated={onCreated}
           onClose={onClose}
         />,
@@ -417,7 +497,11 @@ describe('CreateProjectToken', () => {
       <CreateProjectToken
         open
         projectId="project-1"
-        auth={{ token: 'token', userId: 'user-1' }}
+        auth={{
+          organizationId: 'organization-1',
+          token: 'token',
+          userId: 'user-1',
+        }}
         onCreated={onCreated}
         onClose={jest.fn()}
       />,
@@ -465,7 +549,11 @@ describe('CreateProjectToken', () => {
       <CreateProjectToken
         open
         projectId="project-1"
-        auth={{ token: 'token', userId: 'user-1' }}
+        auth={{
+          organizationId: 'organization-1',
+          token: 'token',
+          userId: 'user-1',
+        }}
         onCreated={jest.fn()}
         onClose={jest.fn()}
       />,
@@ -516,7 +604,11 @@ describe('CreateProjectToken', () => {
     );
     const props = {
       projectId: 'project-1',
-      auth: { token: 'token', userId: 'user-1' },
+      auth: {
+        organizationId: 'organization-1',
+        token: 'token',
+        userId: 'user-1',
+      },
       onCreated: jest.fn(),
       onClose: jest.fn(),
     };
@@ -572,7 +664,11 @@ describe('CreateProjectToken', () => {
     const onClose = jest.fn();
     const props = {
       projectId: 'project-1',
-      auth: { token: 'token', userId: 'user-1' },
+      auth: {
+        organizationId: 'organization-1',
+        token: 'token',
+        userId: 'user-1',
+      },
       onCreated,
       onClose,
     };

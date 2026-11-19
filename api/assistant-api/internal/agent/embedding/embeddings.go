@@ -8,7 +8,7 @@ package internal_agent_embedding
 import (
 	"context"
 
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/protos"
 )
 
@@ -22,7 +22,7 @@ type TextEmbeddingOption struct {
 type QueryEmbedding interface {
 	TextQueryEmbedding(
 		ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		query string,
 		opts *TextEmbeddingOption) (*protos.EmbeddingResponse, error)
 }

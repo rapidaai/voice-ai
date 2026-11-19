@@ -8,11 +8,11 @@ package assistant_api
 import (
 	"context"
 	"errors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
@@ -22,13 +22,9 @@ func (assistantApi *assistantGrpcApi) DeleteAssistantConfiguration(
 	ctx context.Context,
 	req *protos.DeleteAssistantConfigurationRequest,
 ) (*protos.GetAssistantConfigurationResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
 	if !validator.NonZero(req.GetAssistantId()) {

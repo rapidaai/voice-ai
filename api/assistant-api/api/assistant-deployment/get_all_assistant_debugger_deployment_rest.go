@@ -7,21 +7,21 @@ package assistant_deployment_api
 
 import (
 	"encoding/json"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/openapi"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	assistant_api "github.com/rapidaai/protos"
 )
 
 func (deploymentApi *AssistantDeploymentApi) GetAllAssistantDebuggerDeploymentRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		c.JSON(pkg_errors.GetAllAssistantDebuggerDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAllAssistantDebuggerDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -29,19 +29,6 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantDebuggerDeploymentRe
 				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.GetAllAssistantDebuggerDeploymentUnauthenticated.CodeString())),
 				ErrorMessage: utils.Ptr(pkg_errors.GetAllAssistantDebuggerDeploymentUnauthenticated.Error),
 				HumanMessage: utils.Ptr(pkg_errors.GetAllAssistantDebuggerDeploymentUnauthenticated.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		c.JSON(pkg_errors.GetAllAssistantDebuggerDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(pkg_errors.GetAllAssistantDebuggerDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.GetAllAssistantDebuggerDeploymentMissingAuthScope.CodeString())),
-				ErrorMessage: utils.Ptr(pkg_errors.GetAllAssistantDebuggerDeploymentMissingAuthScope.Error),
-				HumanMessage: utils.Ptr(pkg_errors.GetAllAssistantDebuggerDeploymentMissingAuthScope.ErrorMessage),
 			},
 		})
 		return
@@ -213,7 +200,16 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantDebuggerDeploymentRe
 			IdealTimeoutMessage:   deployment.IdleTimeoutMessage,
 		})
 	}
-	totalItem := uint32(totalItems)
+	totalItem, err := utils.Int64ToUint32(totalItems)
+	if err != nil {
+		deploymentApi.logger.Errorf("unable to convert assistant debugger deployment count: %v", err)
+		platformError := pkg_errors.GetAllAssistantDebuggerDeploymentGetDeployment
+		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
+			Code: utils.Ptr(platformError.HTTPStatusCodeInt32()), Success: utils.Ptr(false),
+			Error: &openapi.Error{ErrorCode: utils.Ptr(openapi.Uint64String(platformError.CodeString())), ErrorMessage: utils.Ptr(platformError.Error), HumanMessage: utils.Ptr(platformError.ErrorMessage)},
+		})
+		return
+	}
 	currentPage := paginate.GetPage()
 	c.JSON(http.StatusOK, openapi.GetAllAssistantDebuggerDeploymentResponse{
 		Code:    utils.Ptr(int32(http.StatusOK)),

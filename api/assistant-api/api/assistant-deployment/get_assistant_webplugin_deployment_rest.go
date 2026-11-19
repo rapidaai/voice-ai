@@ -6,20 +6,20 @@
 package assistant_deployment_api
 
 import (
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/openapi"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 )
 
 func (deploymentApi *AssistantDeploymentApi) GetAssistantWebpluginDeploymentRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		c.JSON(pkg_errors.GetAssistantWebpluginDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAssistantWebpluginDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -27,19 +27,6 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantWebpluginDeploymentRest
 				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.GetAssistantWebpluginDeploymentUnauthenticated.CodeString())),
 				ErrorMessage: utils.Ptr(pkg_errors.GetAssistantWebpluginDeploymentUnauthenticated.Error),
 				HumanMessage: utils.Ptr(pkg_errors.GetAssistantWebpluginDeploymentUnauthenticated.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		c.JSON(pkg_errors.GetAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(pkg_errors.GetAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.GetAssistantWebpluginDeploymentMissingAuthScope.CodeString())),
-				ErrorMessage: utils.Ptr(pkg_errors.GetAssistantWebpluginDeploymentMissingAuthScope.Error),
-				HumanMessage: utils.Ptr(pkg_errors.GetAssistantWebpluginDeploymentMissingAuthScope.ErrorMessage),
 			},
 		})
 		return

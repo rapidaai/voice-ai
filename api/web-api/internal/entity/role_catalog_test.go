@@ -56,7 +56,7 @@ func TestRoleCatalogPersistedColumns(t *testing.T) {
 			entity: PermissionDefinition{},
 			fields: map[string]string{
 				"Key": "key", "ScopeType": "scope_type", "Name": "name",
-				"Description": "description", "TokenEligible": "token_eligible",
+				"Description": "description",
 			},
 		},
 		{
@@ -72,12 +72,10 @@ func TestRoleCatalogPersistedColumns(t *testing.T) {
 			fields: map[string]string{
 				"RoleDefinitionID":       "role_definition_id",
 				"PermissionDefinitionID": "permission_definition_id",
-				"ScopeType":              "scope_type", "SubjectType": "subject_type",
-				"TokenEligible": "token_eligible",
+				"ScopeType":              "scope_type",
 			},
 		},
 	}
-
 	for _, test := range tests {
 		entityType := reflect.TypeOf(test.entity)
 		for fieldName, columnName := range test.fields {
@@ -94,5 +92,37 @@ func TestRoleCatalogPersistedColumns(t *testing.T) {
 	organizationID, ok := reflect.TypeOf(RoleDefinition{}).FieldByName("OrganizationID")
 	if !ok || organizationID.Type != reflect.TypeOf((*uint64)(nil)) {
 		t.Fatal("RoleDefinition.OrganizationID must be nullable *uint64")
+	}
+	for _, entity := range []any{RoleDefinition{}, RolePermission{}} {
+		entityType := reflect.TypeOf(entity)
+		for _, fieldName := range []string{
+			"ReductionReason", "ReductionCorrelationID", "ReductionAssuranceCondition",
+			"CreatedActorDisplayName", "UpdatedActorDisplayName", "TokenEligible",
+		} {
+			if _, ok := entityType.FieldByName(fieldName); ok {
+				t.Fatalf("%s.%s must not exist", entityType.Name(), fieldName)
+			}
+		}
+	}
+	if _, ok := reflect.TypeOf(RolePermission{}).FieldByName("SubjectType"); ok {
+		t.Fatal("RolePermission.SubjectType must not exist")
+	}
+}
+
+func TestRoleCatalogAssociationsAreOptionalPointers(t *testing.T) {
+	rolePermissions, ok := reflect.TypeOf(RoleDefinition{}).FieldByName("RolePermissions")
+	if !ok || rolePermissions.Type != reflect.TypeOf([]*RolePermission(nil)) {
+		t.Fatalf("RoleDefinition.RolePermissions type = %v, want []*RolePermission", rolePermissions.Type)
+	}
+	if !strings.Contains(rolePermissions.Tag.Get("gorm"), "foreignKey:RoleDefinitionID") {
+		t.Fatalf("RoleDefinition.RolePermissions gorm tag = %q", rolePermissions.Tag.Get("gorm"))
+	}
+
+	permissionDefinition, ok := reflect.TypeOf(RolePermission{}).FieldByName("PermissionDefinition")
+	if !ok || permissionDefinition.Type != reflect.TypeOf((*PermissionDefinition)(nil)) {
+		t.Fatalf("RolePermission.PermissionDefinition type = %v, want *PermissionDefinition", permissionDefinition.Type)
+	}
+	if !strings.Contains(permissionDefinition.Tag.Get("gorm"), "foreignKey:PermissionDefinitionID") {
+		t.Fatalf("RolePermission.PermissionDefinition gorm tag = %q", permissionDefinition.Tag.Get("gorm"))
 	}
 }

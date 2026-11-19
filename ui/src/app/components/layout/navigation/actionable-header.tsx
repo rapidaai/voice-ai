@@ -5,7 +5,6 @@ import {
   type HTMLAttributes,
   type MouseEvent,
 } from 'react';
-import { ProjectRole } from '@rapidaai/react';
 import { cn } from '@/utils';
 import { useMatches, useNavigate, type UIMatch } from 'react-router-dom';
 import { CustomLink } from '@/app/components/ui/primitives';
@@ -19,10 +18,10 @@ import {
   SwitcherItem,
 } from '@carbon/react';
 import { Breadcrumb } from '@/app/components/ui/primitives';
-import { Dropdown } from '@/app/components/ui/primitives';
 import { useRapidaStore } from '@/stores/app';
 import { useTheme } from '@/theme/theme-provider';
 import type { AppRouteHandle } from '@/app/routes/breadcrumb-handle';
+import { OrganizationProjectSwitcher } from '@/app/components/layout/navigation/organization-project-switcher';
 
 export function ActionableHeader({
   className,
@@ -111,13 +110,21 @@ export function ActionableHeader({
 
 export function CustomerOptions({
   isLoading,
-  showProjectSelector = true,
+  showContextSwitcher = true,
 }: {
   isLoading?: boolean;
-  showProjectSelector?: boolean;
+  showContextSwitcher?: boolean;
 }) {
-  const { projectRoles, currentProjectRole, setCurrentProjectRole } =
-    useContext(AuthContext);
+  const {
+    getOrganizations,
+    getCurrentOrganization,
+    getCurrentProject,
+    setCurrentContext,
+  } = useContext(AuthContext);
+  const organizations = getOrganizations?.() || [];
+  const currentOrganization = getCurrentOrganization?.();
+  const currentProject = getCurrentProject?.();
+  const navigate = useNavigate();
 
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const { resolvedMode, theme, toggleMode } = useTheme();
@@ -125,25 +132,26 @@ export function CustomerOptions({
 
   return (
     <HeaderGlobalBar>
-      {showProjectSelector && projectRoles && setCurrentProjectRole && (
-        <Dropdown
-          id="project-selector"
-          aria-label="Select project"
-          titleText=""
-          hideLabel
-          label="Select a Project"
-          size="sm"
-          direction="bottom"
-          items={projectRoles}
-          selectedItem={currentProjectRole}
-          itemToString={(item: ProjectRole.AsObject | null) =>
-            item?.projectname || ''
-          }
-          onChange={({ selectedItem }) => {
-            if (selectedItem) setCurrentProjectRole(selectedItem);
-          }}
-          className="project-selector-dropdown max-sm:w-12! max-sm:min-w-12!"
+      {showContextSwitcher && setCurrentContext && (
+        <OrganizationProjectSwitcher
+          organizations={organizations}
+          currentOrganization={currentOrganization}
+          currentProject={currentProject}
           isLoading={isLoading}
+          onSelect={(organization, project) => {
+            const selectedProjectID =
+              project?.id ||
+              (organization.id === currentOrganization?.id
+                ? currentProject?.id
+                : organization.projectsList[0]?.id);
+            if (
+              organization.id === currentOrganization?.id &&
+              selectedProjectID === currentProject?.id
+            )
+              return;
+            if (setCurrentContext(organization, project))
+              navigate('/dashboard');
+          }}
         />
       )}
 

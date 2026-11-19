@@ -29,11 +29,13 @@ import (
 
 	"github.com/rapidaai/api/endpoint-api/config"
 	router "github.com/rapidaai/api/endpoint-api/router"
-	authenticators "github.com/rapidaai/pkg/authenticators"
+	authentication_resolver "github.com/rapidaai/pkg/authentication/resolver"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/middlewares"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
+	"github.com/rapidaai/pkg/utils"
 )
 
 // wrapper for gin engine
@@ -71,20 +73,21 @@ func main() {
 	}
 
 	// init
-	authClient := web_client.NewAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)
-	userAuthenticator := authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
-	projectAuthenticator := authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
-	organizationAuthenticator := authenticators.NewOrganizationAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
-	serviceAuthenticator := authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger)
+	authenticationClient := web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)
+	userResolver := authentication_resolver.NewUserPrincipalResolver(authenticationClient)
+	projectResolver := authentication_resolver.NewProjectPrincipalResolver(authenticationClient)
+	organizationResolver := authentication_resolver.NewOrganizationPrincipalResolver(authenticationClient)
+	serviceAuthenticationKey := appRunner.Cfg.ServiceAuthenticationKey()
+	serviceResolver := authentication_resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, serviceAuthenticationKey)
 	appRunner.S = grpc.NewServer(
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
 
-			middlewares.NewProjectAuthenticatorStreamServerMiddleware(projectAuthenticator, appRunner.Logger),
-			middlewares.NewOrganizationAuthenticatorStreamServerMiddleware(organizationAuthenticator, appRunner.Logger),
-			middlewares.NewServiceAuthenticatorStreamServerMiddleware(serviceAuthenticator, appRunner.Logger),
-			middlewares.NewAuthenticationStreamServerMiddleware(userAuthenticator, appRunner.Logger),
+			middleware_authentication.NewProjectStreamMiddleware(projectResolver, appRunner.Logger),
+			middleware_authentication.NewOrganizationStreamMiddleware(organizationResolver, appRunner.Logger),
+			middleware_authentication.NewServiceStreamMiddleware(serviceResolver, appRunner.Logger),
+			middleware_authentication.NewUserStreamMiddleware(userResolver, appRunner.Logger),
 
 			middlewares.NewClientInformationStreamServerMiddleware(
 				appRunner.Logger,
@@ -94,10 +97,10 @@ func main() {
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
 
-			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(projectAuthenticator, appRunner.Logger),
-			middlewares.NewOrganizationAuthenticatorUnaryServerMiddleware(organizationAuthenticator, appRunner.Logger),
-			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(serviceAuthenticator, appRunner.Logger),
-			middlewares.NewAuthenticationUnaryServerMiddleware(userAuthenticator, appRunner.Logger),
+			middleware_authentication.NewProjectUnaryMiddleware(projectResolver, appRunner.Logger),
+			middleware_authentication.NewOrganizationUnaryMiddleware(organizationResolver, appRunner.Logger),
+			middleware_authentication.NewServiceUnaryMiddleware(serviceResolver, appRunner.Logger),
+			middleware_authentication.NewUserUnaryMiddleware(userResolver, appRunner.Logger),
 
 			middlewares.NewClientInformationUnaryServerMiddleware(
 				appRunner.Logger,
@@ -148,7 +151,8 @@ func main() {
 		}
 
 		httpServer := http.Server{
-			Handler: http.HandlerFunc(handler),
+			Handler:           http.HandlerFunc(handler),
+			ReadHeaderTimeout: 10 * time.Second,
 		}
 		//
 		err = httpServer.Serve(grpcFilteredListener)
@@ -329,7 +333,14 @@ func (app *AppRunner) Migrate() error {
 	}
 	if dirty {
 		app.Logger.Warnf("Database is in a dirty state at version: %d. Forcing clean...", version)
-		if err := m.Force(int(version - 1)); err != nil {
+		if version == 0 {
+			return fmt.Errorf("cannot force migration below version zero")
+		}
+		previousVersion, conversionErr := utils.Uint64ToInt(uint64(version - 1))
+		if conversionErr != nil {
+			return fmt.Errorf("invalid migration version: %w", conversionErr)
+		}
+		if err := m.Force(previousVersion); err != nil {
 			return fmt.Errorf("failed to force migration version: %w", err)
 		}
 		app.Logger.Infof("Migration state forced to clean at version: %d. Proceeding with migration.", version-1)

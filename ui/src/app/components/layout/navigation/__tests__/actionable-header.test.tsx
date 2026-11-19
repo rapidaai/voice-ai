@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import {
   createMemoryRouter,
+  MemoryRouter,
   RouterProvider,
   type RouteObject,
 } from 'react-router-dom';
@@ -169,9 +170,58 @@ jest.mock('@carbon/react', () => ({
   },
 }));
 
-const projectRoles = [
-  { id: 'r1', projectid: 'p1', projectname: 'Alpha' },
-  { id: 'r2', projectid: 'p2', projectname: 'Beta' },
+jest.mock(
+  '@/app/components/layout/navigation/organization-project-switcher',
+  () => ({
+    OrganizationProjectSwitcher: ({
+      currentOrganization,
+      currentProject,
+      isLoading,
+      onSelect,
+      organizations,
+    }: any) =>
+      isLoading ? (
+        <div data-testid="context-switcher-skeleton" />
+      ) : (
+        <div>
+          <button
+            type="button"
+            aria-label="Organization and project switcher"
+            onClick={() => onSelect(currentOrganization, currentProject)}
+          >
+            {currentOrganization?.name} / {currentProject?.name}
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              onSelect(organizations[0], organizations[0]?.projectsList?.[0])
+            }
+          >
+            Select alternate context
+          </button>
+        </div>
+      ),
+  }),
+);
+
+const projects = [
+  { id: 'p1', name: 'Alpha', rolesList: [] },
+  { id: 'p2', name: 'Beta', rolesList: [] },
+] as any;
+
+const organizations = [
+  {
+    id: 'o1',
+    name: 'First organization',
+    rolesList: [],
+    projectsList: [{ id: 'p3', name: 'Gamma', rolesList: [] }],
+  },
+  {
+    id: 'o2',
+    name: 'Second organization',
+    rolesList: [],
+    projectsList: projects,
+  },
 ] as any;
 
 function renderHeader(
@@ -188,6 +238,19 @@ function renderHeader(
   return { ...view, router };
 }
 
+function renderCustomerOptions(
+  value: React.ContextType<typeof AuthContext> = {},
+  props: React.ComponentProps<typeof CustomerOptions> = {},
+) {
+  return render(
+    <AuthContext.Provider value={value}>
+      <MemoryRouter>
+        <CustomerOptions {...props} />
+      </MemoryRouter>
+    </AuthContext.Provider>,
+  );
+}
+
 const breadcrumb = (label: string) => ({ breadcrumb: { label } });
 
 describe('Actionable header project switcher', () => {
@@ -202,11 +265,11 @@ describe('Actionable header project switcher', () => {
     window.matchMedia = originalMatchMedia;
   });
 
-  it('renders ancestor links, current location, and project selection', async () => {
+  it('renders ancestor links and changes organization and project together', async () => {
     const user = userEvent.setup();
-    const setCurrentProjectRole = jest.fn();
+    const setCurrentContext = jest.fn(() => true);
 
-    renderHeader(
+    const { router } = renderHeader(
       [
         {
           path: 'dashboard',
@@ -233,11 +296,14 @@ describe('Actionable header project switcher', () => {
       ],
       '/dashboard/assistant/list',
       {
-        projectRoles,
-        currentProjectRole: projectRoles[0],
-        setCurrentProjectRole,
+        getOrganizations: () => organizations,
+        getCurrentOrganization: () => organizations[1],
+        getProjects: () => projects,
+        getCurrentProject: () => projects[0],
+        setCurrentContext,
       },
     );
+    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue();
 
     expect(screen.getByTestId('header')).toHaveClass(
       'custom-header',
@@ -260,14 +326,20 @@ describe('Actionable header project switcher', () => {
       screen.queryByRole('link', { name: 'List' }),
     ).not.toBeInTheDocument();
 
-    const projectSelector = screen.getByLabelText('Select project');
-    expect(projectSelector).toBeInTheDocument();
-    expect(projectSelector).toHaveClass('max-sm:w-12!', 'max-sm:min-w-12!');
-    expect(screen.getByRole('option', { name: 'Alpha' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Beta' })).toBeInTheDocument();
-
-    await user.selectOptions(projectSelector, String('1'));
-    expect(setCurrentProjectRole).toHaveBeenCalledWith(projectRoles[1]);
+    expect(
+      screen.getByRole('button', { name: 'Organization and project switcher' }),
+    ).toHaveTextContent('Second organization / Alpha');
+    await user.click(
+      screen.getByRole('button', { name: 'Select alternate context' }),
+    );
+    expect(setCurrentContext).toHaveBeenCalledWith(
+      organizations[0],
+      organizations[0].projectsList[0],
+    );
+    expect(navigate).toHaveBeenCalledWith(
+      '/dashboard',
+      expect.objectContaining({ fromRouteId: expect.any(String) }),
+    );
   });
 
   it('renders the dashboard as a non-interactive current location', () => {
@@ -418,81 +490,74 @@ describe('Actionable header project switcher', () => {
       ],
       '/dashboard',
       {
-        projectRoles,
-        currentProjectRole: projectRoles[0],
-        setCurrentProjectRole: jest.fn(),
+        getOrganizations: () => organizations,
+        getCurrentOrganization: () => organizations[1],
+        getProjects: () => projects,
+        getCurrentProject: () => projects[0],
+        setCurrentContext: jest.fn(() => true),
       },
     );
 
     expect(screen.getByTestId('breadcrumb-skeleton')).toHaveClass('pl-4');
-    expect(screen.getByTestId('dropdown-skeleton')).toHaveAttribute(
-      'data-size',
-      'sm',
-    );
+    expect(screen.getByTestId('context-switcher-skeleton')).toBeInTheDocument();
   });
 
-  it('does not render project dropdown when setter is unavailable', () => {
-    render(
-      <AuthContext.Provider
-        value={{
-          projectRoles,
-          currentProjectRole: projectRoles[0],
-        }}
-      >
-        <CustomerOptions />
-      </AuthContext.Provider>,
-    );
+  it('does not render the context switcher when its setter is unavailable', () => {
+    renderCustomerOptions({
+      getOrganizations: () => organizations,
+      getCurrentOrganization: () => organizations[1],
+      getProjects: () => projects,
+      getCurrentProject: () => projects[0],
+    });
 
-    expect(screen.queryByLabelText('Select project')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: 'Organization and project switcher',
+      }),
+    ).not.toBeInTheDocument();
   });
 
-  it('does not render project dropdown when it is disabled', () => {
-    render(
-      <AuthContext.Provider
-        value={{
-          projectRoles,
-          currentProjectRole: projectRoles[0],
-          setCurrentProjectRole: jest.fn(),
-        }}
-      >
-        <CustomerOptions showProjectSelector={false} />
-      </AuthContext.Provider>,
+  it('does not render the context switcher when it is disabled', () => {
+    renderCustomerOptions(
+      {
+        getOrganizations: () => organizations,
+        getCurrentOrganization: () => organizations[1],
+        getProjects: () => projects,
+        getCurrentProject: () => projects[0],
+        setCurrentContext: jest.fn(() => true),
+      },
+      { showContextSwitcher: false },
     );
 
-    expect(screen.queryByLabelText('Select project')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: 'Organization and project switcher',
+      }),
+    ).not.toBeInTheDocument();
   });
 
-  it('ignores an empty project selection from the dropdown', async () => {
+  it('does not write or navigate when the current context is selected', async () => {
     const user = userEvent.setup();
-    const setCurrentProjectRole = jest.fn();
+    const setCurrentContext = jest.fn(() => true);
 
-    render(
-      <AuthContext.Provider
-        value={{
-          projectRoles,
-          currentProjectRole: projectRoles[0],
-          setCurrentProjectRole,
-        }}
-      >
-        <CustomerOptions />
-      </AuthContext.Provider>,
+    renderCustomerOptions({
+      getOrganizations: () => organizations,
+      getCurrentOrganization: () => organizations[1],
+      getProjects: () => projects,
+      getCurrentProject: () => projects[0],
+      setCurrentContext,
+    });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Organization and project switcher' }),
     );
 
-    await user.selectOptions(
-      screen.getByLabelText('Select project'),
-      String('-1'),
-    );
-
-    expect(setCurrentProjectRole).not.toHaveBeenCalled();
+    expect(setCurrentContext).not.toHaveBeenCalled();
   });
 
   it('renders configured account links without documentation or source', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
-    render(
-      <AuthContext.Provider value={{}}>
-        <CustomerOptions />
-      </AuthContext.Provider>,
-    );
+    renderCustomerOptions();
 
     await user.click(screen.getByRole('button', { name: 'Account' }));
 
@@ -518,11 +583,7 @@ describe('Actionable header project switcher', () => {
   it('hides the mode action when the theme disables mode selection', () => {
     mockTheme.allowModeSelection = false;
 
-    render(
-      <AuthContext.Provider value={{}}>
-        <CustomerOptions />
-      </AuthContext.Provider>,
-    );
+    renderCustomerOptions();
 
     expect(
       screen.queryByRole('button', { name: 'Switch to dark mode' }),
@@ -532,11 +593,7 @@ describe('Actionable header project switcher', () => {
 
   it('toggles theme mode from the global action', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
-    render(
-      <AuthContext.Provider value={{}}>
-        <CustomerOptions />
-      </AuthContext.Provider>,
-    );
+    renderCustomerOptions();
 
     await user.click(
       screen.getByRole('button', { name: 'Switch to dark mode' }),
@@ -548,11 +605,7 @@ describe('Actionable header project switcher', () => {
   it('shows the light mode action while dark mode is active', () => {
     mockResolvedMode = 'dark';
 
-    render(
-      <AuthContext.Provider value={{}}>
-        <CustomerOptions />
-      </AuthContext.Provider>,
-    );
+    renderCustomerOptions();
 
     expect(
       screen.getByRole('button', { name: 'Switch to light mode' }),

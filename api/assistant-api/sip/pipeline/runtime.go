@@ -19,7 +19,7 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -27,7 +27,7 @@ import (
 
 type sipPreparedCallRuntime struct {
 	session     *sip_runtime.Session
-	auth        *types.Authentication
+	auth        authentication.Principal
 	talkContext context.Context
 	cancelTalk  context.CancelFunc
 	streamer    internal_type.SIPStreamer

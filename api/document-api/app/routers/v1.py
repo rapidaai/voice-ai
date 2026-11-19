@@ -25,7 +25,7 @@ from app.connectors.elstic_search_connector import ElasticSearchConnector
 from app.connectors.postgres_connector import PostgresConnector
 from app.core.indexing_runner import IndexingRunner
 from app.exceptions import RapidaException
-from app.middlewares.auth.user import User
+from app.authentication import AuthenticatedPrincipal
 from app.models.input_model import IndexDocumentRequest
 from app.services.knowledge_service import KnowledgeService
 from app.storage.connector_factory import get_storage
@@ -65,7 +65,7 @@ async def index_document(
         )
 
     # _log.debug("storage ==> ", storage)
-    authenticated_user: User = request.user
+    authenticated_user: AuthenticatedPrincipal = request.user
     project_id = authenticated_user.project_id
     organization_id = authenticated_user.organization_id
     actor = authenticated_user.actor
@@ -90,6 +90,8 @@ async def index_document(
                 integration_client=integration_client,
                 vault_client=vault_client,
                 actor=actor,
+                web_service_assertion_issuer=request.app.state.web_service_assertion_issuer,
+                integration_service_assertion_issuer=request.app.state.integration_service_assertion_issuer,
                 index_type="paragraph-index",
             )
 
@@ -110,7 +112,7 @@ async def get_all_knowledge_base(
             message="Un-authenticated request",
             error_code=401,
         )
-    authenticated_user: User = request.user
+    authenticated_user: AuthenticatedPrincipal = request.user
     user_id = authenticated_user.user_id
     project_id = authenticated_user.project_id
     organization_id = authenticated_user.organization_id

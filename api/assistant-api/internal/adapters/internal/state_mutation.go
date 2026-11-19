@@ -11,12 +11,12 @@ import (
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 )
 
-func (deb *genericRequestor) setAuth(auth *types.Authentication) {
+func (deb *genericRequestor) setAuth(auth authentication.Principal) {
 	deb.auth = auth
 }
 

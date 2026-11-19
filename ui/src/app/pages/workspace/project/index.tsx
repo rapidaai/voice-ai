@@ -25,11 +25,11 @@ import {
   TableBatchActions,
   TableToolbarContent,
   Button,
+  Tag,
   TableSelectRow,
 } from '@carbon/react';
 import { ProjectUserGroupAvatar } from '@/app/components/domain/avatar/project-user-group-avatar';
 import { toHumanReadableDate } from '@/utils/date';
-import { RoleIndicator } from '@/app/components/domain/indicators/role';
 import {
   PageHeader,
   PageHeaderStickyToolbar,
@@ -58,7 +58,7 @@ const skeletonHeaders = [{ key: 'select', header: '' }, ...headers];
 
 export function ProjectPage() {
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
-  const [userId, token] = useCredential();
+  const [userId, token, , organizationId] = useCredential();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isFetching, setIsFetching] = useState(true);
   const [page, setPage] = useState<number>(1);
@@ -73,7 +73,8 @@ export function ProjectPage() {
     useState<Project | null>(null);
   const [projectPendingUpdate, setProjectPendingUpdate] =
     useState<Project | null>(null);
-  const { projectRoles } = useContext(AuthContext);
+  const { getProjects } = useContext(AuthContext);
+  const authenticatedProjects = getProjects?.();
 
   const afterGettingProject = useCallback(
     (err: ServiceError | null, alpr: GetAllProjectResponse | null) => {
@@ -109,7 +110,7 @@ export function ProjectPage() {
         page,
         pageSize,
         criteria,
-        auth: { token, userId },
+        auth: { organizationId, token, userId },
         callback: afterGettingProject,
       });
     },
@@ -123,7 +124,7 @@ export function ProjectPage() {
   const onDeleteProject = (projectId: string) => {
     deleteWorkspaceProject({
       projectId,
-      auth: { token, userId },
+      auth: { organizationId, token, userId },
       callback: (
         err: ServiceError | null,
         apr: ArchiveProjectResponse | null,
@@ -148,8 +149,12 @@ export function ProjectPage() {
       ? toHumanReadableDate(project.getCreateddate()!)
       : '',
     role:
-      projectRoles?.find(role => role.projectid === project.getId())?.role ||
-      '',
+      authenticatedProjects
+        ?.find(
+          authenticatedProject => authenticatedProject.id === project.getId(),
+        )
+        ?.rolesList.map(role => role.name)
+        .join(', ') || '',
     collaborators: project
       .getMembersList()
       .map(member => member.getName())
@@ -306,6 +311,11 @@ export function ProjectPage() {
                                 candidate => candidate.getId() === tableRow.id,
                               );
                               if (!project) return null;
+                              const assignedRoles =
+                                authenticatedProjects?.find(
+                                  authenticatedProject =>
+                                    authenticatedProject.id === project.getId(),
+                                )?.rolesList || [];
 
                               return (
                                 <TableRow
@@ -323,14 +333,19 @@ export function ProjectPage() {
                                       )}
                                   </TableCell>
                                   <TableCell>
-                                    <RoleIndicator
-                                      role={
-                                        projectRoles?.find(
-                                          role =>
-                                            role.projectid === project.getId(),
-                                        )?.role
-                                      }
-                                    />
+                                    <div className="flex flex-wrap gap-1">
+                                      {assignedRoles.length > 0
+                                        ? assignedRoles.map(role => (
+                                            <Tag
+                                              key={role.id}
+                                              type="gray"
+                                              size="sm"
+                                            >
+                                              {role.name}
+                                            </Tag>
+                                          ))
+                                        : '-'}
+                                    </div>
                                   </TableCell>
                                   <TableCell>
                                     <ProjectUserGroupAvatar

@@ -8,10 +8,10 @@ import {
 } from '.';
 
 const authContextValue = {
-  currentUser: { id: 'user-1' },
+  authentication: { user: { id: 'user-1' } },
   token: { token: 'storybook-token' },
-  currentProjectRole: { projectid: 'project-1' },
-  organizationRole: { organizationid: 'org-1' },
+  getCurrentProject: () => ({ id: 'project-1' }),
+  getCurrentOrganization: () => ({ id: 'org-1' }),
 };
 
 const mockSegment = {

@@ -14,9 +14,9 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 )
@@ -41,14 +41,14 @@ type outboundDispatcherTestStore struct {
 type outboundDispatcherConversationServiceStub struct {
 	internal_services.AssistantConversationService
 
-	metricAuth           *types.Authentication
+	metricAuth           authentication.Principal
 	metricAssistantID    uint64
 	metricConversationID uint64
 	metrics              []*protos.Metric
 	metricRecorded       chan struct{}
 	metricOnce           sync.Once
 
-	metadataAuth           *types.Authentication
+	metadataAuth           authentication.Principal
 	metadataAssistantID    uint64
 	metadataConversationID uint64
 	metadata               []*protos.Metadata
@@ -58,7 +58,7 @@ type outboundDispatcherConversationServiceStub struct {
 
 func (s *outboundDispatcherConversationServiceStub) CreateOrUpdateConversationMetrics(
 	_ context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantID uint64,
 	conversationID uint64,
 	metrics []*protos.Metric,
@@ -75,7 +75,7 @@ func (s *outboundDispatcherConversationServiceStub) CreateOrUpdateConversationMe
 
 func (s *outboundDispatcherConversationServiceStub) CreateOrUpdateConversationMetadata(
 	_ context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantID uint64,
 	conversationID uint64,
 	metadata []*protos.Metadata,
@@ -104,12 +104,7 @@ func TestInboundDispatcherSaveCallContextUsesDelegatedContext(t *testing.T) {
 
 	_, err := dispatcher.SaveCallContext(
 		context.Background(),
-		&types.Authentication{
-			AuthType:          types.AuthTypeService,
-			ActorValue:        &types.ActorIdentity{Type: types.ActorTypeService, ID: serviceID},
-			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-			ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
-		},
+		outboundTestServicePrincipal(serviceID, organizationID, projectID),
 		&internal_assistant_entity.Assistant{},
 		9,
 		&internal_type.CallInfo{},
@@ -121,8 +116,8 @@ func TestInboundDispatcherSaveCallContextUsesDelegatedContext(t *testing.T) {
 	if store.callContext == nil || store.callContext.OrganizationID != organizationID || store.callContext.ProjectID != projectID {
 		t.Fatalf("saved call context = %+v", store.callContext)
 	}
-	if store.callContext.AuthActorType == nil || *store.callContext.AuthActorType != string(types.ActorTypeService) || store.callContext.AuthActorID == nil || *store.callContext.AuthActorID != serviceID {
-		t.Fatalf("saved actor = %v/%v", store.callContext.AuthActorType, store.callContext.AuthActorID)
+	if store.callContext.AuthSubjectType != string(authentication.IdentityService) || store.callContext.AuthSubjectID != serviceID {
+		t.Fatalf("saved subject = %s/%d", store.callContext.AuthSubjectType, store.callContext.AuthSubjectID)
 	}
 }
 
@@ -307,24 +302,22 @@ func TestOutboundDispatcher_StatusReporterRecordsTerminalObservability(t *testin
 	organizationID := uint64(11)
 	projectID := uint64(22)
 	serviceID := uint64(55)
-	actorType := string(types.ActorTypeService)
 	service := &outboundDispatcherConversationServiceStub{
 		metricRecorded:   make(chan struct{}),
 		metadataRecorded: make(chan struct{}),
 	}
+	storedCallContext := &callcontext.CallContext{
+		ContextID:      "ctx-provider-terminal",
+		Provider:       SIP.String(),
+		Status:         callcontext.StatusPending,
+		AssistantID:    33,
+		ConversationID: 44,
+	}
+	if err := storedCallContext.SetAuthentication(outboundTestServicePrincipal(serviceID, organizationID, projectID)); err != nil {
+		t.Fatalf("SetAuthentication() error = %v", err)
+	}
 	store := &outboundDispatcherTestStore{
-		callContext: &callcontext.CallContext{
-			ContextID:      "ctx-provider-terminal",
-			Provider:       SIP.String(),
-			Status:         callcontext.StatusPending,
-			AssistantID:    33,
-			ConversationID: 44,
-			OrganizationID: organizationID,
-			ProjectID:      projectID,
-			AuthType:       types.AuthTypeService.String(),
-			AuthActorType:  &actorType,
-			AuthActorID:    &serviceID,
-		},
+		callContext: storedCallContext,
 	}
 	dispatcher := &OutboundDispatcher{
 		store:               store,
@@ -357,7 +350,7 @@ func TestOutboundDispatcher_StatusReporterRecordsTerminalObservability(t *testin
 		t.Fatal("timed out waiting for terminal status metadata")
 	}
 
-	if service.metricAuth == nil {
+	if service.metricAuth.Subject().ID == 0 {
 		t.Fatal("expected terminal status metric to be recorded")
 	}
 	if service.metricAssistantID != 33 || service.metricConversationID != 44 {
@@ -380,7 +373,7 @@ func TestOutboundDispatcher_StatusReporterRecordsTerminalObservability(t *testin
 		metricByName[type_enums.CONVERSATION_STATUS.String()].Description != "Busy Here" {
 		t.Fatalf("unexpected conversation status metric: %+v", metricByName[type_enums.CONVERSATION_STATUS.String()])
 	}
-	if service.metadataAuth == nil {
+	if service.metadataAuth.Subject().ID == 0 {
 		t.Fatal("expected terminal status metadata to be recorded")
 	}
 	metadataByKey := make(map[string]string, len(service.metadata))
@@ -415,23 +408,21 @@ func TestOutboundDispatcher_StatusReporterRecordsTerminalObservability(t *testin
 
 func TestOutboundDispatcher_StatusReporterRecordsRingingProgressObservability(t *testing.T) {
 	serviceID := uint64(55)
-	actorType := string(types.ActorTypeService)
 	service := &outboundDispatcherConversationServiceStub{
 		metricRecorded: make(chan struct{}),
 	}
+	storedCallContext := &callcontext.CallContext{
+		ContextID:      "ctx-provider-ringing",
+		Provider:       SIP.String(),
+		Status:         callcontext.StatusPending,
+		AssistantID:    33,
+		ConversationID: 44,
+	}
+	if err := storedCallContext.SetAuthentication(outboundTestServicePrincipal(serviceID, 11, 22)); err != nil {
+		t.Fatalf("SetAuthentication() error = %v", err)
+	}
 	store := &outboundDispatcherTestStore{
-		callContext: &callcontext.CallContext{
-			ContextID:      "ctx-provider-ringing",
-			Provider:       SIP.String(),
-			Status:         callcontext.StatusPending,
-			AssistantID:    33,
-			ConversationID: 44,
-			OrganizationID: 11,
-			ProjectID:      22,
-			AuthType:       types.AuthTypeService.String(),
-			AuthActorType:  &actorType,
-			AuthActorID:    &serviceID,
-		},
+		callContext: storedCallContext,
 	}
 	dispatcher := &OutboundDispatcher{
 		store:               store,
@@ -456,7 +447,7 @@ func TestOutboundDispatcher_StatusReporterRecordsRingingProgressObservability(t 
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for ringing metric")
 	}
-	if service.metricAuth == nil {
+	if service.metricAuth.Subject().ID == 0 {
 		t.Fatal("expected ringing metric to be recorded")
 	}
 	if service.metricAssistantID != 33 || service.metricConversationID != 44 {
@@ -470,7 +461,7 @@ func TestOutboundDispatcher_StatusReporterRecordsRingingProgressObservability(t 
 		service.metrics[0].Description != "outbound_progress_ringing" {
 		t.Fatalf("unexpected ringing metric: %+v", service.metrics[0])
 	}
-	if service.metadataAuth != nil || len(service.metadata) != 0 {
+	if service.metadataAuth.Subject().ID != 0 || len(service.metadata) != 0 {
 		t.Fatalf("expected no ringing metadata, got auth=%v metadata=%+v", service.metadataAuth, service.metadata)
 	}
 }
@@ -505,10 +496,10 @@ func TestOutboundDispatcher_StatusReporterSkipsRingingWhenContextClaimed(t *test
 	if store.callContext.CallStatus != callcontext.CallStatusAnswered {
 		t.Fatalf("expected claimed context call status to remain answered, got %q", store.callContext.CallStatus)
 	}
-	if service.metricAuth != nil || len(service.metrics) != 0 {
+	if service.metricAuth.Subject().ID != 0 || len(service.metrics) != 0 {
 		t.Fatalf("expected no claimed-context ringing metric, got auth=%v metrics=%+v", service.metricAuth, service.metrics)
 	}
-	if service.metadataAuth != nil || len(service.metadata) != 0 {
+	if service.metadataAuth.Subject().ID != 0 || len(service.metadata) != 0 {
 		t.Fatalf("expected no claimed-context ringing metadata, got auth=%v metadata=%+v", service.metadataAuth, service.metadata)
 	}
 }
@@ -649,4 +640,16 @@ func TestOutboundDispatcher_SIPConnectTimeoutDerivesFromInviteTimeout(t *testing
 	if got != 45*time.Second {
 		t.Fatalf("expected SIP connect timeout 45s, got %s", got)
 	}
+}
+
+func outboundTestServicePrincipal(serviceID, organizationID, projectID uint64) authentication.Principal {
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityService, ID: serviceID, Issuer: "assistant-api"},
+		authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID},
+		authentication.Proof{Method: authentication.AuthenticationServiceAssertion, Audience: authentication.AudienceRapidaInternal, Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "assistant-test-1"}}, nil,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return principal
 }

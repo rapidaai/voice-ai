@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
@@ -74,20 +75,20 @@ func TestCloseUsesRegistrationOrder(t *testing.T) {
 	}
 }
 
-func TestGRPCUsesUserFirstAuthenticationMiddlewareOrder(t *testing.T) {
+func TestGRPCAuthenticationMiddlewareOrder(t *testing.T) {
 	file := parseCommandSource(t, "assistant.go")
 
 	assertAuthenticationMiddlewareOrder(t, interceptorChain(t, file, "ChainUnaryInterceptor"), []string{
-		"NewProjectAuthenticatorUnaryServerMiddleware",
-		"NewOrganizationAuthenticatorUnaryServerMiddleware",
-		"NewServiceAuthenticatorUnaryServerMiddleware",
-		"NewAuthenticationUnaryServerMiddleware",
+		"NewProjectUnaryMiddleware",
+		"NewOrganizationUnaryMiddleware",
+		"NewServiceUnaryMiddleware",
+		"NewUserUnaryMiddleware",
 	})
 	assertAuthenticationMiddlewareOrder(t, interceptorChain(t, file, "ChainStreamInterceptor"), []string{
-		"NewProjectAuthenticatorStreamServerMiddleware",
-		"NewOrganizationAuthenticatorStreamServerMiddleware",
-		"NewServiceAuthenticatorStreamServerMiddleware",
-		"NewAuthenticationStreamServerMiddleware",
+		"NewProjectStreamMiddleware",
+		"NewOrganizationStreamMiddleware",
+		"NewServiceStreamMiddleware",
+		"NewUserStreamMiddleware",
 	})
 }
 
@@ -95,31 +96,24 @@ func TestGinAuthenticationMiddlewareOrder(t *testing.T) {
 	file := parseCommandSource(t, "assistant.go")
 	var middleware []string
 
-	for _, declaration := range file.Decls {
-		function, ok := declaration.(*ast.FuncDecl)
-		if !ok || function.Name.Name != "AuthenticationMiddleware" {
-			continue
+	ast.Inspect(file, func(node ast.Node) bool {
+		useCall, ok := node.(*ast.CallExpr)
+		if !ok || callName(useCall) != "Use" {
+			return true
 		}
-		for _, statement := range function.Body.List {
-			expression, ok := statement.(*ast.ExprStmt)
-			if !ok {
-				continue
-			}
-			useCall, ok := expression.X.(*ast.CallExpr)
-			if !ok || callName(useCall) != "Use" || len(useCall.Args) != 1 {
-				continue
-			}
-			if installed, ok := useCall.Args[0].(*ast.CallExpr); ok {
+		for _, argument := range useCall.Args {
+			if installed, ok := argument.(*ast.CallExpr); ok {
 				middleware = append(middleware, callName(installed))
 			}
 		}
-	}
+		return true
+	})
 
 	assertAuthenticationMiddlewareOrder(t, middleware, []string{
-		"NewProjectAuthenticatorMiddleware",
-		"NewOrganizationAuthenticatorMiddleware",
-		"NewServiceAuthenticatorMiddleware",
-		"NewAuthenticationMiddleware",
+		"NewProjectHTTPMiddleware",
+		"NewOrganizationHTTPMiddleware",
+		"NewServiceHTTPMiddleware",
+		"NewUserHTTPMiddleware",
 	})
 }
 
@@ -132,6 +126,55 @@ func TestInitDoesNotRegisterAuditActorCallbacks(t *testing.T) {
 		}
 		return true
 	})
+}
+
+func TestAuthenticationKeyIsDerivedBeforeServerConstruction(t *testing.T) {
+	file := parseCommandSource(t, "assistant.go")
+	var derivation, server token.Pos
+	ast.Inspect(file, func(node ast.Node) bool {
+		literal, ok := node.(*ast.BasicLit)
+		if ok {
+			value := strings.ToLower(literal.Value)
+			if strings.Contains(value, "root") && strings.Contains(value, "fingerprint") {
+				t.Fatal("root-secret fingerprint logging restored")
+			}
+		}
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		switch callName(call) {
+		case "ServiceAuthenticationKey":
+			derivation = call.Pos()
+		case "NewServer":
+			server = call.Pos()
+		}
+		return true
+	})
+	if derivation == token.NoPos || server == token.NoPos || derivation >= server {
+		t.Fatalf("authentication-key derivation position = %d, server position = %d", derivation, server)
+	}
+}
+
+func TestUsesUnifiedWebAuthenticationClient(t *testing.T) {
+	file := parseCommandSource(t, "assistant.go")
+	found := false
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		switch callName(call) {
+		case "NewAuthenticationClient":
+			found = true
+		case "NewAuthenticationResolverClient":
+			t.Fatal("removed authentication resolver client is constructed")
+		}
+		return true
+	})
+	if !found {
+		t.Fatal("unified Web authentication client is not constructed")
+	}
 }
 
 func TestAllRoutersPassesRapidaClientToKnowledgeRoutes(t *testing.T) {
@@ -216,12 +259,13 @@ func assertAuthenticationMiddlewareOrder(t *testing.T, chain []string, expected 
 	actual := make([]string, 0, len(expected))
 	for _, middleware := range chain {
 		switch middleware {
+		case "NewProjectHTTPMiddleware", "NewOrganizationHTTPMiddleware", "NewServiceHTTPMiddleware", "NewUserHTTPMiddleware",
+			"NewProjectUnaryMiddleware", "NewOrganizationUnaryMiddleware", "NewServiceUnaryMiddleware", "NewUserUnaryMiddleware",
+			"NewProjectStreamMiddleware", "NewOrganizationStreamMiddleware", "NewServiceStreamMiddleware", "NewUserStreamMiddleware":
+			actual = append(actual, middleware)
 		case "NewAuthenticationMiddleware", "NewProjectAuthenticatorMiddleware", "NewOrganizationAuthenticatorMiddleware", "NewServiceAuthenticatorMiddleware",
 			"NewAuthenticationUnaryServerMiddleware", "NewProjectAuthenticatorUnaryServerMiddleware", "NewOrganizationAuthenticatorUnaryServerMiddleware", "NewServiceAuthenticatorUnaryServerMiddleware",
 			"NewAuthenticationStreamServerMiddleware", "NewProjectAuthenticatorStreamServerMiddleware", "NewOrganizationAuthenticatorStreamServerMiddleware", "NewServiceAuthenticatorStreamServerMiddleware":
-			actual = append(actual, middleware)
-		case "NewAuthenticationBoundaryUnaryServerMiddleware", "NewAuthenticationBoundaryStreamServerMiddleware", "NewAuthenticationBoundaryMiddleware",
-			"NewCredentialConflictUnaryServerMiddleware", "NewCredentialConflictStreamServerMiddleware", "NewCredentialConflictMiddleware":
 			t.Fatalf("forbidden middleware %s found in %v", middleware, chain)
 		}
 	}

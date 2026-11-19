@@ -60,6 +60,7 @@ export const listUsers = ({
     ConnectionConfig.WithDebugger({
       authorization: auth.token,
       userId: auth.userId,
+      organizationId: auth.organizationId,
       projectId: auth.projectId,
     }),
   );
@@ -97,6 +98,7 @@ export const updateUserNotificationSettings = ({
     ConnectionConfig.WithDebugger({
       authorization: auth.token,
       userId: auth.userId,
+      organizationId: auth.organizationId,
       projectId: auth.projectId,
     }),
   );

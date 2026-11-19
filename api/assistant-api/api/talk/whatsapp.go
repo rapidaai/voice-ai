@@ -51,7 +51,7 @@ func (cApi *ConversationApi) WhatsappReciever(c *gin.Context) {
 // Helper function to send WhatsApp message using Twilio
 func sendWhatsAppMessage(to, body string) error {
 	accountSid := "YOUR_TWILIO_ACCOUNT_SID"
-	authToken := "YOUR_TWILIO_AUTH_TOKEN"
+	authToken := "YOUR_TWILIO_AUTH_TOKEN" // #nosec G101, this placeholder contains no credential.
 	from := "whatsapp:+YOUR_TWILIO_NUMBER"
 
 	msgData := url.Values{}

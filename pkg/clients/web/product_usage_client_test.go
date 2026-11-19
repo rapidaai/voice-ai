@@ -9,19 +9,19 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/clients"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
 
 type productUsageInternalClientStub struct {
 	clients.InternalClient
-	auth       *types.Authentication
+	auth       authentication.Principal
 	contextKey any
 	err        error
 }
 
-func (client *productUsageInternalClientStub) WithAuth(ctx context.Context, auth *types.Authentication) (context.Context, error) {
+func (client *productUsageInternalClientStub) WithAuth(ctx context.Context, auth authentication.Principal) (context.Context, error) {
 	client.auth = auth
 	if client.err != nil {
 		return nil, client.err
@@ -78,16 +78,16 @@ func TestProductUsageClientCreatesAuthenticatedRequest(t *testing.T) {
 		logger:             testLogger(t),
 		productUsageClient: grpcClient,
 	}
-	auth := &types.Authentication{}
+	principal := productUsagePrincipal(t)
 	request := &protos.CreateProductUsageRequest{UsageType: "stt_duration", Usages: 10, Unit: "nanosecond"}
-	response, err := client.CreateProductUsage(context.Background(), auth, request)
+	response, err := client.CreateProductUsage(context.Background(), principal, request)
 	if err != nil {
 		t.Fatalf("CreateProductUsage() error = %v", err)
 	}
 	if response.GetData().GetId() != 42 {
 		t.Fatalf("CreateProductUsage() response ID = %d", response.GetData().GetId())
 	}
-	if internalClient.auth != auth {
+	if internalClient.auth.Subject() != principal.Subject() || internalClient.auth.Tenant() != principal.Tenant() {
 		t.Fatal("CreateProductUsage() did not forward authentication")
 	}
 	if !grpcClient.hasAuth {
@@ -115,7 +115,7 @@ func TestProductUsageClientReturnsGRPCError(t *testing.T) {
 		productUsageClient: &productUsageGRPCClientStub{err: expectedErr},
 	}
 
-	_, err := client.CreateProductUsage(context.Background(), &types.Authentication{}, nil)
+	_, err := client.CreateProductUsage(context.Background(), productUsagePrincipal(t), nil)
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("CreateProductUsage() error = %v", err)
 	}
@@ -130,7 +130,7 @@ func TestProductUsageClientReturnsAuthenticationErrorWithoutCallingGRPC(t *testi
 		productUsageClient: grpcClient,
 	}
 
-	_, err := client.CreateProductUsage(context.Background(), &types.Authentication{}, nil)
+	_, err := client.CreateProductUsage(context.Background(), productUsagePrincipal(t), nil)
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("CreateProductUsage() error = %v, want %v", err, expectedErr)
 	}
@@ -147,7 +147,7 @@ func TestProductUsageClientReturnsServiceResponse(t *testing.T) {
 		productUsageClient: &productUsageGRPCClientStub{response: want},
 	}
 
-	got, err := client.CreateProductUsage(context.Background(), &types.Authentication{}, nil)
+	got, err := client.CreateProductUsage(context.Background(), productUsagePrincipal(t), nil)
 	if err != nil {
 		t.Fatalf("CreateProductUsage() error = %v", err)
 	}
@@ -168,7 +168,7 @@ func TestProductUsageClientBoundsRequestDuration(t *testing.T) {
 		}),
 	}
 
-	_, err := client.CreateProductUsage(context.Background(), &types.Authentication{}, nil)
+	_, err := client.CreateProductUsage(context.Background(), productUsagePrincipal(t), nil)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("CreateProductUsage() error = %v, want deadline exceeded", err)
 	}
@@ -200,4 +200,18 @@ func (productUsageGRPCClientFunc) GetProductUsages(context.Context, *protos.GetP
 
 func (productUsageGRPCClientFunc) GetOrganizationUsages(context.Context, *protos.GetOrganizationUsagesRequest, ...grpc.CallOption) (*protos.GetUsagesResponse, error) {
 	return nil, errors.New("not implemented")
+}
+
+func productUsagePrincipal(t *testing.T) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: 5},
+		authentication.Tenant{OrganizationID: 7, ProjectID: 11},
+		authentication.Proof{Method: authentication.AuthenticationUserSession, Reference: authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: "session-1"}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return principal
 }

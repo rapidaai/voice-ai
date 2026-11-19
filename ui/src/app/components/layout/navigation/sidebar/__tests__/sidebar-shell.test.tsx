@@ -13,7 +13,6 @@ let mockSetLocked = jest.fn();
 let mockWorkspaceFeatures: Record<string, boolean> = { knowledge: false };
 let mockRapidaLoading = false;
 let mockRapidaLoadingType: string | undefined;
-let mockOrganizationRole = 'member';
 
 jest.mock('@/context/sidebar-context', () => ({
   useSidebar: () => ({
@@ -48,10 +47,6 @@ jest.mock('@/stores/app', () => ({
     loading: mockRapidaLoading,
     loadingType: mockRapidaLoadingType,
   }),
-}));
-
-jest.mock('@/hooks/use-credential', () => ({
-  useAuth: () => ({ organizationRole: { role: mockOrganizationRole } }),
 }));
 
 jest.mock('@/app/components/ui/primitives/text', () => ({
@@ -101,7 +96,6 @@ describe('sidebar shell', () => {
     mockWorkspaceFeatures = { knowledge: false };
     mockRapidaLoading = false;
     mockRapidaLoadingType = undefined;
-    mockOrganizationRole = 'member';
   });
 
   it('uses the shared shell surface and aligned full logo when expanded', () => {
@@ -173,12 +167,8 @@ describe('sidebar shell', () => {
     expect(mockSetLocked).toHaveBeenCalledWith(false);
   });
 
-  it('shows role management only to organization owners and admins', () => {
-    const { rerender } = render(<SidebarNavigation />);
-    expect(screen.queryByText('Roles & Permissions')).not.toBeInTheDocument();
-
-    mockOrganizationRole = 'admin';
-    rerender(<SidebarNavigation />);
+  it('shows role management without a console permission projection', () => {
+    render(<SidebarNavigation />);
     expect(screen.getByText('Roles & Permissions')).toBeInTheDocument();
   });
 });

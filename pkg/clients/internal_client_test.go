@@ -1,7 +1,9 @@
 package clients
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"net/http"
 	"strconv"
@@ -12,14 +14,54 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
+	authentication_jwt "github.com/rapidaai/pkg/authentication/jwt"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/pkg/types"
 )
 
 type recordingRedisConnector struct {
 	command string
 	args    []string
+}
+
+func TestNewInternalClientPreservesIssuerValidationError(t *testing.T) {
+	cfg := &config.AppConfig{Secret: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="}
+	for _, destination := range []string{"", " web-api", "web-api\x00"} {
+		client := NewInternalClient(cfg, destination, nil, nil)
+		serviceContext, serviceErr := client.WithService(context.Background())
+		var invalidIssuer pkg_errors.JWTIssuerInvalidError
+		if serviceContext != nil || !errors.As(serviceErr, &invalidIssuer) {
+			t.Fatalf("WithService(%q) = %v, %v", destination, serviceContext, serviceErr)
+		}
+		delegatedContext, delegatedErr := client.WithAuth(context.Background(), authentication.Principal{})
+		if delegatedContext != nil || !errors.As(delegatedErr, &invalidIssuer) {
+			t.Fatalf("WithAuth(%q) = %v, %v", destination, delegatedContext, delegatedErr)
+		}
+	}
+}
+
+func TestNewInternalClientIssuesDestinationBoundServiceAssertion(t *testing.T) {
+	cfg := &config.AppConfig{Secret: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="}
+	client := NewInternalClient(cfg, "web-api", nil, nil)
+	authContext, err := client.WithService(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	outgoingMetadata, ok := metadata.FromOutgoingContext(authContext)
+	assertions := outgoingMetadata.Get(types.SERVICE_SCOPE_KEY)
+	if !ok || len(assertions) != 1 {
+		t.Fatalf("service assertion metadata = %v", outgoingMetadata)
+	}
+	verified, err := authentication_jwt.NewVerifier("web-api", cfg.ServiceAuthenticationKey()).Verify(assertions[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if verified.Subject() != (authentication.Identity{Type: authentication.IdentityService, ID: 1, Issuer: "internal"}) {
+		t.Fatalf("verified subject = %+v", verified.Subject())
+	}
 }
 
 func TestInternalClientWithTokenPreservesUint64UserID(t *testing.T) {
@@ -104,141 +146,10 @@ func TestInternalClientCacheRejectsUnsupportedValue(t *testing.T) {
 	}
 }
 
-func TestInternalClientCreateServiceScopeToken(t *testing.T) {
-	client := actorAwareInternalClient(t)
-	actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 5}
-	token, err := client.createServiceScopeToken(&types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		ActorValue:        &actor,
-		UserValue:         &types.UserContext{UserID: 5},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
-		ProjectValue:      &types.ProjectContext{OrganizationID: 7, ProjectID: 11},
-	})
-	if err != nil {
-		t.Fatalf("createServiceScopeToken() error = %v", err)
-	}
-	scope, err := types.ExtractServiceScope(token, client.cfg.Secret)
-	if err != nil {
-		t.Fatalf("ExtractServiceScope() error = %v", err)
-	}
-	context, ok := scope.DelegatedContext()
-	if !ok || context.OrganizationID != 7 || context.UserID != nil || context.ProjectID == nil || *context.ProjectID != 11 {
-		t.Fatalf("DelegatedContext() = %+v, %v", context, ok)
-	}
-	serviceActor, err := types.ResolveAuditActor(scope)
-	if err != nil || serviceActor != (types.ActorIdentity{Type: types.ActorTypeService, ID: 41}) {
-		t.Fatalf("ResolveAuditActor() = %+v, %v", serviceActor, err)
-	}
-	auth, err := scope.Authentication()
-	if err != nil {
-		t.Fatalf("Authentication() error = %v", err)
-	}
-	if effectiveActor := auth.Actor(); effectiveActor != (types.ActorIdentity{Type: types.ActorTypeUser, ID: 5}) {
-		t.Fatalf("Actor() = %+v", effectiveActor)
-	}
-}
-
-func TestInternalClientCreateServiceScopeTokenRequiresOrganization(t *testing.T) {
-	client := actorAwareInternalClient(t)
-	actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 5}
-	_, err := client.createServiceScopeToken(&types.Authentication{
-		AuthType:   types.AuthTypeUser,
-		ActorValue: &actor,
-		UserValue:  &types.UserContext{UserID: 5},
-	})
-	if !errors.Is(err, types.ErrUnauthenticated) {
-		t.Fatalf("createServiceScopeToken() error = %v", err)
-	}
-}
-
-func TestInternalClientCreateServiceScopeTokenRejectsInvalidSourceAuthentication(t *testing.T) {
-	client := actorAwareInternalClient(t)
-	userActor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 5}
-	serviceActor := types.ActorIdentity{Type: types.ActorTypeService, ID: 6}
-	tests := []struct {
-		name string
-		auth *types.Authentication
-	}{
-		{
-			name: "missing user context",
-			auth: &types.Authentication{AuthType: types.AuthTypeUser, ActorValue: &userActor, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}},
-		},
-		{
-			name: "mismatched user context",
-			auth: &types.Authentication{AuthType: types.AuthTypeUser, ActorValue: &userActor, UserValue: &types.UserContext{UserID: 8}, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}},
-		},
-		{
-			name: "service actor type mismatch",
-			auth: &types.Authentication{AuthType: types.AuthTypeService, ActorValue: &userActor, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}},
-		},
-		{
-			name: "system actor type mismatch",
-			auth: &types.Authentication{AuthType: types.AuthTypeSystem, ActorValue: &serviceActor, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}},
-		},
-		{
-			name: "system actor missing",
-			auth: &types.Authentication{AuthType: types.AuthTypeSystem, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if _, err := client.createServiceScopeToken(test.auth); err == nil {
-				t.Fatal("createServiceScopeToken() error = nil")
-			}
-		})
-	}
-}
-
-func TestInternalClientCreateServiceScopeTokenRejectsMismatchedProjectOrganization(t *testing.T) {
-	client := actorAwareInternalClient(t)
-	_, err := client.createServiceScopeToken(&types.Authentication{
-		AuthType:          types.AuthTypeProject,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
-		ProjectValue:      &types.ProjectContext{OrganizationID: 8, ProjectID: 11},
-	})
-	if err == nil {
-		t.Fatal("createServiceScopeToken() error = nil")
-	}
-}
-
-func TestInternalClientCreateServiceScopeTokenRequiresActorAndSecret(t *testing.T) {
-	client := actorAwareInternalClient(t)
-	actor := types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 7}
-	authentication := &types.Authentication{
-		AuthType:          types.AuthTypeOrg,
-		ActorValue:        &actor,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
-	}
-	client.cfg.ServiceID = 0
-	if _, err := client.createServiceScopeToken(authentication); !errors.Is(err, types.ErrServiceActorUnavailable) {
-		t.Fatalf("createServiceScopeToken() error = %v, want %v", err, types.ErrServiceActorUnavailable)
-	}
-	client.cfg.ServiceID = 41
-	client.cfg.Secret = ""
-	if _, err := client.createServiceScopeToken(authentication); !errors.Is(err, types.ErrServiceSecretUnavailable) {
-		t.Fatalf("createServiceScopeToken() error = %v, want %v", err, types.ErrServiceSecretUnavailable)
-	}
-}
-
-func TestInternalClientWithAuthReturnsErrorWithoutContext(t *testing.T) {
-	client := actorAwareInternalClient(t)
-	authContext, err := client.WithAuth(context.Background(), &types.Authentication{})
-	if !errors.Is(err, types.ErrUnauthenticated) {
-		t.Fatalf("WithAuth() error = %v", err)
-	}
-	if authContext != nil {
-		t.Fatalf("WithAuth() context = %v, want nil", authContext)
-	}
-}
-
 func TestInternalClientWithAuthAddsServiceAssertion(t *testing.T) {
-	client := actorAwareInternalClient(t)
-	actor := types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 9}
-	authContext, err := client.WithAuth(context.Background(), &types.Authentication{
-		AuthType:          types.AuthTypeOrg,
-		ActorValue:        &actor,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
-	})
+	client, verifier := serviceAssertionClient(t, "web-api")
+	principal := userPrincipal(t, authentication.Tenant{OrganizationID: 7, ProjectID: 11})
+	authContext, err := client.WithAuth(context.Background(), principal)
 	if err != nil {
 		t.Fatalf("WithAuth() error = %v", err)
 	}
@@ -246,206 +157,181 @@ func TestInternalClientWithAuthAddsServiceAssertion(t *testing.T) {
 	if !ok || len(outgoingMetadata.Get(types.SERVICE_SCOPE_KEY)) != 1 {
 		t.Fatalf("WithAuth() metadata = %v, %v", outgoingMetadata, ok)
 	}
-	scope, err := types.ExtractServiceScope(outgoingMetadata.Get(types.SERVICE_SCOPE_KEY)[0], client.cfg.Secret)
+	verified, err := verifier.Verify(outgoingMetadata.Get(types.SERVICE_SCOPE_KEY)[0])
 	if err != nil {
-		t.Fatalf("ExtractServiceScope() error = %v", err)
+		t.Fatalf("Verify() error = %v", err)
 	}
-	forwardedAuth, err := scope.Authentication()
-	if err != nil {
-		t.Fatalf("Authentication() error = %v", err)
+	if verified.Subject() != principal.Subject() || verified.Tenant() != principal.Tenant() {
+		t.Fatalf("verified subject/tenant = %+v/%+v", verified.Subject(), verified.Tenant())
 	}
-	if forwardedActor := forwardedAuth.Actor(); forwardedActor != actor {
-		t.Fatalf("Actor() = %+v; want %+v", forwardedActor, actor)
+	if verified.Actor() != (authentication.ServiceActor{ID: 1, Issuer: "internal"}) {
+		t.Fatalf("Actor() = %+v", verified.Actor())
 	}
 }
 
-func TestInternalClientAllAuthenticationPathsDelegateActor(t *testing.T) {
-	client := actorAwareInternalClient(t)
-	actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 5}
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		ActorValue:        &actor,
-		UserValue:         &types.UserContext{UserID: 5},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
-	}
-	platformContext, err := client.WithPlatform(context.Background(), auth)
+func TestInternalClientAuthenticationPathsUseDestinationBoundAssertion(t *testing.T) {
+	client, verifier := serviceAssertionClient(t, "document-api")
+	principal := organizationPrincipal(t)
+	platformContext, err := client.WithPlatform(context.Background(), principal)
 	if err != nil {
 		t.Fatalf("WithPlatform() error = %v", err)
 	}
 	platformMetadata, _ := metadata.FromOutgoingContext(platformContext)
-	assertDelegatedActor(t, platformMetadata.Get(types.SERVICE_SCOPE_KEY)[0], client.cfg.Secret, actor)
+	if _, err := verifier.Verify(platformMetadata.Get(types.SERVICE_SCOPE_KEY)[0]); err != nil {
+		t.Fatalf("platform assertion error = %v", err)
+	}
 
 	request, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	request, err = client.WithHttpAuth(context.Background(), auth, request)
+	request, err = client.WithHttpAuth(context.Background(), principal, request)
 	if err != nil {
 		t.Fatalf("WithHttpAuth() error = %v", err)
 	}
-	assertDelegatedActor(t, request.Header.Get("Authorization"), client.cfg.Secret, actor)
-}
-
-func TestInternalClientMultiHopAuthentication(t *testing.T) {
-	projectID := uint64(11)
-	tests := []struct {
-		name  string
-		actor types.ActorIdentity
-		auth  *types.Authentication
-	}{
-		{
-			name:  "user",
-			actor: types.ActorIdentity{Type: types.ActorTypeUser, ID: 5},
-			auth:  &types.Authentication{AuthType: types.AuthTypeUser, UserValue: &types.UserContext{UserID: 5}, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}, ProjectValue: &types.ProjectContext{OrganizationID: 7, ProjectID: projectID}},
-		},
-		{
-			name:  "project",
-			actor: types.ActorIdentity{Type: types.ActorTypeProject, ID: 6},
-			auth:  &types.Authentication{AuthType: types.AuthTypeProject, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}, ProjectValue: &types.ProjectContext{OrganizationID: 7, ProjectID: projectID}},
-		},
-		{
-			name:  "organization",
-			actor: types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 8},
-			auth:  &types.Authentication{AuthType: types.AuthTypeOrg, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}},
-		},
+	assertion := request.Header.Get(types.SERVICE_SCOPE_KEY)
+	if request.Header.Get("Authorization") != "" || assertion == "" {
+		t.Fatalf("service/authorization headers = %q/%q", assertion, request.Header.Get("Authorization"))
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			test.auth.ActorValue = &test.actor
-			firstClient := actorAwareInternalClient(t)
-			firstToken, err := firstClient.createServiceScopeToken(test.auth)
-			if err != nil {
-				t.Fatal(err)
-			}
-			firstScope, err := types.ExtractServiceScope(firstToken, firstClient.cfg.Secret)
-			if err != nil {
-				t.Fatal(err)
-			}
-			forwardedAuth, err := firstScope.Authentication()
-			if err != nil {
-				t.Fatal(err)
-			}
-			secondClient := &internalClient{cfg: &config.AppConfig{Name: "integration-api", ServiceID: 42, Secret: "secret"}}
-			secondToken, err := secondClient.createServiceScopeToken(forwardedAuth)
-			if err != nil {
-				t.Fatal(err)
-			}
-			secondScope, err := types.ExtractServiceScope(secondToken, secondClient.cfg.Secret)
-			if err != nil {
-				t.Fatal(err)
-			}
-			secondAuth, err := secondScope.Authentication()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if actor := secondAuth.Actor(); actor != test.actor {
-				t.Fatalf("Actor() = %+v; want %+v", actor, test.actor)
-			}
-		})
+	if _, err := verifier.Verify(assertion); err != nil {
+		t.Fatalf("HTTP assertion error = %v", err)
 	}
 }
 
-func TestInternalClientMultiHopServiceAuthenticationRotatesCaller(t *testing.T) {
-	firstClient := actorAwareInternalClient(t)
-	serviceActor := types.ActorIdentity{Type: types.ActorTypeService, ID: 40}
-	serviceAuth := &types.Authentication{
-		AuthType:          types.AuthTypeService,
-		ActorValue:        &serviceActor,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
+func TestInternalClientRejectsInvalidPrincipalWithoutMutatingRequest(t *testing.T) {
+	client, _ := serviceAssertionClient(t, "document-api")
+	if authContext, err := client.WithPlatform(context.Background(), authentication.Principal{}); err == nil || authContext != nil {
+		t.Fatalf("WithPlatform() = %v, %v", authContext, err)
 	}
-	firstToken, err := firstClient.createServiceScopeToken(serviceAuth)
+	request, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstScope, err := types.ExtractServiceScope(firstToken, firstClient.cfg.Secret)
-	if err != nil {
-		t.Fatal(err)
+	authenticatedRequest, err := client.WithHttpAuth(context.Background(), authentication.Principal{}, request)
+	if err == nil || authenticatedRequest != nil {
+		t.Fatalf("WithHttpAuth() = %v, %v", authenticatedRequest, err)
 	}
-	reconstructedAuth, err := firstScope.Authentication()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if actor := reconstructedAuth.Actor(); actor != serviceActor {
-		t.Fatalf("first Actor() = %+v", actor)
-	}
-	secondClient := &internalClient{cfg: &config.AppConfig{Name: "integration-api", ServiceID: 42, Secret: "secret"}}
-	secondToken, err := secondClient.createServiceScopeToken(reconstructedAuth)
-	if err != nil {
-		t.Fatal(err)
-	}
-	secondScope, err := types.ExtractServiceScope(secondToken, secondClient.cfg.Secret)
-	if err != nil {
-		t.Fatal(err)
-	}
-	secondAuth, err := secondScope.Authentication()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if actor := secondAuth.Actor(); actor != serviceActor {
-		t.Fatalf("second Actor() = %+v", actor)
+	if request.Header.Get(types.SERVICE_SCOPE_KEY) != "" {
+		t.Fatal("WithHttpAuth() mutated request on failure")
 	}
 }
 
-func TestInternalClientSystemAuthenticationIsDelegated(t *testing.T) {
-	client := actorAwareInternalClient(t)
-	actor := types.ActorIdentity{Type: types.ActorTypeSystem, ID: 5}
-	token, err := client.createServiceScopeToken(&types.Authentication{
-		AuthType:          types.AuthTypeSystem,
-		ActorValue:        &actor,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
-	})
+func TestInternalClientAllowsTenantlessDirectService(t *testing.T) {
+	client, verifier := serviceAssertionClient(t, "web-api")
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityService, ID: 41, Issuer: "assistant-api"},
+		authentication.Tenant{},
+		authentication.Proof{Method: authentication.AuthenticationServiceAssertion, Audience: authentication.AudienceRapidaInternal, Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "local-key"}},
+		nil,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertDelegatedActor(t, token, client.cfg.Secret, actor)
+	token, err := client.createServiceAssertion(principal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verified, err := verifier.Verify(token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if verified.Subject() != (authentication.Identity{Type: authentication.IdentityService, ID: 1, Issuer: "internal"}) ||
+		verified.Tenant() != (authentication.Tenant{}) {
+		t.Fatalf("verified = %+v, %+v", verified.Subject(), verified.Tenant())
+	}
 }
 
-func assertDelegatedActor(t *testing.T, token, secret string, expected types.ActorIdentity) {
+func serviceAssertionClient(t *testing.T, destination string) (*internalClient, authentication_jwt.Verifier) {
 	t.Helper()
-	scope, err := types.ExtractServiceScope(token, secret)
+	key := bytes.Repeat([]byte{1}, sha256.Size)
+	issuer, err := authentication_jwt.NewIssuer(destination, key)
 	if err != nil {
-		t.Fatalf("ExtractServiceScope() error = %v", err)
+		t.Fatal(err)
 	}
-	auth, err := scope.Authentication()
-	if err != nil {
-		t.Fatalf("Authentication() error = %v", err)
-	}
-	actor := auth.Actor()
-	if actor != expected {
-		t.Fatalf("Actor() = %+v; want %+v", actor, expected)
-	}
+	verifier := authentication_jwt.NewVerifier(destination, key)
+	return NewInternalClientWithIssuer(issuer, nil, nil).(*internalClient), verifier
 }
 
 func TestInternalClientWithPlatformReturnsAuthError(t *testing.T) {
-	client := actorAwareInternalClient(t)
-	authContext, err := client.WithPlatform(context.Background(), &types.Authentication{})
-	if !errors.Is(err, types.ErrUnauthenticated) {
-		t.Fatalf("WithPlatform() error = %v", err)
-	}
-	if authContext != nil {
-		t.Fatalf("WithPlatform() context = %v, want nil", authContext)
+	client, _ := serviceAssertionClient(t, "web-api")
+	authContext, err := client.WithPlatform(context.Background(), authentication.Principal{})
+	if err == nil || authContext != nil {
+		t.Fatalf("WithPlatform() = %v, %v", authContext, err)
 	}
 }
 
-func TestInternalClientWithHttpAuthDoesNotMutateRequestOnAuthError(t *testing.T) {
-	client := actorAwareInternalClient(t)
-	request, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+func TestInternalClientWithServiceIssuesDirectTenantlessAssertion(t *testing.T) {
+	client, verifier := serviceAssertionClient(t, "web-api")
+	ctx, err := client.WithService(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	authenticatedRequest, err := client.WithHttpAuth(context.Background(), &types.Authentication{}, request)
-	if !errors.Is(err, types.ErrUnauthenticated) {
-		t.Fatalf("WithHttpAuth() error = %v", err)
+	metadataValue, ok := metadata.FromOutgoingContext(ctx)
+	if !ok || len(metadataValue.Get(types.SERVICE_SCOPE_KEY)) != 1 {
+		t.Fatalf("service assertion metadata = %v", metadataValue)
 	}
-	if authenticatedRequest != nil {
-		t.Fatalf("WithHttpAuth() request = %v, want nil", authenticatedRequest)
+	verified, err := verifier.Verify(metadataValue.Get(types.SERVICE_SCOPE_KEY)[0])
+	if err != nil {
+		t.Fatal(err)
 	}
-	if authorization := request.Header.Get("Authorization"); authorization != "" {
-		t.Fatalf("Authorization header = %q, want empty", authorization)
+	if verified.Subject() != (authentication.Identity{Type: authentication.IdentityService, ID: 1, Issuer: "internal"}) ||
+		verified.Tenant() != (authentication.Tenant{}) {
+		t.Fatalf("verified service assertion = %+v", verified)
 	}
 }
 
-func actorAwareInternalClient(t *testing.T) *internalClient {
+func userPrincipal(t *testing.T, tenant authentication.Tenant) authentication.Principal {
 	t.Helper()
-	return &internalClient{cfg: &config.AppConfig{Name: "assistant-api", ServiceID: 41, Secret: "secret"}}
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: 5},
+		tenant,
+		authentication.Proof{Method: authentication.AuthenticationUserSession, Reference: authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: "session-1"}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return principal
+}
+
+func projectPrincipal(t *testing.T) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityProjectCredential, ID: 6},
+		authentication.Tenant{OrganizationID: 7, ProjectID: 11},
+		authentication.Proof{Method: authentication.AuthenticationProjectCredential, Audience: authentication.AudienceManagement, Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: "6"}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return principal
+}
+
+func organizationPrincipal(t *testing.T) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityOrganizationCredential, ID: 9},
+		authentication.Tenant{OrganizationID: 7},
+		authentication.Proof{Method: authentication.AuthenticationOrganizationCredential, Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: "9"}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return principal
+}
+
+func servicePrincipal(t *testing.T, id uint64, issuer string) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityService, ID: id, Issuer: issuer},
+		authentication.Tenant{OrganizationID: 7},
+		authentication.Proof{Method: authentication.AuthenticationServiceAssertion, Audience: authentication.AudienceRapidaInternal, Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "key-1"}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return principal
 }

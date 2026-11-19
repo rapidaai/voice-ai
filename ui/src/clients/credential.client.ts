@@ -32,6 +32,9 @@ type CredentialClientCallback<TResponse> = (
   response: TResponse | null,
 ) => void;
 
+type ProjectCredentialAuth = Pick<ApiAuth, 'token' | 'userId'> &
+  Required<Pick<ApiAuth, 'organizationId'>>;
+
 export type ListOrganizationCredentialsParams = {
   page: number;
   pageSize: number;
@@ -57,7 +60,7 @@ export type CreateProjectPublishableCredentialParams = {
   projectId: string;
   name: string;
   roleDefinitionId: string;
-  auth: Pick<ApiAuth, 'token' | 'userId'>;
+  auth: ProjectCredentialAuth;
   callback: CredentialClientCallback<CreateProjectCredentialResponse>;
 };
 
@@ -66,32 +69,36 @@ export type ListProjectCredentialsParams = {
   page: number;
   pageSize: number;
   criteria: CredentialCriteria[];
-  auth: Pick<ApiAuth, 'token' | 'userId'>;
+  auth: ProjectCredentialAuth;
   callback: CredentialClientCallback<GetAllProjectCredentialResponse>;
 };
 
 export type RevokeProjectCredentialParams = {
   projectId: string;
   credentialId: string;
-  auth: Pick<ApiAuth, 'token' | 'userId'>;
+  auth: ProjectCredentialAuth;
   callback: CredentialClientCallback<RevokeProjectCredentialResponse>;
 };
 
 const createCredentialHeaders = ({
+  organizationId,
   token,
   userId,
-}: Pick<ApiAuth, 'token' | 'userId'>) => ({
+}: ProjectCredentialAuth) => ({
   authorization: token,
   'x-auth-id': userId,
+  'x-organization-id': organizationId,
 });
 
 const createCredentialDebuggerMetadata = ({
+  organizationId,
   projectId,
   token,
   userId,
 }: ApiAuth) =>
   ConnectionConfig.WithDebugger({
     authorization: token,
+    organizationId,
     userId,
     projectId,
   });
@@ -199,9 +206,7 @@ export const revokeProjectCredential = ({
   auth,
   callback,
 }: RevokeProjectCredentialParams) =>
-  revokeProjectCredentialApi(
-    projectId,
-    credentialId,
-    callback,
-    createCredentialHeaders(auth),
-  );
+  revokeProjectCredentialApi(projectId, credentialId, callback, {
+    ...createCredentialHeaders(auth),
+    'x-project-id': projectId,
+  });

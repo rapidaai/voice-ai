@@ -15,8 +15,8 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
 
@@ -30,7 +30,7 @@ type options struct {
 	logger        commons.Logger
 	configuration *internal_assistant_entity.AssistantConfiguration
 	caller        internal_type.InternalCaller
-	auth          *types.Authentication
+	auth          authentication.Principal
 	onPacket      func(context.Context, ...internal_type.Packet) error
 }
 
@@ -60,7 +60,7 @@ func WithCaller(caller internal_type.InternalCaller) Option {
 	}
 }
 
-func WithAuth(auth *types.Authentication) Option {
+func WithAuth(auth authentication.Principal) Option {
 	return func(options *options) {
 		options.auth = auth
 	}

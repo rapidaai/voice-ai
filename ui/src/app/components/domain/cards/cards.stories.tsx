@@ -6,9 +6,9 @@ import { ProviderCard } from './provider-card';
 import { SelectToolCard } from './tool-card';
 
 const authContextValue = {
-  currentProjectRole: { projectid: 'project-1' },
-  currentUser: { id: 'user-1' },
-  organizationRole: { organizationid: 'org-1' },
+  authentication: { user: { id: 'user-1' } },
+  getCurrentProject: () => ({ id: 'project-1' }),
+  getCurrentOrganization: () => ({ id: 'org-1' }),
   token: { token: 'storybook-token' },
 };
 

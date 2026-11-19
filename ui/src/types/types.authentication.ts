@@ -20,58 +20,41 @@
  *  THE SOFTWARE.
  *
  *  Author: Prashant <prashant@rapida.ai>
- *
  */
-import {
+import type {
   Authentication,
+  AuthenticationOrganization,
+  AuthenticationProject,
   Token,
-  ProjectRole,
-  OrganizationRole,
-  FeaturePermission,
 } from '@rapidaai/react';
-import { User } from '@rapidaai/react';
 
 export type AuthenticationType = {
-  //
-  currentUser: User.AsObject;
-  setCurrentUser: (u: User.AsObject) => void;
-
-  //
+  authentication: Authentication.AsObject;
   token: Token.AsObject;
-  setToken: (t: Token.AsObject) => void;
+  selectedOrganizationID: string;
+  selectedProjectID: string;
 
-  //
   setAuthentication: (
-    a: Authentication | undefined,
+    authentication: Authentication | undefined,
+    token: Token | undefined,
     callback: () => void,
-  ) => void;
+  ) => boolean;
+  setCurrentContext: (
+    organization: AuthenticationOrganization.AsObject,
+    project?: AuthenticationProject.AsObject,
+  ) => boolean;
+  getOrganizations: () => AuthenticationOrganization.AsObject[];
+  getCurrentOrganization: () => AuthenticationOrganization.AsObject | undefined;
+  getProjects: () => AuthenticationProject.AsObject[];
+  getCurrentProject: () => AuthenticationProject.AsObject | undefined;
 
-  //
   isAuthenticated: () => boolean;
-
-  //
-  authorize: (onSuccess: () => void, onFailure: (string) => void) => void;
-
-  //
-  projectRoles: ProjectRole.AsObject[];
-  // setProjectRoles: (roles: ProjectRole.AsObject[]) => void;
-
-  //
-  organizationRole: OrganizationRole.AsObject;
-  // setOrganizationRole: (o: OrganizationRole.AsObject) => void;
-
-  //
-  setCurrentProjectRole: (p: ProjectRole.AsObject) => void;
-  currentProjectRole: ProjectRole.AsObject;
-
-  //
+  authorize: (
+    onSuccess: () => void,
+    onFailure: (error: string) => void,
+  ) => void;
+  hasOrganizations: () => boolean;
   isThereOrganization: () => boolean;
   isThereProject: () => boolean;
-
-  //
-  featurePermissions: FeaturePermission.AsObject[];
-  isFeatureEnable: (feature: string) => boolean;
-
-  //
   unauthenticate: () => void;
 };

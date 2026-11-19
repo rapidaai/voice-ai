@@ -12,15 +12,15 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	project_api "github.com/rapidaai/protos"
 )
 
 type ProjectClient interface {
-	GetProject(c context.Context, auth *types.Authentication, projectId uint64) (*project_api.GetProjectResponse, error)
+	GetProject(c context.Context, auth authentication.Principal, projectId uint64) (*project_api.GetProjectResponse, error)
 }
 type projectServiceClient struct {
 	clients.InternalClient
@@ -40,14 +40,14 @@ func NewProjectServiceClientGRPC(config *config.AppConfig, logger commons.Logger
 // NewProjectClientWithClient creates a project client using the provided gRPC client.
 func NewProjectClientWithClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, projectClient project_api.ProjectServiceClient) ProjectClient {
 	return &projectServiceClient{
-		InternalClient: clients.NewInternalClient(config, logger, redis),
+		InternalClient: clients.NewWebInternalClient(config, logger, redis),
 		cfg:            config,
 		logger:         logger,
 		projectClient:  projectClient,
 	}
 }
 
-func (pClient projectServiceClient) GetProject(c context.Context, auth *types.Authentication, projectId uint64) (*project_api.GetProjectResponse, error) {
+func (pClient projectServiceClient) GetProject(c context.Context, auth authentication.Principal, projectId uint64) (*project_api.GetProjectResponse, error) {
 	authContext, err := pClient.WithAuth(c, auth)
 	if err != nil {
 		return nil, err

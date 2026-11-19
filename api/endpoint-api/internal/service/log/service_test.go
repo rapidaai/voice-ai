@@ -2,6 +2,7 @@ package internal_log_service
 
 import (
 	"context"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,10 +11,10 @@ import (
 	"gorm.io/gorm/logger"
 
 	internal_gorm "github.com/rapidaai/api/endpoint-api/internal/entity"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 )
 
@@ -121,14 +122,59 @@ func newEndpointLogServiceTest(t *testing.T) (*endpointLogService, *gorm.DB) {
 	}, db
 }
 
-func testAuth(userID, orgID, projectID uint64) *types.Authentication {
-	return &types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: userID},
-		UserValue:         &types.UserContext{UserID: userID},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: orgID},
-		ProjectValue:      &types.ProjectContext{OrganizationID: orgID, ProjectID: projectID},
-	}
+func testAuth(t *testing.T, userID, orgID, projectID uint64) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: userID},
+		authentication.Tenant{OrganizationID: orgID, ProjectID: projectID},
+		authentication.Proof{
+			Method: authentication.AuthenticationUserSession,
+			Reference: authentication.ProofReference{
+				Type:  authentication.ProofReferenceUserSession,
+				Value: "test-session",
+			},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+	return principal
+}
+
+func testOrganizationAuth(t *testing.T, organizationID uint64) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityOrganizationCredential, ID: 1},
+		authentication.Tenant{OrganizationID: organizationID},
+		authentication.Proof{
+			Method: authentication.AuthenticationOrganizationCredential,
+			Reference: authentication.ProofReference{
+				Type:  authentication.ProofReferenceCredential,
+				Value: "1",
+			},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+	return principal
+}
+
+func testProjectAuth(t *testing.T, credentialID, organizationID, projectID uint64) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityProjectCredential, ID: credentialID},
+		authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID},
+		authentication.Proof{
+			Method:   authentication.AuthenticationProjectCredential,
+			Audience: authentication.AudienceManagement,
+			Reference: authentication.ProofReference{
+				Type:  authentication.ProofReferenceCredential,
+				Value: strconv.FormatUint(credentialID, 10),
+			},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+	return principal
 }
 
 func TestEndpointLogServiceRequiresProjectCapability(t *testing.T) {
@@ -137,7 +183,7 @@ func TestEndpointLogServiceRequiresProjectCapability(t *testing.T) {
 
 	_, err := service.GetEndpointLog(
 		context.Background(),
-		&types.Authentication{AuthType: types.AuthTypeOrg, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}},
+		testOrganizationAuth(t, organizationID),
 		1,
 		2,
 	)
@@ -149,17 +195,12 @@ func TestApplyMetadataAllowsProjectAuthWithoutFakeUser(t *testing.T) {
 	require.NoError(t, db.Exec("CREATE UNIQUE INDEX idx_endpoint_log_metadata_log_key ON endpoint_log_metadata(endpoint_log_id, key)").Error)
 	organizationID := uint64(10)
 	projectID := uint64(20)
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeProject,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeProject, ID: projectID},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
-	}
+	auth := testProjectAuth(t, projectID, organizationID, projectID)
 
 	metadata, err := service.ApplyMetadata(context.Background(), auth, 1, map[string]interface{}{"trace_id": "trace-1"})
 	require.NoError(t, err)
 	require.Len(t, metadata, 1)
-	require.Equal(t, types.AuthTypeProject.String(), metadata[0].CreatedActorType)
+	require.Equal(t, string(authentication.IdentityProjectCredential), metadata[0].CreatedActorType)
 	require.Equal(t, projectID, metadata[0].CreatedActorID)
 	require.Empty(t, metadata[0].UpdatedActorType)
 	require.Zero(t, metadata[0].UpdatedActorID)
@@ -167,7 +208,7 @@ func TestApplyMetadataAllowsProjectAuthWithoutFakeUser(t *testing.T) {
 
 func TestGetEndpointLogPreloadsMetricsAndContext(t *testing.T) {
 	service, db := newEndpointLogServiceTest(t)
-	auth := testAuth(1, 10, 20)
+	auth := testAuth(t, 1, 10, 20)
 
 	require.NoError(t, db.Create(&internal_gorm.EndpointLog{
 		Audited: gorm_models.Audited{Id: 100},
@@ -239,6 +280,6 @@ func TestGetEndpointLogEnforcesProjectOwnership(t *testing.T) {
 		Status:                  type_enums.RECORD_COMPLETE,
 	}).Error)
 
-	_, err := service.GetEndpointLog(context.Background(), testAuth(1, 10, 21), 101, 201)
+	_, err := service.GetEndpointLog(context.Background(), testAuth(t, 1, 10, 21), 101, 201)
 	require.Error(t, err)
 }

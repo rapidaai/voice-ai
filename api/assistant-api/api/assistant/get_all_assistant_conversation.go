@@ -7,24 +7,20 @@ package assistant_api
 
 import (
 	"context"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	assistant_api "github.com/rapidaai/protos"
 )
 
 // GetAllAssistantConversation implements assistant_api.AssistantServiceServer.
 func (assistantApi *assistantGrpcApi) GetAllAssistantConversation(ctx context.Context, cepm *assistant_api.GetAllAssistantConversationRequest) (*assistant_api.GetAllAssistantConversationResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 	cnt, conversations, err := assistantApi.conversactionService.GetAll(ctx, iAuth,
 		cepm.GetAssistantId(),
@@ -42,8 +38,12 @@ func (assistantApi *assistantGrpcApi) GetAllAssistantConversation(ctx context.Co
 	if err != nil {
 		assistantApi.logger.Errorf("unable to cast assistant conversation %v", err)
 	}
+	totalItem, err := utils.Int64ToUint32(cnt)
+	if err != nil {
+		return nil, err
+	}
 	return utils.PaginatedSuccess[assistant_api.GetAllAssistantConversationResponse, []*assistant_api.AssistantConversation](
-		uint32(cnt),
+		totalItem,
 		cepm.GetPaginate().GetPage(),
 		out)
 }

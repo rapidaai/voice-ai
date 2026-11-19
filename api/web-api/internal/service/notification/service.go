@@ -8,10 +8,11 @@ import (
 
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
 	internal_services "github.com/rapidaai/api/web-api/internal/service"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 )
@@ -28,7 +29,12 @@ type notificationService struct {
 	postgres connectors.PostgresConnector
 }
 
-func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, auth *types.Authentication, authId uint64, settings []*protos.NotificationSetting) ([]*internal_entity.NotificationSetting, error) {
+func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, auth authentication.Principal, authId uint64, settings []*protos.NotificationSetting) ([]*internal_entity.NotificationSetting, error) {
+	subject := auth.Subject()
+	if subject.Type != authentication.IdentityUser || subject.ID != authId {
+		return nil, pkg_errors.RouteAuthorizationDeniedError{}
+	}
+	caller := auth.Caller()
 	db := oS.postgres.DB(ctx)
 	nts := make([]*internal_entity.NotificationSetting, 0)
 	for _, st := range settings {
@@ -39,8 +45,8 @@ func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, au
 			UserAuthId: authId,
 			Mutable: gorm_models.Mutable{
 				Status:           type_enums.RECORD_ACTIVE,
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(caller.Type),
+				CreatedActorID:   caller.ID,
 			},
 		})
 	}
@@ -48,8 +54,8 @@ func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, au
 		Columns: []clause.Column{{Name: "channel"}, {Name: "event_type"}, {Name: "user_auth_id"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
 			"enabled":            clause.Expr{SQL: "excluded.enabled"},
-			"updated_actor_type": auth.Actor().Type.String(),
-			"updated_actor_id":   auth.Actor().ID,
+			"updated_actor_type": string(caller.Type),
+			"updated_actor_id":   caller.ID,
 			"updated_date":       time.Now(),
 		}),
 	}).Save(nts)
@@ -60,7 +66,11 @@ func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, au
 	}
 }
 
-func (oS *notificationService) GetAllNotificationSetting(ctx context.Context, auth *types.Authentication, userId uint64) ([]*internal_entity.NotificationSetting, error) {
+func (oS *notificationService) GetAllNotificationSetting(ctx context.Context, auth authentication.Principal, userId uint64) ([]*internal_entity.NotificationSetting, error) {
+	subject := auth.Subject()
+	if subject.Type != authentication.IdentityUser || subject.ID != userId {
+		return nil, pkg_errors.RouteAuthorizationDeniedError{}
+	}
 	db := oS.postgres.DB(ctx)
 	var nts []*internal_entity.NotificationSetting
 	tx := db.Where("user_auth_id = ?", userId).Find(&nts)

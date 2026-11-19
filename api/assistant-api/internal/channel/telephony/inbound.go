@@ -17,9 +17,9 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
 
@@ -111,7 +111,7 @@ func NewInboundDispatcher(opts ...InboundDispatcherFuncOption) *InboundDispatche
 // ResolveVaultCredential fetches the vault credential for the given assistant.
 // This is the only DB round-trip needed — call IDs (assistant, conversation,
 // provider) are already in the CallContext from Redis.
-func (d *InboundDispatcher) ResolveVaultCredential(ctx context.Context, auth *types.Authentication, assistantId, conversationId uint64) (*protos.VaultCredential, error) {
+func (d *InboundDispatcher) ResolveVaultCredential(ctx context.Context, auth authentication.Principal, assistantId, conversationId uint64) (*protos.VaultCredential, error) {
 	assistant, err := d.assistantService.Get(ctx, auth, assistantId, nil, &internal_services.GetAssistantOption{InjectPhoneDeployment: true})
 	if err != nil {
 		return nil, err
@@ -165,7 +165,7 @@ func (d *InboundDispatcher) ReceiveCall(c *gin.Context, provider string) (*inter
 }
 
 // SaveCallContext stores the call context in Postgres and returns the contextID.
-func (d *InboundDispatcher) SaveCallContext(ctx context.Context, auth *types.Authentication, assistant *internal_assistant_entity.Assistant, conversationID uint64, callInfo *internal_type.CallInfo, provider string) (string, error) {
+func (d *InboundDispatcher) SaveCallContext(ctx context.Context, auth authentication.Principal, assistant *internal_assistant_entity.Assistant, conversationID uint64, callInfo *internal_type.CallInfo, provider string) (string, error) {
 	direction := callInfo.Direction
 	if direction == "" {
 		direction = "inbound"
@@ -188,7 +188,7 @@ func (d *InboundDispatcher) SaveCallContext(ctx context.Context, auth *types.Aut
 }
 
 // AnswerProvider instructs the telephony provider to answer the call.
-func (d *InboundDispatcher) AnswerProvider(c *gin.Context, auth *types.Authentication, provider string, assistantID uint64, callerNumber string, conversationID uint64) error {
+func (d *InboundDispatcher) AnswerProvider(c *gin.Context, auth authentication.Principal, provider string, assistantID uint64, callerNumber string, conversationID uint64) error {
 	tel, err := GetTelephony(Telephony(provider), d.cfg, d.logger, d.telephonyOpt)
 	if err != nil {
 		return fmt.Errorf("telephony provider %s not connected: %w", provider, err)

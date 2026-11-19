@@ -1,18 +1,26 @@
-import { useCallback, useContext, useMemo, useState } from 'react';
-import { DefinitionTooltip, Dropdown } from '@carbon/react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  RoleScope,
+  RoleSubject,
+  type RoleDefinition,
+  type ServiceError,
+} from '@rapidaai/react';
 import toast from 'react-hot-toast/headless';
 import {
   Modal,
   ModalBody,
   ModalFooter,
   ModalHeader,
+  MultiSelect,
   type ModalProps,
   PrimaryButton,
   SecondaryButton,
   Stack,
+  Text,
   TextInput,
   typographyClassNames,
 } from '@/app/components/ui/primitives';
+import { HelpToggletip } from '@/app/components/ui/composites';
 import { ErrorMessage } from '@/app/components/ui/feedback';
 import { AuthContext } from '@/context/auth-context';
 import { useCurrentCredential } from '@/hooks/use-credential';
@@ -21,7 +29,7 @@ import {
   ProjectRoleRow,
   ProjectRoleTable,
 } from '@/app/components/domain/project-role-table';
-import { inviteOrganizationUser } from '@/clients';
+import { inviteOrganizationUser, listAccessRoles } from '@/clients';
 
 const PROJECT_ACTION_ERROR =
   'Unable to process your request. please try again later.';
@@ -30,17 +38,6 @@ type OrganizationInviteFailure = {
   getHumanmessage?: () => string;
   message?: string;
 };
-
-const organizationRoles = [
-  { name: 'Admin', value: 'admin' },
-  { name: 'Member', value: 'member' },
-];
-const projectRoles = [
-  { name: 'Super Admin', value: 'super admin' },
-  { name: 'Admin', value: 'admin' },
-  { name: 'Writer', value: 'writer' },
-  { name: 'Reader', value: 'reader' },
-];
 
 interface InviteOrganizationUserDialogProps extends ModalProps {
   onSuccess?: () => void;
@@ -51,36 +48,125 @@ export function InviteOrganizationUserDialog({
   setModalOpen,
   onSuccess,
 }: InviteOrganizationUserDialogProps) {
-  const { authId, token } = useCurrentCredential();
-  const { projectRoles: availableProjects } = useContext(AuthContext);
+  const { authId, organizationId, token } = useCurrentCredential();
+  const { getProjects } = useContext(AuthContext);
+  const availableProjects = getProjects?.();
   const { loading, showLoader, hideLoader } = useRapidaStore();
   const [email, setEmail] = useState('');
-  const [organizationRole, setOrganizationRole] = useState('');
+  const [organizationRoles, setOrganizationRoles] = useState<RoleDefinition[]>(
+    [],
+  );
+  const [projectRoles, setProjectRoles] = useState<RoleDefinition[]>([]);
+  const [organizationRoleDefinitionIds, setOrganizationRoleDefinitionIds] =
+    useState<string[]>([]);
   const [projectRoleRows, setProjectRoleRows] = useState<ProjectRoleRow[]>([]);
+  const [isRoleCatalogLoading, setIsRoleCatalogLoading] = useState(false);
+  const [isRoleCatalogReady, setIsRoleCatalogReady] = useState(false);
   const [error, setError] = useState('');
-
-  const closeDialog = useCallback(() => {
-    setModalOpen(false);
-  }, [setModalOpen]);
 
   const resetForm = useCallback(() => {
     setEmail('');
-    setOrganizationRole('');
+    setOrganizationRoleDefinitionIds([]);
     setProjectRoleRows([]);
     setError('');
   }, []);
+
+  const closeDialog = useCallback(() => {
+    resetForm();
+    setModalOpen(false);
+  }, [resetForm, setModalOpen]);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+
+    let isCurrent = true;
+    setOrganizationRoles([]);
+    setProjectRoles([]);
+    setOrganizationRoleDefinitionIds([]);
+    setProjectRoleRows([]);
+    setIsRoleCatalogReady(false);
+    setIsRoleCatalogLoading(true);
+    Promise.all(
+      ['ORGANIZATION', 'PROJECT'].map(async scope => {
+        const roles: RoleDefinition[] = [];
+        let page = 1;
+        let received = 0;
+        let total = 0;
+        const expectedScope =
+          scope === 'ORGANIZATION'
+            ? RoleScope.ROLE_SCOPE_ORGANIZATION
+            : RoleScope.ROLE_SCOPE_PROJECT;
+
+        do {
+          const response = await listAccessRoles({
+            page,
+            pageSize: 100,
+            criteria: [
+              { key: 'scope', logic: '=', value: scope },
+              { key: 'subject', logic: '=', value: 'USER' },
+            ],
+            auth: { organizationId, token, userId: authId },
+          });
+          if (!response.getSuccess()) {
+            throw new Error(
+              response.getError()?.getHumanmessage() ||
+                `${scope === 'ORGANIZATION' ? 'Organization' : 'Project'} roles could not be loaded.`,
+            );
+          }
+          const pageRoles = response.getRolesList();
+          received += pageRoles.length;
+          roles.push(
+            ...pageRoles.filter(
+              role =>
+                role.getScope() === expectedScope &&
+                role.getSubject() === RoleSubject.ROLE_SUBJECT_USER &&
+                (scope !== 'ORGANIZATION' || role.getId() !== '101'),
+            ),
+          );
+          total = response.getPaginated()?.getTotalitem() || received;
+          if (pageRoles.length === 0 && received < total) {
+            throw new Error('The role catalog returned an incomplete result.');
+          }
+          page += 1;
+        } while (received < total);
+
+        return roles;
+      }),
+    )
+      .then(([loadedOrganizationRoles, loadedProjectRoles]) => {
+        if (!isCurrent) return;
+        setOrganizationRoles(loadedOrganizationRoles);
+        setProjectRoles(loadedProjectRoles);
+        setIsRoleCatalogReady(true);
+        setIsRoleCatalogLoading(false);
+      })
+      .catch((requestError: ServiceError) => {
+        if (isCurrent) {
+          setIsRoleCatalogLoading(false);
+          toast.error(requestError.message || 'Roles could not be loaded.');
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [authId, modalOpen, token]);
 
   const submitInvite = async () => {
     if (!email) {
       setError('Please provide a valid email to invite user.');
       return;
     }
-    if (!organizationRole) {
-      setError('Please select an organization role.');
+    if (organizationRoleDefinitionIds.length === 0) {
+      setError('Select at least one organization role.');
       return;
     }
-    if (projectRoleRows.some(row => !row.projectId || !row.projectRole)) {
-      setError('Select both project and role for each project role row.');
+    if (
+      projectRoleRows.some(
+        row => !row.projectId || row.roleDefinitionIds.length === 0,
+      )
+    ) {
+      setError('Select a project and at least one role for each row.');
       return;
     }
     const selectedProjectIds = projectRoleRows
@@ -97,11 +183,11 @@ export function InviteOrganizationUserDialog({
     try {
       const response = await inviteOrganizationUser({
         email,
-        organizationRole,
+        organizationRoleDefinitionIds,
         projectRoles: projectRoleRows.filter(
-          row => row.projectId && row.projectRole,
+          row => row.projectId && row.roleDefinitionIds.length > 0,
         ),
-        auth: { token, userId: authId },
+        auth: { organizationId, token, userId: authId },
       });
       hideLoader();
 
@@ -109,7 +195,6 @@ export function InviteOrganizationUserDialog({
       const message = responseError?.getHumanmessage() || PROJECT_ACTION_ERROR;
 
       if (response.getSuccess()) {
-        resetForm();
         closeDialog();
         toast.success('The organization invitation was sent successfully.');
         onSuccess?.();
@@ -117,7 +202,6 @@ export function InviteOrganizationUserDialog({
       }
 
       toast.error(message);
-      setError(message);
     } catch (err: unknown) {
       hideLoader();
       const inviteError = err as OrganizationInviteFailure;
@@ -126,15 +210,14 @@ export function InviteOrganizationUserDialog({
         inviteError.message ||
         PROJECT_ACTION_ERROR;
       toast.error(message);
-      setError(message);
     }
   };
 
   const projectOptions = useMemo(
     () =>
       (availableProjects || []).map(project => ({
-        name: project.projectname,
-        value: project.projectid,
+        name: project.name,
+        value: project.id,
       })),
     [availableProjects],
   );
@@ -147,17 +230,17 @@ export function InviteOrganizationUserDialog({
       preventCloseOnClickOutside
     >
       <ModalHeader
-        label="User management"
-        labelClassName={typographyClassNames.helper}
-        title="Invite user to organization"
-        titleClassName={typographyClassNames.sectionTitle}
+        label="User Management"
+        labelClassName={typographyClassNames['helper-text-01']}
+        title="Invite User to Organization"
+        titleClassName={typographyClassNames['heading-03']}
         onClose={closeDialog}
       />
       <ModalBody hasForm hasScrollingContent>
         <Stack gap={6}>
           <TextInput
             id="organization-invite-email"
-            labelText="Email address"
+            labelText="Email Address"
             value={email}
             type="email"
             placeholder="eg: john@deo.io"
@@ -166,34 +249,38 @@ export function InviteOrganizationUserDialog({
               setEmail(e.target.value);
             }}
           />
-          <Dropdown
+          <MultiSelect
             id="organization-invite-role"
-            titleText="Organization role"
-            label="Select organization role"
+            autoAlign
+            titleText="Organization Roles"
+            label="Select roles"
             items={organizationRoles}
-            selectedItem={
-              organizationRoles.find(role => role.value === organizationRole) ||
-              null
-            }
-            itemToString={(item: { name: string; value: string } | null) =>
-              item?.name || ''
-            }
-            onChange={({ selectedItem }) => {
+            clearSelectionDescription="Total items selected: "
+            clearSelectionText="To clear selection, press Delete or Backspace."
+            disabled={!isRoleCatalogReady}
+            selectedItems={organizationRoles.filter(role =>
+              organizationRoleDefinitionIds.includes(role.getId()),
+            )}
+            selectionFeedback="top-after-reopen"
+            itemToString={(item: RoleDefinition) => item?.getName() || ''}
+            onChange={({ selectedItems }) => {
               setError('');
-              setOrganizationRole(selectedItem?.value || '');
+              setOrganizationRoleDefinitionIds(
+                (selectedItems || []).map(role => role.getId()),
+              );
             }}
+            size="md"
+            type="default"
           />
           <div>
-            <div className="mb-3">
-              <h3 className={typographyClassNames.componentTitle}>
-                <DefinitionTooltip
-                  align="right"
-                  definition="Optional. Assign project roles now, or invite the user with organization access only."
-                  openOnHover
-                >
-                  Project access
-                </DefinitionTooltip>
-              </h3>
+            <div className="mb-3 flex items-center gap-1">
+              <Text as="h3" variant="heading-compact-01">
+                Project Access
+              </Text>
+              <HelpToggletip
+                label="Project access"
+                helpText="Optional. Assign project roles now, or invite the user with organization access only."
+              />
             </div>
             <ProjectRoleTable
               rows={projectRoleRows}
@@ -202,7 +289,10 @@ export function InviteOrganizationUserDialog({
                 setProjectRoleRows(next);
               }}
               projectOptions={projectOptions}
-              roleOptions={projectRoles}
+              roleOptions={projectRoles.map(role => ({
+                name: role.getName(),
+                value: role.getId(),
+              }))}
               defaultProjectId={projectOptions[0]?.value || ''}
               addButtonLabel="Add project access"
             />
@@ -214,7 +304,12 @@ export function InviteOrganizationUserDialog({
         <SecondaryButton size="lg" onClick={closeDialog}>
           Cancel
         </SecondaryButton>
-        <PrimaryButton size="lg" onClick={submitInvite} isLoading={loading}>
+        <PrimaryButton
+          size="lg"
+          onClick={submitInvite}
+          disabled={!isRoleCatalogReady}
+          isLoading={loading || isRoleCatalogLoading}
+        >
           Invite user
         </PrimaryButton>
       </ModalFooter>

@@ -9,8 +9,11 @@
 package freeswitch_test
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"strings"
 	"testing"
 	"time"
@@ -21,10 +24,12 @@ import (
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_middleware "github.com/rapidaai/api/assistant-api/sip/middleware"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/authentication"
+	authentication_jwt "github.com/rapidaai/pkg/authentication/jwt"
+	authentication_resolver "github.com/rapidaai/pkg/authentication/resolver"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/require"
@@ -34,7 +39,6 @@ import (
 )
 
 const (
-	integrationServiceID      = uint64(9007)
 	integrationProjectID      = uint64(7001)
 	integrationOrganizationID = uint64(8001)
 	integrationCredentialID   = uint64(6001)
@@ -92,6 +96,14 @@ func TestFreeSWITCHInboundRouteAuthenticationCompleteFlow(t *testing.T) {
 			routeContext := make(chan *sip_runtime.SIPRequestContext, 1)
 			answered := make(chan inboundRouteCapture, 1)
 			remoteBye := make(chan *sip_runtime.Session, 1)
+			serviceAuthenticationKey := bytes.Repeat([]byte{1}, sha256.Size)
+			serviceAssertionIssuer, err := authentication_jwt.NewIssuer("assistant-api", serviceAuthenticationKey)
+			require.NoError(t, err)
+			servicePrincipalResolver, err := authentication_resolver.NewServicePrincipalResolver(
+				"assistant-api",
+				serviceAuthenticationKey,
+			)
+			require.NoError(t, err)
 
 			harness.server.SetMiddlewares([]sip_runtime.Middleware{
 				sip_middleware.NewRouteMiddleware(
@@ -100,7 +112,7 @@ func TestFreeSWITCHInboundRouteAuthenticationCompleteFlow(t *testing.T) {
 					sip_middleware.WithAssistantService(integrationAssistantService{assistants: map[uint64]*internal_assistant_entity.Assistant{
 						test.assistantID: assistant,
 					}}),
-					sip_middleware.WithServiceID(integrationServiceID),
+					sip_middleware.WithServiceAuthentication(serviceAssertionIssuer, servicePrincipalResolver),
 				),
 				sip_middleware.NewVaultMiddleware(
 					sip_middleware.WithContext(context.Background()),
@@ -162,8 +174,12 @@ func TestFreeSWITCHInboundRouteAuthenticationCompleteFlow(t *testing.T) {
 
 			auth := capture.session.GetAuth()
 			require.NotNil(t, auth)
-			require.Equal(t, types.ActorIdentity{Type: types.ActorTypeService, ID: integrationServiceID}, auth.Actor())
-			projectContext, err := auth.ProjectContext()
+			require.Equal(t, authentication.Identity{Type: authentication.IdentityService, ID: 1, Issuer: "internal"}, auth.Caller())
+			projectContext := auth.Tenant()
+			var err error
+			if projectContext.ProjectID == 0 {
+				err = pkg_errors.AuthenticationPrincipalInvalidError{}
+			}
 			require.NoError(t, err)
 			require.Equal(t, integrationProjectID, projectContext.ProjectID)
 			require.Equal(t, integrationOrganizationID, projectContext.OrganizationID)
@@ -258,7 +274,7 @@ func (s integrationAssistantService) GetAssistantWithPhoneDeploymentByDID(
 
 func (s integrationAssistantService) Get(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantID uint64,
 	_ *uint64,
 	_ *internal_services.GetAssistantOption,
@@ -279,12 +295,12 @@ type integrationVaultClient struct {
 	requestedVaultID uint64
 }
 
-func (v *integrationVaultClient) GetCredential(_ context.Context, _ *types.Authentication, vaultID uint64) (*protos.VaultCredential, error) {
+func (v *integrationVaultClient) GetCredential(_ context.Context, _ authentication.Principal, vaultID uint64) (*protos.VaultCredential, error) {
 	v.requestedVaultID = vaultID
 	return v.credential, nil
 }
 
-func (v *integrationVaultClient) GetOauth2Credential(_ context.Context, _ *types.Authentication, vaultID uint64) (*protos.VaultCredential, error) {
+func (v *integrationVaultClient) GetOauth2Credential(_ context.Context, _ authentication.Principal, vaultID uint64) (*protos.VaultCredential, error) {
 	v.requestedVaultID = vaultID
 	return v.credential, nil
 }

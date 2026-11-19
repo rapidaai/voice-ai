@@ -1,7 +1,9 @@
 package sip_registration
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,8 @@ import (
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	app_config "github.com/rapidaai/config"
+	authentication_jwt "github.com/rapidaai/pkg/authentication/jwt"
+	authentication_resolver "github.com/rapidaai/pkg/authentication/resolver"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"gorm.io/driver/sqlite"
@@ -88,11 +92,25 @@ func newTestManager(t *testing.T) (*manager, *gorm.DB, context.Context) {
 	if err != nil {
 		t.Fatalf("failed to create logger: %v", err)
 	}
+	key := bytes.Repeat([]byte{1}, sha256.Size)
+	issuer, err := authentication_jwt.NewIssuer("assistant-api", key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	principalResolver := authentication_resolver.NewServicePrincipalResolver(
+		"assistant-api",
+		key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	return &manager{
-		logger:       logger,
-		postgres:     &testPostgresConnector{db: db},
-		rapidaClient: &rapida_client.RapidaClient{},
+		logger:                   logger,
+		postgres:                 &testPostgresConnector{db: db},
+		rapidaClient:             &rapida_client.RapidaClient{},
+		serviceAssertionIssuer:   issuer,
+		servicePrincipalResolver: principalResolver,
 		assistantConfig: &assistant_config.AssistantConfig{AppConfig: app_config.AppConfig{
 			Name:      "assistant-api",
 			ServiceID: 9007,

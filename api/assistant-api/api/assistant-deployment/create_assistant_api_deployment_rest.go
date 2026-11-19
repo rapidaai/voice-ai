@@ -6,21 +6,21 @@
 package assistant_deployment_api
 
 import (
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/openapi"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	assistant_api "github.com/rapidaai/protos"
 )
 
 func (deploymentApi *AssistantDeploymentApi) CreateAssistantApiDeploymentRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		c.JSON(pkg_errors.CreateAssistantApiDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantApiDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -28,19 +28,6 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantApiDeploymentRest(c 
 				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.CreateAssistantApiDeploymentUnauthenticated.CodeString())),
 				ErrorMessage: utils.Ptr(pkg_errors.CreateAssistantApiDeploymentUnauthenticated.Error),
 				HumanMessage: utils.Ptr(pkg_errors.CreateAssistantApiDeploymentUnauthenticated.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		c.JSON(pkg_errors.CreateAssistantApiDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(pkg_errors.CreateAssistantApiDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.CreateAssistantApiDeploymentMissingAuthScope.CodeString())),
-				ErrorMessage: utils.Ptr(pkg_errors.CreateAssistantApiDeploymentMissingAuthScope.Error),
-				HumanMessage: utils.Ptr(pkg_errors.CreateAssistantApiDeploymentMissingAuthScope.ErrorMessage),
 			},
 		})
 		return
@@ -86,7 +73,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantApiDeploymentRest(c 
 		})
 		return
 	}
-	if validator.NonNil(request.IdealTimeout) && !validator.Between(int(*request.IdealTimeout), 5, 120) {
+	if validator.NonNil(request.IdealTimeout) && !validator.Between(*request.IdealTimeout, 5, 120) {
 		c.JSON(pkg_errors.CreateAssistantApiDeploymentInvalidIdealTimeout.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantApiDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -98,7 +85,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantApiDeploymentRest(c 
 		})
 		return
 	}
-	if validator.NonNil(request.IdealTimeoutBackoff) && !validator.Between(int(*request.IdealTimeoutBackoff), 0, 5) {
+	if validator.NonNil(request.IdealTimeoutBackoff) && !validator.Between(*request.IdealTimeoutBackoff, 0, 5) {
 		c.JSON(pkg_errors.CreateAssistantApiDeploymentInvalidTimeoutBackoff.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantApiDeploymentInvalidTimeoutBackoff.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -110,7 +97,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantApiDeploymentRest(c 
 		})
 		return
 	}
-	if validator.NonNil(request.MaxSessionDuration) && !validator.Between(int(*request.MaxSessionDuration), 180, 600) {
+	if validator.NonNil(request.MaxSessionDuration) && !validator.Between(*request.MaxSessionDuration, 180, 600) {
 		c.JSON(pkg_errors.CreateAssistantApiDeploymentInvalidSessionDuration.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantApiDeploymentInvalidSessionDuration.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),

@@ -81,6 +81,7 @@ describe('user client', () => {
       pageSize: 25,
       criteria,
       auth: {
+        organizationId: 'organization-1',
         projectId: 'project-1',
         token: 'token-1',
         userId: 'user-1',
@@ -101,6 +102,7 @@ describe('user client', () => {
     expect(ConnectionConfig.WithDebugger).toHaveBeenCalledWith({
       authorization: 'token-1',
       userId: 'user-1',
+      organizationId: 'organization-1',
       projectId: 'project-1',
     });
   });
@@ -115,6 +117,7 @@ describe('user client', () => {
         ignored: 'not-boolean',
       },
       auth: {
+        organizationId: 'organization-1',
         projectId: 'project-1',
         token: 'token-1',
         userId: 'user-1',
@@ -135,6 +138,7 @@ describe('user client', () => {
     expect(ConnectionConfig.WithDebugger).toHaveBeenCalledWith({
       authorization: 'token-1',
       userId: 'user-1',
+      organizationId: 'organization-1',
       projectId: 'project-1',
     });
     expect(UpdateNotificationSetting).toHaveBeenCalledWith(

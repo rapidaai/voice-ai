@@ -1,0 +1,990 @@
+# Copyright (c) 2023-2025 RapidaAI
+# Author: Prashant Srivastav <prashant@rapida.ai>
+#
+# Licensed under GPL-2.0 with Rapida Additional Terms.
+# See LICENSE.md or contact sales@rapida.ai for commercial usage.
+
+version: 1
+deployable: web-api
+
+grpc:
+  "/assistant_api.AssistantDeploymentService/CreateAssistantApiDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.manage]
+  "/assistant_api.AssistantDeploymentService/CreateAssistantDebuggerDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.manage]
+  "/assistant_api.AssistantDeploymentService/CreateAssistantPhoneDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.manage]
+  "/assistant_api.AssistantDeploymentService/CreateAssistantWebpluginDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.manage]
+  "/assistant_api.AssistantDeploymentService/CreateAssistantWhatsappDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.manage]
+  "/assistant_api.AssistantDeploymentService/DisableAssistantApiDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.manage]
+  "/assistant_api.AssistantDeploymentService/DisableAssistantDebuggerDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.manage]
+  "/assistant_api.AssistantDeploymentService/DisableAssistantPhoneDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.manage]
+  "/assistant_api.AssistantDeploymentService/DisableAssistantWebpluginDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.manage]
+  "/assistant_api.AssistantDeploymentService/DisableAssistantWhatsappDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.manage]
+  "/assistant_api.AssistantDeploymentService/GetAllAssistantApiDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.read]
+  "/assistant_api.AssistantDeploymentService/GetAllAssistantDebuggerDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.read]
+  "/assistant_api.AssistantDeploymentService/GetAllAssistantPhoneDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.read]
+  "/assistant_api.AssistantDeploymentService/GetAllAssistantWebpluginDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.read]
+  "/assistant_api.AssistantDeploymentService/GetAllAssistantWhatsappDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.read]
+  "/assistant_api.AssistantDeploymentService/GetAssistantApiDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.read]
+  "/assistant_api.AssistantDeploymentService/GetAssistantDebuggerDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.read]
+  "/assistant_api.AssistantDeploymentService/GetAssistantPhoneDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.read]
+  "/assistant_api.AssistantDeploymentService/GetAssistantWebpluginDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.read]
+  "/assistant_api.AssistantDeploymentService/GetAssistantWhatsappDeployment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.deployments.read]
+  "/assistant_api.AssistantService/CreateAssistant":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.create]
+  "/assistant_api.AssistantService/CreateAssistantConfiguration":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.create]
+  "/assistant_api.AssistantService/CreateAssistantKnowledge":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.create]
+  "/assistant_api.AssistantService/CreateAssistantProvider":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.create]
+  "/assistant_api.AssistantService/CreateAssistantTag":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.create]
+  "/assistant_api.AssistantService/CreateAssistantTool":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.create]
+  "/assistant_api.AssistantService/DeleteAssistant":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.delete]
+  "/assistant_api.AssistantService/DeleteAssistantConfiguration":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.delete]
+  "/assistant_api.AssistantService/DeleteAssistantKnowledge":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.delete]
+  "/assistant_api.AssistantService/DeleteAssistantTool":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.delete]
+  "/assistant_api.AssistantService/GetAllAssistant":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/assistant_api.AssistantService/GetAllAssistantConfiguration":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/assistant_api.AssistantService/GetAllAssistantConversation":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.conversations.read]
+  "/assistant_api.AssistantService/GetAllAssistantHTTPLog":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.observability.read]
+  "/assistant_api.AssistantService/GetAllAssistantKnowledge":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/assistant_api.AssistantService/GetAllAssistantMessage":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.conversations.read]
+  "/assistant_api.AssistantService/GetAllAssistantProvider":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/assistant_api.AssistantService/GetAllAssistantTool":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/assistant_api.AssistantService/GetAllAssistantToolLog":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.observability.read]
+  "/assistant_api.AssistantService/GetAllConversationMessage":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.conversations.read]
+  "/assistant_api.AssistantService/GetAllMessage":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.conversations.read]
+  "/assistant_api.AssistantService/GetAssistant":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/assistant_api.AssistantService/GetAssistantConfiguration":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/assistant_api.AssistantService/GetAssistantConversation":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.conversations.read]
+  "/assistant_api.AssistantService/GetAssistantDashboard":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.observability.read]
+  "/assistant_api.AssistantService/GetAssistantHTTPLog":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.observability.read]
+  "/assistant_api.AssistantService/GetAssistantKnowledge":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/assistant_api.AssistantService/GetAssistantTool":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/assistant_api.AssistantService/GetAssistantToolLog":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.observability.read]
+  "/assistant_api.AssistantService/RetryAssistantHTTPLog":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions:
+      - project.observability.read
+      - project.resources.update
+  "/assistant_api.AssistantService/UpdateAssistantConfiguration":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/assistant_api.AssistantService/UpdateAssistantDetail":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/assistant_api.AssistantService/UpdateAssistantKnowledge":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/assistant_api.AssistantService/UpdateAssistantTool":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/assistant_api.AssistantService/UpdateAssistantVersion":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/billing_api.ProductUsageService/CreateProductUsage":
+    authorization: authenticated
+    actors: [user, project, service]
+    context: project
+    caller_services:
+      - issuer: internal
+        actor_id: 1
+    project_token:
+      audience: runtime
+      binding: project
+  "/billing_api.ProductUsageService/GetOrganizationUsages":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.billing.read]
+  "/billing_api.ProductUsageService/GetProductUsages":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.observability.read]
+  "/connect_api.ConnectService/GeneralConnect":
+    authorization: disabled
+  "/connect_api.ConnectService/GetConnectorFiles":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.provider_credentials.use]
+  "/dashboard_api.DashboardService/GetProjectDashboard":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.observability.read]
+  "/document_api.DocumentService/IndexKnowledgeDocument":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/endpoint_api.Deployment/Invoke":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: runtime
+      binding: project
+    permissions: [project.runtime.invoke]
+  "/endpoint_api.Deployment/Probe":
+    authorization: disabled
+  "/endpoint_api.Deployment/Update":
+    authorization: disabled
+  "/endpoint_api.EndpointService/CreateEndpoint":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.create]
+  "/endpoint_api.EndpointService/CreateEndpointCacheConfiguration":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/endpoint_api.EndpointService/CreateEndpointProviderModel":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/endpoint_api.EndpointService/CreateEndpointRetryConfiguration":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/endpoint_api.EndpointService/CreateEndpointTag":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/endpoint_api.EndpointService/ForkEndpoint":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.create]
+  "/endpoint_api.EndpointService/GetAllEndpoint":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/endpoint_api.EndpointService/GetAllEndpointLog":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.observability.read]
+  "/endpoint_api.EndpointService/GetAllEndpointProviderModel":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/endpoint_api.EndpointService/GetEndpoint":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/endpoint_api.EndpointService/GetEndpointLog":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.observability.read]
+  "/endpoint_api.EndpointService/UpdateEndpointDetail":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/endpoint_api.EndpointService/UpdateEndpointVersion":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/integration_api.AuditLoggingService/CreateMetadata":
+    authorization: disabled
+  "/integration_api.AuditLoggingService/GetAllAuditLog":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.audit.read]
+  "/integration_api.AuditLoggingService/GetAuditLog":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.audit.read]
+  "/knowledge_api.KnowledgeService/CreateKnowledge":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.create]
+  "/knowledge_api.KnowledgeService/CreateKnowledgeDocument":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.create]
+  "/knowledge_api.KnowledgeService/CreateKnowledgeTag":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.create]
+  "/knowledge_api.KnowledgeService/DeleteKnowledgeDocumentSegment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.delete]
+  "/knowledge_api.KnowledgeService/GetAllKnowledge":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/knowledge_api.KnowledgeService/GetAllKnowledgeDocument":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/knowledge_api.KnowledgeService/GetAllKnowledgeDocumentSegment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/knowledge_api.KnowledgeService/GetAllKnowledgeLog":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.observability.read]
+  "/knowledge_api.KnowledgeService/GetKnowledge":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.read]
+  "/knowledge_api.KnowledgeService/GetKnowledgeLog":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.observability.read]
+  "/knowledge_api.KnowledgeService/UpdateKnowledgeDetail":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/knowledge_api.KnowledgeService/UpdateKnowledgeDocumentSegment":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.resources.update]
+  "/notification_api.NotificationService/GetNotificationSettting":
+    authorization: authenticated
+    actors: [user]
+    context: user
+  "/notification_api.NotificationService/UpdateNotificationSetting":
+    authorization: authenticated
+    actors: [user]
+    context: user
+  "/observability_api.ObservabilityService/GetAllTelemetry":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.observability.read]
+  "/vault_api.VaultService/CreateProviderCredential":
+    authorization: disabled
+  "/vault_api.VaultService/DeleteCredential":
+    authorization: disabled
+  "/vault_api.VaultService/GetAllOrganizationCredential":
+    authorization: any_of
+    any_of:
+      - actors: [user]
+        context: project
+        permissions: [organization.provider_credentials.read_metadata]
+      - actors: [user, project]
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions: [project.provider_credentials.read_metadata]
+  "/vault_api.VaultService/GetCredential":
+    authorization: disabled
+  "/vault_api.VaultService/GetOauth2Credential":
+    authorization: disabled
+  "/web_api.AccessManagementService/ArchiveCustomRole":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.roles.archive]
+  "/web_api.AccessManagementService/CreateCustomRole":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.roles.create]
+  "/web_api.AccessManagementService/GetRole":
+    authorization: any_of
+    any_of:
+      - actors: [user]
+        context: organization
+        permissions: [organization.roles.read]
+      - actors: [user, project]
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions: [project.roles.read]
+  "/web_api.AccessManagementService/ListPermissions":
+    authorization: any_of
+    any_of:
+      - actors: [user]
+        context: organization
+        permissions: [organization.roles.read]
+      - actors: [user, project]
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions: [project.roles.read]
+  "/web_api.AccessManagementService/ListRoles":
+    authorization: any_of
+    any_of:
+      - actors: [user]
+        context: organization
+        permissions: [organization.roles.read]
+      - actors: [user, project]
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions: [project.roles.read]
+  "/web_api.AccessManagementService/ReduceCustomRolePermissions":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.roles.update]
+  "/web_api.AccessManagementService/UpdateCustomRole":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.roles.update]
+  "/web_api.AuthenticationService/Authenticate":
+    authorization: public
+  "/web_api.AuthenticationService/Authorize":
+    authorization: authenticated
+    actors: [user]
+    context: user
+  "/web_api.AuthenticationService/ChangePassword":
+    authorization: authenticated
+    actors: [user]
+    context: user
+  "/web_api.AuthenticationService/CreatePassword":
+    authorization: public
+  "/web_api.AuthenticationService/ForgotPassword":
+    authorization: public
+  "/web_api.AuthenticationService/GetAllUser":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.members.read]
+  "/web_api.AuthenticationService/GetUser":
+    authorization: authenticated
+    actors: [user]
+    context: user
+  "/web_api.AuthenticationService/Github":
+    authorization: public
+  "/web_api.AuthenticationService/Google":
+    authorization: public
+  "/web_api.AuthenticationService/Linkedin":
+    authorization: public
+  "/web_api.AuthenticationService/RegisterUser":
+    authorization: public
+  "/web_api.AuthenticationService/UpdateUser":
+    authorization: authenticated
+    actors: [user]
+    context: user
+  "/web_api.AuthenticationService/VerifyToken":
+    authorization: authenticated
+    actors: [service]
+    caller_services:
+      - issuer: internal
+        actor_id: 1
+    context: service
+  "/web_api.OrganizationService/CreateOrganization":
+    authorization: authenticated
+    actors: [user]
+    context: user
+  "/web_api.OrganizationService/DeleteUserFromOrganization":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.members.remove]
+  "/web_api.OrganizationService/GetOrganization":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.read]
+  "/web_api.OrganizationService/InviteUserToOrganization":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions:
+      - organization.members.invite
+      - organization.access.manage
+  "/web_api.OrganizationService/UpdateBillingInformation":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.billing.manage]
+  "/web_api.OrganizationService/UpdateOrganization":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.update]
+  "/web_api.OrganizationService/UpdateUserOrganizationRole":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.access.manage]
+  "/web_api.ProjectService/AddUserToProjects":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.access.manage]
+  "/web_api.ProjectService/ArchiveProject":
+    authorization: permission
+    actors: [user]
+    context: project
+    permissions: [project.archive]
+  "/web_api.ProjectService/CreateProject":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.projects.create]
+  "/web_api.ProjectService/CreateProjectCredential":
+    authorization: disabled
+  "/web_api.ProjectService/DeleteUserFromProject":
+    authorization: permission
+    actors: [user]
+    context: project
+    permissions: [project.access.manage]
+  "/web_api.ProjectService/GetAllProject":
+    authorization: permission
+    actors: [user]
+    context: organization
+    permissions: [organization.projects.read]
+  "/web_api.ProjectService/GetAllProjectCredential":
+    authorization: disabled
+  "/web_api.ProjectService/GetProject":
+    authorization: permission
+    actors: [user, project]
+    context: project
+    project_token:
+      audience: management
+      binding: project
+    permissions: [project.read]
+  "/web_api.ProjectService/RevokeProjectCredential":
+    authorization: any_of
+    any_of:
+      - actors: [user]
+        context: project
+        permissions: [organization.project_access_tokens.revoke]
+      - actors: [user]
+        context: project
+        permissions: [project.access_tokens.revoke]
+  "/web_api.ProjectService/UpdateProject":
+    authorization: permission
+    actors: [user]
+    context: project
+    permissions: [project.update]
+
+http:
+  "GET /healthz/":
+    authorization: public
+  "GET /oauth/github/":
+    authorization: public
+  "GET /oauth/google/":
+    authorization: public
+  "GET /oauth/linkedin/":
+    authorization: public
+  "GET /readiness/":
+    authorization: public
+  "GET /v1/connect-action/gmail/":
+    authorization: disabled
+  "GET /v1/connect-action/jira/":
+    authorization: disabled
+  "GET /v1/connect-action/slack/":
+    authorization: disabled
+  "GET /v1/connect-crm/hubspot/":
+    authorization: disabled
+  "GET /v1/connect-knowledge/confluence/":
+    authorization: disabled
+  "GET /v1/connect-knowledge/github/":
+    authorization: disabled
+  "GET /v1/connect-knowledge/gitlab/":
+    authorization: disabled
+  "GET /v1/connect-knowledge/google-drive/":
+    authorization: disabled
+  "GET /v1/connect-knowledge/microsoft-onedrive/":
+    authorization: disabled
+  "GET /v1/connect-knowledge/notion/":
+    authorization: disabled
+  "GET /v1/connect-knowledge/sharepoint/":
+    authorization: disabled
+  "POST /v1/auth/authenticate/":
+    authorization: public
+  "POST /v1/auth/register-user/":
+    authorization: public

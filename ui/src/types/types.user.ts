@@ -28,6 +28,7 @@ export type UserType = {
   getAllUser: (
     token: string,
     userId: string,
+    organizationId: string,
     projectId: string,
     onError: (err: string) => void,
     onSuccess: (e: User[]) => void,

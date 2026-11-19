@@ -3,10 +3,12 @@ package dashboard_api
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 
 	internal_dashboard_service "github.com/rapidaai/api/assistant-api/internal/services/dashboard"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/protos"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,18 +19,25 @@ type projectDashboardAnalyticsServiceStub struct {
 	err  error
 }
 
-func (stub projectDashboardAnalyticsServiceStub) GetProjectDashboardAnalytics(context.Context, types.ProjectContext, *protos.GetProjectDashboardAnalyticsRequest) (*protos.ProjectDashboardAnalytics, error) {
+func (stub projectDashboardAnalyticsServiceStub) GetProjectDashboardAnalytics(context.Context, authentication.Tenant, *protos.GetProjectDashboardAnalyticsRequest) (*protos.ProjectDashboardAnalytics, error) {
 	return stub.data, stub.err
 }
 
 func projectDashboardAnalyticsContext() context.Context {
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeProject,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeProject, ID: 11},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
-		ProjectValue:      &types.ProjectContext{OrganizationID: 7, ProjectID: 11},
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityProjectCredential, ID: 11},
+		authentication.Tenant{OrganizationID: 7, ProjectID: 11},
+		authentication.Proof{Method: authentication.AuthenticationProjectCredential, Audience: authentication.AudienceManagement, Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: "11"}},
+		nil,
+	)
+	if err != nil {
+		panic(err)
 	}
-	return context.WithValue(context.Background(), types.CTX_, auth)
+	ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), principal)
+	if err != nil {
+		panic(err)
+	}
+	return ctx
 }
 
 func TestProjectDashboardAnalyticsAPIRejectsNilRequest(t *testing.T) {
@@ -46,26 +55,44 @@ func TestProjectDashboardAnalyticsAPIRequiresAuthentication(t *testing.T) {
 }
 
 func TestProjectDashboardAnalyticsAPIRequiresProjectContext(t *testing.T) {
-	tests := []*types.Authentication{
+	tests := []struct {
+		name      string
+		principal authentication.Principal
+	}{
 		{
-			AuthType:          types.AuthTypeOrg,
-			ActorValue:        &types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 7},
-			OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
+			name: "organization",
+			principal: mustDashboardPrincipal(authentication.NewDirectPrincipal(
+				authentication.Identity{Type: authentication.IdentityOrganizationCredential, ID: 7},
+				authentication.Tenant{OrganizationID: 7},
+				authentication.Proof{Method: authentication.AuthenticationOrganizationCredential, Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: "7"}}, nil,
+			)),
 		},
 		{
-			AuthType:          types.AuthTypeUser,
-			ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: 3},
-			UserValue:         &types.UserContext{UserID: 3},
-			OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
+			name: "user",
+			principal: mustDashboardPrincipal(authentication.NewDirectPrincipal(
+				authentication.Identity{Type: authentication.IdentityUser, ID: 3},
+				authentication.Tenant{OrganizationID: 7},
+				authentication.Proof{Method: authentication.AuthenticationUserSession, Reference: authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: strconv.FormatUint(3, 10)}}, nil,
+			)),
 		},
 	}
-	for _, auth := range tests {
-		ctx := context.WithValue(context.Background(), types.CTX_, auth)
+	for _, test := range tests {
+		ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), test.principal)
+		if err != nil {
+			t.Fatal(err)
+		}
 		dashboardAPI := &projectDashboardAnalyticsGRPCApi{projectDashboardAnalytics: projectDashboardAnalyticsServiceStub{}}
 		if _, err := dashboardAPI.GetProjectDashboardAnalytics(ctx, &protos.GetProjectDashboardAnalyticsRequest{}); status.Code(err) != codes.PermissionDenied {
-			t.Fatalf("auth type %v error = %v", auth.AuthType, err)
+			t.Fatalf("%s principal error = %v", test.name, err)
 		}
 	}
+}
+
+func mustDashboardPrincipal(principal authentication.Principal, err error) authentication.Principal {
+	if err != nil {
+		panic(err)
+	}
+	return principal
 }
 
 func TestProjectDashboardAnalyticsAPIReturnsSuccess(t *testing.T) {

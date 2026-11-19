@@ -9,6 +9,7 @@ import (
 	"time"
 
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
@@ -26,10 +27,10 @@ var (
 )
 
 type Service interface {
-	CreateProductUsage(context.Context, *types.Authentication, *protos.CreateProductUsageRequest) (*internal_entity.ProductUsage, error)
-	GetProductUsages(context.Context, *types.Authentication, string, []*protos.Criteria, *protos.Paginate) (int64, []*internal_entity.ProductUsage, error)
-	GetOrganizationUsages(context.Context, *types.Authentication, []*protos.Criteria, *protos.Paginate) (int64, []*internal_entity.ProductUsage, error)
-	GetDashboardUsage(context.Context, *types.Authentication, time.Time, time.Time) (*protos.DashboardUsageSection, error)
+	CreateProductUsage(context.Context, authentication.Principal, *protos.CreateProductUsageRequest) (*internal_entity.ProductUsage, error)
+	GetProductUsages(context.Context, authentication.Principal, string, []*protos.Criteria, *protos.Paginate) (int64, []*internal_entity.ProductUsage, error)
+	GetOrganizationUsages(context.Context, authentication.Principal, []*protos.Criteria, *protos.Paginate) (int64, []*internal_entity.ProductUsage, error)
+	GetDashboardUsage(context.Context, authentication.Principal, time.Time, time.Time) (*protos.DashboardUsageSection, error)
 }
 
 type productUsageService struct {
@@ -41,13 +42,13 @@ func NewProductUsageService(postgres connectors.PostgresConnector, logger common
 	return &productUsageService{postgres: postgres, logger: logger}
 }
 
-func (service *productUsageService) CreateProductUsage(ctx context.Context, auth *types.Authentication, input *protos.CreateProductUsageRequest) (*internal_entity.ProductUsage, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrProjectMismatch, err)
+func (service *productUsageService) CreateProductUsage(ctx context.Context, auth authentication.Principal, input *protos.CreateProductUsageRequest) (*internal_entity.ProductUsage, error) {
+	tenant := auth.Tenant()
+	if tenant.OrganizationID == 0 || tenant.ProjectID == 0 {
+		return nil, ErrProjectMismatch
 	}
 
-	usage, err := buildProductUsage(auth, projectContext, input)
+	usage, err := buildProductUsage(auth, tenant, input)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidRequest, err)
 	}
@@ -55,7 +56,7 @@ func (service *productUsageService) CreateProductUsage(ctx context.Context, auth
 	err = service.postgres.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		var projectCount int64
 		if countErr := tx.Model(&internal_entity.Project{}).
-			Where("id = ? AND organization_id = ? AND status = ?", projectContext.ProjectID, projectContext.OrganizationID, type_enums.RECORD_ACTIVE).
+			Where("id = ? AND organization_id = ? AND status = ?", tenant.ProjectID, tenant.OrganizationID, type_enums.RECORD_ACTIVE).
 			Count(&projectCount).Error; countErr != nil {
 			return countErr
 		}
@@ -70,10 +71,10 @@ func (service *productUsageService) CreateProductUsage(ctx context.Context, auth
 	return &usage, nil
 }
 
-func (service *productUsageService) GetProductUsages(ctx context.Context, auth *types.Authentication, usageType string, criteria []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_entity.ProductUsage, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return 0, nil, fmt.Errorf("%w: %v", ErrProjectMismatch, err)
+func (service *productUsageService) GetProductUsages(ctx context.Context, auth authentication.Principal, usageType string, criteria []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_entity.ProductUsage, error) {
+	tenant := auth.Tenant()
+	if tenant.OrganizationID == 0 || tenant.ProjectID == 0 {
+		return 0, nil, ErrProjectMismatch
 	}
 	if _, ok := types.ProductUsageUnitFor(usageType); !ok {
 		return 0, nil, fmt.Errorf("%w: usageType is required and must be supported", ErrInvalidRequest)
@@ -83,8 +84,8 @@ func (service *productUsageService) GetProductUsages(ctx context.Context, auth *
 		Model(&internal_entity.ProductUsage{}).
 		Where(
 			"organization_id = ? AND project_id = ? AND usage_type = ? AND status = ?",
-			projectContext.OrganizationID,
-			projectContext.ProjectID,
+			tenant.OrganizationID,
+			tenant.ProjectID,
 			usageType,
 			type_enums.RECORD_ACTIVE,
 		)
@@ -173,15 +174,15 @@ func (service *productUsageService) GetProductUsages(ctx context.Context, auth *
 	return count, usages, nil
 }
 
-func (service *productUsageService) GetOrganizationUsages(ctx context.Context, auth *types.Authentication, criteria []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_entity.ProductUsage, error) {
-	organizationContext, err := auth.OrganizationContext()
-	if err != nil {
-		return 0, nil, fmt.Errorf("%w: %v", ErrInvalidRequest, err)
+func (service *productUsageService) GetOrganizationUsages(ctx context.Context, auth authentication.Principal, criteria []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_entity.ProductUsage, error) {
+	tenant := auth.Tenant()
+	if tenant.OrganizationID == 0 {
+		return 0, nil, ErrInvalidRequest
 	}
 
 	query := service.postgres.DB(ctx).
 		Model(&internal_entity.ProductUsage{}).
-		Where("organization_id = ? AND status = ?", organizationContext.OrganizationID, type_enums.RECORD_ACTIVE)
+		Where("organization_id = ? AND status = ?", tenant.OrganizationID, type_enums.RECORD_ACTIVE)
 	for index, criterion := range criteria {
 		if criterion == nil || strings.TrimSpace(criterion.GetKey()) == "" || strings.TrimSpace(criterion.GetValue()) == "" {
 			continue
@@ -275,10 +276,10 @@ func (service *productUsageService) GetOrganizationUsages(ctx context.Context, a
 	return count, usages, nil
 }
 
-func (service *productUsageService) GetDashboardUsage(ctx context.Context, auth *types.Authentication, fromDate, toDate time.Time) (*protos.DashboardUsageSection, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrProjectMismatch, err)
+func (service *productUsageService) GetDashboardUsage(ctx context.Context, auth authentication.Principal, fromDate, toDate time.Time) (*protos.DashboardUsageSection, error) {
+	tenant := auth.Tenant()
+	if tenant.OrganizationID == 0 || tenant.ProjectID == 0 {
+		return nil, ErrProjectMismatch
 	}
 	if !fromDate.Before(toDate) {
 		return nil, fmt.Errorf("%w: dashboard range must have positive duration", ErrInvalidRequest)
@@ -289,13 +290,13 @@ func (service *productUsageService) GetDashboardUsage(ctx context.Context, auth 
 		Total     int64
 	}
 	var totals []usageTotal
-	if err = service.postgres.DB(ctx).
+	if err := service.postgres.DB(ctx).
 		Model(&internal_entity.ProductUsage{}).
 		Select("usage_type, SUM(usages) AS total").
 		Where(
 			"organization_id = ? AND project_id = ? AND status = ? AND unit = ? AND occurred_at >= ? AND occurred_at < ?",
-			projectContext.OrganizationID,
-			projectContext.ProjectID,
+			tenant.OrganizationID,
+			tenant.ProjectID,
 			type_enums.RECORD_ACTIVE,
 			types.ProductUsageUnitNanosecond,
 			fromDate.UTC(),
@@ -353,7 +354,7 @@ func (service *productUsageService) GetDashboardUsage(ctx context.Context, auth 
 	return section, nil
 }
 
-func buildProductUsage(auth *types.Authentication, projectContext types.ProjectContext, input *protos.CreateProductUsageRequest) (internal_entity.ProductUsage, error) {
+func buildProductUsage(auth authentication.Principal, tenant authentication.Tenant, input *protos.CreateProductUsageRequest) (internal_entity.ProductUsage, error) {
 	if input == nil {
 		return internal_entity.ProductUsage{}, errors.New("usage is required")
 	}
@@ -370,16 +371,16 @@ func buildProductUsage(auth *types.Authentication, projectContext types.ProjectC
 		return internal_entity.ProductUsage{}, fmt.Errorf("occurredAt is invalid: %w", err)
 	}
 
-	actor := auth.Actor()
+	actor := auth.Caller()
 	return internal_entity.ProductUsage{
 		Mutable: gorm_model.Mutable{
 			Status:           type_enums.RECORD_ACTIVE,
-			CreatedActorType: actor.Type.String(),
+			CreatedActorType: string(actor.Type),
 			CreatedActorID:   actor.ID,
 		},
 		Organizational: gorm_model.Organizational{
-			OrganizationId: projectContext.OrganizationID,
-			ProjectId:      projectContext.ProjectID,
+			OrganizationId: tenant.OrganizationID,
+			ProjectId:      tenant.ProjectID,
 		},
 		UsageType:  input.GetUsageType(),
 		Usages:     input.GetUsages(),

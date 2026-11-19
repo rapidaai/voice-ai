@@ -1,0 +1,2660 @@
+# Copyright (c) 2023-2025 RapidaAI
+# Author: Prashant Srivastav <prashant@rapida.ai>
+#
+# Licensed under GPL-2.0 with Rapida Additional Terms.
+# See LICENSE.md or contact sales@rapida.ai for commercial usage.
+
+version: 1
+deployable: assistant-api
+
+grpc:
+  /assistant_api.AssistantDeploymentService/CreateAssistantApiDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  /assistant_api.AssistantDeploymentService/CreateAssistantDebuggerDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  /assistant_api.AssistantDeploymentService/CreateAssistantPhoneDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  /assistant_api.AssistantDeploymentService/CreateAssistantWebpluginDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  /assistant_api.AssistantDeploymentService/CreateAssistantWhatsappDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  /assistant_api.AssistantDeploymentService/DisableAssistantApiDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  /assistant_api.AssistantDeploymentService/DisableAssistantDebuggerDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  /assistant_api.AssistantDeploymentService/DisableAssistantPhoneDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  /assistant_api.AssistantDeploymentService/DisableAssistantWebpluginDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  /assistant_api.AssistantDeploymentService/DisableAssistantWhatsappDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  /assistant_api.AssistantDeploymentService/GetAllAssistantApiDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  /assistant_api.AssistantDeploymentService/GetAllAssistantDebuggerDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  /assistant_api.AssistantDeploymentService/GetAllAssistantPhoneDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  /assistant_api.AssistantDeploymentService/GetAllAssistantWebpluginDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  /assistant_api.AssistantDeploymentService/GetAllAssistantWhatsappDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  /assistant_api.AssistantDeploymentService/GetAssistantApiDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  /assistant_api.AssistantDeploymentService/GetAssistantDebuggerDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  /assistant_api.AssistantDeploymentService/GetAssistantPhoneDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  /assistant_api.AssistantDeploymentService/GetAssistantWebpluginDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  /assistant_api.AssistantDeploymentService/GetAssistantWhatsappDeployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  /assistant_api.AssistantService/CreateAssistant:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.create
+  /assistant_api.AssistantService/CreateAssistantConfiguration:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.create
+  /assistant_api.AssistantService/CreateAssistantKnowledge:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.create
+  /assistant_api.AssistantService/CreateAssistantProvider:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.create
+  /assistant_api.AssistantService/CreateAssistantTag:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.create
+  /assistant_api.AssistantService/CreateAssistantTool:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.create
+  /assistant_api.AssistantService/DeleteAssistant:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.delete
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.delete
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.delete
+  /assistant_api.AssistantService/DeleteAssistantConfiguration:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.delete
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.delete
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.delete
+  /assistant_api.AssistantService/DeleteAssistantKnowledge:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.delete
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.delete
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.delete
+  /assistant_api.AssistantService/DeleteAssistantTool:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.delete
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.delete
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.delete
+  /assistant_api.AssistantService/GetAllAssistant:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /assistant_api.AssistantService/GetAllAssistantConfiguration:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /assistant_api.AssistantService/GetAllAssistantConversation:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.conversations.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.conversations.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.conversations.read
+  /assistant_api.AssistantService/GetAllAssistantHTTPLog:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.observability.read
+  /assistant_api.AssistantService/GetAllAssistantKnowledge:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /assistant_api.AssistantService/GetAllAssistantMessage:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.conversations.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.conversations.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.conversations.read
+  /assistant_api.AssistantService/GetAllAssistantProvider:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /assistant_api.AssistantService/GetAllAssistantTool:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /assistant_api.AssistantService/GetAllAssistantToolLog:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.observability.read
+  /assistant_api.AssistantService/GetAllConversationMessage:
+    authorization: disabled
+  /assistant_api.AssistantService/GetAllMessage:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.conversations.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.conversations.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.conversations.read
+  /assistant_api.AssistantService/GetAssistant:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /assistant_api.AssistantService/GetAssistantConfiguration:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /assistant_api.AssistantService/GetAssistantConversation:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.conversations.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.conversations.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.conversations.read
+  /assistant_api.AssistantService/GetAssistantDashboard:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.observability.read
+  /assistant_api.AssistantService/GetAssistantHTTPLog:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.observability.read
+  /assistant_api.AssistantService/GetAssistantKnowledge:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /assistant_api.AssistantService/GetAssistantTool:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /assistant_api.AssistantService/GetAssistantToolLog:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.observability.read
+  /assistant_api.AssistantService/RetryAssistantHTTPLog:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.observability.read
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.observability.read
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.observability.read
+          - project.resources.update
+  /assistant_api.AssistantService/UpdateAssistantConfiguration:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  /assistant_api.AssistantService/UpdateAssistantDetail:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  /assistant_api.AssistantService/UpdateAssistantKnowledge:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  /assistant_api.AssistantService/UpdateAssistantTool:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  /assistant_api.AssistantService/UpdateAssistantVersion:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  /dashboard_api.ProjectDashboardAnalyticsService/GetProjectDashboardAnalytics:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.observability.read
+  /document_api.DocumentService/IndexKnowledgeDocument:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  /knowledge_api.KnowledgeService/CreateKnowledge:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.create
+  /knowledge_api.KnowledgeService/CreateKnowledgeDocument:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.create
+  /knowledge_api.KnowledgeService/CreateKnowledgeTag:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.create
+  /knowledge_api.KnowledgeService/DeleteKnowledgeDocumentSegment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.delete
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.delete
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.delete
+  /knowledge_api.KnowledgeService/GetAllKnowledge:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /knowledge_api.KnowledgeService/GetAllKnowledgeDocument:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /knowledge_api.KnowledgeService/GetAllKnowledgeDocumentSegment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /knowledge_api.KnowledgeService/GetAllKnowledgeLog:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.observability.read
+  /knowledge_api.KnowledgeService/GetKnowledge:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  /knowledge_api.KnowledgeService/GetKnowledgeLog:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.observability.read
+  /knowledge_api.KnowledgeService/UpdateKnowledgeDetail:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  /knowledge_api.KnowledgeService/UpdateKnowledgeDocumentSegment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  /observability_api.ObservabilityService/GetAllTelemetry:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.observability.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.observability.read
+  /talk_api.TalkService/AssistantTalk:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.runtime.invoke
+  /talk_api.TalkService/CreateBulkPhoneCall:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.runtime.invoke
+  /talk_api.TalkService/CreateConversationMetric:
+    authorization: disabled
+  /talk_api.TalkService/CreateMessageMetric:
+    authorization: disabled
+  /talk_api.TalkService/CreatePhoneCall:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.runtime.invoke
+  /talk_api.TalkService/GetAllAssistantConversation:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.conversations.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.conversations.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.conversations.read
+  /talk_api.TalkService/GetAllConversationMessage:
+    authorization: disabled
+  /talk_api.WebRTC/WebTalk:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.runtime.invoke
+
+http:
+  DELETE /v1/assistant/configurations/:assistantId/:id:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.delete
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.delete
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.delete
+  GET /healthz/:
+    authorization: public
+  GET /readiness/:
+    authorization: public
+  GET /v1/assistant-deployment/get-all-api-deployment/:assistantId:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  GET /v1/assistant-deployment/get-all-debugger-deployment/:assistantId:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  GET /v1/assistant-deployment/get-all-phone-deployment/:assistantId:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  GET /v1/assistant-deployment/get-all-webplugin-deployment/:assistantId:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  GET /v1/assistant-deployment/get-all-whatsapp-deployment/:assistantId:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  GET /v1/assistant-deployment/get-api-deployment/:assistantId:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  GET /v1/assistant-deployment/get-debugger-deployment/:assistantId:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  GET /v1/assistant-deployment/get-phone-deployment/:assistantId:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  GET /v1/assistant-deployment/get-webplugin-deployment/:assistantId:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  GET /v1/assistant-deployment/get-whatsapp-deployment/:assistantId:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.read
+  GET /v1/assistant/configurations/:assistantId:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  GET /v1/assistant/configurations/:assistantId/:id:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.read
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.read
+  GET /v1/talk/:telephony/call/:assistantId:
+    authorization: disabled
+  GET /v1/talk/:telephony/ctx/:contextId:
+    authorization: disabled
+  GET /v1/talk/:telephony/ctx/:contextId/event:
+    authorization: disabled
+  GET /v1/talk/:telephony/event/:assistantId:
+    authorization: disabled
+  PATCH /v1/assistant/configurations/:assistantId/:id:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.update
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.update
+  POST /v1/assistant-deployment/create-api-deployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  POST /v1/assistant-deployment/create-debugger-deployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  POST /v1/assistant-deployment/create-phone-deployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  POST /v1/assistant-deployment/create-webplugin-deployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  POST /v1/assistant-deployment/create-whatsapp-deployment:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.deployments.manage
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.deployments.manage
+  POST /v1/assistant/configurations:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.create
+  POST /v1/assistant/create-assistant:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.resources.create
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.resources.create
+  POST /v1/talk/:telephony/call/:assistantId:
+    authorization: disabled
+  POST /v1/talk/:telephony/ctx/:contextId/event:
+    authorization: disabled
+  POST /v1/talk/:telephony/event/:assistantId:
+    authorization: disabled
+  POST /v1/talk/create-bulk-phone-call:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.runtime.invoke
+  POST /v1/talk/create-phone-call:
+    authorization: any_of
+    any_of:
+      - actors:
+          - user
+        context: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        context: project
+        project_token:
+          audience: management
+          binding: project
+        permissions:
+          - project.runtime.invoke
+      - actors:
+          - project
+        caller_services:
+          - issuer: internal
+            actor_id: 1
+        context: project
+        project_token:
+          audience: runtime
+          binding: project
+        permissions:
+          - project.runtime.invoke

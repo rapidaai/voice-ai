@@ -16,11 +16,11 @@ import (
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/authentication"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/storages"
-	"github.com/rapidaai/pkg/types"
 )
 
 const (
@@ -65,7 +65,7 @@ type CallSetupResult struct {
 	AssistantID         uint64
 	ConversationID      uint64
 	AssistantProviderId uint64
-	Auth                *types.Authentication
+	Auth                authentication.Principal
 	ProjectID           uint64
 	OrganizationID      uint64
 	CallContext         *callcontext.CallContext

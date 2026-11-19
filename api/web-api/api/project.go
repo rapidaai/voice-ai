@@ -1,17 +1,22 @@
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package web_api
 
 import (
 	"context"
 	"errors"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"math"
+	"strings"
 	"time"
 
 	"github.com/rapidaai/api/web-api/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
@@ -24,6 +29,8 @@ import (
 	external_clients "github.com/rapidaai/pkg/clients/external"
 	external_emailer "github.com/rapidaai/pkg/clients/external/emailer"
 	type_enums "github.com/rapidaai/pkg/types/enums"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -44,6 +51,19 @@ type webProjectRPCApi struct {
 
 type webProjectGRPCApi struct {
 	webProjectApi
+}
+
+func projectMemberProjection(assignments []*internal_entity.UserProjectRole) []*protos.User {
+	members := make([]*protos.User, 0)
+	seen := map[uint64]struct{}{}
+	for _, assignment := range assignments {
+		if _, exists := seen[assignment.UserAuthId]; exists {
+			continue
+		}
+		seen[assignment.UserAuthId] = struct{}{}
+		members = append(members, &protos.User{Id: assignment.UserAuthId, Name: assignment.Member.Name, Email: assignment.Member.Email})
+	}
+	return members
 }
 
 func NewProjectRPC(config *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) *webProjectRPCApi {
@@ -75,27 +95,14 @@ func NewProjectGRPC(config *config.WebAppConfig, logger commons.Logger, postgres
 }
 
 func (wProjectApi *webProjectGRPCApi) CreateProject(ctx context.Context, irRequest *protos.CreateProjectRequest) (*protos.CreateProjectResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	userContext, err := iAuth.UserContext()
-	if err != nil {
-		return nil, err
-	}
-	organizationContext, err := iAuth.OrganizationContext()
-	if err != nil {
-		wProjectApi.logger.Errorf("current org is null, you can't create project without an organization.")
-		return utils.Error[protos.CreateProjectResponse](
-			errors.New("you cannot create a project when you are not part of any organization"),
-			"Please create organization before creating a project.")
-	}
+	userID := principal.Subject().ID
+	tenant := principal.Tenant()
 
-	prj, err := wProjectApi.projectService.Create(ctx, iAuth, organizationContext.OrganizationID, irRequest.GetProjectName(), irRequest.GetProjectDescription())
+	prj, err := wProjectApi.projectService.Create(ctx, principal, tenant.OrganizationID, irRequest.GetProjectName(), irRequest.GetProjectDescription())
 	if err != nil {
 		wProjectApi.logger.Errorf("projectService.Create from grpc with err %v", err)
 		return utils.Error[protos.CreateProjectResponse](
@@ -103,7 +110,7 @@ func (wProjectApi *webProjectGRPCApi) CreateProject(ctx context.Context, irReque
 			"Unable to create project for your organization, please try again in sometime")
 	}
 
-	_, err = wProjectApi.userService.CreateProjectRole(ctx, iAuth, userContext.UserID, type_enums.PROJECT_ROLE_ADMIN.String(), prj.Id, type_enums.RECORD_ACTIVE)
+	_, err = wProjectApi.userService.CreateProjectRole(ctx, principal, userID, internal_service.ProjectAdminRoleDefinitionID, prj.Id, type_enums.RECORD_ACTIVE)
 	if err != nil {
 		wProjectApi.logger.Errorf("userService.CreateProjectRole from grpc with err %v", err)
 		return utils.Error[protos.CreateProjectResponse](
@@ -121,23 +128,17 @@ func (wProjectApi *webProjectGRPCApi) CreateProject(ctx context.Context, irReque
 update project request
 */
 func (wProjectApi *webProjectGRPCApi) UpdateProject(ctx context.Context, irRequest *protos.UpdateProjectRequest) (*protos.UpdateProjectResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	if _, err := iAuth.OrganizationContext(); err != nil {
-		wProjectApi.logger.Errorf("current org is not null, you can't create multiple organization at same time.")
-		return utils.Error[protos.UpdateProjectResponse](
-			errors.New("you cannot update a project when you are not part of any organization"),
-			"Please create organization before updating a project.")
+	tenant := principal.Tenant()
+	if irRequest.GetProjectId() != tenant.ProjectID {
+		return nil, status.Error(codes.PermissionDenied, "project context does not match request")
 	}
 
-	prj, err := wProjectApi.projectService.Update(ctx, iAuth, irRequest.GetProjectId(), irRequest.ProjectName, irRequest.ProjectDescription)
+	prj, err := wProjectApi.projectService.Update(ctx, principal, irRequest.GetProjectId(), irRequest.ProjectName, irRequest.ProjectDescription)
 	if err != nil {
 		wProjectApi.logger.Errorf("projectService.Update from grpc with err %v", err)
 		return utils.Error[protos.UpdateProjectResponse](err,
@@ -153,26 +154,15 @@ func (wProjectApi *webProjectGRPCApi) UpdateProject(ctx context.Context, irReque
 	return utils.Success[protos.UpdateProjectResponse, *protos.Project](ot)
 }
 func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irRequest *protos.GetAllProjectRequest) (*protos.GetAllProjectResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	organizationContext, err := iAuth.OrganizationContext()
-	if err != nil {
-		wProjectApi.logger.Errorf("current org is not null, you can't create multiple organization at same time.")
-		return utils.Error[protos.GetAllProjectResponse](
-			errors.New("you are not part of any active organization"),
-			"Please create organization and try again.",
-		)
-	}
+	tenant := principal.Tenant()
 
-	cnt, prjs, err := wProjectApi.projectService.GetAll(ctx, iAuth,
-		organizationContext.OrganizationID, irRequest.GetCriterias(), irRequest.GetPaginate())
+	cnt, prjs, err := wProjectApi.projectService.GetAll(ctx, principal,
+		tenant.OrganizationID, irRequest.GetCriterias(), irRequest.GetPaginate())
 	if err != nil {
 		wProjectApi.logger.Errorf("projectService.GetAll from grpc with err %v", err)
 		return utils.Error[protos.GetAllProjectResponse](
@@ -193,14 +183,7 @@ func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irReque
 			wProjectApi.logger.Errorf("no member in the project %v with err %v", prj.Id, err)
 			continue
 		}
-		for _, upr := range _m {
-			prj.Members = append(prj.Members, &protos.User{
-				Role:  upr.Role,
-				Id:    upr.UserAuthId,
-				Name:  upr.Member.Name,
-				Email: upr.Member.Email,
-			})
-		}
+		prj.Members = projectMemberProjection(_m)
 	}
 	totalItem, err := utils.Int64ToUint32(cnt)
 	if err != nil {
@@ -214,13 +197,9 @@ func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irReque
 }
 
 func (wProjectApi *webProjectGRPCApi) GetProject(ctx context.Context, irRequest *protos.GetProjectRequest) (*protos.GetProjectResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
 	if irRequest.GetProjectId() == 0 {
@@ -229,8 +208,11 @@ func (wProjectApi *webProjectGRPCApi) GetProject(ctx context.Context, irRequest 
 			"Please select the project to see the details.",
 		)
 	}
+	if irRequest.GetProjectId() != principal.Tenant().ProjectID {
+		return nil, status.Error(codes.PermissionDenied, "project context does not match request")
+	}
 
-	prj, err := wProjectApi.projectService.Get(ctx, iAuth, irRequest.GetProjectId())
+	prj, err := wProjectApi.projectService.Get(ctx, principal, irRequest.GetProjectId())
 	if err != nil {
 		wProjectApi.logger.Errorf("projectService.Get from grpc with err %v", err)
 		return utils.Error[protos.GetProjectResponse](
@@ -248,60 +230,16 @@ func (wProjectApi *webProjectGRPCApi) GetProject(ctx context.Context, irRequest 
 		return nil, err
 	}
 
-	projectMembers := make([]*protos.User, len(projectMemebers))
-	for idx, upr := range projectMemebers {
-		projectMembers[idx] = &protos.User{
-			Role:  upr.Role,
-			Id:    upr.UserAuthId,
-			Name:  upr.Member.Name,
-			Email: upr.Member.Email,
-		}
-	}
-
-	ot.Members = projectMembers
+	ot.Members = projectMemberProjection(projectMemebers)
 	return utils.Success[protos.GetProjectResponse, *protos.Project](ot)
 }
 
 func (wProjectApi *webProjectGRPCApi) AddUserToProjects(ctx context.Context, irRequest *protos.AddUserToProjectsRequest) (*protos.AddUserToProjectsResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	userContext, err := iAuth.UserContext()
-	if err != nil {
-		return nil, err
-	}
-	organizationContext, err := iAuth.OrganizationContext()
-	if err != nil {
-		return nil, err
-	}
-	currentOrgRole, err := wProjectApi.userService.GetActiveOrInvitedOrganizationRoleForOrganization(ctx, userContext.UserID, organizationContext.OrganizationID)
-	if err != nil || currentOrgRole == nil {
-		return &protos.AddUserToProjectsResponse{
-			Code:    pkg_errors.AddUserToProjectsMissingOrganization.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.AddUserToProjectsMissingOrganization.Code),
-				ErrorMessage: pkg_errors.AddUserToProjectsMissingOrganization.Error,
-				HumanMessage: pkg_errors.AddUserToProjectsMissingOrganization.ErrorMessage,
-			},
-		}, nil
-	}
-	if !validator.OneOf(currentOrgRole.Role, type_enums.ORGANIZATION_ROLE_OWNER.String(), type_enums.ORGANIZATION_ROLE_ADMIN.String()) {
-		return &protos.AddUserToProjectsResponse{
-			Code:    pkg_errors.AddUserToProjectsUnauthorized.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.AddUserToProjectsUnauthorized.Code),
-				ErrorMessage: pkg_errors.AddUserToProjectsUnauthorized.Error,
-				HumanMessage: pkg_errors.AddUserToProjectsUnauthorized.ErrorMessage,
-			},
-		}, nil
-	}
+	tenant := principal.Tenant()
 	if !validator.NonZero(irRequest.GetUserId()) {
 		return &protos.AddUserToProjectsResponse{
 			Code:    pkg_errors.AddUserToProjectsInvalidUser.HTTPStatusCodeInt32(),
@@ -325,39 +263,10 @@ func (wProjectApi *webProjectGRPCApi) AddUserToProjects(ctx context.Context, irR
 		}, nil
 	}
 
-	eUser, err := wProjectApi.userService.GetUser(ctx, irRequest.GetUserId())
-	if err != nil {
-		wProjectApi.logger.Errorf("unable to get user for project assignment err %v", err)
-		return &protos.AddUserToProjectsResponse{
-			Code:    pkg_errors.AddUserToProjectsInvalidUser.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.AddUserToProjectsInvalidUser.Code),
-				ErrorMessage: pkg_errors.AddUserToProjectsInvalidUser.Error,
-				HumanMessage: pkg_errors.AddUserToProjectsInvalidUser.ErrorMessage,
-			},
-		}, nil
-	}
-	org, err := wProjectApi.userService.GetActiveOrInvitedOrganizationRole(ctx, eUser.GetId())
-	if err != nil || org.GetOrganizationId() != currentOrgRole.OrganizationId {
-		if err != nil {
-			wProjectApi.logger.Errorf("unable to get organization role for project assignment err %v", err)
-		}
-		return &protos.AddUserToProjectsResponse{
-			Code:    pkg_errors.AddUserToProjectsUserNotInOrganization.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.AddUserToProjectsUserNotInOrganization.Code),
-				ErrorMessage: pkg_errors.AddUserToProjectsUserNotInOrganization.Error,
-				HumanMessage: pkg_errors.AddUserToProjectsUserNotInOrganization.ErrorMessage,
-			},
-		}, nil
-	}
-
-	projectIds := make([]uint64, 0, len(irRequest.GetProjectRoles()))
-	projectRoles := map[uint64]string{}
+	projectIDs := make(map[uint64]struct{}, len(irRequest.GetProjectRoles()))
+	selections := make([]internal_service.ProjectRoleSelection, 0, len(irRequest.GetProjectRoles()))
 	for _, projectRole := range irRequest.GetProjectRoles() {
-		if !validator.NonZero(projectRole.GetProjectId()) {
+		if projectRole == nil || !validator.NonZero(projectRole.GetProjectId()) {
 			return &protos.AddUserToProjectsResponse{
 				Code:    pkg_errors.AddUserToProjectsInvalidProjects.HTTPStatusCodeInt32(),
 				Success: false,
@@ -368,7 +277,7 @@ func (wProjectApi *webProjectGRPCApi) AddUserToProjects(ctx context.Context, irR
 				},
 			}, nil
 		}
-		if _, ok := projectRoles[projectRole.GetProjectId()]; ok {
+		if _, ok := projectIDs[projectRole.GetProjectId()]; ok {
 			return &protos.AddUserToProjectsResponse{
 				Code:    pkg_errors.AddUserToProjectsDuplicateProject.HTTPStatusCodeInt32(),
 				Success: false,
@@ -379,7 +288,8 @@ func (wProjectApi *webProjectGRPCApi) AddUserToProjects(ctx context.Context, irR
 				},
 			}, nil
 		}
-		if !validator.OneOf(projectRole.GetProjectRole(), type_enums.PROJECT_ROLE_SUPER_ADMIN.String(), type_enums.PROJECT_ROLE_ADMIN.String(), type_enums.PROJECT_ROLE_WRITER.String(), type_enums.PROJECT_ROLE_READER.String()) {
+		roleDefinitionIDs := append([]uint64(nil), projectRole.GetRoleDefinitionIds()...)
+		if !validator.NotEmpty(roleDefinitionIDs) {
 			return &protos.AddUserToProjectsResponse{
 				Code:    pkg_errors.AddUserToProjectsInvalidProjectRole.HTTPStatusCodeInt32(),
 				Success: false,
@@ -390,61 +300,41 @@ func (wProjectApi *webProjectGRPCApi) AddUserToProjects(ctx context.Context, irR
 				},
 			}, nil
 		}
-		projectIds = append(projectIds, projectRole.GetProjectId())
-		projectRoles[projectRole.GetProjectId()] = projectRole.GetProjectRole()
+		roleDefinitionIDSet := make(map[uint64]struct{}, len(roleDefinitionIDs))
+		for _, roleDefinitionID := range roleDefinitionIDs {
+			_, duplicate := roleDefinitionIDSet[roleDefinitionID]
+			if !validator.NonZero(roleDefinitionID) || duplicate {
+				return &protos.AddUserToProjectsResponse{
+					Code:    pkg_errors.AddUserToProjectsInvalidProjectRole.HTTPStatusCodeInt32(),
+					Success: false,
+					Error: &protos.Error{
+						ErrorCode:    uint64(pkg_errors.AddUserToProjectsInvalidProjectRole.Code),
+						ErrorMessage: pkg_errors.AddUserToProjectsInvalidProjectRole.Error,
+						HumanMessage: pkg_errors.AddUserToProjectsInvalidProjectRole.ErrorMessage,
+					},
+				}, nil
+			}
+			roleDefinitionIDSet[roleDefinitionID] = struct{}{}
+		}
+		projectIDs[projectRole.GetProjectId()] = struct{}{}
+		selections = append(selections, internal_service.ProjectRoleSelection{ProjectID: projectRole.GetProjectId(), RoleDefinitionIDs: roleDefinitionIDs})
 	}
-
-	projects, err := wProjectApi.projectService.GetAllByOrganization(ctx, iAuth, currentOrgRole.OrganizationId, projectIds)
+	projects, err := wProjectApi.userService.AddUserToProjects(ctx, principal, irRequest.GetUserId(), tenant.OrganizationID, selections)
 	if err != nil {
-		wProjectApi.logger.Errorf("projectService.GetAllByOrganization from grpc with err %v", err)
-		return &protos.AddUserToProjectsResponse{
-			Code:    pkg_errors.AddUserToProjectsInvalidProjects.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.AddUserToProjectsInvalidProjects.Code),
-				ErrorMessage: pkg_errors.AddUserToProjectsInvalidProjects.Error,
-				HumanMessage: pkg_errors.AddUserToProjectsInvalidProjects.ErrorMessage,
-			},
-		}, nil
-	}
-	existingProjectRoles, err := wProjectApi.userService.GetProjectRolesForUsers(ctx, projectIds, []uint64{eUser.Id})
-	if err != nil {
-		wProjectApi.logger.Errorf("unable to get existing project roles for assignment err %v", err)
-		return &protos.AddUserToProjectsResponse{
-			Code:    pkg_errors.AddUserToProjectsCreateProjectRoles.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.AddUserToProjectsCreateProjectRoles.Code),
-				ErrorMessage: pkg_errors.AddUserToProjectsCreateProjectRoles.Error,
-				HumanMessage: pkg_errors.AddUserToProjectsCreateProjectRoles.ErrorMessage,
-			},
-		}, nil
-	}
-	if len(existingProjectRoles) > 0 {
-		return &protos.AddUserToProjectsResponse{
-			Code:    pkg_errors.AddUserToProjectsUserAlreadyInProject.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.AddUserToProjectsUserAlreadyInProject.Code),
-				ErrorMessage: pkg_errors.AddUserToProjectsUserAlreadyInProject.Error,
-				HumanMessage: pkg_errors.AddUserToProjectsUserAlreadyInProject.ErrorMessage,
-			},
-		}, nil
-	}
-
-	for _, projectRole := range irRequest.GetProjectRoles() {
-		_, err = wProjectApi.userService.CreateProjectRole(ctx, iAuth, eUser.Id, projectRole.GetProjectRole(), projectRole.GetProjectId(), org.Status)
-		if err != nil {
-			wProjectApi.logger.Errorf("unable to create project role err %v", err)
-			return &protos.AddUserToProjectsResponse{
-				Code:    pkg_errors.AddUserToProjectsCreateProjectRoles.HTTPStatusCodeInt32(),
-				Success: false,
-				Error: &protos.Error{
-					ErrorCode:    uint64(pkg_errors.AddUserToProjectsCreateProjectRoles.Code),
-					ErrorMessage: pkg_errors.AddUserToProjectsCreateProjectRoles.Error,
-					HumanMessage: pkg_errors.AddUserToProjectsCreateProjectRoles.ErrorMessage,
-				},
-			}, nil
+		var conflict pkg_errors.ProjectMembershipConflictError
+		var selectionError pkg_errors.RoleAssignmentSelectionUnavailableError
+		switch {
+		case errors.As(err, &conflict):
+			return &protos.AddUserToProjectsResponse{Code: pkg_errors.AddUserToProjectsUserAlreadyInProject.HTTPStatusCodeInt32(), Error: &protos.Error{ErrorCode: uint64(pkg_errors.AddUserToProjectsUserAlreadyInProject.Code), ErrorMessage: pkg_errors.AddUserToProjectsUserAlreadyInProject.Error, HumanMessage: pkg_errors.AddUserToProjectsUserAlreadyInProject.ErrorMessage}}, nil
+		case errors.As(err, &selectionError) && selectionError.Selection == pkg_errors.RoleAssignmentMembership:
+			return &protos.AddUserToProjectsResponse{Code: pkg_errors.AddUserToProjectsUserNotInOrganization.HTTPStatusCodeInt32(), Error: &protos.Error{ErrorCode: uint64(pkg_errors.AddUserToProjectsUserNotInOrganization.Code), ErrorMessage: pkg_errors.AddUserToProjectsUserNotInOrganization.Error, HumanMessage: pkg_errors.AddUserToProjectsUserNotInOrganization.ErrorMessage}}, nil
+		case errors.As(err, &selectionError) && selectionError.Selection == pkg_errors.RoleAssignmentProject:
+			return &protos.AddUserToProjectsResponse{Code: pkg_errors.AddUserToProjectsInvalidProjects.HTTPStatusCodeInt32(), Error: &protos.Error{ErrorCode: uint64(pkg_errors.AddUserToProjectsInvalidProjects.Code), ErrorMessage: pkg_errors.AddUserToProjectsInvalidProjects.Error, HumanMessage: pkg_errors.AddUserToProjectsInvalidProjects.ErrorMessage}}, nil
+		case errors.As(err, &selectionError):
+			return &protos.AddUserToProjectsResponse{Code: pkg_errors.AddUserToProjectsInvalidProjectRole.HTTPStatusCodeInt32(), Error: &protos.Error{ErrorCode: uint64(pkg_errors.AddUserToProjectsInvalidProjectRole.Code), ErrorMessage: pkg_errors.AddUserToProjectsInvalidProjectRole.Error, HumanMessage: pkg_errors.AddUserToProjectsInvalidProjectRole.ErrorMessage}}, nil
+		default:
+			wProjectApi.logger.Errorf("unable to create project roles: %v", err)
+			return &protos.AddUserToProjectsResponse{Code: pkg_errors.AddUserToProjectsCreateProjectRoles.HTTPStatusCodeInt32(), Error: &protos.Error{ErrorCode: uint64(pkg_errors.AddUserToProjectsCreateProjectRoles.Code), ErrorMessage: pkg_errors.AddUserToProjectsCreateProjectRoles.Error, HumanMessage: pkg_errors.AddUserToProjectsCreateProjectRoles.ErrorMessage}}, nil
 		}
 	}
 
@@ -466,45 +356,11 @@ func (wProjectApi *webProjectGRPCApi) AddUserToProjects(ctx context.Context, irR
 }
 
 func (wProjectApi *webProjectGRPCApi) DeleteUserFromProject(ctx context.Context, irRequest *protos.DeleteUserFromProjectRequest) (*protos.DeleteUserFromProjectResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	userContext, err := iAuth.UserContext()
-	if err != nil {
-		return nil, err
-	}
-	organizationContext, err := iAuth.OrganizationContext()
-	if err != nil {
-		return nil, err
-	}
-	currentOrgRole, err := wProjectApi.userService.GetActiveOrInvitedOrganizationRoleForOrganization(ctx, userContext.UserID, organizationContext.OrganizationID)
-	if err != nil || currentOrgRole == nil {
-		return &protos.DeleteUserFromProjectResponse{
-			Code:    pkg_errors.DeleteUserFromProjectMissingOrganization.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.DeleteUserFromProjectMissingOrganization.Code),
-				ErrorMessage: pkg_errors.DeleteUserFromProjectMissingOrganization.Error,
-				HumanMessage: pkg_errors.DeleteUserFromProjectMissingOrganization.ErrorMessage,
-			},
-		}, nil
-	}
-	if !validator.OneOf(currentOrgRole.Role, type_enums.ORGANIZATION_ROLE_OWNER.String(), type_enums.ORGANIZATION_ROLE_ADMIN.String()) {
-		return &protos.DeleteUserFromProjectResponse{
-			Code:    pkg_errors.DeleteUserFromProjectUnauthorized.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.DeleteUserFromProjectUnauthorized.Code),
-				ErrorMessage: pkg_errors.DeleteUserFromProjectUnauthorized.Error,
-				HumanMessage: pkg_errors.DeleteUserFromProjectUnauthorized.ErrorMessage,
-			},
-		}, nil
-	}
+	tenant := principal.Tenant()
 	if !validator.NonZero(irRequest.GetUserId()) {
 		return &protos.DeleteUserFromProjectResponse{
 			Code:    pkg_errors.DeleteUserFromProjectInvalidUser.HTTPStatusCodeInt32(),
@@ -527,6 +383,9 @@ func (wProjectApi *webProjectGRPCApi) DeleteUserFromProject(ctx context.Context,
 			},
 		}, nil
 	}
+	if irRequest.GetProjectId() != tenant.ProjectID {
+		return nil, status.Error(codes.PermissionDenied, "project context does not match request")
+	}
 
 	eUser, err := wProjectApi.userService.GetUser(ctx, irRequest.GetUserId())
 	if err != nil {
@@ -541,8 +400,8 @@ func (wProjectApi *webProjectGRPCApi) DeleteUserFromProject(ctx context.Context,
 			},
 		}, nil
 	}
-	org, err := wProjectApi.userService.GetAnyOrganizationRole(ctx, eUser.GetId())
-	if err != nil || org.GetOrganizationId() != currentOrgRole.OrganizationId || !validator.OneOf(org.Status.String(), type_enums.RECORD_ACTIVE.String(), type_enums.RECORD_INVITED.String()) {
+	organizationRoles, err := wProjectApi.userService.GetActiveOrInvitedOrganizationRolesForOrganization(ctx, eUser.GetId(), tenant.OrganizationID)
+	if err != nil || len(organizationRoles) == 0 {
 		if err != nil {
 			wProjectApi.logger.Errorf("unable to get organization role for project delete err %v", err)
 		}
@@ -556,7 +415,7 @@ func (wProjectApi *webProjectGRPCApi) DeleteUserFromProject(ctx context.Context,
 			},
 		}, nil
 	}
-	if _, err = wProjectApi.projectService.GetAllByOrganization(ctx, iAuth, currentOrgRole.OrganizationId, []uint64{irRequest.GetProjectId()}); err != nil {
+	if _, err = wProjectApi.projectService.GetAllByOrganization(ctx, principal, tenant.OrganizationID, []uint64{irRequest.GetProjectId()}); err != nil {
 		wProjectApi.logger.Errorf("projectService.GetAllByOrganization from grpc with err %v", err)
 		return &protos.DeleteUserFromProjectResponse{
 			Code:    pkg_errors.DeleteUserFromProjectInvalidProject.HTTPStatusCodeInt32(),
@@ -568,8 +427,8 @@ func (wProjectApi *webProjectGRPCApi) DeleteUserFromProject(ctx context.Context,
 			},
 		}, nil
 	}
-	projectRole, err := wProjectApi.userService.GetActiveOrInvitedProjectRole(ctx, eUser.GetId(), irRequest.GetProjectId())
-	if err != nil || !validator.OneOf(projectRole.Status.String(), type_enums.RECORD_ACTIVE.String(), type_enums.RECORD_INVITED.String()) {
+	projectRoles, err := wProjectApi.userService.GetActiveOrInvitedProjectRoles(ctx, eUser.GetId(), irRequest.GetProjectId())
+	if err != nil || len(projectRoles) == 0 {
 		if err != nil {
 			wProjectApi.logger.Errorf("unable to get project role for project delete err %v", err)
 		}
@@ -584,7 +443,7 @@ func (wProjectApi *webProjectGRPCApi) DeleteUserFromProject(ctx context.Context,
 		}, nil
 	}
 
-	if err = wProjectApi.userService.ArchiveUserFromProject(ctx, iAuth, eUser.GetId(), irRequest.GetProjectId()); err != nil {
+	if err = wProjectApi.userService.ArchiveUserFromProject(ctx, principal, eUser.GetId(), irRequest.GetProjectId()); err != nil {
 		wProjectApi.logger.Errorf("unable to archive user from project err %v", err)
 		return &protos.DeleteUserFromProjectResponse{
 			Code:    pkg_errors.DeleteUserFromProjectArchiveRole.HTTPStatusCodeInt32(),
@@ -610,15 +469,14 @@ if you are reading one of the example that you waste time writing code
 */
 func (wProjectApi *webProjectGRPCApi) ArchiveProject(c context.Context, irRequest *protos.ArchiveProjectRequest) (*protos.ArchiveProjectResponse, error) {
 	wProjectApi.logger.Debugf("ArchiveProjectRequest from grpc with requestPayload %v, %v", irRequest, c)
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	if irRequest.GetId() != principal.Tenant().ProjectID {
+		return nil, status.Error(codes.PermissionDenied, "project context does not match request")
 	}
-	if _, err := wProjectApi.projectService.Archive(c, iAuth, irRequest.Id); err != nil {
+	if _, err := wProjectApi.projectService.Archive(c, principal, irRequest.Id); err != nil {
 		wProjectApi.logger.Errorf("DeleteProviderCredential while archieving project")
 		return nil, err
 	}
@@ -626,79 +484,264 @@ func (wProjectApi *webProjectGRPCApi) ArchiveProject(c context.Context, irReques
 }
 
 func (wProjectApi *webProjectGRPCApi) CreateProjectCredential(c context.Context, irRequest *protos.CreateProjectCredentialRequest) (*protos.CreateProjectCredentialResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	if !validator.Between(irRequest.GetProjectId(), uint64(1), uint64(math.MaxInt64)) {
+		return &protos.CreateProjectCredentialResponse{
+			Code: pkg_errors.CreateProjectCredentialInvalidProject.HTTPStatusCodeInt32(),
+			Error: &protos.Error{
+				ErrorCode:    uint64(pkg_errors.CreateProjectCredentialInvalidProject.Code),
+				ErrorMessage: pkg_errors.CreateProjectCredentialInvalidProject.Error,
+				HumanMessage: pkg_errors.CreateProjectCredentialInvalidProject.ErrorMessage,
+			},
+		}, nil
 	}
-
-	// name, key string, projectId, organizationId uint64
-	organizationContext, err := iAuth.OrganizationContext()
+	tenant := principal.Tenant()
+	if irRequest.GetProjectId() != tenant.ProjectID {
+		return nil, status.Error(codes.PermissionDenied, "project context does not match request")
+	}
+	name := strings.TrimSpace(irRequest.GetName())
+	if !validator.NotBlank(name) {
+		return &protos.CreateProjectCredentialResponse{
+			Code: pkg_errors.CreateProjectCredentialMissingName.HTTPStatusCodeInt32(),
+			Error: &protos.Error{
+				ErrorCode:    uint64(pkg_errors.CreateProjectCredentialMissingName.Code),
+				ErrorMessage: pkg_errors.CreateProjectCredentialMissingName.Error,
+				HumanMessage: pkg_errors.CreateProjectCredentialMissingName.ErrorMessage,
+			},
+		}, nil
+	}
+	if !validator.Between(irRequest.GetRoleDefinitionId(), uint64(1), uint64(math.MaxInt64)) {
+		return &protos.CreateProjectCredentialResponse{
+			Code: pkg_errors.CreateProjectCredentialInvalidRole.HTTPStatusCodeInt32(),
+			Error: &protos.Error{
+				ErrorCode:    uint64(pkg_errors.CreateProjectCredentialInvalidRole.Code),
+				ErrorMessage: pkg_errors.CreateProjectCredentialInvalidRole.Error,
+				HumanMessage: pkg_errors.CreateProjectCredentialInvalidRole.ErrorMessage,
+			},
+		}, nil
+	}
+	pc, err := wProjectApi.projectService.CreateCredential(
+		c, principal, name, irRequest.GetProjectId(), tenant.OrganizationID, irRequest.GetRoleDefinitionId(),
+	)
 	if err != nil {
-		return nil, err
+		var selectionError pkg_errors.CredentialSelectionNotFoundError
+		var organizationError pkg_errors.CredentialOrganizationInvalidError
+		switch {
+		case errors.As(err, &selectionError):
+			return &protos.CreateProjectCredentialResponse{
+				Code: pkg_errors.CreateProjectCredentialSelectionNotFound.HTTPStatusCodeInt32(),
+				Error: &protos.Error{
+					ErrorCode:    uint64(pkg_errors.CreateProjectCredentialSelectionNotFound.Code),
+					ErrorMessage: pkg_errors.CreateProjectCredentialSelectionNotFound.Error,
+					HumanMessage: pkg_errors.CreateProjectCredentialSelectionNotFound.ErrorMessage,
+				},
+			}, nil
+		case errors.As(err, &organizationError):
+			return nil, status.Error(codes.Internal, "project credential creation failed")
+		case errors.Is(err, context.Canceled):
+			return nil, status.Error(codes.Canceled, "request canceled")
+		case errors.Is(err, context.DeadlineExceeded):
+			return nil, status.Error(codes.DeadlineExceeded, "request deadline exceeded")
+		default:
+			return nil, status.Error(codes.Internal, "project credential creation failed")
+		}
 	}
-	pc, err := wProjectApi.projectService.CreateCredential(c, iAuth, irRequest.GetName(), irRequest.GetProjectId(), organizationContext.OrganizationID)
-	if err != nil {
-		return utils.Error[protos.CreateProjectCredentialResponse](
-			err,
-			"Unable to create the project credential, please try again in sometime.",
-		)
+	out := &protos.ProjectCredential{
+		Id: pc.Id, ProjectId: pc.ProjectId, OrganizationId: pc.OrganizationId,
+		Name: pc.Name, Key: pc.Key, Status: pc.Status.String(),
+		RoleDefinitionId: pc.RoleDefinitionID,
+		CreatedDate:      timestamppb.New(time.Time(pc.CreatedDate)),
 	}
-	out := &protos.ProjectCredential{}
-	err = utils.Cast(pc, &out)
-	if err != nil {
-		wProjectApi.logger.Errorf("unable to cast project credential to proto object %v", err)
+	if pc.RoleDefinition != nil {
+		out.RoleName = pc.RoleDefinition.Name
 	}
-	return utils.Success[protos.CreateProjectCredentialResponse, *protos.ProjectCredential](out)
+	if updatedDate := time.Time(pc.UpdatedDate); !updatedDate.IsZero() {
+		out.UpdatedDate = timestamppb.New(updatedDate)
+	}
+	if pc.CreatedActorType != "" && pc.CreatedActorID != 0 {
+		out.CreatedActor = &protos.AuditActor{Type: pc.CreatedActorType, Id: pc.CreatedActorID}
+	}
+	if pc.UpdatedActorType != "" && pc.UpdatedActorID != 0 {
+		out.UpdatedActor = &protos.AuditActor{Type: pc.UpdatedActorType, Id: pc.UpdatedActorID}
+	}
+	return &protos.CreateProjectCredentialResponse{Code: 200, Success: true, Data: out}, nil
 }
 
 func (wProjectApi *webProjectGRPCApi) GetAllProjectCredential(c context.Context, irRequest *protos.GetAllProjectCredentialRequest) (*protos.GetAllProjectCredentialResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	tenant := principal.Tenant()
+	if !validator.Between(tenant.OrganizationID, uint64(1), uint64(math.MaxInt64)) {
+		return nil, status.Error(codes.PermissionDenied, "project API key listing permission denied")
 	}
-
-	// name, key string, projectId, organizationId uint64
-	organizationContext, err := iAuth.OrganizationContext()
+	if !validator.Between(irRequest.GetProjectId(), uint64(1), uint64(math.MaxInt64)) {
+		return &protos.GetAllProjectCredentialResponse{
+			Code: pkg_errors.ListProjectAPIKeyInvalidProject.HTTPStatusCodeInt32(),
+			Error: &protos.Error{
+				ErrorCode: uint64(pkg_errors.ListProjectAPIKeyInvalidProject.Code), ErrorMessage: pkg_errors.ListProjectAPIKeyInvalidProject.Error,
+				HumanMessage: pkg_errors.ListProjectAPIKeyInvalidProject.ErrorMessage,
+			},
+		}, nil
+	}
+	if irRequest.GetProjectId() != tenant.ProjectID {
+		return nil, status.Error(codes.PermissionDenied, "project context does not match request")
+	}
+	page := uint32(1)
+	var paginate *protos.Paginate
+	if irRequest.GetPaginate() != nil {
+		page = irRequest.GetPaginate().GetPage()
+		pageSize := irRequest.GetPaginate().GetPageSize()
+		if page == 0 && pageSize == 0 {
+			page, pageSize = 1, 25
+		} else if page == 0 || !validator.Between(pageSize, uint32(1), uint32(100)) {
+			return &protos.GetAllProjectCredentialResponse{
+				Code: pkg_errors.ListProjectAPIKeyInvalidPagination.HTTPStatusCodeInt32(),
+				Error: &protos.Error{
+					ErrorCode: uint64(pkg_errors.ListProjectAPIKeyInvalidPagination.Code), ErrorMessage: pkg_errors.ListProjectAPIKeyInvalidPagination.Error,
+					HumanMessage: pkg_errors.ListProjectAPIKeyInvalidPagination.ErrorMessage,
+				},
+			}, nil
+		}
+		paginate = &protos.Paginate{Page: page, PageSize: pageSize}
+	}
+	if len(irRequest.GetCriterias()) > 2 {
+		return &protos.GetAllProjectCredentialResponse{
+			Code: pkg_errors.ListProjectAPIKeyInvalidCriteria.HTTPStatusCodeInt32(),
+			Error: &protos.Error{
+				ErrorCode: uint64(pkg_errors.ListProjectAPIKeyInvalidCriteria.Code), ErrorMessage: pkg_errors.ListProjectAPIKeyInvalidCriteria.Error,
+				HumanMessage: pkg_errors.ListProjectAPIKeyInvalidCriteria.ErrorMessage,
+			},
+		}, nil
+	}
+	criterias := make([]*protos.Criteria, 0, len(irRequest.GetCriterias()))
+	seen := make(map[string]struct{}, len(irRequest.GetCriterias()))
+	for _, criteria := range irRequest.GetCriterias() {
+		if criteria == nil {
+			return &protos.GetAllProjectCredentialResponse{
+				Code: pkg_errors.ListProjectAPIKeyInvalidCriteria.HTTPStatusCodeInt32(),
+				Error: &protos.Error{
+					ErrorCode: uint64(pkg_errors.ListProjectAPIKeyInvalidCriteria.Code), ErrorMessage: pkg_errors.ListProjectAPIKeyInvalidCriteria.Error,
+					HumanMessage: pkg_errors.ListProjectAPIKeyInvalidCriteria.ErrorMessage,
+				},
+			}, nil
+		}
+		key, value := criteria.GetKey(), strings.TrimSpace(criteria.GetValue())
+		_, duplicate := seen[key]
+		if duplicate || !validator.OneOf(key, "name", "role") || criteria.GetLogic() != "contains" || strings.ContainsRune(value, '\x00') || !validator.Between(len([]rune(value)), 1, 200) {
+			return &protos.GetAllProjectCredentialResponse{
+				Code: pkg_errors.ListProjectAPIKeyInvalidCriteria.HTTPStatusCodeInt32(),
+				Error: &protos.Error{
+					ErrorCode: uint64(pkg_errors.ListProjectAPIKeyInvalidCriteria.Code), ErrorMessage: pkg_errors.ListProjectAPIKeyInvalidCriteria.Error,
+					HumanMessage: pkg_errors.ListProjectAPIKeyInvalidCriteria.ErrorMessage,
+				},
+			}, nil
+		}
+		seen[key] = struct{}{}
+		criterias = append(criterias, &protos.Criteria{Key: key, Logic: criteria.GetLogic(), Value: value})
+	}
+	count, credentials, err := wProjectApi.projectService.GetAllCredential(c, principal, irRequest.GetProjectId(), tenant.OrganizationID, criterias, paginate)
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			return nil, status.Error(codes.Canceled, "request canceled")
+		case errors.Is(err, context.DeadlineExceeded):
+			return nil, status.Error(codes.DeadlineExceeded, "request deadline exceeded")
+		default:
+			return nil, status.Error(codes.Internal, "project API key listing failed")
+		}
+	}
+	if count < 0 || count > math.MaxUint32 {
+		return nil, status.Error(codes.Internal, "project API key listing failed")
+	}
+	out := make([]*protos.ProjectCredential, 0, len(credentials))
+	for _, credential := range credentials {
+		if credential == nil {
+			continue
+		}
+		item := &protos.ProjectCredential{
+			Id: credential.Id, ProjectId: credential.ProjectId, OrganizationId: credential.OrganizationId,
+			Name: credential.Name, Key: credential.Key, Status: credential.Status.String(),
+			RoleDefinitionId: credential.RoleDefinitionID,
+			CreatedDate:      timestamppb.New(time.Time(credential.CreatedDate)),
+		}
+		if credential.RoleDefinition != nil {
+			item.RoleName = credential.RoleDefinition.Name
+		}
+		if updatedDate := time.Time(credential.UpdatedDate); !updatedDate.IsZero() {
+			item.UpdatedDate = timestamppb.New(updatedDate)
+		}
+		if credential.CreatedActorType != "" && credential.CreatedActorID != 0 {
+			item.CreatedActor = &protos.AuditActor{Type: credential.CreatedActorType, Id: credential.CreatedActorID}
+		}
+		if credential.UpdatedActorType != "" && credential.UpdatedActorID != 0 {
+			item.UpdatedActor = &protos.AuditActor{Type: credential.UpdatedActorType, Id: credential.UpdatedActorID}
+		}
+		out = append(out, item)
+	}
+	totalItem, err := utils.Int64ToUint32(count)
 	if err != nil {
 		return nil, err
 	}
-	cnt, allProjectCredential, err := wProjectApi.projectService.
-		GetAllCredential(
-			c, iAuth,
-			irRequest.GetProjectId(),
-			organizationContext.OrganizationID,
-			irRequest.GetCriterias(), irRequest.GetPaginate())
-	if err != nil {
-		return utils.Error[protos.GetAllProjectCredentialResponse](
-			err,
-			"Unable to get all the project credentials, please try again in sometime.",
-		)
-	}
+	return &protos.GetAllProjectCredentialResponse{
+		Code: 200, Success: true, Data: out,
+		Paginated: &protos.Paginated{CurrentPage: page, TotalItem: totalItem},
+	}, nil
+}
 
-	out := []*protos.ProjectCredential{}
-	err = utils.Cast(allProjectCredential, &out)
-	if err != nil {
-		wProjectApi.logger.Errorf("unable to cast project credential to proto object %v", err)
+func (wProjectApi *webProjectGRPCApi) RevokeProjectCredential(c context.Context, irRequest *protos.RevokeProjectCredentialRequest) (*protos.RevokeProjectCredentialResponse, error) {
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	totalItem, err := utils.Int64ToUint32(cnt)
-	if err != nil {
-		wProjectApi.logger.Errorf("invalid project credential count %d: %v", cnt, err)
-		return utils.Error[protos.GetAllProjectCredentialResponse](
-			err,
-			"Unable to get all the project credentials, please try again in sometime.",
-		)
+	tenant := principal.Tenant()
+	if !validator.AllNonZero(tenant.OrganizationID, tenant.ProjectID) {
+		return nil, status.Error(codes.PermissionDenied, "project API key revocation permission denied")
 	}
-
-	return utils.PaginatedSuccess[protos.GetAllProjectCredentialResponse, []*protos.ProjectCredential](
-		totalItem,
-		irRequest.GetPaginate().GetPage(),
-		out)
+	if !validator.Between(irRequest.GetProjectId(), uint64(1), uint64(math.MaxInt64)) {
+		return &protos.RevokeProjectCredentialResponse{
+			Code: pkg_errors.RevokeProjectAPIKeyInvalidProject.HTTPStatusCodeInt32(),
+			Error: &protos.Error{
+				ErrorCode: uint64(pkg_errors.RevokeProjectAPIKeyInvalidProject.Code), ErrorMessage: pkg_errors.RevokeProjectAPIKeyInvalidProject.Error,
+				HumanMessage: pkg_errors.RevokeProjectAPIKeyInvalidProject.ErrorMessage,
+			},
+		}, nil
+	}
+	if irRequest.GetProjectId() != tenant.ProjectID {
+		return nil, status.Error(codes.PermissionDenied, "project context does not match request")
+	}
+	if !validator.Between(irRequest.GetCredentialId(), uint64(1), uint64(math.MaxInt64)) {
+		return &protos.RevokeProjectCredentialResponse{
+			Code: pkg_errors.RevokeProjectAPIKeyInvalidCredential.HTTPStatusCodeInt32(),
+			Error: &protos.Error{
+				ErrorCode: uint64(pkg_errors.RevokeProjectAPIKeyInvalidCredential.Code), ErrorMessage: pkg_errors.RevokeProjectAPIKeyInvalidCredential.Error,
+				HumanMessage: pkg_errors.RevokeProjectAPIKeyInvalidCredential.ErrorMessage,
+			},
+		}, nil
+	}
+	revokedID, err := wProjectApi.projectService.RevokeCredential(c, principal, irRequest.GetCredentialId(), irRequest.GetProjectId(), tenant.OrganizationID)
+	if err != nil {
+		var notFound pkg_errors.ProjectAPIKeyNotFoundError
+		switch {
+		case errors.As(err, &notFound):
+			return &protos.RevokeProjectCredentialResponse{
+				Code: pkg_errors.RevokeProjectAPIKeyNotFound.HTTPStatusCodeInt32(),
+				Error: &protos.Error{
+					ErrorCode: uint64(pkg_errors.RevokeProjectAPIKeyNotFound.Code), ErrorMessage: pkg_errors.RevokeProjectAPIKeyNotFound.Error,
+					HumanMessage: pkg_errors.RevokeProjectAPIKeyNotFound.ErrorMessage,
+				},
+			}, nil
+		case errors.Is(err, context.Canceled):
+			return nil, status.Error(codes.Canceled, "request canceled")
+		case errors.Is(err, context.DeadlineExceeded):
+			return nil, status.Error(codes.DeadlineExceeded, "request deadline exceeded")
+		default:
+			return nil, status.Error(codes.Internal, "project API key revocation failed")
+		}
+	}
+	return &protos.RevokeProjectCredentialResponse{Code: 200, Success: true, Id: revokedID}, nil
 }

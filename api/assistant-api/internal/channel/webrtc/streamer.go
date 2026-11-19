@@ -33,8 +33,8 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"google.golang.org/grpc"
@@ -109,7 +109,7 @@ type webrtcStreamer struct {
 
 	observer observability.Recorder
 
-	auth                 *types.Authentication
+	auth                 authentication.Principal
 	configurationService internal_services.AssistantConfigurationService
 	httpLogService       internal_services.AssistantHTTPLogService
 	assistantToolService internal_services.AssistantToolService
@@ -121,7 +121,7 @@ type StreamerOptions struct {
 	GRPCStream           grpc.BidiStreamingServer[protos.WebTalkRequest, protos.WebTalkResponse]
 	ServerConfig         *assistant_config.WebRTCConfig
 	Observer             observability.Recorder
-	Auth                 *types.Authentication
+	Auth                 authentication.Principal
 	ConfigurationService internal_services.AssistantConfigurationService
 	HTTPLogService       internal_services.AssistantHTTPLogService
 	AssistantToolService internal_services.AssistantToolService
@@ -159,7 +159,7 @@ func WithObserver(observer observability.Recorder) FuncOption {
 	}
 }
 
-func WithAuth(auth *types.Authentication) FuncOption {
+func WithAuth(auth authentication.Principal) FuncOption {
 	return func(options *StreamerOptions) {
 		options.Auth = auth
 	}

@@ -1,0 +1,56 @@
+# Copyright (c) 2023-2025 RapidaAI
+# Author: Prashant Srivastav <prashant@rapida.ai>
+#
+# Licensed under GPL-2.0 with Rapida Additional Terms.
+# See LICENSE.md or contact sales@rapida.ai for commercial usage.
+
+version: 1
+deployable: integration-api
+
+grpc:
+  /integration_api.AuditLoggingService/CreateMetadata:
+    authorization: disabled
+  /integration_api.AuditLoggingService/GetAllAuditLog:
+    authorization: permission
+    actors:
+      - user
+      - project
+    caller_services:
+      - issuer: internal
+        actor_id: 1
+    context: project
+    project_token:
+      audience: runtime
+      binding: project
+    permissions:
+      - project.audit.read
+  /integration_api.AuditLoggingService/GetAuditLog:
+    authorization: permission
+    actors:
+      - user
+      - project
+    caller_services:
+      - issuer: internal
+        actor_id: 1
+    context: project
+    project_token:
+      audience: runtime
+      binding: project
+    permissions:
+      - project.audit.read
+  /integration_api.UnifiedProviderService/Chat:
+    authorization: disabled
+  /integration_api.UnifiedProviderService/Embedding:
+    authorization: disabled
+  /integration_api.UnifiedProviderService/Reranking:
+    authorization: disabled
+  /integration_api.UnifiedProviderService/StreamChat:
+    authorization: disabled
+  /integration_api.UnifiedProviderService/VerifyCredential:
+    authorization: disabled
+
+http:
+  GET /healthz/:
+    authorization: public
+  GET /readiness/:
+    authorization: public

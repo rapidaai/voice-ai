@@ -149,6 +149,7 @@ jest.mock('@/hooks/use-model', () => ({
 jest.mock('@/hooks/use-credential', () => ({
   useCurrentCredential: () => ({
     authId: 'user-1',
+    organizationId: 'organization-1',
     token: 'token-1',
     projectId: 'project-1',
   }),

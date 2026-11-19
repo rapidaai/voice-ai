@@ -7,21 +7,21 @@ package assistant_deployment_api
 
 import (
 	"encoding/json"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/openapi"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	assistant_api "github.com/rapidaai/protos"
 )
 
 func (deploymentApi *AssistantDeploymentApi) GetAllAssistantApiDeploymentRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		c.JSON(pkg_errors.GetAllAssistantApiDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAllAssistantApiDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -29,19 +29,6 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantApiDeploymentRest(c 
 				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.GetAllAssistantApiDeploymentUnauthenticated.CodeString())),
 				ErrorMessage: utils.Ptr(pkg_errors.GetAllAssistantApiDeploymentUnauthenticated.Error),
 				HumanMessage: utils.Ptr(pkg_errors.GetAllAssistantApiDeploymentUnauthenticated.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		c.JSON(pkg_errors.GetAllAssistantApiDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(pkg_errors.GetAllAssistantApiDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.GetAllAssistantApiDeploymentMissingAuthScope.CodeString())),
-				ErrorMessage: utils.Ptr(pkg_errors.GetAllAssistantApiDeploymentMissingAuthScope.Error),
-				HumanMessage: utils.Ptr(pkg_errors.GetAllAssistantApiDeploymentMissingAuthScope.ErrorMessage),
 			},
 		})
 		return
@@ -213,7 +200,16 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantApiDeploymentRest(c 
 			IdealTimeoutMessage:   deployment.IdleTimeoutMessage,
 		})
 	}
-	totalItem := uint32(totalItems)
+	totalItem, err := utils.Int64ToUint32(totalItems)
+	if err != nil {
+		deploymentApi.logger.Errorf("unable to convert assistant api deployment count: %v", err)
+		platformError := pkg_errors.GetAllAssistantApiDeploymentGetDeployment
+		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
+			Code: utils.Ptr(platformError.HTTPStatusCodeInt32()), Success: utils.Ptr(false),
+			Error: &openapi.Error{ErrorCode: utils.Ptr(openapi.Uint64String(platformError.CodeString())), ErrorMessage: utils.Ptr(platformError.Error), HumanMessage: utils.Ptr(platformError.ErrorMessage)},
+		})
+		return
+	}
 	currentPage := paginate.GetPage()
 	c.JSON(http.StatusOK, openapi.GetAllAssistantApiDeploymentResponse{
 		Code:    utils.Ptr(int32(http.StatusOK)),

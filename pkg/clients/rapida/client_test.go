@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rapidaai/config"
+	web_client "github.com/rapidaai/pkg/clients/web"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 )
@@ -18,6 +19,10 @@ func TestNewCreatesSeparateConnections(t *testing.T) {
 
 	if client.Authentication == nil || client.Vault == nil || client.Project == nil || client.ProductUsage == nil {
 		t.Fatal("web clients were not initialized")
+	}
+	var authenticationClient web_client.AuthenticationClient = client.Authentication
+	if authenticationClient == nil {
+		t.Fatal("unified authentication client was not initialized")
 	}
 	if client.Integration == nil || client.Deployment == nil || client.Indexer == nil {
 		t.Fatal("service clients were not initialized")

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/rapidaai/pkg/authentication"
 	"math"
 	"sort"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -37,7 +37,7 @@ func NewProjectDashboardAnalyticsService(postgres connectors.PostgresConnector) 
 	return &projectDashboardAnalyticsService{postgres: postgres}
 }
 
-func (dashboardService *projectDashboardAnalyticsService) GetProjectDashboardAnalytics(ctx context.Context, projectContext types.ProjectContext, request *protos.GetProjectDashboardAnalyticsRequest) (*protos.ProjectDashboardAnalytics, error) {
+func (dashboardService *projectDashboardAnalyticsService) GetProjectDashboardAnalytics(ctx context.Context, projectContext authentication.Tenant, request *protos.GetProjectDashboardAnalyticsRequest) (*protos.ProjectDashboardAnalytics, error) {
 	if request == nil {
 		return nil, fmt.Errorf("%w: request is required", ErrInvalidProjectDashboardAnalyticsRequest)
 	}
@@ -148,7 +148,7 @@ func (dashboardService *projectDashboardAnalyticsService) GetProjectDashboardAna
 	}, nil
 }
 
-func (dashboardService *projectDashboardAnalyticsService) getProjectDashboardSummary(ctx context.Context, project types.ProjectContext, fromDate, toDate time.Time) (uint64, uint64, *uint64, error) {
+func (dashboardService *projectDashboardAnalyticsService) getProjectDashboardSummary(ctx context.Context, project authentication.Tenant, fromDate, toDate time.Time) (uint64, uint64, *uint64, error) {
 	database := dashboardService.postgres.DB(ctx)
 	latencyValueExpression := fmt.Sprintf(`CASE
 		WHEN LENGTH(BTRIM(assistant_conversation_message_metrics.value)) <= 64
@@ -244,7 +244,7 @@ FROM (
 	return counts.Sessions, counts.Failed, &latencyMilliseconds, nil
 }
 
-func (dashboardService *projectDashboardAnalyticsService) getProjectDashboardActivity(ctx context.Context, project types.ProjectContext, fromDate, toDate time.Time) ([]*protos.DashboardActivityBucket, error) {
+func (dashboardService *projectDashboardAnalyticsService) getProjectDashboardActivity(ctx context.Context, project authentication.Tenant, fromDate, toDate time.Time) ([]*protos.DashboardActivityBucket, error) {
 	duration := toDate.Sub(fromDate)
 	bucketDuration := 24 * time.Hour
 	switch {
@@ -324,7 +324,7 @@ ORDER BY bucket_index
 	return buckets, nil
 }
 
-func (dashboardService *projectDashboardAnalyticsService) getProjectDashboardAssistants(ctx context.Context, project types.ProjectContext, fromDate, toDate time.Time, failedSessions uint64, limit uint32) ([]*protos.DashboardAssistant, *protos.DashboardHealth, uint32, error) {
+func (dashboardService *projectDashboardAnalyticsService) getProjectDashboardAssistants(ctx context.Context, project authentication.Tenant, fromDate, toDate time.Time, failedSessions uint64, limit uint32) ([]*protos.DashboardAssistant, *protos.DashboardHealth, uint32, error) {
 	database := dashboardService.postgres.DB(ctx)
 	latencyValueExpression := fmt.Sprintf(`CASE
 		WHEN LENGTH(BTRIM(assistant_conversation_message_metrics.value)) <= 64
@@ -571,7 +571,7 @@ FROM (
 	return assistants, health, assistantCount, nil
 }
 
-func (dashboardService *projectDashboardAnalyticsService) getProjectDashboardRecentFailures(ctx context.Context, project types.ProjectContext, fromDate, toDate time.Time, limit uint32) ([]*protos.DashboardRecentFailure, error) {
+func (dashboardService *projectDashboardAnalyticsService) getProjectDashboardRecentFailures(ctx context.Context, project authentication.Tenant, fromDate, toDate time.Time, limit uint32) ([]*protos.DashboardRecentFailure, error) {
 	database := dashboardService.postgres.DB(ctx)
 	durationValueExpression := `CASE
 		WHEN LENGTH(BTRIM(assistant_conversation_metrics.value)) <= 18

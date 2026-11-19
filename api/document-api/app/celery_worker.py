@@ -12,6 +12,7 @@ from logging.config import dictConfig
 from celery import Celery
 from celery.signals import worker_init, worker_shutdown, task_prerun
 
+from app.authentication import ServiceAssertionIssuer
 from app.config import get_settings
 from app.configs.log_config import LogConfig
 from app.connectors import Connector
@@ -19,13 +20,19 @@ from app.connectors.connector_factory import attach_connectors
 from app.storage.connector_factory import attach_storage
 from app.vars import service_name
 
-# Set the service name
-service_name.set(get_settings().service_name)
-
-# Initialize the logger
+settings = get_settings()
+dictConfig(LogConfig(level=settings.log_level).model_dump())
 _log = logging.getLogger("celery_worker")
-
-dictConfig(LogConfig(level=get_settings().log_level).model_dump())
+# Set the service name
+service_name.set(settings.service_name)
+web_service_assertion_issuer = ServiceAssertionIssuer(
+    destination="web-api",
+    secret=settings.secret,
+)
+integration_service_assertion_issuer = ServiceAssertionIssuer(
+    destination="integration-api",
+    secret=settings.secret,
+)
 
 # Initialize Celery app
 celery_app = Celery(

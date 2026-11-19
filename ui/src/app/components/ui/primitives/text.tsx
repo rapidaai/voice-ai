@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import { SkeletonText } from '@carbon/react';
 import { cn } from '@/utils';
 
@@ -55,7 +55,7 @@ export const typographyClassNames = {
 
 export type TypographyVariant = keyof typeof typographyClassNames;
 
-export interface CarbonTextProps {
+export interface CarbonTextProps extends HTMLAttributes<HTMLElement> {
   children: ReactNode;
   className?: string;
   id?: string;
@@ -81,7 +81,8 @@ export interface CarbonTextProps {
     | 'div'
     | 'label'
     | 'dt'
-    | 'dd';
+    | 'dd'
+    | 'code';
 }
 
 /** Carbon Text: renders children or a SkeletonText placeholder when loading. */
@@ -95,6 +96,7 @@ export function Text({
   lineCount = 1,
   variant,
   as: Tag = 'span',
+  ...attributes
 }: CarbonTextProps) {
   const textClassName =
     variant || className
@@ -114,7 +116,7 @@ export function Text({
   }
 
   return (
-    <Tag id={id} className={textClassName}>
+    <Tag {...attributes} id={id} className={textClassName}>
       {children}
     </Tag>
   );

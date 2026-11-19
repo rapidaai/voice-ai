@@ -25,7 +25,7 @@ export function OverviewPage() {
     Partial<Organization.AsObject>
   >({});
   const { showLoader, hideLoader } = useRapidaStore();
-  const [userId, token] = useCredential();
+  const [userId, token, , organizationId] = useCredential();
   const { register, handleSubmit } = useForm();
 
   const afterUpdateOrganization = useCallback(
@@ -59,7 +59,7 @@ export function OverviewPage() {
       name: data.organizationName,
       industry: data.organizationIndustry,
       contact: data.organizationContact,
-      auth: { token, userId },
+      auth: { organizationId, token, userId },
       callback: afterUpdateOrganization,
     });
   };
@@ -90,7 +90,7 @@ export function OverviewPage() {
 
   useEffect(() => {
     getWorkspaceOrganization({
-      auth: { token, userId },
+      auth: { organizationId, token, userId },
       callback: afterGetOrganization,
     });
   }, [afterGetOrganization, token, userId]);

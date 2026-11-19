@@ -53,6 +53,9 @@ jest.mock('@/app/components/dialogs/shared', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives', () => ({
+  PrimaryButton: ({ children, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
   Tabs: ({
     children,
     onChange,
@@ -82,6 +85,9 @@ jest.mock('@/app/components/ui/primitives', () => ({
       </div>
       {Array.isArray(children) ? children[selectedIndex] : children}
     </section>
+  ),
+  Text: ({ as: Tag = 'span', children, variant: _variant, ...props }: any) => (
+    <Tag {...props}>{children}</Tag>
   ),
 }));
 

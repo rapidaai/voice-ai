@@ -9,14 +9,16 @@ package knowledge_api
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 
 	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/entity/knowledges"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	"github.com/rapidaai/pkg/authentication"
 	document_client "github.com/rapidaai/pkg/clients/document"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	knowledge_api "github.com/rapidaai/protos"
 	"github.com/stretchr/testify/require"
 )
@@ -26,7 +28,7 @@ type knowledgeServiceStub struct {
 	knowledge *internal_knowledge_gorm.Knowledge
 }
 
-func (stub *knowledgeServiceStub) Get(context.Context, *types.Authentication, uint64) (*internal_knowledge_gorm.Knowledge, error) {
+func (stub *knowledgeServiceStub) Get(context.Context, authentication.Principal, uint64) (*internal_knowledge_gorm.Knowledge, error) {
 	return stub.knowledge, nil
 }
 
@@ -37,7 +39,7 @@ type knowledgeDocumentServiceStub struct {
 
 func (stub *knowledgeDocumentServiceStub) CreateManualDocument(
 	context.Context,
-	*types.Authentication,
+	authentication.Principal,
 	*internal_knowledge_gorm.Knowledge,
 	string,
 	string,
@@ -54,7 +56,7 @@ type indexerServiceStub struct {
 
 func (stub *indexerServiceStub) IndexKnowledgeDocument(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	request *knowledge_api.IndexKnowledgeDocumentRequest,
 ) (*knowledge_api.IndexKnowledgeDocumentResponse, error) {
 	stub.request = request
@@ -125,10 +127,17 @@ func newKnowledgeDocumentTestAPI(t *testing.T, indexer document_client.IndexerSe
 func knowledgeTestContext() context.Context {
 	organizationID := uint64(1)
 	projectID := uint64(2)
-	return context.WithValue(context.Background(), types.CTX_, &types.Authentication{
-		AuthType:          types.AuthTypeProject,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeProject, ID: projectID},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
-	})
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityProjectCredential, ID: projectID},
+		authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID},
+		authentication.Proof{Method: authentication.AuthenticationProjectCredential, Audience: authentication.AudienceManagement, Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: strconv.FormatUint(projectID, 10)}}, nil,
+	)
+	if err != nil {
+		panic(err)
+	}
+	ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), principal)
+	if err != nil {
+		panic(err)
+	}
+	return ctx
 }

@@ -21,6 +21,7 @@ import (
 	internal_exotel "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/exotel/internal"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	configs "github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -326,7 +327,7 @@ func TestStatusCallback(t *testing.T) {
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			c.Request = req
 
-			statusInfo, err := telephony.StatusCallback(c, nil, 1, 1)
+			statusInfo, err := telephony.StatusCallback(c, authentication.Principal{}, 1, 1)
 
 			require.NoError(t, err)
 			tt.checkStatus(t, statusInfo)
@@ -353,7 +354,7 @@ func TestStatusCallback_MultipartForm(t *testing.T) {
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	c.Request = req
 
-	statusInfo, err := telephony.StatusCallback(c, nil, 1, 1)
+	statusInfo, err := telephony.StatusCallback(c, authentication.Principal{}, 1, 1)
 
 	require.NoError(t, err)
 	require.NotNil(t, statusInfo)
@@ -382,7 +383,7 @@ func TestStatusCallback_QueryAndMultipartForm(t *testing.T) {
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	c.Request = req
 
-	statusInfo, err := telephony.StatusCallback(c, nil, 1, 1)
+	statusInfo, err := telephony.StatusCallback(c, authentication.Principal{}, 1, 1)
 
 	require.NoError(t, err)
 	require.NotNil(t, statusInfo)

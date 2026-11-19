@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
@@ -91,7 +91,7 @@ func (a Attributes) Clone() Attributes {
 
 type Context struct {
 	TraceID string
-	Auth    *types.Authentication
+	Auth    authentication.Principal
 }
 
 type GlobalScope struct {

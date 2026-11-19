@@ -100,6 +100,7 @@ export const useUserPageStore = create<UserType>((set, get) => ({
   getAllUser: (
     token: string,
     userId: string,
+    organizationId: string,
     projectId: string,
     onError: (err: string) => void,
     onSuccess: (e: User[]) => void,
@@ -126,7 +127,7 @@ export const useUserPageStore = create<UserType>((set, get) => ({
       page: get().page,
       pageSize: get().pageSize,
       criteria: get().criteria,
-      auth: { projectId, token, userId },
+      auth: { organizationId, projectId, token, userId },
       callback: afterGetAllUser,
     });
   },

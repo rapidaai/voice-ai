@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 describe('Carbon component styles', () => {
-  it('loads styles for components rendered by the voice debugger', () => {
+  it('loads styles for rendered Carbon components', () => {
     const carbonStyles = readFileSync(
       resolve(process.cwd(), 'src/styles/carbon.scss'),
       'utf8',
@@ -16,6 +16,9 @@ describe('Carbon component styles', () => {
     );
     expect(carbonStyles).toContain(
       "@use '@carbon/react/scss/components/structured-list';",
+    );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/react/scss/components/treeview';",
     );
     expect(carbonStyles).toContain(
       "@use '@carbon/react/scss/components/fluid-text-input';",
@@ -73,6 +76,9 @@ describe('Carbon component styles', () => {
     );
     expect(carbonStyles).toContain(
       "@use '@carbon/ibm-products/scss/components/EmptyStates';",
+    );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/ibm-products/scss/components/FullPageError';",
     );
     expect(carbonStyles).not.toContain('.role-create-modal');
   });

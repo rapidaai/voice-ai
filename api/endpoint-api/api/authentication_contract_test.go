@@ -19,7 +19,8 @@ import (
 
 	internal_gorm "github.com/rapidaai/api/endpoint-api/internal/entity"
 	internal_services "github.com/rapidaai/api/endpoint-api/internal/service"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/protos"
 )
 
@@ -31,7 +32,7 @@ type endpointLookupStub struct {
 
 func (stub *endpointLookupStub) Get(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	_ uint64,
 	_ *uint64,
 	option *internal_services.GetEndpointOption,
@@ -43,22 +44,22 @@ func (stub *endpointLookupStub) Get(
 
 func TestEndpointRPCAuthenticationContract(t *testing.T) {
 	expected := map[string][]string{
-		"CreateEndpoint":                   {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"CreateEndpointCacheConfiguration": {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"CreateEndpointProviderModel":      {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"CreateEndpointRetryConfiguration": {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"CreateEndpointTag":                {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"ForkEndpoint":                     {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"GetAllEndpoint":                   {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"GetAllEndpointLog":                {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"GetAllEndpointProviderModel":      {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"GetEndpoint":                      {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"GetEndpointLog":                   {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"UpdateEndpointDetail":             {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"UpdateEndpointVersion":            {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"Invoke":                           {"AuthTypeOrg", "AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"Probe":                            {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
-		"Update":                           {"AuthTypeProject", "AuthTypeService", "AuthTypeUser"},
+		"CreateEndpoint":                   {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"CreateEndpointCacheConfiguration": {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"CreateEndpointProviderModel":      {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"CreateEndpointRetryConfiguration": {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"CreateEndpointTag":                {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"ForkEndpoint":                     {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"GetAllEndpoint":                   {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"GetAllEndpointLog":                {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"GetAllEndpointProviderModel":      {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"GetEndpoint":                      {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"GetEndpointLog":                   {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"UpdateEndpointDetail":             {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"UpdateEndpointVersion":            {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"Invoke":                           {"IdentityOrganizationCredential", "IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"Probe":                            {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
+		"Update":                           {"IdentityProjectCredential", "IdentityService", "IdentityUser"},
 	}
 
 	actual := make(map[string][]string, len(expected))
@@ -84,7 +85,7 @@ func TestEndpointRPCAuthenticationContract(t *testing.T) {
 				continue
 			}
 			assertEndpointExplicitAuthenticationPattern(t, fileSet, filename, function)
-			hasAuthorize := false
+			hasPrincipal := false
 			scopes := map[string]struct{}{}
 			ast.Inspect(function.Body, func(node ast.Node) bool {
 				call, ok := node.(*ast.CallExpr)
@@ -95,10 +96,10 @@ func TestEndpointRPCAuthenticationContract(t *testing.T) {
 				if !ok {
 					return true
 				}
-				if packageName, ok := selector.X.(*ast.Ident); ok && packageName.Name == "types" && selector.Sel.Name == "Authorize" {
-					hasAuthorize = true
+				if packageName, ok := selector.X.(*ast.Ident); ok && packageName.Name == "middleware_authentication" && selector.Sel.Name == "Principal" {
+					hasPrincipal = true
 				}
-				if selector.Sel.Name != "Scope" {
+				if selector.Sel.Name != "OneOf" {
 					return true
 				}
 				for _, argument := range call.Args {
@@ -107,14 +108,14 @@ func TestEndpointRPCAuthenticationContract(t *testing.T) {
 						continue
 					}
 					packageName, ok := authType.X.(*ast.Ident)
-					if ok && packageName.Name == "types" {
+					if ok && packageName.Name == "authentication" {
 						scopes[authType.Sel.Name] = struct{}{}
 					}
 				}
 				return true
 			})
-			if !hasAuthorize {
-				t.Errorf("%s does not call types.Authorize", function.Name.Name)
+			if !hasPrincipal {
+				t.Errorf("%s does not read the request principal", function.Name.Name)
 			}
 			for scope := range scopes {
 				actual[function.Name.Name] = append(actual[function.Name.Name], scope)
@@ -135,12 +136,11 @@ func assertEndpointExplicitAuthenticationPattern(t *testing.T, fileSet *token.Fi
 		t.Fatalf("format %s:%s: %v", filename, function.Name.Name, err)
 	}
 	for _, required := range []string{
-		"auth, authErr := types.Authorize(",
-		"if authErr != nil {",
-		"status.Error(codes.Unauthenticated, authErr.Error())",
-		"iAuth, scopeErr := auth.Scope(",
-		"if scopeErr != nil {",
-		"status.Error(codes.PermissionDenied, scopeErr.Error())",
+		"iAuth, ok := middleware_authentication.Principal(ctx)",
+		"if !ok {",
+		"status.Error(codes.Unauthenticated, (pkg_errors.AuthenticationFailureError{}).Error())",
+		"if !validator.OneOf(iAuth.Subject().Type,",
+		"status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())",
 	} {
 		if !strings.Contains(source.String(), required) {
 			t.Errorf("%s:%s missing explicit authentication contract %q", filename, function.Name.Name, required)
@@ -150,19 +150,8 @@ func assertEndpointExplicitAuthenticationPattern(t *testing.T, fileSet *token.Fi
 
 func TestEndpointRPCAuthenticationErrors(t *testing.T) {
 	organizationID := uint64(2)
-	userActor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 1}
-	organizationActor := types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 3}
-	projectlessUserContext := context.WithValue(context.Background(), types.CTX_, &types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		ActorValue:        &userActor,
-		UserValue:         &types.UserContext{UserID: 1},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-	})
-	organizationContext := context.WithValue(context.Background(), types.CTX_, &types.Authentication{
-		AuthType:          types.AuthTypeOrg,
-		ActorValue:        &organizationActor,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-	})
+	projectlessUserContext := contextWithTestPrincipal(t, authentication.Identity{Type: authentication.IdentityUser, ID: 1}, authentication.Tenant{OrganizationID: organizationID})
+	organizationContext := contextWithTestPrincipal(t, authentication.Identity{Type: authentication.IdentityOrganizationCredential, ID: 3}, authentication.Tenant{OrganizationID: organizationID})
 
 	tests := []struct {
 		name string
@@ -222,12 +211,7 @@ func TestEndpointRPCAuthenticationErrors(t *testing.T) {
 
 func TestOrganizationInvokeUsesPublicEndpointLookupPolicy(t *testing.T) {
 	organizationID := uint64(2)
-	actor := types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 3}
-	ctx := context.WithValue(context.Background(), types.CTX_, &types.Authentication{
-		AuthType:          types.AuthTypeOrg,
-		ActorValue:        &actor,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-	})
+	ctx := contextWithTestPrincipal(t, authentication.Identity{Type: authentication.IdentityOrganizationCredential, ID: 3}, authentication.Tenant{OrganizationID: organizationID})
 	endpointService := &endpointLookupStub{}
 	api := &invokerGRPCApi{invokerApi: invokerApi{endpointService: endpointService}}
 
@@ -239,4 +223,33 @@ func TestOrganizationInvokeUsesPublicEndpointLookupPolicy(t *testing.T) {
 	if endpointService.option == nil || !endpointService.option.AllowPublicWithoutProject {
 		t.Fatal("organization Invoke did not use public endpoint lookup policy")
 	}
+}
+
+func contextWithTestPrincipal(t *testing.T, subject authentication.Identity, tenant authentication.Tenant) context.Context {
+	t.Helper()
+	proof := authentication.Proof{
+		Method: authentication.AuthenticationUserSession,
+		Reference: authentication.ProofReference{
+			Type:  authentication.ProofReferenceUserSession,
+			Value: "test-session",
+		},
+	}
+	if subject.Type == authentication.IdentityOrganizationCredential {
+		proof = authentication.Proof{
+			Method: authentication.AuthenticationOrganizationCredential,
+			Reference: authentication.ProofReference{
+				Type:  authentication.ProofReferenceCredential,
+				Value: "3",
+			},
+		}
+	}
+	principal, err := authentication.NewDirectPrincipal(subject, tenant, proof, nil)
+	if err != nil {
+		t.Fatalf("construct test principal: %v", err)
+	}
+	ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), principal)
+	if err != nil {
+		t.Fatalf("attach test principal: %v", err)
+	}
+	return ctx
 }

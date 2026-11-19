@@ -2,19 +2,25 @@ package observability_api
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/protos"
 )
 
 func mustTelemetryQueryParts(t *testing.T, organizationID, projectID uint64) telemetryQueryParts {
 	t.Helper()
-	parts, err := newTelemetryQueryParts(&types.Authentication{
-		AuthType:          types.AuthTypeProject,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
-	})
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityProjectCredential, ID: projectID},
+		authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID},
+		authentication.Proof{Method: authentication.AuthenticationProjectCredential, Audience: authentication.AudienceManagement, Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: strconv.FormatUint(projectID, 10)}},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewDirectPrincipal() error = %v", err)
+	}
+	parts, err := newTelemetryQueryParts(principal)
 	if err != nil {
 		t.Fatalf("newTelemetryQueryParts() error = %v", err)
 	}

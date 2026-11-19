@@ -1,8 +1,7 @@
 import { UserAvatar } from '@/app/components/ui/primitives';
 import { User } from '@rapidaai/react';
-import { OrganizationRoleIndicator } from '@/app/components/domain/indicators/organization-role';
 import { toHumanReadableDate } from '@/utils/date';
-import { TableCell } from '@carbon/react';
+import { TableCell, Tag } from '@carbon/react';
 import { CarbonIconIndicator } from '@/app/components/ui/feedback';
 import { CopyButton } from '@/app/components/ui/primitives';
 
@@ -30,7 +29,15 @@ export function SingleUser({ user }: { user: User }) {
         </div>
       </TableCell>
       <TableCell>
-        <OrganizationRoleIndicator role={user.getRole()} />
+        <div className="flex flex-wrap gap-1">
+          {user.getOrganizationrolesList().length > 0
+            ? user.getOrganizationrolesList().map(role => (
+                <Tag key={role.getRoledefinitionid()} type="gray" size="sm">
+                  {role.getName()}
+                </Tag>
+              ))
+            : '-'}
+        </div>
       </TableCell>
       <TableCell>
         {user.getCreateddate() && toHumanReadableDate(user.getCreateddate()!)}

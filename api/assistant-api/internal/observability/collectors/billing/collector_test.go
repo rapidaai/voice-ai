@@ -13,18 +13,19 @@ import (
 	"time"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
 
 type productUsageClientStub struct {
-	auth  *types.Authentication
+	auth  authentication.Principal
 	usage *protos.CreateProductUsageRequest
 	err   error
 	calls int
 }
 
-func (stub *productUsageClientStub) CreateProductUsage(_ context.Context, auth *types.Authentication, usage *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error) {
+func (stub *productUsageClientStub) CreateProductUsage(_ context.Context, auth authentication.Principal, usage *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error) {
 	stub.calls++
 	stub.auth = auth
 	stub.usage = usage
@@ -39,7 +40,7 @@ func TestCollector_ForwardsUsageRecord(t *testing.T) {
 	productUsageClient := &productUsageClientStub{}
 	collector := New(Config{ProductUsageClient: productUsageClient})
 	now := time.Date(2026, 6, 5, 10, 0, 0, 123456789, time.UTC)
-	auth := &types.Authentication{}
+	auth := authentication.Principal{}
 
 	err := collector.Collect(context.Background(), observability.ConversationScope{
 		AssistantScope: observability.AssistantScope{AssistantID: 10}, ConversationID: 20,
@@ -54,7 +55,7 @@ func TestCollector_ForwardsUsageRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CollectUsage returned error: %v", err)
 	}
-	if productUsageClient.auth != auth {
+	if productUsageClient.auth.Subject() != auth.Subject() {
 		t.Fatal("expected authentication to be forwarded")
 	}
 	if productUsageClient.usage == nil {

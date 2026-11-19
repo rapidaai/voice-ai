@@ -52,7 +52,7 @@ export function EditRoleModal({
   onClose,
   onUpdated,
 }: RoleActionModalProps) {
-  const [userId, token] = useCredential();
+  const [userId, token, , organizationId] = useCredential();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [metadataError, setMetadataError] = useState('');
@@ -81,7 +81,7 @@ export function EditRoleModal({
     setActiveAction('');
     getAccessRole({
       roleDefinitionId: role.getId(),
-      auth: { token, userId },
+      auth: { organizationId, token, userId },
     })
       .then(response => {
         if (requestId !== requestSequence.current) return;
@@ -137,7 +137,7 @@ export function EditRoleModal({
         roleDefinitionId: loadedRole.getId(),
         name: name.trim(),
         description: description.trim(),
-        auth: { token, userId },
+        auth: { organizationId, token, userId },
       });
       if (requestId !== requestSequence.current) return;
       if (!response.getSuccess()) {
@@ -244,7 +244,7 @@ export function DeleteRoleDialog({
   onClose,
   onDeleted,
 }: DeleteRoleDialogProps) {
-  const [userId, token] = useCredential();
+  const [userId, token, , organizationId] = useCredential();
   const [isDeleting, setIsDeleting] = useState(false);
   const requestSequence = useRef(0);
 
@@ -271,7 +271,7 @@ export function DeleteRoleDialog({
       const response = await archiveAccessRole({
         roleDefinitionId: role.getId(),
         reason: roleDeletionReason,
-        auth: { token, userId },
+        auth: { organizationId, token, userId },
       });
       if (requestId !== requestSequence.current) return;
       if (!response.getSuccess()) {

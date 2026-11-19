@@ -35,10 +35,10 @@ describe('use-credential hooks', () => {
 
   it('returns credential tuple with empty-string fallbacks', () => {
     const wrapper = makeWrapper({
-      currentUser: { id: 'user-1' } as any,
+      authentication: { user: { id: 'user-1' } } as any,
       token: {} as any,
-      currentProjectRole: {} as any,
-      organizationRole: {} as any,
+      getCurrentProject: () => undefined,
+      getCurrentOrganization: () => undefined,
     });
 
     const { result } = renderHook(() => useCredential(), { wrapper });
@@ -48,10 +48,10 @@ describe('use-credential hooks', () => {
   it('returns current credential object', () => {
     const user = { id: 'user-1', email: 'a@b.c' } as any;
     const wrapper = makeWrapper({
-      currentUser: user,
+      authentication: { user } as any,
       token: { token: 'token-1' } as any,
-      currentProjectRole: { projectid: 'project-1' } as any,
-      organizationRole: { organizationid: 'org-1' } as any,
+      getCurrentProject: () => ({ id: 'project-1' }) as any,
+      getCurrentOrganization: () => ({ id: 'org-1' }) as any,
     });
 
     const { result } = renderHook(() => useCurrentCredential(), { wrapper });
@@ -66,12 +66,9 @@ describe('use-credential hooks', () => {
 
   it('resolves resource role in owner/project/org/anyone order', () => {
     const wrapper = makeWrapper({
-      currentUser: { id: 'owner-user' } as any,
-      projectRoles: [
-        { projectid: 'project-1' },
-        { projectid: 'project-2' },
-      ] as any,
-      organizationRole: { organizationid: 'org-1' } as any,
+      authentication: { user: { id: 'owner-user' } } as any,
+      getProjects: () => [{ id: 'project-1' }, { id: 'project-2' }] as any,
+      getCurrentOrganization: () => ({ id: 'org-1' }) as any,
     });
 
     const ownerResource = {
@@ -115,9 +112,9 @@ describe('use-credential hooks', () => {
 
   it('falls back to anyone when auth context is incomplete', () => {
     const wrapper = makeWrapper({
-      currentUser: { id: 'owner-user' } as any,
-      projectRoles: undefined as any,
-      organizationRole: { organizationid: 'org-1' } as any,
+      authentication: { user: { id: 'owner-user' } } as any,
+      getProjects: undefined,
+      getCurrentOrganization: () => ({ id: 'org-1' }) as any,
     });
 
     const resource = {

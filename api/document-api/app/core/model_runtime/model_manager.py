@@ -8,6 +8,7 @@ See LICENSE.md for details or contact sales@rapida.ai for commercial use.
 import logging
 from typing import Dict, List, Optional, OrderedDict, Tuple
 
+from app.authentication import ServiceAssertionIssuer, Tenant
 from app.bridges.artifacts.protos.common_pb2 import Metric
 from app.bridges.artifacts.protos.integration_api_pb2 import Credential, Embedding
 from app.bridges.artifacts.protos.vault_api_pb2 import VaultCredential
@@ -20,7 +21,6 @@ from app.core.errors.error import (
 )
 from app.exceptions import RapidaException
 from app.exceptions.bridges_exceptions import BridgeException
-from app.utils.general import generate_jwt_token
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +65,8 @@ class ModelManager:
         model_provider_name: str,
         model_parameters: Optional[Dict] = {},
         references: Optional[Dict] = {},
+        web_service_assertion_issuer: ServiceAssertionIssuer = None,
+        integration_service_assertion_issuer: ServiceAssertionIssuer = None,
     ):
         """
         initialize the model manager with required parameters that will help do things
@@ -76,6 +78,10 @@ class ModelManager:
         self.organization_id = organization_id
         self.model_provider_name = model_provider_name
         self.model_parameters = model_parameters
+        if web_service_assertion_issuer is None or integration_service_assertion_issuer is None:
+            raise ValueError("service assertion issuers are required")
+        self.web_service_assertion_issuer = web_service_assertion_issuer
+        self.integration_service_assertion_issuer = integration_service_assertion_issuer
 
     async def _fetch_credential(self, credential_id: int) -> VaultCredential:
         """
@@ -88,8 +94,11 @@ class ModelManager:
         """
         try:
             return await self.__vault_service_client.get_credential(
-                auth_token=generate_jwt_token(
-                    organization_id=self.organization_id, project_id=self.project_id
+                auth_token=self.web_service_assertion_issuer.issue(
+                    tenant=Tenant(
+                        organizationId=self.organization_id,
+                        projectId=self.project_id,
+                    ),
                 ),
                 crendential_id=int(credential_id),
             )
@@ -132,8 +141,11 @@ class ModelManager:
             )
 
             return await self.__integration_service_client.get_embedding(
-                auth_token=generate_jwt_token(
-                    organization_id=self.organization_id, project_id=self.project_id
+                auth_token=self.integration_service_assertion_issuer.issue(
+                    tenant=Tenant(
+                        organizationId=self.organization_id,
+                        projectId=self.project_id,
+                    ),
                 ),
                 provider_name=self.model_provider_name,
                 request=request,

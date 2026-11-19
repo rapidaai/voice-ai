@@ -6,23 +6,24 @@ import (
 	"go/token"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
-func TestGRPCUsesUserFirstAuthenticationMiddlewareOrder(t *testing.T) {
+func TestGRPCUsesPrincipalAuthenticationMiddlewareOrder(t *testing.T) {
 	file := parseCommandSource(t, "endpoint.go")
 
 	assertAuthenticationMiddlewareOrder(t, interceptorChain(t, file, "ChainUnaryInterceptor"), []string{
-		"NewProjectAuthenticatorUnaryServerMiddleware",
-		"NewOrganizationAuthenticatorUnaryServerMiddleware",
-		"NewServiceAuthenticatorUnaryServerMiddleware",
-		"NewAuthenticationUnaryServerMiddleware",
+		"NewProjectUnaryMiddleware",
+		"NewOrganizationUnaryMiddleware",
+		"NewServiceUnaryMiddleware",
+		"NewUserUnaryMiddleware",
 	})
 	assertAuthenticationMiddlewareOrder(t, interceptorChain(t, file, "ChainStreamInterceptor"), []string{
-		"NewProjectAuthenticatorStreamServerMiddleware",
-		"NewOrganizationAuthenticatorStreamServerMiddleware",
-		"NewServiceAuthenticatorStreamServerMiddleware",
-		"NewAuthenticationStreamServerMiddleware",
+		"NewProjectStreamMiddleware",
+		"NewOrganizationStreamMiddleware",
+		"NewServiceStreamMiddleware",
+		"NewUserStreamMiddleware",
 	})
 }
 
@@ -35,6 +36,55 @@ func TestInitDoesNotRegisterAuditActorCallbacks(t *testing.T) {
 		}
 		return true
 	})
+}
+
+func TestAuthenticationKeyIsDerivedBeforeServerConstruction(t *testing.T) {
+	file := parseCommandSource(t, "endpoint.go")
+	var derivation, server token.Pos
+	ast.Inspect(file, func(node ast.Node) bool {
+		literal, ok := node.(*ast.BasicLit)
+		if ok {
+			value := strings.ToLower(literal.Value)
+			if strings.Contains(value, "root") && strings.Contains(value, "fingerprint") {
+				t.Fatal("root-secret fingerprint logging restored")
+			}
+		}
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		switch callName(call) {
+		case "ServiceAuthenticationKey":
+			derivation = call.Pos()
+		case "NewServer":
+			server = call.Pos()
+		}
+		return true
+	})
+	if derivation == token.NoPos || server == token.NoPos || derivation >= server {
+		t.Fatalf("authentication-key derivation position = %d, server position = %d", derivation, server)
+	}
+}
+
+func TestUsesUnifiedWebAuthenticationClient(t *testing.T) {
+	file := parseCommandSource(t, "endpoint.go")
+	found := false
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		switch callName(call) {
+		case "NewAuthenticationClient":
+			found = true
+		case "NewAuthenticationResolverClient":
+			t.Fatal("removed authentication resolver client is constructed")
+		}
+		return true
+	})
+	if !found {
+		t.Fatal("unified Web authentication client is not constructed")
+	}
 }
 
 func parseCommandSource(t *testing.T, name string) *ast.File {
@@ -90,11 +140,11 @@ func assertAuthenticationMiddlewareOrder(t *testing.T, chain []string, expected 
 	actual := make([]string, 0, len(expected))
 	for _, middleware := range chain {
 		switch middleware {
+		case "NewProjectUnaryMiddleware", "NewOrganizationUnaryMiddleware", "NewServiceUnaryMiddleware", "NewUserUnaryMiddleware",
+			"NewProjectStreamMiddleware", "NewOrganizationStreamMiddleware", "NewServiceStreamMiddleware", "NewUserStreamMiddleware":
+			actual = append(actual, middleware)
 		case "NewAuthenticationUnaryServerMiddleware", "NewProjectAuthenticatorUnaryServerMiddleware", "NewOrganizationAuthenticatorUnaryServerMiddleware", "NewServiceAuthenticatorUnaryServerMiddleware",
 			"NewAuthenticationStreamServerMiddleware", "NewProjectAuthenticatorStreamServerMiddleware", "NewOrganizationAuthenticatorStreamServerMiddleware", "NewServiceAuthenticatorStreamServerMiddleware":
-			actual = append(actual, middleware)
-		case "NewAuthenticationBoundaryUnaryServerMiddleware", "NewAuthenticationBoundaryStreamServerMiddleware",
-			"NewCredentialConflictUnaryServerMiddleware", "NewCredentialConflictStreamServerMiddleware":
 			t.Fatalf("forbidden middleware %s found in %v", middleware, chain)
 		}
 	}

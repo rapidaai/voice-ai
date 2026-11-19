@@ -21,10 +21,11 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/authentication"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
+	"github.com/stretchr/testify/require"
 )
 
 type callbackCallContextStore struct {
@@ -43,7 +44,7 @@ type callbackConversationServiceStub struct {
 
 func (service *callbackConversationServiceStub) CreateOrUpdateConversationMetrics(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	_ uint64,
 	_ uint64,
 	metrics []*protos.Metric,
@@ -57,7 +58,7 @@ func (service *callbackConversationServiceStub) CreateOrUpdateConversationMetric
 
 func (service *callbackConversationServiceStub) CreateOrUpdateConversationMetadata(
 	context.Context,
-	*types.Authentication,
+	authentication.Principal,
 	uint64,
 	uint64,
 	[]*protos.Metadata,
@@ -205,36 +206,26 @@ func TestCallbackByContextRestoresAuthenticationForEveryProvider(t *testing.T) {
 		{name: "vobiz", method: http.MethodPost, body: "Event=Hangup&CallUUID=vobiz-call&CallStatus=completed", contentType: "application/x-www-form-urlencoded"},
 	}
 
-	projectActorType := types.ActorTypeProject.String()
-	userActorType := types.ActorTypeUser.String()
-	userID := uint64(31)
 	authContexts := []struct {
-		name       string
-		authType   types.AuthType
-		authUserID *uint64
-		actorType  *string
-		actorID    uint64
+		name      string
+		principal authentication.Principal
 	}{
-		{name: "project API key", authType: types.AuthTypeProject, actorType: &projectActorType, actorID: 41},
-		{name: "personal access token", authType: types.AuthTypeUser, authUserID: &userID, actorType: &userActorType, actorID: userID},
+		{name: "project API key", principal: callbackProjectPrincipal(41)},
+		{name: "personal access token", principal: callbackUserPrincipal(31)},
 	}
 
 	for _, authContext := range authContexts {
 		for _, providerRequest := range providerRequests {
 			t.Run(authContext.name+"/"+providerRequest.name, func(t *testing.T) {
-				store := &callbackCallContextStore{callContext: &callcontext.CallContext{
+				storedContext := &callcontext.CallContext{
 					ContextID:      "callback-context",
 					AssistantID:    11,
 					ConversationID: 22,
-					ProjectID:      21,
-					OrganizationID: 20,
-					AuthType:       authContext.authType.String(),
-					AuthUserID:     authContext.authUserID,
-					AuthActorType:  authContext.actorType,
-					AuthActorID:    &authContext.actorID,
 					Provider:       providerRequest.name,
 					Direction:      "outbound",
-				}}
+				}
+				require.NoError(t, storedContext.SetAuthentication(authContext.principal))
+				store := &callbackCallContextStore{callContext: storedContext}
 				api := &ConversationApi{
 					cfg:              &config.AssistantConfig{},
 					logger:           logger,
@@ -345,20 +336,15 @@ func TestFailedCallbacksPersistCallAndConversationStatus(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actorType := types.ActorTypeProject.String()
-			actorID := uint64(41)
-			store := &callbackCallContextStore{callContext: &callcontext.CallContext{
+			storedContext := &callcontext.CallContext{
 				ContextID:      "callback-context",
 				AssistantID:    11,
 				ConversationID: 22,
-				ProjectID:      21,
-				OrganizationID: 20,
-				AuthType:       types.AuthTypeProject.String(),
-				AuthActorType:  &actorType,
-				AuthActorID:    &actorID,
 				Provider:       "twilio",
 				Direction:      "outbound",
-			}}
+			}
+			require.NoError(t, storedContext.SetAuthentication(callbackProjectPrincipal(41)))
+			store := &callbackCallContextStore{callContext: storedContext}
 			conversationService := &callbackConversationServiceStub{metricRecorded: make(chan struct{})}
 			api := &ConversationApi{
 				cfg:                          &config.AssistantConfig{},
@@ -421,4 +407,28 @@ func assertFailedStatusMetrics(t *testing.T, metrics []*protos.Metric, reason st
 			t.Errorf("metric %q description = %q, want %q", name, descriptions[name], reason)
 		}
 	}
+}
+
+func callbackProjectPrincipal(credentialID uint64) authentication.Principal {
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityProjectCredential, ID: credentialID},
+		authentication.Tenant{OrganizationID: 20, ProjectID: 21},
+		authentication.Proof{Method: authentication.AuthenticationProjectCredential, Audience: authentication.AudienceManagement, Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: "41"}}, nil,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return principal
+}
+
+func callbackUserPrincipal(userID uint64) authentication.Principal {
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: userID},
+		authentication.Tenant{OrganizationID: 20, ProjectID: 21},
+		authentication.Proof{Method: authentication.AuthenticationUserSession, Reference: authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: "session-31"}}, nil,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return principal
 }

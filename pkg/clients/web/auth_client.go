@@ -3,170 +3,105 @@
 //
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
+
 package web_client
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
-	"fmt"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
+	"github.com/rapidaai/pkg/authentication/resolver"
 	"github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
-	web_api "github.com/rapidaai/protos"
+	pkg_errors "github.com/rapidaai/pkg/errors"
+	"github.com/rapidaai/protos"
 )
 
-const (
-	scopeAuthorizationCacheVersion = "v2"
-	scopeAuthorizationCacheTTL     = 5 * time.Minute
-)
-
-type authServiceClient struct {
-	clients.InternalClient
-	cfg        *config.AppConfig
-	logger     commons.Logger
-	authClient web_api.AuthenticationServiceClient
+// AuthenticationClient resolves opaque credentials through Web Access Management.
+type AuthenticationClient interface {
+	resolver.UserAuthenticationService
+	resolver.ProjectAuthenticationService
+	resolver.OrganizationAuthenticationService
 }
 
-type AuthClient interface {
-	Authorize(ctx context.Context, authToken string, userId uint64) (*web_api.Authentication, error)
-	ScopeAuthorize(c context.Context, scopeToken string, scopeType string) (*web_api.ScopedAuthentication, error)
+type authenticationClient struct {
+	internalClient clients.ServiceInternalClient
+	client         protos.AuthenticationServiceClient
 }
 
-func NewAuthenticator(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector) AuthClient {
-	conn, err := grpc.NewClient(config.Web.Host, grpc.WithTransportCredentials(insecure.NewCredentials()))
+// NewAuthenticationClient constructs a Web credential resolver client.
+func NewAuthenticationClient(cfg *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector) AuthenticationClient {
+	connection, err := grpc.NewClient(cfg.Web.Host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logger.Fatalf("Unable to create connection %v", err)
+		logger.Fatalf("unable to create Web authentication connection: %v", err)
 	}
-	return NewAuthenticatorWithClient(config, logger, redis, web_api.NewAuthenticationServiceClient(conn))
+	return NewAuthenticationClientWithClient(cfg, logger, redis, protos.NewAuthenticationServiceClient(connection))
 }
 
-// NewAuthenticatorWithClient creates an authentication client using the provided gRPC client.
-func NewAuthenticatorWithClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, authClient web_api.AuthenticationServiceClient) AuthClient {
-	return &authServiceClient{
-		clients.NewInternalClient(config, logger, redis),
-		config,
-		logger,
-		authClient,
+// NewAuthenticationClientWithClient constructs a resolver around an owned gRPC client.
+func NewAuthenticationClientWithClient(
+	cfg *config.AppConfig,
+	logger commons.Logger,
+	redis connectors.RedisConnector,
+	client protos.AuthenticationServiceClient,
+) AuthenticationClient {
+	return &authenticationClient{
+		internalClient: clients.NewWebInternalClient(cfg, logger, redis),
+		client:         client,
 	}
 }
 
-// Authorize implements types.Authenticator.
-func (client *authServiceClient) Authorize(c context.Context, authToken string, userId uint64) (*web_api.Authentication, error) {
-	start := time.Now()
-	// Generate cache key
-	cacheKey := client.CacheKey(c, "Authorize", authToken, fmt.Sprintf("%d", userId))
-
-	// Retrieve data from cache
-	cachedValue := client.Retrieve(c, cacheKey)
-
-	// Initialize data variable
-	data := &web_api.Authentication{}
-	// Parse cached value into data
-	err := cachedValue.ResultStruct(data)
+// ResolveUserCredential resolves one User session without caching credential or authorization facts.
+func (client *authenticationClient) ResolveUserCredential(ctx context.Context, token string, userID uint64, selectedOrganizationID uint64, selectedProjectID uint64) (authentication.Authentication, error) {
+	requestContext, err := client.internalClient.WithService(ctx)
 	if err != nil {
-		client.logger.Errorf("Failed to parse cached data: %v", err)
-
-		// Call the vault service to fetch data
-		res, err := client.authClient.Authorize(client.WithToken(c, authToken, userId), &web_api.AuthorizeRequest{})
-		if err != nil {
-			client.logger.Errorf("Failed to get credentials from auth service: %v", err)
-			return nil, err
-		}
-
-		// Check if the request was successful
-		if res.GetSuccess() && res.GetData() != nil {
-			// Cache the fetched data
-			_c := client.Cache(c, cacheKey, res.GetData())
-			if _c.HasError() {
-				client.logger.Errorf("Failed to cache the data %+v: %v", res.GetData(), _c.Err)
-			}
-			client.logger.Benchmark("Benchmarking: AuthClient.ScopeAuthorize", time.Since(start))
-			return res.GetData(), nil
-		}
-
-		// Handle error response from vault service
-		if res.GetError() != nil {
-			errMsg := fmt.Sprintf("Failed to get credentials from vault service: %s", res.GetError().HumanMessage)
-			client.logger.Errorf("%s", errMsg)
-			return nil, errors.New(errMsg)
-		}
+		return authentication.Authentication{}, err
 	}
-
-	// Log benchmarking information
-	client.logger.Benchmark("Benchmarking: AuthClient.ScopeAuthorize", time.Since(start))
-	return data, nil
-}
-
-func (client *authServiceClient) ScopeAuthorize(c context.Context, scopeToken string, scopeType string) (*web_api.ScopedAuthentication, error) {
-	start := time.Now()
-	cacheKey := client.scopeAuthorizationCacheKey(c, scopeToken, scopeType)
-
-	// Retrieve data from cache
-	cachedValue := client.Retrieve(c, cacheKey)
-
-	// Initialize data variable
-	data := &web_api.ScopedAuthentication{}
-	// Parse cached value into data
-	err := cachedValue.ResultStruct(data)
-	if err == nil {
-		err = validateScopedAuthentication(data, scopeType)
-	}
+	response, err := client.client.VerifyToken(requestContext, &protos.VerifyTokenRequest{Credential: &protos.VerifyTokenRequest_User{User: &protos.VerifyTokenRequest_UserCredential{
+		Token: token, UserId: userID, SelectedOrganizationId: selectedOrganizationID, SelectedProjectId: selectedProjectID,
+	}}})
 	if err != nil {
-		// Call the vault service to fetch data
-		res, err := client.authClient.ScopeAuthorize(client.WithScopeToken(c, scopeToken, scopeType), &web_api.ScopeAuthorizeRequest{
-			Scope: scopeType,
-		})
-		if err != nil {
-			client.logger.Errorf("Failed to get credentials from vault service: %v", err)
-			return nil, err
-		}
-
-		// Check if the request was successful
-		if res.GetSuccess() && res.GetData() != nil {
-			if err := validateScopedAuthentication(res.GetData(), scopeType); err != nil {
-				return nil, err
-			}
-			// Cache the fetched data
-			_c := client.CacheWithTTL(c, cacheKey, res.GetData(), scopeAuthorizationCacheTTL)
-			if _c.HasError() {
-				client.logger.Errorf("Failed to cache the data %+v: %v", res.GetData(), _c.Err)
-			}
-			client.logger.Benchmark("Benchmarking: AuthClient.ScopeAuthorize", time.Since(start))
-			return res.GetData(), nil
-		}
-
-		// Handle error response from vault service
-		if res.GetError() != nil {
-			errMsg := fmt.Sprintf("Failed to get credentials from vault service: %s", res.GetError().HumanMessage)
-			client.logger.Errorf("%s", errMsg)
-			return nil, errors.New(errMsg)
-		}
+		return authentication.Authentication{}, err
 	}
-	// Log benchmarking information
-	client.logger.Benchmark("Benchmarking: AuthClient.ScopeAuthorize", time.Since(start))
-	return data, nil
+	if response == nil || response.Authentication == nil {
+		return authentication.Authentication{}, pkg_errors.AuthenticationInvalidError{}
+	}
+	return authentication.AuthenticationFromProto(response.Authentication)
 }
 
-func validateScopedAuthentication(authentication *web_api.ScopedAuthentication, scopeType string) error {
-	if scopeType == "project" && (authentication.GetActorType() != string(types.ActorTypeProject) || authentication.GetActorId() == "") {
-		return errors.New("project authentication is missing durable actor identity")
+// ResolveProjectCredential resolves one Project credential without cross-request caching.
+func (client *authenticationClient) ResolveProjectCredential(ctx context.Context, token string) (authentication.Authentication, error) {
+	requestContext, err := client.internalClient.WithService(ctx)
+	if err != nil {
+		return authentication.Authentication{}, err
 	}
-	return nil
+	response, err := client.client.VerifyToken(requestContext, &protos.VerifyTokenRequest{Credential: &protos.VerifyTokenRequest_Project{Project: &protos.VerifyTokenRequest_ProjectCredential{Token: token}}})
+	if err != nil {
+		return authentication.Authentication{}, err
+	}
+	if response == nil || response.Authentication == nil {
+		return authentication.Authentication{}, pkg_errors.AuthenticationInvalidError{}
+	}
+	return authentication.AuthenticationFromProto(response.Authentication)
 }
 
-func (client *authServiceClient) scopeAuthorizationCacheKey(c context.Context, scopeToken string, scopeType string) string {
-	mac := hmac.New(sha256.New, []byte(client.cfg.Secret))
-	_, _ = mac.Write([]byte(scopeToken))
-	fingerprint := hex.EncodeToString(mac.Sum(nil))
-	return client.CacheKey(c, "ScopeAuthorize", scopeAuthorizationCacheVersion, scopeType, fingerprint)
+// ResolveOrganizationCredential resolves one Organization credential without cross-request caching.
+func (client *authenticationClient) ResolveOrganizationCredential(ctx context.Context, token string) (authentication.Authentication, error) {
+	requestContext, err := client.internalClient.WithService(ctx)
+	if err != nil {
+		return authentication.Authentication{}, err
+	}
+	response, err := client.client.VerifyToken(requestContext, &protos.VerifyTokenRequest{Credential: &protos.VerifyTokenRequest_Organization{Organization: &protos.VerifyTokenRequest_OrganizationCredential{Token: token}}})
+	if err != nil {
+		return authentication.Authentication{}, err
+	}
+	if response == nil || response.Authentication == nil {
+		return authentication.Authentication{}, pkg_errors.AuthenticationInvalidError{}
+	}
+	return authentication.AuthenticationFromProto(response.Authentication)
 }

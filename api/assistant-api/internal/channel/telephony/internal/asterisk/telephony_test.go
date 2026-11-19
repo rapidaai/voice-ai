@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 )
 
@@ -40,7 +41,7 @@ func TestStatusCallback_NormalizesChannelDestroyedCompleted(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	c.Request = req
 
-	info, err := tel.StatusCallback(c, nil, 42, 99)
+	info, err := tel.StatusCallback(c, authentication.Principal{}, 42, 99)
 	if err != nil {
 		t.Fatalf("StatusCallback() error = %v", err)
 	}
@@ -76,7 +77,7 @@ func TestStatusCallback_NormalizesDialFailure(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	c.Request = req
 
-	info, err := tel.StatusCallback(c, nil, 42, 99)
+	info, err := tel.StatusCallback(c, authentication.Principal{}, 42, 99)
 	if err != nil {
 		t.Fatalf("StatusCallback() error = %v", err)
 	}
@@ -103,7 +104,7 @@ func TestStatusCallback_NormalizesRingingStateChange(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	c.Request = req
 
-	info, err := tel.StatusCallback(c, nil, 42, 99)
+	info, err := tel.StatusCallback(c, authentication.Principal{}, 42, 99)
 	if err != nil {
 		t.Fatalf("StatusCallback() error = %v", err)
 	}

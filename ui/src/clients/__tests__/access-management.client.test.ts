@@ -28,8 +28,16 @@ jest.mock('@rapidaai/react', () => ({
   UpdateCustomRole: jest.fn(),
 }));
 
-const auth = { token: 'token-1', userId: 'user-1' };
-const metadata = { authorization: 'token-1', 'x-auth-id': 'user-1' };
+const auth = {
+  organizationId: 'organization-1',
+  token: 'token-1',
+  userId: 'user-1',
+};
+const metadata = {
+  authorization: 'token-1',
+  'x-auth-id': 'user-1',
+  'x-organization-id': 'organization-1',
+};
 
 describe('access management client', () => {
   beforeEach(() => {
@@ -120,6 +128,15 @@ describe('access management client', () => {
       roleDefinitionId: '101',
       permissionDefinitionIds: ['35'],
       reason: 'No longer required',
+      mode: 'preview',
+      auth,
+    });
+    await reduceAccessRolePermissions({
+      roleDefinitionId: '101',
+      permissionDefinitionIds: ['35'],
+      reason: 'No longer required',
+      mode: 'confirm',
+      confirmationDigest: 'confirmation-digest',
       auth,
     });
     await archiveAccessRole({
@@ -142,12 +159,32 @@ describe('access management client', () => {
       .calls[0][1];
     expect(reduceRequest.getPermissiondefinitionidsList()).toEqual(['35']);
     expect(reduceRequest.getReason()).toBe('No longer required');
+    expect(reduceRequest.getPreview()).toBe(true);
+    expect(reduceRequest.getConfirmationdigest()).toBe('');
+    const confirmRequest = (ReduceCustomRolePermissions as jest.Mock).mock
+      .calls[1][1];
+    expect(confirmRequest.getPreview()).toBe(false);
+    expect(confirmRequest.getConfirmationdigest()).toBe('confirmation-digest');
     expect((ArchiveCustomRole as jest.Mock).mock.calls[0][1].getReason()).toBe(
       'Replaced',
     );
     expect((GetRole as jest.Mock).mock.calls[0][1].getRoledefinitionid()).toBe(
       '101',
     );
+  });
+
+  it('rejects an unconfirmed role reduction before transport', async () => {
+    await expect(
+      reduceAccessRolePermissions({
+        roleDefinitionId: '101',
+        permissionDefinitionIds: ['35'],
+        reason: 'No longer required',
+        auth,
+      } as any),
+    ).rejects.toThrow(
+      'Role reduction requires an explicit preview or confirmation with a digest.',
+    );
+    expect(ReduceCustomRolePermissions).not.toHaveBeenCalled();
   });
 
   it('returns transport failures to the caller', async () => {

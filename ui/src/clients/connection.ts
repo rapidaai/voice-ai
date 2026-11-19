@@ -1,6 +1,7 @@
 import { connectionConfig } from '@/configs';
 
 export type ApiAuth = {
+  organizationId?: string;
   projectId: string;
   token: string;
   userId: string;
@@ -8,16 +9,19 @@ export type ApiAuth = {
 
 export type ApiMetadata = {
   authorization: string;
+  'x-organization-id'?: string;
   'x-project-id': string;
   'x-auth-id': string;
 };
 
 export const createApiMetadata = ({
+  organizationId,
   projectId,
   token,
   userId,
 }: ApiAuth): ApiMetadata => ({
   authorization: token,
+  ...(organizationId ? { 'x-organization-id': organizationId } : {}),
   'x-project-id': projectId,
   'x-auth-id': userId,
 });

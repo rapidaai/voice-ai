@@ -22,6 +22,7 @@ import {
 import { withConnection } from './connection';
 
 export type AccessManagementAuth = {
+  organizationId: string;
   token: string;
   userId: string;
 };
@@ -58,6 +59,7 @@ export const listAccessPermissions = ({
   return withConnection(ListPermissions)(request, {
     authorization: auth.token,
     'x-auth-id': auth.userId,
+    'x-organization-id': auth.organizationId,
   });
 };
 
@@ -87,6 +89,7 @@ export const listAccessRoles = ({
   return withConnection(ListRoles)(request, {
     authorization: auth.token,
     'x-auth-id': auth.userId,
+    'x-organization-id': auth.organizationId,
   });
 };
 
@@ -102,6 +105,7 @@ export const getAccessRole = ({
   return withConnection(GetRole)(request, {
     authorization: auth.token,
     'x-auth-id': auth.userId,
+    'x-organization-id': auth.organizationId,
   });
 };
 
@@ -132,6 +136,7 @@ export const createAccessRole = ({
   return withConnection(CreateCustomRole)(request, {
     authorization: auth.token,
     'x-auth-id': auth.userId,
+    'x-organization-id': auth.organizationId,
   });
 };
 
@@ -153,27 +158,42 @@ export const updateAccessRole = ({
   return withConnection(UpdateCustomRole)(request, {
     authorization: auth.token,
     'x-auth-id': auth.userId,
+    'x-organization-id': auth.organizationId,
   });
 };
 
-export const reduceAccessRolePermissions = ({
-  roleDefinitionId,
-  permissionDefinitionIds,
-  reason,
-  auth,
-}: {
+type AccessRolePermissionReduction = {
   roleDefinitionId: string;
   permissionDefinitionIds: string[];
   reason: string;
   auth: AccessManagementAuth;
-}) => {
+} & ({ mode: 'preview' } | { mode: 'confirm'; confirmationDigest: string });
+
+export const reduceAccessRolePermissions = (
+  reduction: AccessRolePermissionReduction,
+) => {
+  const { roleDefinitionId, permissionDefinitionIds, reason, auth, mode } =
+    reduction;
   const request = new ReduceCustomRolePermissionsRequest();
   request.setRoledefinitionid(roleDefinitionId);
   request.setPermissiondefinitionidsList(permissionDefinitionIds);
   request.setReason(reason);
+  if (mode === 'preview') {
+    request.setPreview(true);
+  } else if (mode === 'confirm' && reduction.confirmationDigest.trim() !== '') {
+    request.setPreview(false);
+    request.setConfirmationdigest(reduction.confirmationDigest.trim());
+  } else {
+    return Promise.reject(
+      new Error(
+        'Role reduction requires an explicit preview or confirmation with a digest.',
+      ),
+    );
+  }
   return withConnection(ReduceCustomRolePermissions)(request, {
     authorization: auth.token,
     'x-auth-id': auth.userId,
+    'x-organization-id': auth.organizationId,
   });
 };
 
@@ -192,5 +212,6 @@ export const archiveAccessRole = ({
   return withConnection(ArchiveCustomRole)(request, {
     authorization: auth.token,
     'x-auth-id': auth.userId,
+    'x-organization-id': auth.organizationId,
   });
 };

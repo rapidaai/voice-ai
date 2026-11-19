@@ -26,7 +26,7 @@ import (
 
 // RapidaClient owns the internal service clients and their connections.
 type RapidaClient struct {
-	Authentication web_client.AuthClient
+	Authentication web_client.AuthenticationClient
 	Vault          web_client.VaultClient
 	Project        web_client.ProjectClient
 	ProductUsage   web_client.ProductUsageClient
@@ -92,7 +92,7 @@ func New(cfg *config.AppConfig, logger commons.Logger, redis connectors.RedisCon
 		return nil, err
 	}
 
-	client.Authentication = web_client.NewAuthenticatorWithClient(
+	client.Authentication = web_client.NewAuthenticationClientWithClient(
 		cfg,
 		logger,
 		redis,

@@ -6,67 +6,33 @@ Licensed under GPL-2.0 with Rapida Additional Terms.
 See LICENSE.md for details or contact sales@rapida.ai for commercial use.
 """
 
-from typing import Set, Optional, Union
-
-from pydantic import BaseModel, SecretStr, Field
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
-class TokenAuthenticationConfig(BaseModel):
-    # strict authentication
-    strict: bool = False
+class UserAuthenticationConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
-    header_key: str = "Authorization"
+    auth_host: str
+    authorization_header: str = "authorization"
+    user_header: str = "x-auth-id"
+    organization_header: str = "x-organization-id"
+    project_header: str = "x-project-id"
 
-    auth_host: Optional[str] = Field(
-        default=None, description="auth host that will get called when authentication"
+    @field_validator(
+        "auth_host",
+        "authorization_header",
+        "user_header",
+        "organization_header",
+        "project_header",
     )
-
-
-class JwtAuthenticationConfig(BaseModel):
-    """
-    JWT configuration Template
-    """
-
-    strict: bool = False
-    # secret key
-    # print safe
-    secret_key: SecretStr
-    # algorithms for jwt
-    algorithms: Set = ["HS256"]
-
-    # header keys
-    header_key: str = "Authorization"
-
-    class Config:
-        case_sensitive = True
-        env_file_encoding = "utf-8"
+    @classmethod
+    def validate_required_string(cls, value):
+        if not value or value.strip() != value or "\x00" in value:
+            raise ValueError("authentication configuration contains an invalid string")
+        return value
 
 
 class AuthenticationConfig(BaseModel):
-    #
-    type: Optional[str]
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
-    config: Optional[Union[TokenAuthenticationConfig, JwtAuthenticationConfig]]
-
-
-class TokenConfig(BaseModel):
-    """Token-based auth config used by TokenAuthorizationMiddleware."""
-
-    strict: bool = False
-    enable: bool = True
-    header_key: str = "Authorization"
-    auth_host: Optional[str] = Field(default=None)
-
-
-class JwtConfig(BaseModel):
-    """JWT auth config used by JwtAuthorizationMiddleware."""
-
-    strict: bool = False
-    enable: bool = True
-    secret_key: SecretStr
-    algorithms: Set = frozenset({"HS256"})
-    header_key: str = "Authorization"
-
-    class Config:
-        case_sensitive = True
-        env_file_encoding = "utf-8"
+    user: UserAuthenticationConfig

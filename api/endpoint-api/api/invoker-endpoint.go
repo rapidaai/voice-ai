@@ -15,14 +15,17 @@ import (
 	internal_services "github.com/rapidaai/api/endpoint-api/internal/service"
 	internal_endpoint_service "github.com/rapidaai/api/endpoint-api/internal/service/endpoint"
 	internal_log_service "github.com/rapidaai/api/endpoint-api/internal/service/log"
+	"github.com/rapidaai/pkg/authentication"
 	integration_client "github.com/rapidaai/pkg/clients/integration"
 	integration_client_builders "github.com/rapidaai/pkg/clients/integration/builders"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
+	pkg_errors "github.com/rapidaai/pkg/errors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	gorm_generator "github.com/rapidaai/pkg/models/gorm/generators"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/pkg/validator"
 	invoker_api "github.com/rapidaai/protos"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -62,13 +65,12 @@ func NewInvokerGRPCApi(config *config.EndpointConfig, logger commons.Logger,
 
 func (invokeApi *invokerGRPCApi) Invoke(ctx context.Context, iRequest *invoker_api.InvokeRequest) (*invoker_api.InvokeResponse, error) {
 	start := time.Now()
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, (pkg_errors.AuthenticationFailureError{}).Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeOrg, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	if !validator.OneOf(iAuth.Subject().Type, authentication.IdentityUser, authentication.IdentityProjectCredential, authentication.IdentityOrganizationCredential, authentication.IdentityService) {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
 
 	requestID := gorm_generator.ID()
@@ -171,13 +173,17 @@ func (invokeApi *invokerGRPCApi) Invoke(ctx context.Context, iRequest *invoker_a
 						)...,
 				))
 
+	elapsedNanoseconds, err := utils.Int64ToUint64(int64(time.Since(start)))
+	if err != nil {
+		return nil, err
+	}
 	utils.Go(context.Background(), func() {
 		invokeApi.endpointLogService.UpdateEndpointLog(
 			context.Background(),
 			iAuth,
 			requestID,
 			output.GetMetrics(),
-			uint64(time.Since(start)),
+			elapsedNanoseconds,
 		)
 	})
 	if err != nil {
@@ -188,37 +194,39 @@ func (invokeApi *invokerGRPCApi) Invoke(ctx context.Context, iRequest *invoker_a
 	if output.GetData() != nil && output.GetData().GetAssistant() != nil {
 		data = output.GetData().GetAssistant().GetContents()
 	}
+	elapsedMicroseconds, err := utils.Int64ToUint64(time.Since(start).Microseconds())
+	if err != nil {
+		return nil, err
+	}
 	return &invoker_api.InvokeResponse{
 		RequestId: requestID,
 		Code:      200,
 		Success:   true,
-		TimeTaken: uint64(time.Since(start).Microseconds()),
+		TimeTaken: elapsedMicroseconds,
 		Data:      data,
 		Metrics:   output.GetMetrics(),
 	}, nil
 }
 
 func (endpoint *invokerGRPCApi) Probe(ctx context.Context, rpv *invoker_api.ProbeRequest) (*invoker_api.ProbeResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, (pkg_errors.AuthenticationFailureError{}).Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	if !validator.OneOf(iAuth.Subject().Type, authentication.IdentityUser, authentication.IdentityProjectCredential, authentication.IdentityService) {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
 	_ = iAuth
 	return nil, status.Error(codes.Unimplemented, "Probe is not implemented")
 }
 
 func (endpoint *invokerGRPCApi) Update(ctx context.Context, ur *invoker_api.UpdateRequest) (*invoker_api.UpdateResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, (pkg_errors.AuthenticationFailureError{}).Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	if !validator.OneOf(iAuth.Subject().Type, authentication.IdentityUser, authentication.IdentityProjectCredential, authentication.IdentityService) {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
 	_ = iAuth
 	return nil, status.Error(codes.Unimplemented, "Update is not implemented")

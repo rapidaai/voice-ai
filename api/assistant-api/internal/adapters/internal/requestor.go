@@ -39,10 +39,10 @@ import (
 	web_client "github.com/rapidaai/pkg/clients/web"
 
 	//
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/storages"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 )
@@ -62,7 +62,7 @@ type genericRequestor struct {
 	logger   commons.Logger
 	config   *config.AssistantConfig
 	source   utils.RapidaSource
-	auth     *types.Authentication
+	auth     authentication.Principal
 	streamer internal_type.Streamer
 
 	// service
@@ -216,7 +216,7 @@ func (dm *genericRequestor) GetSource() utils.RapidaSource {
 	return dm.source
 }
 
-func (gr *genericRequestor) getAssistantConversation(ctx context.Context, auth *types.Authentication, assistantId uint64, assistantConversationId uint64) (*internal_conversation_entity.AssistantConversation, error) {
+func (gr *genericRequestor) getAssistantConversation(ctx context.Context, auth authentication.Principal, assistantId uint64, assistantConversationId uint64) (*internal_conversation_entity.AssistantConversation, error) {
 	return gr.conversationService.GetConversation(ctx, auth, assistantId, assistantConversationId, &internal_services.GetConversationOption{
 		InjectContext:  true,
 		InjectArgument: true,

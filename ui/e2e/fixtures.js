@@ -50,42 +50,85 @@ const SCREENSHOT_VIEWPORTS = [
 ];
 
 function createAuthState({ organization = true, project = true } = {}) {
+  const hasProject = organization && project;
+  const organizationRole = {
+    id: '102',
+    key: 'organization_admin',
+    name: 'Organization Admin',
+    scope: 'organization',
+    permissionsList: [
+      'organization.members.read',
+      'organization.members.invite',
+      'organization.members.remove',
+      'organization.access.manage',
+      'organization.roles.read',
+      'organization.project_access_tokens.revoke',
+    ].map((key, index) => ({
+      id: String(1000 + index),
+      key,
+      scope: 'organization',
+    })),
+  };
+  const projectRole = {
+    id: '110',
+    key: 'project_admin',
+    name: 'Project Admin',
+    scope: 'project',
+    permissionsList: ['project.read', 'project.access_tokens.revoke'].map(
+      (key, index) => ({
+        id: String(2000 + index),
+        key,
+        scope: 'project',
+      }),
+    ),
+  };
+
   return {
     state: {
-      currentUser: {
-        id: '101',
-        name: 'E2E User',
-        email: 'e2e@example.test',
+      authentication: {
+        principal: {
+          subject: { type: 'user', id: '101' },
+          selectedtenant: {
+            organizationid: organization ? '202' : '0',
+            projectid: hasProject ? '302' : '0',
+          },
+          proof: {
+            method: 'user_session',
+            reference: { type: 'token', value: '1' },
+          },
+        },
+        user: {
+          id: '101',
+          name: 'E2E User',
+          email: 'e2e@example.test',
+          status: 'active',
+        },
+        organizationsList: organization
+          ? [
+              {
+                id: '202',
+                name: 'E2E Organization',
+                rolesList: [organizationRole],
+                projectsList: hasProject
+                  ? [
+                      {
+                        id: '302',
+                        name: 'E2E Project',
+                        rolesList: [projectRole],
+                      },
+                    ]
+                  : [],
+              },
+            ]
+          : [],
       },
       token: {
         token: 'token-e2e',
       },
-      organizationRole: organization
-        ? {
-            id: '201',
-            organizationid: '202',
-            role: 'admin',
-          }
-        : {},
-      projectRoles: project
-        ? [
-            {
-              id: '301',
-              projectid: '302',
-              role: 'admin',
-            },
-          ]
-        : [],
-      currentProjectRole: project
-        ? {
-            id: '301',
-            projectid: '302',
-            role: 'admin',
-          }
-        : {},
-      featurePermissions: [],
+      selectedOrganizationID: organization ? '202' : '',
+      selectedProjectID: hasProject ? '302' : '',
     },
-    version: 1,
+    version: 3,
   };
 }
 

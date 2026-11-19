@@ -15,7 +15,11 @@ from app.bridges.bridge_factory import (
     get_me_integration_client,
     get_me_vault_service_client,
 )
-from app.celery_worker import celery_app
+from app.celery_worker import (
+    celery_app,
+    integration_service_assertion_issuer,
+    web_service_assertion_issuer,
+)
 from app.config import get_settings
 from app.connectors.connector_factory import get_me_elastic_search, get_me_postgres
 from app.core.indexing_runner import IndexingRunner
@@ -42,7 +46,6 @@ async def __index_document(request, data: Dict):
         storage = await get_me_storage(request)
         integration_client = get_me_integration_client(get_settings().internal_service.integration_host)
         vault_client = get_me_vault_service_client(get_settings().internal_service.web_host)
-
         org_id = data.get("organization_id")
         project_id = data.get("project_id")
         knowledge_id = data.get("knowledge_id")
@@ -109,6 +112,8 @@ async def __index_document(request, data: Dict):
                 integration_client=integration_client,
                 vault_client=vault_client,
                 actor=actor,
+                web_service_assertion_issuer=web_service_assertion_issuer,
+                integration_service_assertion_issuer=integration_service_assertion_issuer,
                 index_type="paragraph-index",
             ).run()
             end_at = time.perf_counter()

@@ -21,8 +21,8 @@ import (
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 )
@@ -41,7 +41,7 @@ func NewAsteriskTelephony(config *config.AssistantConfig, logger commons.Logger)
 
 func (apt *asteriskTelephony) StatusCallback(
 	c *gin.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	assistantConversationId uint64,
 ) (*internal_type.StatusInfo, error) {
@@ -115,7 +115,7 @@ func (apt *asteriskTelephony) ReceiveCall(c *gin.Context) (*internal_type.CallIn
 
 func (apt *asteriskTelephony) OutboundCall(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	toPhone string,
 	fromPhone string,
 	assistant *internal_assistant_entity.Assistant, assistantConversationId uint64,
@@ -330,7 +330,7 @@ func (apt *asteriskTelephony) OutboundCall(
 
 func (apt *asteriskTelephony) InboundCall(
 	c *gin.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	clientNumber string,
 	assistantConversationId uint64,

@@ -122,6 +122,24 @@ const BUILT_IN_ROLE = role({
   definitionType: RoleDefinitionType.ROLE_DEFINITION_TYPE_BUILT_IN,
   permissions: [PROJECT_READ],
 });
+const ORGANIZATION_OWNER_ROLE = role({
+  id: '101',
+  key: 'organization_owner',
+  name: 'Organization Owner',
+  description: 'Owns the organization.',
+  definitionType: RoleDefinitionType.ROLE_DEFINITION_TYPE_BUILT_IN,
+  scope: RoleScope.ROLE_SCOPE_ORGANIZATION,
+  permissions: [],
+});
+const ORGANIZATION_ADMIN_ROLE = role({
+  id: '102',
+  key: 'organization_admin',
+  name: 'Organization Admin',
+  description: 'Administers organization access.',
+  definitionType: RoleDefinitionType.ROLE_DEFINITION_TYPE_BUILT_IN,
+  scope: RoleScope.ROLE_SCOPE_ORGANIZATION,
+  permissions: [],
+});
 const CREATED_ROLE = role({
   id: '503',
   key: 'incident_manager',
@@ -281,17 +299,40 @@ async function installAccessManagementClientMock(page) {
       definitionType: RoleDefinitionType.ROLE_DEFINITION_TYPE_CUSTOM,
       permissions: [],
     });
-    const roles = request
-      .getCriteriasList()
-      .some(
-        criteria =>
-          criteria.getKey() === 'subject' &&
-          criteria.getValue() === 'PROJECT_TOKEN',
-      )
-      ? [RUNTIME_TOKEN_ROLE, OBSERVER_TOKEN_ROLE]
-      : isCustomRoleArchived
-        ? [BUILT_IN_ROLE]
-        : [customRoleSummary, BUILT_IN_ROLE];
+    const criteria = request.getCriteriasList();
+    const isOrganizationScope = criteria.some(
+      criterion =>
+        criterion.getKey() === 'scope' &&
+        criterion.getValue() === 'ORGANIZATION',
+    );
+    const isProjectScope = criteria.some(
+      criterion =>
+        criterion.getKey() === 'scope' && criterion.getValue() === 'PROJECT',
+    );
+    const isProjectTokenSubject = criteria.some(
+      criterion =>
+        criterion.getKey() === 'subject' &&
+        criterion.getValue() === 'PROJECT_TOKEN',
+    );
+    const roles = isOrganizationScope
+      ? [
+          ORGANIZATION_OWNER_ROLE,
+          ORGANIZATION_ADMIN_ROLE,
+          BUILT_IN_ROLE,
+          RUNTIME_TOKEN_ROLE,
+        ]
+      : isProjectTokenSubject
+        ? [RUNTIME_TOKEN_ROLE, OBSERVER_TOKEN_ROLE]
+        : isProjectScope
+          ? [
+              customRoleSummary,
+              BUILT_IN_ROLE,
+              ORGANIZATION_OWNER_ROLE,
+              RUNTIME_TOKEN_ROLE,
+            ]
+          : isCustomRoleArchived
+            ? [BUILT_IN_ROLE]
+            : [customRoleSummary, BUILT_IN_ROLE];
     return fulfillGrpcWeb(route, buildRoleListResponse(roles));
   });
 

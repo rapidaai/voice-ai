@@ -7,23 +7,19 @@ package assistant_api
 
 import (
 	"context"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	assistant_api "github.com/rapidaai/protos"
 )
 
 // GetAssistantDashboard implements assistant_api.AssistantServiceServer.
 func (assistantApi *assistantGrpcApi) GetAssistantDashboard(ctx context.Context, dashboardRequest *assistant_api.GetAssistantDashboardRequest) (*assistant_api.GetAssistantDashboardResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
 	assistantDashboard, err := assistantApi.assistantService.GetAssistantDashboard(

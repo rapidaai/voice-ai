@@ -3,9 +3,9 @@ package plugins_types
 import (
 	"context"
 
+	"github.com/rapidaai/pkg/authentication"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 )
 
 const (
@@ -16,7 +16,7 @@ const (
 type ExecuteDeps struct {
 	VaultClient web_client.VaultClient
 	Logger      commons.Logger
-	Auth        *types.Authentication
+	Auth        authentication.Principal
 }
 
 type ExecuteRequest struct {

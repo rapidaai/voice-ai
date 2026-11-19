@@ -82,21 +82,31 @@ class Ordering(_message.Message):
     order: str
     def __init__(self, column: _Optional[str] = ..., order: _Optional[str] = ...) -> None: ...
 
+class AssignedRole(_message.Message):
+    __slots__ = ("roleDefinitionId", "key", "name")
+    ROLEDEFINITIONID_FIELD_NUMBER: _ClassVar[int]
+    KEY_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    roleDefinitionId: int
+    key: str
+    name: str
+    def __init__(self, roleDefinitionId: _Optional[int] = ..., key: _Optional[str] = ..., name: _Optional[str] = ...) -> None: ...
+
 class User(_message.Message):
-    __slots__ = ("id", "name", "email", "role", "createdDate", "status")
+    __slots__ = ("id", "name", "email", "createdDate", "status", "organizationRoles")
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     EMAIL_FIELD_NUMBER: _ClassVar[int]
-    ROLE_FIELD_NUMBER: _ClassVar[int]
     CREATEDDATE_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
+    ORGANIZATIONROLES_FIELD_NUMBER: _ClassVar[int]
     id: int
     name: str
     email: str
-    role: str
     createdDate: _timestamp_pb2.Timestamp
     status: str
-    def __init__(self, id: _Optional[int] = ..., name: _Optional[str] = ..., email: _Optional[str] = ..., role: _Optional[str] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., status: _Optional[str] = ...) -> None: ...
+    organizationRoles: _containers.RepeatedCompositeFieldContainer[AssignedRole]
+    def __init__(self, id: _Optional[int] = ..., name: _Optional[str] = ..., email: _Optional[str] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., status: _Optional[str] = ..., organizationRoles: _Optional[_Iterable[_Union[AssignedRole, _Mapping]]] = ...) -> None: ...
 
 class AuditActor(_message.Message):
     __slots__ = ("type", "id", "displayName")

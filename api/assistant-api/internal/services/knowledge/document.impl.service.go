@@ -9,6 +9,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	pkg_errors "github.com/rapidaai/pkg/errors"
+	"mime"
 	"net/http"
 	"net/url"
 	"path"
@@ -18,6 +20,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/entity/knowledges"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/ciphers"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -25,7 +28,6 @@ import (
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
 	"github.com/rapidaai/pkg/storages"
 	storage_files "github.com/rapidaai/pkg/storages/file-storage"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	protos "github.com/rapidaai/protos"
 	"gorm.io/gorm/clause"
@@ -53,8 +55,12 @@ func NewKnowledgeDocumentService(config *config.AssistantConfig, logger commons.
 	}
 }
 
-func (knowledge *knowledgeDocumentService) GetCounts(ctx context.Context, auth *types.Authentication, knowledgeId uint64) (documentCount, wordCount, tokenCount uint32) {
-	projectContext, err := auth.ProjectContext()
+func (knowledge *knowledgeDocumentService) GetCounts(ctx context.Context, auth authentication.Principal, knowledgeId uint64) (documentCount, wordCount, tokenCount uint32) {
+	projectContext := auth.Tenant()
+	var err error
+	if projectContext.ProjectID == 0 {
+		err = pkg_errors.AuthenticationPrincipalInvalidError{}
+	}
 	if err != nil {
 		return 0, 0, 0
 	}
@@ -80,12 +86,12 @@ func (knowledge *knowledgeDocumentService) GetCounts(ctx context.Context, auth *
 
 }
 
-func (knowledge *knowledgeDocumentService) GetAll(ctx context.Context, auth *types.Authentication,
+func (knowledge *knowledgeDocumentService) GetAll(ctx context.Context, auth authentication.Principal,
 	knowledgeId uint64,
 	criterias []*protos.Criteria, paginate *protos.Paginate) (int64, *[]internal_knowledge_gorm.KnowledgeDocument, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return 0, nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return 0, nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	db := knowledge.postgres.DB(ctx)
 	var knowledgeDocuments []internal_knowledge_gorm.KnowledgeDocument
@@ -116,10 +122,10 @@ func (knowledge *knowledgeDocumentService) GetAll(ctx context.Context, auth *typ
 	return cnt, &knowledgeDocuments, nil
 }
 
-func (knowledge *knowledgeDocumentService) Get(ctx context.Context, auth *types.Authentication, knowledgeId uint64, knowledgeDocumentId uint64) (*internal_knowledge_gorm.KnowledgeDocument, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+func (knowledge *knowledgeDocumentService) Get(ctx context.Context, auth authentication.Principal, knowledgeId uint64, knowledgeDocumentId uint64) (*internal_knowledge_gorm.KnowledgeDocument, error) {
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	db := knowledge.postgres.DB(ctx)
 	var _knowledge internal_knowledge_gorm.KnowledgeDocument
@@ -133,23 +139,23 @@ func (knowledge *knowledgeDocumentService) Get(ctx context.Context, auth *types.
 }
 
 func (knowledgeDocument *knowledgeDocumentService) CreateToolDocument(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	knowledge *internal_knowledge_gorm.Knowledge,
 	datasource string,
 	documentStructure string,
 	contents []*protos.DocumentContent,
 ) ([]*internal_knowledge_gorm.KnowledgeDocument, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	db := knowledgeDocument.postgres.DB(ctx)
 	allKnowledge := make([]*internal_knowledge_gorm.KnowledgeDocument, 0)
 	for _, cntnt := range contents {
 		allKnowledge = append(allKnowledge, &internal_knowledge_gorm.KnowledgeDocument{
 			ActorAudit: gorm_models.ActorAudit{
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 			KnowledgeId:       knowledge.Id,
 			Name:              cntnt.GetName(),
@@ -179,15 +185,15 @@ func (knowledgeDocument *knowledgeDocumentService) CreateToolDocument(ctx contex
 
 func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	knowledge *internal_knowledge_gorm.Knowledge,
 	datasource string,
 	documentStructure string,
 	contents []*protos.DocumentContent,
 ) ([]*internal_knowledge_gorm.KnowledgeDocument, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	db := knowledgeDocument.postgres.DB(ctx)
@@ -199,7 +205,7 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 			fileName := fmt.Sprintf("%d/%d/%d_%s%s",
 				projectContext.OrganizationID,
 				projectContext.ProjectID,
-				auth.Actor().ID,
+				auth.Caller().ID,
 				ciphers.RandomHash(KNOWLEDGE_DOCUMENT_PREFIX), path.Ext(cntnt.GetName()))
 
 			fileContent := cntnt.GetContent()
@@ -218,8 +224,8 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 
 			allKnowledge = append(allKnowledge, &internal_knowledge_gorm.KnowledgeDocument{
 				ActorAudit: gorm_models.ActorAudit{
-					CreatedActorType: auth.Actor().Type.String(),
-					CreatedActorID:   auth.Actor().ID,
+					CreatedActorType: string(auth.Caller().Type),
+					CreatedActorID:   auth.Caller().ID,
 				},
 				KnowledgeId:       knowledge.Id,
 				Name:              cntnt.GetName(),
@@ -252,8 +258,8 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 
 			allKnowledge = append(allKnowledge, &internal_knowledge_gorm.KnowledgeDocument{
 				ActorAudit: gorm_models.ActorAudit{
-					CreatedActorType: auth.Actor().Type.String(),
-					CreatedActorID:   auth.Actor().ID,
+					CreatedActorType: string(auth.Caller().Type),
+					CreatedActorID:   auth.Caller().ID,
 				},
 				KnowledgeId:       knowledge.Id,
 				Name:              cntnt.GetName(),
@@ -290,17 +296,15 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 
 func (knowledge *knowledgeDocumentService) webfileMimeType(
 	weburl string, fallback string) string {
-	resp, err := http.Head(weburl)
+	parsedURL, err := url.ParseRequestURI(weburl)
 	if err != nil {
 		return fallback
 	}
-	defer resp.Body.Close()
-	mimeType := resp.Header.Get("Content-Type")
+	mimeType := mime.TypeByExtension(path.Ext(parsedURL.Path))
 	if mimeType == "" {
 		return fallback
-	} else {
-		return strings.Split(mimeType, ";")[0]
 	}
+	return strings.Split(mimeType, ";")[0]
 }
 
 // func (kr *knowledgeDocumentService) getCollectionName(name string) string {
@@ -312,14 +316,14 @@ func (knowledge *knowledgeDocumentService) webfileMimeType(
 
 func (knowledge *knowledgeDocumentService) GetAllDocumentSegment(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	knowledgeId uint64,
 	storageNamespace string,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, []*protos.KnowledgeDocumentSegment, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return 0, nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return 0, nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	indexs := make([]string, 0)
 	indexs = append(indexs, storageNamespace)
@@ -416,7 +420,7 @@ func (knowledge *knowledgeDocumentService) GetAllDocumentSegment(
 
 func (knowledge *knowledgeDocumentService) UpdateDocumentSegment(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	index string,
 	documentId string,
 	documentName string,
@@ -430,8 +434,8 @@ func (knowledge *knowledgeDocumentService) UpdateDocumentSegment(
 	locations []string,
 	industries []string,
 ) (*protos.KnowledgeDocumentSegment, error) {
-	if _, err := auth.ProjectContext(); err != nil {
-		return nil, err
+	if auth.Tenant().ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	// Construct the update query
 	updateQuery := map[string]interface{}{
@@ -498,13 +502,13 @@ func (knowledge *knowledgeDocumentService) UpdateDocumentSegment(
 
 func (knowledge *knowledgeDocumentService) DeleteDocumentSegment(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	index string,
 	documentId string,
 	reason string,
 ) (*protos.KnowledgeDocumentSegment, error) {
-	if _, err := auth.ProjectContext(); err != nil {
-		return nil, err
+	if auth.Tenant().ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	// Update the document status directly
 	updateBody := map[string]interface{}{

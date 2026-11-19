@@ -18,7 +18,6 @@ import {
   View,
 } from '@carbon/icons-react';
 import {
-  Button,
   DataTable,
   DataTableSkeleton,
   Table,
@@ -44,7 +43,9 @@ import { EmptyState } from '@/app/components/ui/feedback';
 import {
   IconOnlyButton,
   Pagination,
+  PrimaryButton,
   Text,
+  typographyClassNames,
 } from '@/app/components/ui/primitives';
 import { listAccessRoles } from '@/clients';
 import { useCredential } from '@/hooks/use-credential';
@@ -81,7 +82,7 @@ type RoleLocationState = {
 export function RoleCatalogPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [userId, token] = useCredential();
+  const [userId, token, , organizationId] = useCredential();
   const [roles, setRoles] = useState<RoleDefinition[]>([]);
   const [querySearchValue, setQuerySearchValue] = useState('');
   const [criteria, setCriteria] = useState<RoleSearchCriteria[]>([]);
@@ -122,7 +123,7 @@ export function RoleCatalogPage() {
       page,
       pageSize,
       criteria,
-      auth: { token, userId },
+      auth: { organizationId, token, userId },
     })
       .then(response => {
         if (requestId !== requestSequence.current) return;
@@ -191,8 +192,8 @@ export function RoleCatalogPage() {
               setCriteria(filters);
             }}
           />
-          <Button
-            hasIconOnly
+          <IconOnlyButton
+            size="md"
             renderIcon={Renew}
             iconDescription="Refresh roles"
             kind="ghost"
@@ -224,7 +225,7 @@ export function RoleCatalogPage() {
           </Text>
         }
         pageActions={
-          <Button
+          <PrimaryButton
             ref={createLauncherButtonRef}
             className="w-full md:w-auto"
             size="md"
@@ -232,7 +233,7 @@ export function RoleCatalogPage() {
             onClick={createRole}
           >
             Create role
-          </Button>
+          </PrimaryButton>
         }
       />
 
@@ -311,8 +312,8 @@ export function RoleCatalogPage() {
                                   className={
                                     cell.info.header === 'created' ||
                                     cell.info.header === 'updated'
-                                      ? 'min-w-36 whitespace-nowrap text-[13px]'
-                                      : 'text-sm'
+                                      ? `min-w-36 whitespace-nowrap ${typographyClassNames['body-compact-01']}`
+                                      : typographyClassNames['body-compact-01']
                                   }
                                 >
                                   {cell.info.header === 'actions' ? (

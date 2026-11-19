@@ -7,23 +7,19 @@ package knowledge_api
 
 import (
 	"context"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/exceptions"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	knowledge_api "github.com/rapidaai/protos"
 )
 
 func (knowledgeApi *knowledgeGrpcApi) GetAllKnowledgeLog(ctx context.Context, gaar *knowledge_api.GetAllKnowledgeLogRequest) (*knowledge_api.GetAllKnowledgeLogResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 	cnt, epms, err := knowledgeApi.knowledgeService.GetAllLog(ctx,
 		iAuth,
@@ -40,8 +36,12 @@ func (knowledgeApi *knowledgeGrpcApi) GetAllKnowledgeLog(ctx context.Context, ga
 		knowledgeApi.logger.Errorf("unable to cast assistant webhook logs %v", err)
 	}
 
+	totalItem, err := utils.Int64ToUint32(cnt)
+	if err != nil {
+		return nil, err
+	}
 	return utils.PaginatedSuccess[knowledge_api.GetAllKnowledgeLogResponse, []*knowledge_api.KnowledgeLog](
-		uint32(cnt),
+		totalItem,
 		gaar.GetPaginate().GetPage(),
 		out)
 }

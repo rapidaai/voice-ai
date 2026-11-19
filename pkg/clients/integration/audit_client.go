@@ -14,16 +14,16 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
 
 type AuditServiceClient interface {
-	GetAuditLog(c context.Context, auth *types.Authentication, auditId uint64) (*protos.GetAuditLogResponse, error)
-	GetAllAuditLog(c context.Context, auth *types.Authentication, req *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error)
+	GetAuditLog(c context.Context, auth authentication.Principal, auditId uint64) (*protos.GetAuditLogResponse, error)
+	GetAllAuditLog(c context.Context, auth authentication.Principal, req *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error)
 }
 
 type auditServiceClient struct {
@@ -46,14 +46,14 @@ func NewAuditServiceClient(config *config.AppConfig, logger commons.Logger, redi
 		logger.Errorf("Unable to create connection %v", err)
 	}
 	return &auditServiceClient{
-		InternalClient:     clients.NewInternalClient(config, logger, redis),
+		InternalClient:     clients.NewInternalClient(config, "integration-api", logger, redis),
 		cfg:                config,
 		logger:             logger,
 		auditLoggingClient: protos.NewAuditLoggingServiceClient(conn),
 	}
 }
 
-func (client *auditServiceClient) GetAuditLog(c context.Context, auth *types.Authentication, auditId uint64) (*protos.GetAuditLogResponse, error) {
+func (client *auditServiceClient) GetAuditLog(c context.Context, auth authentication.Principal, auditId uint64) (*protos.GetAuditLogResponse, error) {
 	client.logger.Debugf("Calling to get audit log with org and project")
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
@@ -70,7 +70,7 @@ func (client *auditServiceClient) GetAuditLog(c context.Context, auth *types.Aut
 	client.logger.Debugf("Benchmarking: auditServiceClient.GetAuditLog time taken %v", time.Since(start))
 	return res, nil
 }
-func (client *auditServiceClient) GetAllAuditLog(c context.Context, auth *types.Authentication, req *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error) {
+func (client *auditServiceClient) GetAllAuditLog(c context.Context, auth authentication.Principal, req *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error) {
 	client.logger.Debugf("Calling to get audit log with org and project")
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)

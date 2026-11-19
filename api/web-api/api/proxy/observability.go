@@ -7,6 +7,7 @@ package web_proxy_api
 
 import (
 	"context"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -15,7 +16,7 @@ import (
 	workflow_client "github.com/rapidaai/pkg/clients/workflow"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/protos"
 )
 
@@ -46,13 +47,9 @@ func NewObservabilityGRPC(config *config.WebAppConfig, logger commons.Logger, po
 }
 
 func (api *webObservabilityGRPCApi) GetAllTelemetry(ctx context.Context, request *protos.GetAllTelemetryRequest) (*protos.GetAllTelemetryResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return api.observabilityClient.GetAllTelemetry(ctx, iAuth, request)
+	return api.observabilityClient.GetAllTelemetry(ctx, principal, request)
 }

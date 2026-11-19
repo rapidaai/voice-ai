@@ -8,6 +8,8 @@
 package validator
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"math"
 	"net/mail"
 	"reflect"
@@ -19,6 +21,12 @@ import (
 )
 
 var phonePattern = regexp.MustCompile(`^\+?[0-9]+$`)
+
+// AuthenticationSecret reports whether value is the canonical encoding of a 32-byte root secret.
+func AuthenticationSecret(value string) bool {
+	decoded, err := base64.StdEncoding.Strict().DecodeString(value)
+	return err == nil && len(decoded) == sha256.Size && base64.StdEncoding.EncodeToString(decoded) == value
+}
 
 type numeric interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 |

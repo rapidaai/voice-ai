@@ -13,20 +13,22 @@ import (
 	"google.golang.org/grpc/status"
 
 	internal_services "github.com/rapidaai/api/endpoint-api/internal/service"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
+	pkg_errors "github.com/rapidaai/pkg/errors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/pkg/validator"
 	endpoint_grpc_api "github.com/rapidaai/protos"
 )
 
 func (endpointGRPCApi *endpointGRPCApi) GetEndpoint(ctx context.Context, cepm *endpoint_grpc_api.GetEndpointRequest) (*endpoint_grpc_api.GetEndpointResponse, error) {
 	start := time.Now()
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, (pkg_errors.AuthenticationFailureError{}).Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	if !validator.OneOf(iAuth.Subject().Type, authentication.IdentityUser, authentication.IdentityProjectCredential, authentication.IdentityService) {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
 
 	ep, err := endpointGRPCApi.endpointService.Get(ctx, iAuth, cepm.GetId(), cepm.EndpointProviderModelId, internal_services.NewDefaultGetEndpointOption())

@@ -8,26 +8,25 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
 	internal_service "github.com/rapidaai/api/web-api/internal/service"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/middlewares"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type onboardingOrganizationService struct {
 	internal_service.OrganizationService
-	auth *types.Authentication
+	auth authentication.Principal
 }
 
-func (service *onboardingOrganizationService) Create(_ context.Context, auth *types.Authentication, name string, size string, industry string) (*internal_entity.Organization, error) {
+func (service *onboardingOrganizationService) Create(_ context.Context, auth authentication.Principal, name string, size string, industry string) (*internal_entity.Organization, error) {
 	service.auth = auth
 	return &internal_entity.Organization{
 		Audited:  gorm_models.Audited{Id: 21},
@@ -39,50 +38,49 @@ func (service *onboardingOrganizationService) Create(_ context.Context, auth *ty
 
 type onboardingUserService struct {
 	internal_service.UserService
-	auth   *types.Authentication
+	auth   authentication.Principal
 	userID uint64
+	roleID uint64
 }
 
-type onboardingAuthenticator struct {
-	principle types.Principle
-}
-
-func (authenticator onboardingAuthenticator) Authorize(_ context.Context, token string, userID uint64) (types.Principle, error) {
-	if token != "signup-token" || userID != 11 {
-		return nil, types.ErrUnauthenticated
-	}
-	return authenticator.principle, nil
-}
-
-func (authenticator onboardingAuthenticator) AuthPrinciple(_ context.Context, userID uint64) (types.Principle, error) {
-	if userID != 11 {
-		return nil, types.ErrUnauthenticated
-	}
-	return authenticator.principle, nil
-}
-
-func (service *onboardingUserService) CreateOrganizationRole(_ context.Context, auth *types.Authentication, role string, userID uint64, organizationID uint64, state type_enums.RecordState) (*internal_entity.UserOrganizationRole, error) {
+func (service *onboardingUserService) CreateOrganizationRole(_ context.Context, auth authentication.Principal, roleDefinitionID uint64, userID uint64, organizationID uint64, state type_enums.RecordState) (*internal_entity.UserOrganizationRole, error) {
 	service.auth = auth
 	service.userID = userID
+	service.roleID = roleDefinitionID
 	return &internal_entity.UserOrganizationRole{
-		Audited:        gorm_models.Audited{Id: 22},
-		UserAuthId:     userID,
-		OrganizationId: organizationID,
-		Role:           role,
-		Mutable:        gorm_models.Mutable{Status: state},
+		Audited:          gorm_models.Audited{Id: 22},
+		UserAuthId:       userID,
+		OrganizationId:   organizationID,
+		RoleDefinitionID: roleDefinitionID,
+		Mutable:          gorm_models.Mutable{Status: state},
 	}, nil
 }
 
-func onboardingAuthentication(userID, organizationID uint64) *types.Authentication {
-	auth := &types.Authentication{
-		AuthType:   types.AuthTypeUser,
-		ActorValue: &types.ActorIdentity{Type: types.ActorTypeUser, ID: userID},
-		UserValue:  &types.UserContext{UserID: userID},
+func (service *onboardingUserService) GetOrganizationRoles(_ context.Context, userID uint64) ([]*internal_entity.UserOrganizationRole, error) {
+	return []*internal_entity.UserOrganizationRole{{
+		UserAuthId: userID, OrganizationId: 21, RoleDefinitionID: service.roleID,
+		RoleDefinition: internal_entity.RoleDefinition{Key: "organization_owner", Name: "Organization Owner"},
+	}}, nil
+}
+
+func onboardingAuthentication(t *testing.T, userID, organizationID uint64) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: userID},
+		authentication.Tenant{OrganizationID: organizationID},
+		authentication.Proof{
+			Method: authentication.AuthenticationUserSession,
+			Reference: authentication.ProofReference{
+				Type:  authentication.ProofReferenceUserSession,
+				Value: "test-session",
+			},
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if organizationID != 0 {
-		auth.OrganizationValue = &types.OrganizationContext{OrganizationID: organizationID}
-	}
-	return auth
+	return principal
 }
 
 func TestCreateOrganizationAcceptsUserWithoutOrganization(t *testing.T) {
@@ -99,10 +97,7 @@ func TestCreateOrganizationAcceptsUserWithoutOrganization(t *testing.T) {
 			userService:         userService,
 		}, organizationService, userService
 	}
-	authenticator := onboardingAuthenticator{principle: &types.PlainAuthPrinciple{
-		User:  types.UserInfo{Id: 11},
-		Token: types.AuthToken{Token: "signup-token"},
-	}}
+	principal := onboardingAuthentication(t, 11, 0)
 
 	t.Run("grpc", func(t *testing.T) {
 		api, organizationService, userService := newAPI()
@@ -111,26 +106,19 @@ func TestCreateOrganizationAcceptsUserWithoutOrganization(t *testing.T) {
 			OrganizationSize:     "small",
 			OrganizationIndustry: "software",
 		}
-		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
-			types.AUTHORIZATION_KEY, "signup-token",
-			types.AUTH_KEY, "11",
-		))
-		responseValue, err := middlewares.NewAuthenticationUnaryServerMiddleware(authenticator, logger)(
-			ctx,
-			request,
-			nil,
-			func(ctx context.Context, request any) (any, error) {
-				return (&webOrganizationGRPCApi{webOrganizationApi: api}).CreateOrganization(ctx, request.(*protos.CreateOrganizationRequest))
-			},
-		)
+		ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), principal)
 		if err != nil {
 			t.Fatal(err)
 		}
-		response := responseValue.(*protos.CreateOrganizationResponse)
-		if !response.GetSuccess() || response.GetData().GetId() != 21 || response.GetRole().GetId() != 22 {
+		responseValue, err := (&webOrganizationGRPCApi{webOrganizationApi: api}).CreateOrganization(ctx, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response := responseValue
+		if !response.GetSuccess() || response.GetData().GetId() != 21 {
 			t.Fatalf("response = %+v", response)
 		}
-		if organizationService.auth == nil || userService.auth != organizationService.auth || userService.userID != 11 {
+		if organizationService.auth.Subject().ID != 11 || userService.auth.Subject().ID != 11 || userService.userID != 11 {
 			t.Fatal("services did not receive authenticated onboarding user")
 		}
 	})
@@ -139,18 +127,23 @@ func TestCreateOrganizationAcceptsUserWithoutOrganization(t *testing.T) {
 		gin.SetMode(gin.TestMode)
 		api, organizationService, userService := newAPI()
 		engine := gin.New()
-		engine.Use(middlewares.NewAuthenticationMiddleware(authenticator, logger))
+		engine.Use(func(c *gin.Context) {
+			requestContext, err := middleware_authentication.ContextWithPrincipal(c.Request.Context(), principal)
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.Request = c.Request.WithContext(requestContext)
+			c.Next()
+		})
 		engine.POST("/organization", (&webOrganizationRPCApi{webOrganizationApi: api}).CreateOrganization)
 		request := httptest.NewRequest(http.MethodPost, "/organization", bytes.NewBufferString(`{"organization_name":"Acme","organization_size":"small","organization_industry":"software"}`))
 		request.Header.Set("content-type", "application/json")
-		request.Header.Set(types.AUTHORIZATION_KEY, "signup-token")
-		request.Header.Set(types.AUTH_KEY, "11")
 		recorder := httptest.NewRecorder()
 		engine.ServeHTTP(recorder, request)
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
 		}
-		if organizationService.auth == nil || userService.auth != organizationService.auth || userService.userID != 11 {
+		if organizationService.auth.Subject().ID != 11 || userService.auth.Subject().ID != 11 || userService.userID != 11 {
 			t.Fatal("services did not receive authenticated onboarding user")
 		}
 	})
@@ -161,7 +154,10 @@ func TestCreateOrganizationRejectsExistingOrganization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx := context.WithValue(context.Background(), types.CTX_, onboardingAuthentication(11, 12))
+	ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), onboardingAuthentication(t, 11, 12))
+	if err != nil {
+		t.Fatal(err)
+	}
 	response, err := (&webOrganizationGRPCApi{webOrganizationApi: webOrganizationApi{logger: logger}}).CreateOrganization(ctx, &protos.CreateOrganizationRequest{})
 	if err != nil {
 		t.Fatal(err)
@@ -171,14 +167,27 @@ func TestCreateOrganizationRejectsExistingOrganization(t *testing.T) {
 	}
 }
 
-func TestCreateOrganizationRejectsNonUserAuthentication(t *testing.T) {
-	ctx := context.WithValue(context.Background(), types.CTX_, &types.Authentication{
-		AuthType:          types.AuthTypeOrg,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 12},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 12},
-	})
-	_, err := (&webOrganizationGRPCApi{}).CreateOrganization(ctx, &protos.CreateOrganizationRequest{})
-	if status.Code(err) != codes.Unauthenticated {
-		t.Fatalf("status = %v, want %v", status.Code(err), codes.Unauthenticated)
+func TestUpdateBillingInformationRequiresOrganizationPrincipal(t *testing.T) {
+	api := &webOrganizationGRPCApi{}
+	request := &protos.UpdateBillingInformationRequest{}
+	if _, err := api.UpdateBillingInformation(context.Background(), request); status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("missing principal code = %v", status.Code(err))
+	}
+
+	withoutOrganization, err := middleware_authentication.ContextWithPrincipal(context.Background(), onboardingAuthentication(t, 11, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := api.UpdateBillingInformation(withoutOrganization, request); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("missing organization code = %v", status.Code(err))
+	}
+
+	withOrganization, err := middleware_authentication.ContextWithPrincipal(context.Background(), onboardingAuthentication(t, 11, 12))
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := api.UpdateBillingInformation(withOrganization, request)
+	if err != nil || response != nil {
+		t.Fatalf("authorized response = %v, error = %v", response, err)
 	}
 }

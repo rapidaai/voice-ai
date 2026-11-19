@@ -1,4 +1,20 @@
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
+
 package config
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+)
+
+const (
+	serviceAuthenticationLabel             = "rapida/service-authentication/v1"
+	organizationCredentialFingerprintLabel = "rapida/organization-credential-fingerprint/v1"
+)
 
 type RegionalHost struct {
 	Region string `mapstructure:"region" validate:"required"`
@@ -36,4 +52,18 @@ func (cfg *AppConfig) IsDevelopment() bool {
 
 func (cfg *AppConfig) BaseUrl() string {
 	return cfg.Ui.Host
+}
+
+// ServiceAuthenticationKey derives the internal assertion key.
+func (cfg *AppConfig) ServiceAuthenticationKey() []byte {
+	mac := hmac.New(sha256.New, []byte(cfg.Secret))
+	_, _ = mac.Write([]byte(serviceAuthenticationLabel))
+	return mac.Sum(nil)
+}
+
+// OrganizationCredentialFingerprintKey derives the Organization credential HMAC key.
+func (cfg *AppConfig) OrganizationCredentialFingerprintKey() []byte {
+	mac := hmac.New(sha256.New, []byte(cfg.Secret))
+	_, _ = mac.Write([]byte(organizationCredentialFingerprintLabel))
+	return mac.Sum(nil)
 }
