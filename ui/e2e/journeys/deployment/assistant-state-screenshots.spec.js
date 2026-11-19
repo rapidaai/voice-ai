@@ -102,7 +102,10 @@ const scenarios = [
       await expect(
         page.getByRole('heading', { name: 'Assistant not available' }),
       ).toBeVisible();
-      await expect(page.getByText('403', { exact: true })).toBeVisible();
+      await expect(
+        page.locator('.c4p--empty-state-type--unauthorized'),
+      ).toBeVisible();
+      await expect(page.getByText('403', { exact: true })).toHaveCount(0);
       await expect(
         page.getByRole('button', { name: 'Back to assistants' }),
       ).toBeVisible();

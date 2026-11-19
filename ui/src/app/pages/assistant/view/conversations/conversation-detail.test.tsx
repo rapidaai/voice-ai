@@ -62,6 +62,15 @@ jest.mock('@/app/components/ui/feedback', () => {
     ...actual,
     CarbonStatusIndicator: () => <span>Status</span>,
     EmptyState: ({ title }: { title: string }) => <div>{title}</div>,
+    ErrorContainer: ({ title, description, actionLabel, onAction }: any) => (
+      <section>
+        <h1>{title}</h1>
+        <p>{description}</p>
+        <button type="button" onClick={onAction}>
+          {actionLabel}
+        </button>
+      </section>
+    ),
     PageLoader: () => <div>Loading</div>,
   };
 });
@@ -179,18 +188,13 @@ describe('ConversationDetailPage', () => {
 
     render(<ConversationDetailPage />);
 
-    const errorHeading = await screen.findByRole('heading', {
+    await screen.findByRole('heading', {
       name: 'Session unavailable',
     });
-    expect(errorHeading).toHaveClass(
-      ...typographyClassNames['heading-04'].split(' '),
-    );
-    expect(screen.getByText('503')).toHaveClass(
-      ...typographyClassNames['heading-06'].split(' '),
-    );
+    expect(screen.queryByText('503', { exact: true })).not.toBeInTheDocument();
     expect(
       screen.getByText("We couldn't load this session. Try again in a moment."),
-    ).toHaveClass(...typographyClassNames['body-01'].split(' '));
+    ).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Try again' }));
 

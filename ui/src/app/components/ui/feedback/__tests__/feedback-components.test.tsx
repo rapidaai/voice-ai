@@ -48,6 +48,10 @@ jest.mock('@/stores/app', () => ({
   }),
 }));
 
+jest.mock('@/theme/theme-provider', () => ({
+  useTheme: () => ({ resolvedMode: 'light' }),
+}));
+
 jest.mock('react-hot-toast/headless', () => ({
   __esModule: true,
   default: {
@@ -93,11 +97,17 @@ jest.mock('@carbon/react', () => ({
       {children}
     </section>
   ),
-  Button: ({ children, onClick, renderIcon: Icon, size, kind }: any) => (
-    <button data-kind={kind} data-size={size} onClick={onClick}>
-      {Icon ? <Icon data-testid="button-icon" /> : null}
-      {children}
-    </button>
+  Button: Object.assign(
+    ({ children, onClick, renderIcon: Icon, size, kind }: any) => (
+      <button data-kind={kind} data-size={size} onClick={onClick}>
+        {Icon ? <Icon data-testid="button-icon" /> : null}
+        {children}
+      </button>
+    ),
+    { propTypes: { onClick: jest.fn() } },
+  ),
+  Heading: ({ children, className }: any) => (
+    <h2 className={className}>{children}</h2>
   ),
   InlineNotification: ({
     className,
@@ -128,6 +138,17 @@ jest.mock('@carbon/react', () => ({
       data-with-overlay={withOverlay}
       role="status"
     />
+  ),
+  Link: Object.assign(
+    ({ children, className, href }: any) => (
+      <a className={className} href={href}>
+        {children}
+      </a>
+    ),
+    { propTypes: {} },
+  ),
+  Section: ({ children, className }: any) => (
+    <section className={className}>{children}</section>
   ),
   ToastNotification: ({
     caption,
@@ -269,10 +290,15 @@ describe('feedback components', () => {
     expect(
       screen.getByRole('heading', { name: 'Access denied' }),
     ).toBeVisible();
-    expect(screen.getByText('403')).toBeVisible();
+    expect(screen.queryByText('403')).not.toBeInTheDocument();
     expect(screen.getByText(/do not have access/i)).toBeVisible();
     expect(screen.getByLabelText('Access denied')).toHaveClass('custom-error');
-    expect(screen.getByTestId('arrow-left')).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('heading', { name: 'Access denied' })
+        .closest('.c4p--empty-state-type--unauthorized'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('button-icon')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Go back' }));
 

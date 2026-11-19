@@ -1,6 +1,7 @@
 const {
   ASSISTANT_DETAIL_PATH,
   authenticatePage,
+  checkA11y,
   expect,
   gotoJourney,
   setColorMode,
@@ -61,9 +62,11 @@ for (const colorMode of ['light', 'dark']) {
 
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(
-      page.getByText(
-        'Write a brief note describing what changed in this version.',
-      ).first(),
+      page
+        .getByText(
+          'Write a brief note describing what changed in this version.',
+        )
+        .first(),
     ).toBeVisible();
     const versionNote = page.locator('#model-version-note');
     await expect(versionNote).toBeVisible();
@@ -554,7 +557,7 @@ for (const colorMode of ['light', 'dark']) {
     await expect(
       page.getByRole('heading', { name: 'Session unavailable' }),
     ).toBeVisible();
-    await expect(page.getByText('503')).toBeVisible();
+    await expect(page.getByText('503', { exact: true })).toHaveCount(0);
     await expect(
       page.getByText("We couldn't load this session. Try again in a moment."),
     ).toBeVisible();
@@ -605,4 +608,5 @@ test('assistant transport failure renders the full unavailable state', async ({
     page.getByRole('button', { name: 'Back to assistants' }),
   ).toBeVisible();
   await expect(page.getByText('Assistant activity')).toHaveCount(0);
+  await checkA11y(page, { id: 'deployment.assistantUnavailable' });
 });
