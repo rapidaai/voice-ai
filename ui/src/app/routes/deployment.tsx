@@ -50,7 +50,6 @@ import {
 } from '@/app/pages/assistant';
 import { AssistantViewLayout } from '@/app/pages/assistant/view/assistant-view.layout';
 import { EndpointViewLayout } from '@/app/pages/endpoint/view/endpoint-view.layout';
-import { StaticPageNotFoundPage } from '@/app/pages/static-pages';
 import {
   PreviewPhoneAgentPage,
   PreviewVoiceAgentV2Page,
@@ -454,11 +453,6 @@ export const deploymentRoute: RouteObject = {
           ],
         },
       ],
-    },
-    {
-      path: '*',
-      element: <StaticPageNotFoundPage />,
-      handle: breadcrumb('Not found'),
     },
   ],
 };

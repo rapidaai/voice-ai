@@ -138,11 +138,7 @@ describe('workspace route breadcrumb metadata', () => {
     expect(screen.getByText('Knowledge unavailable')).toBeInTheDocument();
   });
 
-  it('uses explicit not-found metadata for unknown deployment routes', () => {
-    const labels = getBreadcrumbs('/deployment/missing').map(definition =>
-      'label' in definition! ? definition.label : 'dynamic',
-    );
-
-    expect(labels).toEqual(['Deployment', 'Not found']);
+  it('leaves unknown deployment routes to the top-level not-found page', () => {
+    expect(matchRoutes(workspaceRoutes, '/deployment/missing')).toBeNull();
   });
 });

@@ -185,9 +185,7 @@ async function gotoJourney(page, journey) {
     await expect(page.locator('body')).toContainText(journey.readyText);
   }
   if (!journey.allowNotFound) {
-    await expect(page.locator('body')).not.toContainText(
-      "Sorry we couldn't find this page.",
-    );
+    await expect(page.locator('body')).not.toContainText('Page not found');
   }
 }
 
