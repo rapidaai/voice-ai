@@ -29,6 +29,43 @@ test('dashboard requests the default range exactly once', async ({ page }) => {
   await expect(page.getByLabel('Auto-refresh')).toHaveCount(0);
 });
 
+test('header presents organization and project as one searchable hierarchy', async ({
+  page,
+}) => {
+  await gotoJourney(page, dashboardJourney);
+
+  const contextSwitcher = page.getByRole('button', {
+    name: /Change organization or project\. Current organization:/,
+  });
+  await expect(contextSwitcher).toContainText('E2E Organization');
+  await expect(contextSwitcher).toContainText('E2E Project');
+  await contextSwitcher.click();
+
+  await expect(
+    page.getByRole('searchbox', {
+      name: 'Search organizations or projects',
+    }),
+  ).toBeVisible();
+  const selector = page.locator('.cds--popover-content');
+  const organizationLabel = selector.getByText('E2E Organization', {
+    exact: true,
+  });
+  const selectedProject = selector.getByRole('button', {
+    name: 'E2E Project Selected project',
+  });
+  await expect(selector.getByLabel('Selected project')).toBeVisible();
+
+  const [organizationBounds, projectBounds] = await Promise.all([
+    organizationLabel.boundingBox(),
+    selectedProject.getByText('E2E Project', { exact: true }).boundingBox(),
+  ]);
+  expect(organizationBounds).not.toBeNull();
+  expect(projectBounds).not.toBeNull();
+  expect(projectBounds.x).toBeGreaterThan(organizationBounds.x + 8);
+
+  await checkA11y(page, dashboardJourney);
+});
+
 test('mobile sidebar expands without reducing dashboard width', async ({
   page,
 }) => {

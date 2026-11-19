@@ -170,39 +170,45 @@ jest.mock('@carbon/react', () => ({
   },
 }));
 
-jest.mock(
-  '@/app/components/layout/navigation/organization-project-switcher',
-  () => ({
-    OrganizationProjectSwitcher: ({
-      currentOrganization,
-      currentProject,
-      isLoading,
-      onSelect,
-      organizations,
-    }: any) =>
-      isLoading ? (
-        <div data-testid="context-switcher-skeleton" />
-      ) : (
-        <div>
-          <button
-            type="button"
-            aria-label="Organization and project switcher"
-            onClick={() => onSelect(currentOrganization, currentProject)}
-          >
-            {currentOrganization?.name} / {currentProject?.name}
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              onSelect(organizations[0], organizations[0]?.projectsList?.[0])
-            }
-          >
-            Select alternate context
-          </button>
-        </div>
-      ),
-  }),
-);
+jest.mock('@/app/components/ui/composites', () => ({
+  OrganizationProjectSelector: ({
+    organizations,
+    selectedOrganizationId,
+    selectedProjectId,
+    isCompact,
+    isLoading,
+    onChange,
+  }: any) => {
+    const organization = organizations.find(
+      (candidate: any) => candidate.id === selectedOrganizationId,
+    );
+    const project = organization?.projects.find(
+      (candidate: any) => candidate.id === selectedProjectId,
+    );
+
+    return isLoading ? (
+      <div data-testid="context-switcher-skeleton" />
+    ) : (
+      <div data-compact={String(Boolean(isCompact))}>
+        <button
+          type="button"
+          aria-label="Organization and project switcher"
+          onClick={() => onChange(organization, project)}
+        >
+          {organization?.name} / {project?.name}
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onChange(organizations[0], organizations[0]?.projects[0])
+          }
+        >
+          Select alternate context
+        </button>
+      </div>
+    );
+  },
+}));
 
 const projects = [
   { id: 'p1', name: 'Alpha', rolesList: [] },
@@ -455,7 +461,7 @@ describe('Actionable header project switcher', () => {
     const addListener = jest.fn();
     const removeListener = jest.fn();
     window.matchMedia = jest.fn().mockReturnValue({
-      matches: false,
+      matches: true,
       addListener,
       removeListener,
     });
@@ -469,9 +475,20 @@ describe('Actionable header project switcher', () => {
         },
       ],
       '/dashboard',
+      {
+        getOrganizations: () => organizations,
+        getCurrentOrganization: () => organizations[1],
+        getCurrentProject: () => projects[0],
+        setCurrentContext: jest.fn(() => true),
+      },
     );
 
     expect(addListener).toHaveBeenCalledTimes(1);
+    expect(
+      screen
+        .getByRole('button', { name: 'Organization and project switcher' })
+        .closest('[data-compact]'),
+    ).toHaveAttribute('data-compact', 'true');
     result.unmount();
     expect(removeListener).toHaveBeenCalledTimes(1);
   });

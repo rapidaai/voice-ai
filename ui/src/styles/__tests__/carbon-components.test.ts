@@ -12,13 +12,13 @@ describe('Carbon component styles', () => {
       "@use '@carbon/react/scss/components/inline-loading';",
     );
     expect(carbonStyles).toContain(
+      "@use '@carbon/react/scss/components/contained-list';",
+    );
+    expect(carbonStyles).toContain(
       "@use '@carbon/react/scss/components/accordion';",
     );
     expect(carbonStyles).toContain(
       "@use '@carbon/react/scss/components/structured-list';",
-    );
-    expect(carbonStyles).toContain(
-      "@use '@carbon/react/scss/components/treeview';",
     );
     expect(carbonStyles).toContain(
       "@use '@carbon/react/scss/components/fluid-text-input';",

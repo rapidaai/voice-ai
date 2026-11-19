@@ -21,7 +21,7 @@ import { Breadcrumb } from '@/app/components/ui/primitives';
 import { useRapidaStore } from '@/stores/app';
 import { useTheme } from '@/theme/theme-provider';
 import type { AppRouteHandle } from '@/app/routes/breadcrumb-handle';
-import { OrganizationProjectSwitcher } from '@/app/components/layout/navigation/organization-project-switcher';
+import { OrganizationProjectSelector } from '@/app/components/ui/composites';
 
 export function ActionableHeader({
   className,
@@ -103,15 +103,20 @@ export function ActionableHeader({
         className="global-breadcrumb min-w-0 overflow-hidden pl-4"
         items={breadcrumbs}
       />
-      <CustomerOptions isLoading={isLoading} />
+      <CustomerOptions
+        isCompact={maxVisibleBreadcrumbItems === 2}
+        isLoading={isLoading}
+      />
     </header>
   );
 }
 
 export function CustomerOptions({
+  isCompact = false,
   isLoading,
   showContextSwitcher = true,
 }: {
+  isCompact?: boolean;
   isLoading?: boolean;
   showContextSwitcher?: boolean;
 }) {
@@ -133,23 +138,36 @@ export function CustomerOptions({
   return (
     <HeaderGlobalBar>
       {showContextSwitcher && setCurrentContext && (
-        <OrganizationProjectSwitcher
-          organizations={organizations}
-          currentOrganization={currentOrganization}
-          currentProject={currentProject}
+        <OrganizationProjectSelector
+          organizations={organizations.map(organization => ({
+            id: organization.id,
+            name: organization.name,
+            projects: organization.projectsList.map(project => ({
+              id: project.id,
+              name: project.name,
+            })),
+          }))}
+          selectedOrganizationId={currentOrganization?.id}
+          selectedProjectId={currentProject?.id}
+          isCompact={isCompact}
           isLoading={isLoading}
-          onSelect={(organization, project) => {
-            const selectedProjectID =
-              project?.id ||
-              (organization.id === currentOrganization?.id
-                ? currentProject?.id
-                : organization.projectsList[0]?.id);
+          onChange={(organization, project) => {
+            const selectedOrganization = organizations.find(
+              candidate => candidate.id === organization.id,
+            );
+            if (!selectedOrganization) return;
+            const selectedProject = project
+              ? selectedOrganization.projectsList.find(
+                  candidate => candidate.id === project.id,
+                )
+              : undefined;
+            if (project && !selectedProject) return;
             if (
-              organization.id === currentOrganization?.id &&
-              selectedProjectID === currentProject?.id
+              selectedOrganization.id === currentOrganization?.id &&
+              selectedProject?.id === currentProject?.id
             )
               return;
-            if (setCurrentContext(organization, project))
+            if (setCurrentContext(selectedOrganization, selectedProject))
               navigate('/dashboard');
           }}
         />
