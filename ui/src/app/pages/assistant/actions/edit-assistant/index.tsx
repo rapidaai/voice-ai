@@ -1,5 +1,5 @@
 import type { GetAssistantResponse, ServiceError } from '@rapidaai/react';
-import { ErrorContainer } from '@/app/components/ui/feedback';
+import { ErrorContainer } from '@/app/components/ui/feedback/error-container';
 import { useDeleteConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-delete-confirmation';
 import { useRapidaStore } from '@/stores/app';
 import { useCurrentCredential } from '@/hooks/use-credential';

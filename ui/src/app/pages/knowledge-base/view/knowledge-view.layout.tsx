@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Outlet, useParams } from 'react-router-dom';
 import { getKnowledgeBaseDetail } from '@/clients/knowledge.client';
-import { ErrorContainer } from '@/app/components/ui/feedback';
+import { ErrorContainer } from '@/app/components/ui/feedback/error-container';
 import { useCredential } from '@/hooks/use-credential';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { useRapidaStore } from '@/stores/app';

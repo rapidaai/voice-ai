@@ -17,7 +17,7 @@ import type { GetAssistantProviderResponse } from '@rapidaai/react';
 import { FormLabel } from '@/app/components/ui/primitives';
 import { Textarea } from '@/app/components/ui/primitives';
 import { ConfigPrompt } from '@/app/components/domain/configuration/config-prompt';
-import { ErrorContainer } from '@/app/components/ui/feedback';
+import { ErrorContainer } from '@/app/components/ui/feedback/error-container';
 import { ChatCompletePrompt, Prompt } from '@/utils/prompt';
 import {
   GetDefaultTextProviderConfigIfInvalid,

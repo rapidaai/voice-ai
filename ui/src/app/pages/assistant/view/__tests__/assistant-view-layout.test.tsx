@@ -58,7 +58,7 @@ jest.mock('@/app/components/app-shell/helmet', () => ({
   Helmet: () => null,
 }));
 
-jest.mock('@/app/components/ui/feedback', () => ({
+jest.mock('@/app/components/ui/feedback/error-container', () => ({
   ErrorContainer: ({ title, description, actionLabel, onAction }: any) => (
     <section>
       <h1>{title}</h1>

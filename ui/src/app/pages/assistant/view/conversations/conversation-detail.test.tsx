@@ -62,18 +62,21 @@ jest.mock('@/app/components/ui/feedback', () => {
     ...actual,
     CarbonStatusIndicator: () => <span>Status</span>,
     EmptyState: ({ title }: { title: string }) => <div>{title}</div>,
-    ErrorContainer: ({ title, description, actionLabel, onAction }: any) => (
-      <section>
-        <h1>{title}</h1>
-        <p>{description}</p>
-        <button type="button" onClick={onAction}>
-          {actionLabel}
-        </button>
-      </section>
-    ),
     PageLoader: () => <div>Loading</div>,
   };
 });
+
+jest.mock('@/app/components/ui/feedback/error-container', () => ({
+  ErrorContainer: ({ title, description, actionLabel, onAction }: any) => (
+    <section>
+      <h1>{title}</h1>
+      <p>{description}</p>
+      <button type="button" onClick={onAction}>
+        {actionLabel}
+      </button>
+    </section>
+  ),
+}));
 
 const conversation = {
   getArgumentsList: () => [],

@@ -6,7 +6,7 @@ import { Outlet, useParams } from 'react-router-dom';
 import { cn } from '@/utils';
 import { useAssistantPageStore } from '@/stores/assistant/assistant.store';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
-import { ErrorContainer } from '@/app/components/ui/feedback';
+import { ErrorContainer } from '@/app/components/ui/feedback/error-container';
 import { getAssistantById } from '@/clients/assistant.client';
 import { AssistantSideNav } from './assistant-side-nav';
 

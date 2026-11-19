@@ -1,5 +1,4 @@
 export * from './empty-state';
-export * from './error-container';
 export * from './error-message';
 export * from './icon-indicator';
 export * from './loader';

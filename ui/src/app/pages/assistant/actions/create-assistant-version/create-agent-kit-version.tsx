@@ -24,7 +24,7 @@ import { CreateAssistantProviderRequest } from '@rapidaai/react';
 import type { GetAssistantProviderResponse } from '@rapidaai/react';
 import { FormLabel } from '@/app/components/ui/primitives';
 import { Textarea } from '@/app/components/ui/primitives';
-import { ErrorContainer } from '@/app/components/ui/feedback';
+import { ErrorContainer } from '@/app/components/ui/feedback/error-container';
 import { DocNoticeBlock } from '@/app/components/layout/container/message/notice-block/doc-notice-block';
 import { Input } from '@/app/components/ui/primitives';
 import { Select } from '@/app/components/ui/primitives';
