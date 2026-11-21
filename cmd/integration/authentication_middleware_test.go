@@ -38,9 +38,10 @@ func TestInitDoesNotRegisterAuditActorCallbacks(t *testing.T) {
 	})
 }
 
-func TestAuthenticationKeyIsDerivedBeforeServerConstruction(t *testing.T) {
+func TestIntegrationDerivesServiceAuthenticationKeyAtConsumers(t *testing.T) {
 	file := parseCommandSource(t, "integration.go")
-	var derivation, server token.Pos
+	resolverCalls := 0
+	keyCalls := 0
 	ast.Inspect(file, func(node ast.Node) bool {
 		literal, ok := node.(*ast.BasicLit)
 		if ok {
@@ -55,14 +56,21 @@ func TestAuthenticationKeyIsDerivedBeforeServerConstruction(t *testing.T) {
 		}
 		switch callName(call) {
 		case "ServiceAuthenticationKey":
-			derivation = call.Pos()
-		case "NewServer":
-			server = call.Pos()
+			keyCalls++
+		case "NewServicePrincipalResolver":
+			resolverCalls++
+			if len(call.Args) != 2 {
+				t.Fatalf("NewServicePrincipalResolver args = %d, want 2", len(call.Args))
+			}
+			keyCall, ok := call.Args[1].(*ast.CallExpr)
+			if !ok || callName(keyCall) != "ServiceAuthenticationKey" {
+				t.Fatal("NewServicePrincipalResolver key is not a direct ServiceAuthenticationKey call")
+			}
 		}
 		return true
 	})
-	if derivation == token.NoPos || server == token.NoPos || derivation >= server {
-		t.Fatalf("authentication-key derivation position = %d, server position = %d", derivation, server)
+	if resolverCalls != 2 || keyCalls != 2 {
+		t.Fatalf("NewServicePrincipalResolver calls = %d, ServiceAuthenticationKey calls = %d, want 2 each", resolverCalls, keyCalls)
 	}
 }
 
