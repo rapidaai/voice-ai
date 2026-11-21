@@ -13,24 +13,24 @@ import (
 )
 
 // Proto returns a detached wire representation of the Authentication aggregate.
+// Authorities stay in the Role graph and are derived again when the message is decoded.
 func (authentication Authentication) Proto() *authentication_proto.Authentication {
 	principal := authentication.Principal()
-	subject := principal.Subject()
-	tenant := principal.Tenant()
-	proof := principal.Proof()
 	value := &authentication_proto.Authentication{
 		Principal: &authentication_proto.Principal{
-			Subject: &authentication_proto.Identity{Type: string(subject.Type), Id: subject.ID, Issuer: subject.Issuer},
+			Subject: &authentication_proto.Identity{
+				Type: string(principal.Subject().Type), Id: principal.Subject().ID, Issuer: principal.Subject().Issuer,
+			},
 			SelectedTenant: &authentication_proto.Tenant{
-				OrganizationId: tenant.OrganizationID,
-				ProjectId:      tenant.ProjectID,
+				OrganizationId: principal.Tenant().OrganizationID,
+				ProjectId:      principal.Tenant().ProjectID,
 			},
 			Proof: &authentication_proto.Proof{
-				Method:   string(proof.Method),
-				Audience: string(proof.Audience),
+				Method:   string(principal.Proof().Method),
+				Audience: string(principal.Proof().Audience),
 				Reference: &authentication_proto.ProofReference{
-					Type:  string(proof.Reference.Type),
-					Value: proof.Reference.Value,
+					Type:  string(principal.Proof().Reference.Type),
+					Value: principal.Proof().Reference.Value,
 				},
 			},
 		},
@@ -44,17 +44,7 @@ func (authentication Authentication) Proto() *authentication_proto.Authenticatio
 	for _, organization := range authentication.Organizations() {
 		wireOrganization := &authentication_proto.Organization{Id: organization.ID, Name: organization.Name}
 		for _, role := range organization.Roles {
-			wireRole := &authentication_proto.Role{
-				Id: role.ID, Key: role.Key, Name: role.Name, Description: role.Description,
-				Scope: role.Scope, Subject: role.Subject, DefinitionType: role.DefinitionType,
-			}
-			for _, permission := range role.Permissions {
-				wireRole.Permissions = append(wireRole.Permissions, &authentication_proto.Permission{
-					Id: permission.ID, Key: permission.Key, Scope: permission.Scope,
-					Name: permission.Name, Description: permission.Description,
-				})
-			}
-			wireOrganization.Roles = append(wireOrganization.Roles, wireRole)
+			wireOrganization.Roles = append(wireOrganization.Roles, authentication.roleProto(role))
 		}
 		if organization.BillingPlan != nil {
 			plan := organization.BillingPlan
@@ -73,17 +63,7 @@ func (authentication Authentication) Proto() *authentication_proto.Authenticatio
 		for _, project := range organization.Projects {
 			wireProject := &authentication_proto.Project{Id: project.ID, Name: project.Name}
 			for _, role := range project.Roles {
-				wireRole := &authentication_proto.Role{
-					Id: role.ID, Key: role.Key, Name: role.Name, Description: role.Description,
-					Scope: role.Scope, Subject: role.Subject, DefinitionType: role.DefinitionType,
-				}
-				for _, permission := range role.Permissions {
-					wireRole.Permissions = append(wireRole.Permissions, &authentication_proto.Permission{
-						Id: permission.ID, Key: permission.Key, Scope: permission.Scope,
-						Name: permission.Name, Description: permission.Description,
-					})
-				}
-				wireProject.Roles = append(wireProject.Roles, wireRole)
+				wireProject.Roles = append(wireProject.Roles, authentication.roleProto(role))
 			}
 			wireOrganization.Projects = append(wireOrganization.Projects, wireProject)
 		}
@@ -92,8 +72,31 @@ func (authentication Authentication) Proto() *authentication_proto.Authenticatio
 	return value
 }
 
-// AuthenticationFromProto validates a wire aggregate and derives its Principal authorities once.
+// roleProto maps a Role and its Permissions without retaining domain-owned slices.
+func (authentication Authentication) roleProto(role Role) *authentication_proto.Role {
+	wireRole := &authentication_proto.Role{
+		Id: role.ID, Key: role.Key, Name: role.Name, Description: role.Description,
+		Scope: role.Scope, Subject: role.Subject, DefinitionType: role.DefinitionType,
+	}
+	for _, permission := range role.Permissions {
+		wireRole.Permissions = append(wireRole.Permissions, &authentication_proto.Permission{
+			Id: permission.ID, Key: permission.Key, Scope: permission.Scope,
+			Name: permission.Name, Description: permission.Description,
+		})
+	}
+	return wireRole
+}
+
+// AuthenticationFromProto reconstructs an Authentication from its wire representation.
+// It rejects incomplete graphs and delegates domain validation to the aggregate constructors.
 func AuthenticationFromProto(source *authentication_proto.Authentication) (Authentication, error) {
+	return Authentication{}.fromProto(source)
+}
+
+// fromProto maps present wire messages into domain values before aggregate validation.
+func (authentication Authentication) fromProto(source *authentication_proto.Authentication) (Authentication, error) {
+	// Required message presence is checked explicitly because generated proto3 getters return zero
+	// values for missing nested messages.
 	if source == nil || source.Principal == nil || source.Principal.Subject == nil ||
 		source.Principal.SelectedTenant == nil || source.Principal.Proof == nil || source.Principal.Proof.Reference == nil {
 		return Authentication{}, pkg_errors.AuthenticationInvalidError{}
@@ -116,21 +119,9 @@ func AuthenticationFromProto(source *authentication_proto.Authentication) (Authe
 		}
 		organization := Organization{ID: wireOrganization.Id, Name: wireOrganization.Name}
 		for _, wireRole := range wireOrganization.Roles {
-			if wireRole == nil {
-				return Authentication{}, pkg_errors.AuthenticationInvalidError{}
-			}
-			role := Role{
-				ID: wireRole.Id, Key: wireRole.Key, Name: wireRole.Name, Description: wireRole.Description,
-				Scope: wireRole.Scope, Subject: wireRole.Subject, DefinitionType: wireRole.DefinitionType,
-			}
-			for _, wirePermission := range wireRole.Permissions {
-				if wirePermission == nil {
-					return Authentication{}, pkg_errors.AuthenticationInvalidError{}
-				}
-				role.Permissions = append(role.Permissions, Permission{
-					ID: wirePermission.Id, Key: wirePermission.Key, Scope: wirePermission.Scope,
-					Name: wirePermission.Name, Description: wirePermission.Description,
-				})
+			role, err := authentication.roleFromProto(wireRole)
+			if err != nil {
+				return Authentication{}, err
 			}
 			organization.Roles = append(organization.Roles, role)
 		}
@@ -158,21 +149,9 @@ func AuthenticationFromProto(source *authentication_proto.Authentication) (Authe
 			}
 			project := Project{ID: wireProject.Id, Name: wireProject.Name}
 			for _, wireRole := range wireProject.Roles {
-				if wireRole == nil {
-					return Authentication{}, pkg_errors.AuthenticationInvalidError{}
-				}
-				role := Role{
-					ID: wireRole.Id, Key: wireRole.Key, Name: wireRole.Name, Description: wireRole.Description,
-					Scope: wireRole.Scope, Subject: wireRole.Subject, DefinitionType: wireRole.DefinitionType,
-				}
-				for _, wirePermission := range wireRole.Permissions {
-					if wirePermission == nil {
-						return Authentication{}, pkg_errors.AuthenticationInvalidError{}
-					}
-					role.Permissions = append(role.Permissions, Permission{
-						ID: wirePermission.Id, Key: wirePermission.Key, Scope: wirePermission.Scope,
-						Name: wirePermission.Name, Description: wirePermission.Description,
-					})
+				role, err := authentication.roleFromProto(wireRole)
+				if err != nil {
+					return Authentication{}, err
 				}
 				project.Roles = append(project.Roles, role)
 			}
@@ -180,8 +159,31 @@ func AuthenticationFromProto(source *authentication_proto.Authentication) (Authe
 		}
 		organizations = append(organizations, organization)
 	}
+	// Actor presence selects delegated construction. Both constructors derive authorities from the
+	// selected tenant's validated Role graph instead of accepting authorities from the wire.
 	if principal.Actor != nil {
 		return NewDelegatedAuthentication(subject, ServiceActor{ID: principal.Actor.Id, Issuer: principal.Actor.Issuer}, tenant, proof, user, organizations)
 	}
 	return NewDirectAuthentication(subject, tenant, proof, user, organizations)
+}
+
+// roleFromProto rejects nil repeated-message elements before mapping a Role and its Permissions.
+func (authentication Authentication) roleFromProto(wire *authentication_proto.Role) (Role, error) {
+	if wire == nil {
+		return Role{}, pkg_errors.AuthenticationInvalidError{}
+	}
+	role := Role{
+		ID: wire.Id, Key: wire.Key, Name: wire.Name, Description: wire.Description,
+		Scope: wire.Scope, Subject: wire.Subject, DefinitionType: wire.DefinitionType,
+	}
+	for _, wirePermission := range wire.Permissions {
+		if wirePermission == nil {
+			return Role{}, pkg_errors.AuthenticationInvalidError{}
+		}
+		role.Permissions = append(role.Permissions, Permission{
+			ID: wirePermission.Id, Key: wirePermission.Key, Scope: wirePermission.Scope,
+			Name: wirePermission.Name, Description: wirePermission.Description,
+		})
+	}
+	return role, nil
 }

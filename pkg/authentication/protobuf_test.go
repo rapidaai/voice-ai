@@ -86,3 +86,64 @@ func TestAuthenticationFromProtoRejectsMalformedGraph(t *testing.T) {
 		}
 	}
 }
+
+func TestAuthenticationFromProtoRejectsNilRoleWireElements(t *testing.T) {
+	if _, err := authentication.AuthenticationFromProto(validWireAuthentication()); err != nil {
+		t.Fatalf("valid fixture rejected: %v", err)
+	}
+	tests := []struct {
+		name   string
+		mutate func(*authentication_proto.Authentication)
+	}{
+		{"organization role", func(value *authentication_proto.Authentication) {
+			value.Organizations[0].Roles[0] = nil
+		}},
+		{"organization role permission", func(value *authentication_proto.Authentication) {
+			value.Organizations[0].Roles[0].Permissions[0] = nil
+		}},
+		{"project role", func(value *authentication_proto.Authentication) {
+			value.Organizations[0].Projects[0].Roles[0] = nil
+		}},
+		{"project role permission", func(value *authentication_proto.Authentication) {
+			value.Organizations[0].Projects[0].Roles[0].Permissions[0] = nil
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			source := validWireAuthentication()
+			test.mutate(source)
+			if _, err := authentication.AuthenticationFromProto(source); err == nil {
+				t.Fatal("accepted nil role wire element")
+			} else if _, ok := err.(pkg_errors.AuthenticationInvalidError); !ok {
+				t.Fatalf("error = %T", err)
+			}
+		})
+	}
+}
+
+func validWireAuthentication() *authentication_proto.Authentication {
+	return &authentication_proto.Authentication{
+		Principal: &authentication_proto.Principal{
+			Subject:        &authentication_proto.Identity{Type: "user", Id: 7},
+			SelectedTenant: &authentication_proto.Tenant{OrganizationId: 9},
+			Proof:          &authentication_proto.Proof{Method: "user_session", Reference: &authentication_proto.ProofReference{Type: "user_session", Value: "8"}},
+		},
+		User: &authentication_proto.User{Id: 7, Name: "Ada", Email: "ada@example.com", Status: "ACTIVE"},
+		Organizations: []*authentication_proto.Organization{{
+			Id: 9, Name: "Organization",
+			Roles: []*authentication_proto.Role{{
+				Id: 11, Key: "organization_reader", Name: "Organization Reader", Scope: "ORGANIZATION",
+				Subject: "USER", DefinitionType: "BUILT_IN",
+				Permissions: []*authentication_proto.Permission{{Id: 1, Key: "organization.projects.read", Scope: "ORGANIZATION", Name: "Read projects"}},
+			}},
+			Projects: []*authentication_proto.Project{{
+				Id: 10, Name: "Project",
+				Roles: []*authentication_proto.Role{{
+					Id: 14, Key: "project_reader", Name: "Project Reader", Scope: "PROJECT",
+					Subject: "USER", DefinitionType: "CUSTOM",
+					Permissions: []*authentication_proto.Permission{{Id: 2, Key: "project.resources.read", Scope: "PROJECT", Name: "Read resources"}},
+				}},
+			}},
+		}},
+	}
+}

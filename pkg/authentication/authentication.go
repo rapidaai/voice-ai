@@ -351,6 +351,7 @@ func newAuthentication(principal Principal, user *User, organizations []Organiza
 	}
 	switch subject.Type {
 	case IdentityUser:
+		// Users may hold any validated organization and project membership shape.
 	case IdentityProjectCredential:
 		if len(value.organizations) != 1 || selectedOrganization == nil || selectedProject == nil || len(selectedOrganization.Projects) != 1 || len(selectedOrganization.Roles) != 0 {
 			return Authentication{}, pkg_errors.AuthenticationInvalidError{}
