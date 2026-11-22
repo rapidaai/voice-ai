@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -31,7 +32,6 @@ import (
 	assistant_socket "github.com/rapidaai/api/assistant-api/socket"
 	authentication_resolver "github.com/rapidaai/pkg/authentication/resolver"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
-	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/middlewares"
@@ -89,10 +89,10 @@ func main() {
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
 
-			middleware_authentication.NewProjectStreamMiddleware(authentication_resolver.NewProjectPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
-			middleware_authentication.NewOrganizationStreamMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+			middleware_authentication.NewProjectStreamMiddleware(authentication_resolver.NewProjectPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
+			middleware_authentication.NewOrganizationStreamMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 			middleware_authentication.NewServiceStreamMiddleware(authentication_resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, appRunner.Cfg.ServiceAuthenticationKey()), appRunner.Logger),
-			middleware_authentication.NewUserStreamMiddleware(authentication_resolver.NewUserPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+			middleware_authentication.NewUserStreamMiddleware(authentication_resolver.NewUserPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 
 			middlewares.NewClientInformationStreamServerMiddleware(
 				appRunner.Logger,
@@ -102,10 +102,10 @@ func main() {
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.AppConfig.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
 
-			middleware_authentication.NewProjectUnaryMiddleware(authentication_resolver.NewProjectPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
-			middleware_authentication.NewOrganizationUnaryMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+			middleware_authentication.NewProjectUnaryMiddleware(authentication_resolver.NewProjectPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
+			middleware_authentication.NewOrganizationUnaryMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 			middleware_authentication.NewServiceUnaryMiddleware(authentication_resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, appRunner.Cfg.ServiceAuthenticationKey()), appRunner.Logger),
-			middleware_authentication.NewUserUnaryMiddleware(authentication_resolver.NewUserPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+			middleware_authentication.NewUserUnaryMiddleware(authentication_resolver.NewUserPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 
 			middlewares.NewClientInformationUnaryServerMiddleware(
 				appRunner.Logger,
@@ -121,10 +121,10 @@ func main() {
 	// add all middleware depends on configurations
 	appRunner.AllMiddlewares(ctx)
 	appRunner.E.Use(
-		middleware_authentication.NewProjectHTTPMiddleware(authentication_resolver.NewProjectPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
-		middleware_authentication.NewOrganizationHTTPMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+		middleware_authentication.NewProjectHTTPMiddleware(authentication_resolver.NewProjectPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
+		middleware_authentication.NewOrganizationHTTPMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 		middleware_authentication.NewServiceHTTPMiddleware(authentication_resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, appRunner.Cfg.ServiceAuthenticationKey()), appRunner.Logger),
-		middleware_authentication.NewUserHTTPMiddleware(authentication_resolver.NewUserPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+		middleware_authentication.NewUserHTTPMiddleware(authentication_resolver.NewUserPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 	)
 
 	// all router add all handlers which required to resolve the service request
@@ -144,22 +144,52 @@ func main() {
 		cmux.HTTP1HeaderField("sec-websocket-protocol", "grpc-websockets"),
 		cmux.HTTP1HeaderField("x-grpc-web", "1"))
 	rpcFilteredListener := cmuxListener.Match(cmux.Any())
-	group, ctx := errgroup.WithContext(ctx)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(quit)
+
+	group, groupContext := errgroup.WithContext(ctx)
+	serveDone := make(chan struct{})
+	shutdownDone := make(chan struct{})
+	go func() {
+		defer close(shutdownDone)
+		select {
+		case <-quit:
+		case <-groupContext.Done():
+		case <-serveDone:
+			return
+		}
+		cmuxListener.Close()
+		if closeErr := listener.Close(); closeErr != nil && !errors.Is(closeErr, net.ErrClosed) {
+			appRunner.Logger.Errorf("Failed to close server listener: %v", closeErr)
+		}
+		grpcStopped := make(chan struct{})
+		go func() {
+			appRunner.S.GracefulStop()
+			close(grpcStopped)
+		}()
+		select {
+		case <-grpcStopped:
+		case <-time.After(10 * time.Second):
+			appRunner.S.Stop()
+			<-grpcStopped
+		}
+	}()
 
 	// here is grpc
 	group.Go(func() error {
-		err = appRunner.S.Serve(http2GRPCFilteredListener)
-		if err != nil {
-			appRunner.Logger.Errorf("Failed to start grpc server err: %v", err)
+		serveErr := appRunner.S.Serve(http2GRPCFilteredListener)
+		if serveErr != nil && !errors.Is(serveErr, cmux.ErrServerClosed) && !errors.Is(serveErr, cmux.ErrListenerClosed) && !errors.Is(serveErr, grpc.ErrServerStopped) {
+			appRunner.Logger.Errorf("Failed to start grpc server err: %v", serveErr)
 		}
-		return err
+		return serveErr
 	})
 	group.Go(func() error {
-		err = appRunner.E.RunListener(rpcFilteredListener)
-		if err != nil {
-			appRunner.Logger.Errorf("Failed to start gin server err: %v", err)
+		serveErr := appRunner.E.RunListener(rpcFilteredListener)
+		if serveErr != nil && !errors.Is(serveErr, cmux.ErrServerClosed) && !errors.Is(serveErr, cmux.ErrListenerClosed) {
+			appRunner.Logger.Errorf("Failed to start gin server err: %v", serveErr)
 		}
-		return err
+		return serveErr
 	})
 	group.Go(func() error {
 		//
@@ -179,27 +209,26 @@ func main() {
 			Handler:           http.HandlerFunc(handler),
 			ReadHeaderTimeout: 10 * time.Second,
 		}
-		err = httpServer.Serve(grpcFilteredListener)
-		if err != nil {
-			appRunner.Logger.Errorf("Failed to start grpc server err: %v", err)
+		serveErr := httpServer.Serve(grpcFilteredListener)
+		if serveErr != nil && !errors.Is(serveErr, cmux.ErrServerClosed) && !errors.Is(serveErr, cmux.ErrListenerClosed) && !errors.Is(serveErr, http.ErrServerClosed) {
+			appRunner.Logger.Errorf("Failed to start grpc-web server err: %v", serveErr)
 		}
-		return err
+		return serveErr
 
 	})
 
 	//serve now
-	err = cmuxListener.Serve()
-	if err != nil {
-		appRunner.Logger.Errorf("Failed to start grpc server err: %v", err)
-		panic(err)
+	serveErr := cmuxListener.Serve()
+	close(serveDone)
+	groupErr := group.Wait()
+	<-shutdownDone
+	if serveErr != nil && !errors.Is(serveErr, net.ErrClosed) {
+		appRunner.Logger.Errorf("Failed to serve multiplexed listener: %v", serveErr)
+		panic(serveErr)
 	}
-
-	err = group.Wait()
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	// done with ctx
-	ctx.Done()
-	<-quit
+	if groupErr != nil && !errors.Is(groupErr, cmux.ErrServerClosed) && !errors.Is(groupErr, cmux.ErrListenerClosed) && !errors.Is(groupErr, grpc.ErrServerStopped) && !errors.Is(groupErr, http.ErrServerClosed) {
+		panic(groupErr)
+	}
 }
 
 func (app *AppRunner) Logging() error {
@@ -282,7 +311,9 @@ func (app *AppRunner) Init(ctx context.Context) error {
 		return fmt.Errorf("initialize internal clients: %w", err)
 	}
 	app.Clients = clients
-	app.Closeable = append(app.Closeable, app.Clients.Close)
+	if app.Clients != nil {
+		app.Closeable = append(app.Closeable, app.Clients.Close)
+	}
 
 	return nil
 }

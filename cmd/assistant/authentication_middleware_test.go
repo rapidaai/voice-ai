@@ -16,6 +16,32 @@ import (
 	"github.com/rapidaai/pkg/commons"
 )
 
+func TestSignalHandlerIsRegisteredBeforeServing(t *testing.T) {
+	file := parseCommandSource(t, "assistant.go")
+	var notifyPosition token.Pos
+	var servePosition token.Pos
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		switch callName(call) {
+		case "Notify":
+			if notifyPosition == 0 {
+				notifyPosition = call.Pos()
+			}
+		case "Serve":
+			if servePosition == 0 {
+				servePosition = call.Pos()
+			}
+		}
+		return true
+	})
+	if notifyPosition == 0 || servePosition == 0 || notifyPosition > servePosition {
+		t.Fatalf("signal Notify position = %d, first Serve position = %d; signal handling must be registered before serving", notifyPosition, servePosition)
+	}
+}
+
 func TestAppRunnerRetainsRapidaClient(t *testing.T) {
 	clients := &rapida_client.RapidaClient{}
 	app := AppRunner{Clients: clients}
@@ -164,9 +190,11 @@ func TestAssistantDerivesServiceAuthenticationKeyAtConsumers(t *testing.T) {
 	}
 }
 
-func TestUsesUnifiedWebAuthenticationClient(t *testing.T) {
+func TestUsesRapidaAuthenticationClient(t *testing.T) {
 	file := parseCommandSource(t, "assistant.go")
-	found := false
+	constructedClients := 0
+	resolverCalls := 0
+	sharedClientCalls := 0
 	ast.Inspect(file, func(node ast.Node) bool {
 		call, ok := node.(*ast.CallExpr)
 		if !ok {
@@ -174,14 +202,31 @@ func TestUsesUnifiedWebAuthenticationClient(t *testing.T) {
 		}
 		switch callName(call) {
 		case "NewAuthenticationClient":
-			found = true
+			constructedClients++
 		case "NewAuthenticationResolverClient":
 			t.Fatal("removed authentication resolver client is constructed")
+		case "NewProjectPrincipalResolver", "NewOrganizationPrincipalResolver", "NewUserPrincipalResolver":
+			resolverCalls++
+			if len(call.Args) != 1 {
+				return true
+			}
+			authentication, ok := call.Args[0].(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			clients, clientsOK := authentication.X.(*ast.SelectorExpr)
+			if !clientsOK {
+				return true
+			}
+			appRunner, appRunnerOK := clients.X.(*ast.Ident)
+			if appRunnerOK && authentication.Sel.Name == "Authentication" && clients.Sel.Name == "Clients" && appRunner.Name == "appRunner" {
+				sharedClientCalls++
+			}
 		}
 		return true
 	})
-	if !found {
-		t.Fatal("unified Web authentication client is not constructed")
+	if constructedClients != 0 || resolverCalls != 9 || sharedClientCalls != resolverCalls {
+		t.Fatalf("constructed clients = %d, resolver calls = %d, shared client calls = %d, want 0, 9, 9", constructedClients, resolverCalls, sharedClientCalls)
 	}
 }
 

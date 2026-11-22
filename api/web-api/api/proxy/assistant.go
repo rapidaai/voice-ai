@@ -32,7 +32,7 @@ type webAssistantGRPCApi struct {
 	webAssistantApi
 }
 
-func NewAssistantGRPC(config *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) protos.AssistantServiceServer {
+func NewAssistantGRPC(config *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector, assistantClient assistant_client.AssistantServiceClient) protos.AssistantServiceServer {
 	return &webAssistantGRPCApi{
 		webAssistantApi{
 			WebApi:          web_api.NewWebApi(config, logger, postgres, redis),
@@ -40,7 +40,7 @@ func NewAssistantGRPC(config *config.WebAppConfig, logger commons.Logger, postgr
 			logger:          logger,
 			postgres:        postgres,
 			redis:           redis,
-			assistantClient: assistant_client.NewAssistantServiceClientGRPC(&config.AppConfig, logger, redis),
+			assistantClient: assistantClient,
 		},
 	}
 }

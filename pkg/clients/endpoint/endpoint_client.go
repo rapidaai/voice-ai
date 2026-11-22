@@ -48,11 +48,16 @@ func NewEndpointServiceClientGRPC(config *config.AppConfig, logger commons.Logge
 	if err != nil {
 		logger.Errorf("Unable to create connection %v", err)
 	}
+	return NewEndpointServiceClientWithClient(config, logger, redis, endpoint_api.NewEndpointServiceClient(conn))
+}
+
+// NewEndpointServiceClientWithClient constructs an endpoint client around the provided gRPC client.
+func NewEndpointServiceClientWithClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, endpointClient endpoint_api.EndpointServiceClient) EndpointServiceClient {
 	return &endpointServiceClient{
 		InternalClient: clients.NewInternalClient(config, "endpoint-api", logger, redis),
 		cfg:            config,
 		logger:         logger,
-		endpointClient: endpoint_api.NewEndpointServiceClient(conn),
+		endpointClient: endpointClient,
 	}
 }
 

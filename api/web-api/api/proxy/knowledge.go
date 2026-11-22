@@ -30,7 +30,7 @@ type webKnowledgeGRPCApi struct {
 	webKnowledgeApi
 }
 
-func NewKnowledgeGRPC(config *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) protos.KnowledgeServiceServer {
+func NewKnowledgeGRPC(config *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector, knowledgeClient knowledge_client.KnowledgeServiceClient) protos.KnowledgeServiceServer {
 	return &webKnowledgeGRPCApi{
 		webKnowledgeApi{
 			WebApi:          web_api.NewWebApi(config, logger, postgres, redis),
@@ -38,7 +38,7 @@ func NewKnowledgeGRPC(config *config.WebAppConfig, logger commons.Logger, postgr
 			logger:          logger,
 			postgres:        postgres,
 			redis:           redis,
-			knowledgeClient: knowledge_client.NewKnowledgeServiceClientGRPC(&config.AppConfig, logger, redis),
+			knowledgeClient: knowledgeClient,
 		},
 	}
 }

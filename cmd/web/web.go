@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -33,6 +34,7 @@ import (
 	web_router "github.com/rapidaai/api/web-api/router"
 	"github.com/rapidaai/pkg/authentication/policy"
 	"github.com/rapidaai/pkg/authentication/resolver"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/middlewares"
@@ -48,6 +50,7 @@ type AppRunner struct {
 	Logger    commons.Logger
 	Postgres  connectors.PostgresConnector
 	Redis     connectors.RedisConnector
+	Clients   *rapida_client.RapidaClient
 	Closeable []func(context.Context) error
 }
 
@@ -73,6 +76,11 @@ func main() {
 		appRunner.Logger.Errorf("Warning: Migration failed: %v", err)
 		panic(err)
 	}
+	if err := appRunner.Init(ctx); err != nil {
+		appRunner.Close(ctx)
+		panic(err)
+	}
+	defer appRunner.Close(ctx)
 
 	authorizationPolicy, err := policy.NewWebAuthorizationPolicy()
 	if err != nil {
@@ -100,10 +108,6 @@ func main() {
 		grpc.MaxRecvMsgSize(commons.MaxRecvMsgSize), // 10 MB
 		grpc.MaxSendMsgSize(commons.MaxSendMsgSize), // 10 MB
 	)
-	if err := appRunner.Init(ctx); err != nil {
-		panic(err)
-	}
-
 	// add all middleware depends on configurations
 	appRunner.AllMiddlewares(
 		authentication.NewProjectHTTPMiddleware(web_authenticators.NewProjectResolver(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
@@ -122,7 +126,6 @@ func main() {
 		panic(err)
 	}
 
-	defer appRunner.Close(ctx)
 	cmuxListener := cmux.New(listener)
 
 	// if application json
@@ -134,13 +137,44 @@ func main() {
 	// rpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
 	// grpcFilteredListener := cmuxListener.Match(cmux.Any())
 
-	group, ctx := errgroup.WithContext(ctx)
-	group.Go(func() error {
-		err = appRunner.E.RunListener(rpcFilteredListener)
-		if err != nil {
-			appRunner.Logger.Errorf("Failed to start gin server err: %v", err)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(quit)
+
+	group, groupContext := errgroup.WithContext(ctx)
+	serveDone := make(chan struct{})
+	shutdownDone := make(chan struct{})
+	go func() {
+		defer close(shutdownDone)
+		select {
+		case <-quit:
+		case <-groupContext.Done():
+		case <-serveDone:
+			return
 		}
-		return err
+		cmuxListener.Close()
+		if closeErr := listener.Close(); closeErr != nil && !errors.Is(closeErr, net.ErrClosed) {
+			appRunner.Logger.Errorf("Failed to close server listener: %v", closeErr)
+		}
+		grpcStopped := make(chan struct{})
+		go func() {
+			appRunner.S.GracefulStop()
+			close(grpcStopped)
+		}()
+		select {
+		case <-grpcStopped:
+		case <-time.After(10 * time.Second):
+			appRunner.S.Stop()
+			<-grpcStopped
+		}
+	}()
+
+	group.Go(func() error {
+		serveErr := appRunner.E.RunListener(rpcFilteredListener)
+		if serveErr != nil && !errors.Is(serveErr, cmux.ErrServerClosed) && !errors.Is(serveErr, cmux.ErrListenerClosed) {
+			appRunner.Logger.Errorf("Failed to start gin server err: %v", serveErr)
+		}
+		return serveErr
 	})
 	group.Go(func() error {
 		//
@@ -154,33 +188,32 @@ func main() {
 			ReadHeaderTimeout: 10 * time.Second,
 		}
 		//
-		err = httpServer.Serve(grpcFilteredListener)
-		if err != nil {
-			appRunner.Logger.Errorf("Failed to start grpc server err: %v", err)
+		serveErr := httpServer.Serve(grpcFilteredListener)
+		if serveErr != nil && !errors.Is(serveErr, cmux.ErrServerClosed) && !errors.Is(serveErr, cmux.ErrListenerClosed) && !errors.Is(serveErr, http.ErrServerClosed) {
+			appRunner.Logger.Errorf("Failed to start grpc-web server err: %v", serveErr)
 		}
-		return err
+		return serveErr
 	})
 
 	group.Go(func() error {
-		err = appRunner.S.Serve(http2GRPCFilteredListener)
-		if err != nil {
-			appRunner.Logger.Errorf("Failed to start grpc server err: %v", err)
+		serveErr := appRunner.S.Serve(http2GRPCFilteredListener)
+		if serveErr != nil && !errors.Is(serveErr, cmux.ErrServerClosed) && !errors.Is(serveErr, cmux.ErrListenerClosed) && !errors.Is(serveErr, grpc.ErrServerStopped) {
+			appRunner.Logger.Errorf("Failed to start grpc server err: %v", serveErr)
 		}
-		return err
+		return serveErr
 	})
 	// serve now
-	err = cmuxListener.Serve()
-	if err != nil {
-		appRunner.Logger.Errorf("Failed to start grpc server err: %v", err)
-		panic(err)
+	serveErr := cmuxListener.Serve()
+	close(serveDone)
+	groupErr := group.Wait()
+	<-shutdownDone
+	if serveErr != nil && !errors.Is(serveErr, net.ErrClosed) {
+		appRunner.Logger.Errorf("Failed to serve multiplexed listener: %v", serveErr)
+		panic(serveErr)
 	}
-
-	err = group.Wait()
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	// done with ctx
-	ctx.Done()
-	<-quit
+	if groupErr != nil && !errors.Is(groupErr, cmux.ErrServerClosed) && !errors.Is(groupErr, cmux.ErrListenerClosed) && !errors.Is(groupErr, grpc.ErrServerStopped) && !errors.Is(groupErr, http.ErrServerClosed) {
+		panic(groupErr)
+	}
 }
 
 func (app *AppRunner) Logging() error {
@@ -228,18 +261,29 @@ func (app *AppRunner) ResolveConfig() error {
 
 // init for app close
 func (app *AppRunner) Init(ctx context.Context) error {
-	err := app.Postgres.Connect(ctx)
-	if err != nil {
-		app.Logger.Error("error while connecting to postgres.", err)
-		return err
+	if app.Postgres != nil {
+		err := app.Postgres.Connect(ctx)
+		if err != nil {
+			app.Logger.Error("error while connecting to postgres.", err)
+			return err
+		}
+		app.Closeable = append(app.Closeable, app.Postgres.Disconnect)
 	}
-	err = app.Redis.Connect(ctx)
-	if err != nil {
-		app.Logger.Error("error while connecting to redis.", err)
-		return err
+	if app.Redis != nil {
+		err := app.Redis.Connect(ctx)
+		if err != nil {
+			app.Logger.Error("error while connecting to redis.", err)
+			return err
+		}
+		app.Closeable = append(app.Closeable, app.Redis.Disconnect)
 	}
-	app.Closeable = append(app.Closeable, app.Postgres.Disconnect)
-	app.Closeable = append(app.Closeable, app.Redis.Disconnect)
+
+	clients, err := rapida_client.New(&app.Cfg.AppConfig, app.Logger, app.Redis)
+	if err != nil {
+		return fmt.Errorf("initialize internal clients: %w", err)
+	}
+	app.Clients = clients
+	app.Closeable = append(app.Closeable, app.Clients.Close)
 	return nil
 }
 
@@ -263,7 +307,7 @@ func (g *AppRunner) AllRouters(organizationCredentialKey []byte) {
 }
 
 func (g *AppRunner) AllProxyRouter() {
-	web_router.ProxyApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis)
+	web_router.ProxyApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Clients)
 }
 
 // all middleware

@@ -16,6 +16,19 @@ type deploymentGRPCClientStub struct {
 	endpoint_api.DeploymentClient
 }
 
+type endpointGRPCClientStub struct {
+	endpoint_api.EndpointServiceClient
+}
+
+func TestNewEndpointServiceClientWithClientUsesProvidedGRPCClient(t *testing.T) {
+	grpcClient := &endpointGRPCClientStub{}
+	client := NewEndpointServiceClientWithClient(&config.AppConfig{}, nil, nil, grpcClient)
+
+	if client.(*endpointServiceClient).endpointClient != grpcClient {
+		t.Fatal("NewEndpointServiceClientWithClient() did not retain the provided gRPC client")
+	}
+}
+
 func TestNewDeploymentServiceClientWithClientUsesProvidedGRPCClient(t *testing.T) {
 	grpcClient := &deploymentGRPCClientStub{}
 	client := NewDeploymentServiceClientWithClient(&config.AppConfig{}, nil, nil, grpcClient)

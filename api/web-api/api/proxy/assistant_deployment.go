@@ -30,6 +30,19 @@ type webAssistantDeploymentGRPCApi struct {
 	webAssistantDeploymentApi
 }
 
+func NewAssistantDeploymentGRPCApi(config *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector, assistantClient assistant_client.AssistantServiceClient) protos.AssistantDeploymentServiceServer {
+	return &webAssistantDeploymentGRPCApi{
+		webAssistantDeploymentApi{
+			WebApi:          web_api.NewWebApi(config, logger, postgres, redis),
+			cfg:             config,
+			logger:          logger,
+			postgres:        postgres,
+			redis:           redis,
+			assistantClient: assistantClient,
+		},
+	}
+}
+
 // GetAssistantApiDeployment implements protos.AssistantDeploymentServiceServer.
 func (w *webAssistantDeploymentGRPCApi) GetAssistantApiDeployment(c context.Context, iRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantApiDeploymentResponse, error) {
 	principal, ok := middleware_authentication.Principal(c)
@@ -227,18 +240,4 @@ func (w *webAssistantDeploymentGRPCApi) CreateAssistantWhatsappDeployment(c cont
 		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 	return w.assistantClient.CreateAssistantWhatsappDeployment(c, principal, iRequest)
-}
-
-// G
-func NewAssistantDeploymentGRPCApi(config *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) protos.AssistantDeploymentServiceServer {
-	return &webAssistantDeploymentGRPCApi{
-		webAssistantDeploymentApi{
-			WebApi:          web_api.NewWebApi(config, logger, postgres, redis),
-			cfg:             config,
-			logger:          logger,
-			postgres:        postgres,
-			redis:           redis,
-			assistantClient: assistant_client.NewAssistantServiceClientGRPC(&config.AppConfig, logger, redis),
-		},
-	}
 }

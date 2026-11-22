@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -8,7 +9,64 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	endpoint_config "github.com/rapidaai/api/endpoint-api/config"
+	app_config "github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/commons"
 )
+
+func TestSignalHandlerIsRegisteredBeforeServing(t *testing.T) {
+	file := parseCommandSource(t, "endpoint.go")
+	var notifyPosition token.Pos
+	var servePosition token.Pos
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		switch callName(call) {
+		case "Notify":
+			if notifyPosition == 0 {
+				notifyPosition = call.Pos()
+			}
+		case "Serve":
+			if servePosition == 0 {
+				servePosition = call.Pos()
+			}
+		}
+		return true
+	})
+	if notifyPosition == 0 || servePosition == 0 || notifyPosition > servePosition {
+		t.Fatalf("signal Notify position = %d, first Serve position = %d; signal handling must be registered before serving", notifyPosition, servePosition)
+	}
+}
+
+func TestInitInitializesRapidaClient(t *testing.T) {
+	logger, err := commons.NewApplicationLogger(commons.EnableConsole(true), commons.EnableFile(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := AppRunner{
+		Cfg: &endpoint_config.EndpointConfig{AppConfig: app_config.AppConfig{
+			Web:         app_config.ServiceHostConfig{Host: "passthrough:///web-api"},
+			Integration: app_config.ServiceHostConfig{Host: "passthrough:///integration-api"},
+			Endpoint:    app_config.ServiceHostConfig{Host: "passthrough:///endpoint-api"},
+			Document:    app_config.ServiceHostConfig{Host: "http://document-api"},
+		}},
+		Logger: logger,
+	}
+
+	if err := app.Init(context.Background()); err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+	if app.Clients == nil || app.Clients.Authentication == nil {
+		t.Fatal("Init() did not initialize the Rapida authentication client")
+	}
+	if len(app.Closeable) != 1 {
+		t.Fatalf("Closeable count = %d, want 1", len(app.Closeable))
+	}
+	app.Close(context.Background())
+}
 
 func TestGRPCUsesPrincipalAuthenticationMiddlewareOrder(t *testing.T) {
 	file := parseCommandSource(t, "endpoint.go")
@@ -74,9 +132,11 @@ func TestEndpointDerivesServiceAuthenticationKeyAtConsumers(t *testing.T) {
 	}
 }
 
-func TestUsesUnifiedWebAuthenticationClient(t *testing.T) {
+func TestUsesRapidaAuthenticationClient(t *testing.T) {
 	file := parseCommandSource(t, "endpoint.go")
-	found := false
+	constructedClients := 0
+	resolverCalls := 0
+	sharedClientCalls := 0
 	ast.Inspect(file, func(node ast.Node) bool {
 		call, ok := node.(*ast.CallExpr)
 		if !ok {
@@ -84,14 +144,31 @@ func TestUsesUnifiedWebAuthenticationClient(t *testing.T) {
 		}
 		switch callName(call) {
 		case "NewAuthenticationClient":
-			found = true
+			constructedClients++
 		case "NewAuthenticationResolverClient":
 			t.Fatal("removed authentication resolver client is constructed")
+		case "NewProjectPrincipalResolver", "NewOrganizationPrincipalResolver", "NewUserPrincipalResolver":
+			resolverCalls++
+			if len(call.Args) != 1 {
+				return true
+			}
+			authentication, ok := call.Args[0].(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			clients, clientsOK := authentication.X.(*ast.SelectorExpr)
+			if !clientsOK {
+				return true
+			}
+			appRunner, appRunnerOK := clients.X.(*ast.Ident)
+			if appRunnerOK && authentication.Sel.Name == "Authentication" && clients.Sel.Name == "Clients" && appRunner.Name == "appRunner" {
+				sharedClientCalls++
+			}
 		}
 		return true
 	})
-	if !found {
-		t.Fatal("unified Web authentication client is not constructed")
+	if constructedClients != 0 || resolverCalls != 6 || sharedClientCalls != resolverCalls {
+		t.Fatalf("constructed clients = %d, resolver calls = %d, shared client calls = %d, want 0, 6, 6", constructedClients, resolverCalls, sharedClientCalls)
 	}
 }
 

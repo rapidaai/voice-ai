@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -12,8 +13,64 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	web_config "github.com/rapidaai/api/web-api/config"
+	app_config "github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/commons"
 )
+
+func TestSignalHandlerIsRegisteredBeforeServing(t *testing.T) {
+	file := parseCommandSource(t, "web.go")
+	var notifyPosition token.Pos
+	var servePosition token.Pos
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		switch callName(call) {
+		case "Notify":
+			if notifyPosition == 0 {
+				notifyPosition = call.Pos()
+			}
+		case "Serve":
+			if servePosition == 0 {
+				servePosition = call.Pos()
+			}
+		}
+		return true
+	})
+	if notifyPosition == 0 || servePosition == 0 || notifyPosition > servePosition {
+		t.Fatalf("signal Notify position = %d, first Serve position = %d; signal handling must be registered before serving", notifyPosition, servePosition)
+	}
+}
+
+func TestInitInitializesRapidaClient(t *testing.T) {
+	logger, err := commons.NewApplicationLogger(commons.EnableConsole(true), commons.EnableFile(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := AppRunner{
+		Cfg: &web_config.WebAppConfig{AppConfig: app_config.AppConfig{
+			Web:         app_config.ServiceHostConfig{Host: "passthrough:///web-api"},
+			Integration: app_config.ServiceHostConfig{Host: "passthrough:///integration-api"},
+			Endpoint:    app_config.ServiceHostConfig{Host: "passthrough:///endpoint-api"},
+			Assistant:   app_config.ServiceHostConfig{Host: "passthrough:///assistant-api"},
+			Document:    app_config.ServiceHostConfig{Host: "http://document-api"},
+		}},
+		Logger: logger,
+	}
+
+	if err := app.Init(context.Background()); err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+	if app.Clients == nil || app.Clients.Assistant == nil || app.Clients.Endpoint == nil || app.Clients.Audit == nil {
+		t.Fatal("Init() did not initialize the Rapida proxy clients")
+	}
+	if len(app.Closeable) != 1 {
+		t.Fatalf("Closeable count = %d, want 1", len(app.Closeable))
+	}
+	app.Close(context.Background())
+}
 
 func TestCORSAllowsAuthenticationSelectionHeaders(t *testing.T) {
 	logger, err := commons.NewApplicationLogger(commons.Level("error"), commons.Name("cors-test"))
