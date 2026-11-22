@@ -153,6 +153,9 @@ for (const colorMode of ['light', 'dark']) {
       await expect(
         page.getByText('Edit deployment', { exact: true }),
       ).toBeHidden();
+      await expect(
+        drawer.getByText('rpx_e2e_web_widget', { exact: true }),
+      ).toBeVisible();
       await page.evaluate(() => document.activeElement?.blur());
       await page.mouse.move(0, 0);
       await expect(page.getByRole('tooltip')).toBeHidden();
@@ -162,7 +165,11 @@ for (const colorMode of ['light', 'dark']) {
         { animations: 'disabled', maxDiffPixelRatio: 0.01 },
       );
 
-      await drawer.getByLabel('Close').click();
+      await drawer
+        .getByRole('heading', { name: deployment.dialogName, exact: true })
+        .locator('..')
+        .getByRole('button', { name: 'Close', exact: true })
+        .click();
       await expect(drawer).toBeHidden();
     }
   });
