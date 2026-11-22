@@ -959,6 +959,9 @@ func (aS *userService) GetAllOrganizationMember(ctx context.Context, organizatio
 	usersQuery := db.Model(&internal_entity.UserAuth{}).
 		Joins("JOIN (?) AS organization_members ON organization_members.user_auth_id = user_auths.id", organizationMemberIDs)
 	for _, criterion := range criteria {
+		if criterion == nil {
+			return 0, &roles, errors.New("organization member criterion is required")
+		}
 		switch criterion.GetKey() {
 		case "id":
 			usersQuery = usersQuery.Where("user_auths.id = ?", criterion.GetValue())
@@ -970,6 +973,8 @@ func (aS *userService) GetAllOrganizationMember(ctx context.Context, organizatio
 			usersQuery = usersQuery.Where("user_auths.status = ?", criterion.GetValue())
 		case "source":
 			usersQuery = usersQuery.Where("user_auths.source = ?", criterion.GetValue())
+		default:
+			return 0, &roles, fmt.Errorf("unsupported organization member criterion %q", criterion.GetKey())
 		}
 	}
 

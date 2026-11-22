@@ -8,6 +8,7 @@ package internal_user_service
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -160,6 +161,34 @@ func TestGetAllOrganizationMemberAppliesCriteriaToUsers(t *testing.T) {
 		if role.UserAuthId != 2 {
 			t.Fatalf("role.UserAuthId = %d, want 2", role.UserAuthId)
 		}
+	}
+}
+
+func TestGetAllOrganizationMemberRejectsUnsupportedCriteria(t *testing.T) {
+	service, _, _ := newAssignmentServiceTest(t)
+
+	_, _, err := service.GetAllOrganizationMember(
+		context.Background(),
+		10,
+		[]*protos.Criteria{{Key: "unknown", Value: "value"}},
+		&protos.Paginate{Page: 1, PageSize: 20},
+	)
+	if err == nil || !strings.Contains(err.Error(), "unsupported organization member criterion") {
+		t.Fatalf("GetAllOrganizationMember() error = %v, want unsupported criterion error", err)
+	}
+}
+
+func TestGetAllOrganizationMemberRejectsNilCriteria(t *testing.T) {
+	service, _, _ := newAssignmentServiceTest(t)
+
+	_, _, err := service.GetAllOrganizationMember(
+		context.Background(),
+		10,
+		[]*protos.Criteria{nil},
+		&protos.Paginate{Page: 1, PageSize: 20},
+	)
+	if err == nil || !strings.Contains(err.Error(), "organization member criterion is required") {
+		t.Fatalf("GetAllOrganizationMember() error = %v, want required criterion error", err)
 	}
 }
 
