@@ -140,10 +140,10 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	wrappedServer := grpcweb.WrapServer(appRunner.S, grpcweb.WithOriginFunc(func(origin string) bool { return true }))
-	grpcWebServer := &http.Server{
+	grpcWebServer := command_lifecycle.NewHTTPServer(&http.Server{
 		Handler:           wrappedServer,
 		ReadHeaderTimeout: 10 * time.Second,
-	}
+	})
 	// rpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
 	// grpcFilteredListener := cmuxListener.Match(cmux.Any())
 
@@ -160,7 +160,6 @@ func main() {
 		case <-quit:
 		case <-groupContext.Done():
 		case <-serveDone:
-			return
 		}
 		cmuxListener.Close()
 		if closeErr := listener.Close(); closeErr != nil && !errors.Is(closeErr, net.ErrClosed) {
@@ -198,8 +197,7 @@ func main() {
 	// serve now
 	serveErr := cmuxListener.Serve()
 	close(serveDone)
-	groupErr := group.Wait()
-	<-shutdownDone
+	groupErr := command_lifecycle.WaitForServers(group, shutdownDone)
 	if serveErr != nil && !errors.Is(serveErr, net.ErrClosed) {
 		appRunner.Logger.Errorf("Failed to serve multiplexed listener: %v", serveErr)
 		panic(serveErr)

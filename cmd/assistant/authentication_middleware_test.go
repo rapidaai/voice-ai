@@ -22,6 +22,7 @@ func TestSignalHandlerIsRegisteredBeforeServing(t *testing.T) {
 	var servePosition token.Pos
 	var newMuxCalls int
 	var shutdownCalls int
+	var waitForServersCalls int
 	ast.Inspect(file, func(node ast.Node) bool {
 		call, ok := node.(*ast.CallExpr)
 		if !ok {
@@ -40,14 +41,50 @@ func TestSignalHandlerIsRegisteredBeforeServing(t *testing.T) {
 			}
 		case "Shutdown":
 			shutdownCalls++
+		case "WaitForServers":
+			waitForServersCalls++
 		}
 		return true
 	})
 	if notifyPosition == 0 || servePosition == 0 || notifyPosition > servePosition {
 		t.Fatalf("signal Notify position = %d, first Serve position = %d; signal handling must be registered before serving", notifyPosition, servePosition)
 	}
-	if newMuxCalls != 1 || shutdownCalls != 1 {
-		t.Fatalf("NewMux calls = %d, Shutdown calls = %d, want 1 each", newMuxCalls, shutdownCalls)
+	if newMuxCalls != 1 || shutdownCalls != 1 || waitForServersCalls != 1 {
+		t.Fatalf("NewMux calls = %d, Shutdown calls = %d, WaitForServers calls = %d, want 1 each", newMuxCalls, shutdownCalls, waitForServersCalls)
+	}
+	assertServeCompletionDoesNotBypassShutdown(t, file)
+}
+
+func assertServeCompletionDoesNotBypassShutdown(t *testing.T, file *ast.File) {
+	t.Helper()
+	found := false
+	ast.Inspect(file, func(node ast.Node) bool {
+		clause, ok := node.(*ast.CommClause)
+		if !ok {
+			return true
+		}
+		expression, ok := clause.Comm.(*ast.ExprStmt)
+		if !ok {
+			return true
+		}
+		receive, ok := expression.X.(*ast.UnaryExpr)
+		if !ok {
+			return true
+		}
+		channel, ok := receive.X.(*ast.Ident)
+		if !ok || channel.Name != "serveDone" {
+			return true
+		}
+		found = true
+		for _, statement := range clause.Body {
+			if _, bypassesShutdown := statement.(*ast.ReturnStmt); bypassesShutdown {
+				t.Fatal("serveDone bypasses server shutdown")
+			}
+		}
+		return false
+	})
+	if !found {
+		t.Fatal("serveDone shutdown trigger is missing")
 	}
 }
 

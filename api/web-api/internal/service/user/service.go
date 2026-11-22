@@ -964,14 +964,33 @@ func (aS *userService) GetAllOrganizationMember(ctx context.Context, organizatio
 		}
 		switch criterion.GetKey() {
 		case "id":
+			if criterion.GetLogic() != "" && criterion.GetLogic() != "=" {
+				return 0, &roles, fmt.Errorf("unsupported logic %q for organization member criterion %q", criterion.GetLogic(), criterion.GetKey())
+			}
 			usersQuery = usersQuery.Where("user_auths.id = ?", criterion.GetValue())
-		case "name":
-			usersQuery = usersQuery.Where("user_auths.name = ?", criterion.GetValue())
-		case "email":
-			usersQuery = usersQuery.Where("user_auths.email = ?", criterion.GetValue())
+		case "name", "email":
+			column := "user_auths.name"
+			if criterion.GetKey() == "email" {
+				column = "user_auths.email"
+			}
+			switch criterion.GetLogic() {
+			case "":
+				usersQuery = usersQuery.Where(column+" = ?", criterion.GetValue())
+			case "contains":
+				pattern := "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(criterion.GetValue()) + "%"
+				usersQuery = usersQuery.Where(`LOWER(`+column+`) LIKE LOWER(?) ESCAPE '\'`, pattern)
+			default:
+				return 0, &roles, fmt.Errorf("unsupported logic %q for organization member criterion %q", criterion.GetLogic(), criterion.GetKey())
+			}
 		case "status":
+			if criterion.GetLogic() != "" && criterion.GetLogic() != "=" {
+				return 0, &roles, fmt.Errorf("unsupported logic %q for organization member criterion %q", criterion.GetLogic(), criterion.GetKey())
+			}
 			usersQuery = usersQuery.Where("user_auths.status = ?", criterion.GetValue())
 		case "source":
+			if criterion.GetLogic() != "" && criterion.GetLogic() != "=" {
+				return 0, &roles, fmt.Errorf("unsupported logic %q for organization member criterion %q", criterion.GetLogic(), criterion.GetKey())
+			}
 			usersQuery = usersQuery.Where("user_auths.source = ?", criterion.GetValue())
 		default:
 			return 0, &roles, fmt.Errorf("unsupported organization member criterion %q", criterion.GetKey())

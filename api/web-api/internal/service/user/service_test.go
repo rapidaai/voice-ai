@@ -164,6 +164,44 @@ func TestGetAllOrganizationMemberAppliesCriteriaToUsers(t *testing.T) {
 	}
 }
 
+func TestGetAllOrganizationMemberAppliesContainsCriteriaLiterally(t *testing.T) {
+	service, db, _ := newAssignmentServiceTest(t)
+	users := []internal_entity.UserAuth{
+		{
+			Audited: gorm_models.Audited{Id: 2}, Mutable: gorm_models.Mutable{Status: type_enums.RECORD_ACTIVE},
+			Name: "Percent", Email: "p_iyer%25@example.com", Password: "hash", Source: "direct",
+		},
+		{
+			Audited: gorm_models.Audited{Id: 3}, Mutable: gorm_models.Mutable{Status: type_enums.RECORD_ACTIVE},
+			Name: "Other", Email: "plain@example.com", Password: "hash", Source: "direct",
+		},
+	}
+	if err := db.Create(&users).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, userID := range []uint64{2, 3} {
+		if err := db.Create(&internal_entity.UserOrganizationRole{
+			Mutable: gorm_models.Mutable{Status: type_enums.RECORD_ACTIVE}, UserAuthId: userID,
+			OrganizationId: 10, RoleDefinitionID: 102, RoleScopeType: "ORGANIZATION", RoleSubjectType: "USER",
+		}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	count, roles, err := service.GetAllOrganizationMember(
+		context.Background(),
+		10,
+		[]*protos.Criteria{{Key: "email", Logic: "contains", Value: "p_iyer%"}},
+		&protos.Paginate{Page: 1, PageSize: 20},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 || len(*roles) != 1 || (*roles)[0].UserAuthId != 2 {
+		t.Fatalf("count = %d, roles = %+v, want literal partial match for user 2", count, *roles)
+	}
+}
+
 func TestGetAllOrganizationMemberRejectsUnsupportedCriteria(t *testing.T) {
 	service, _, _ := newAssignmentServiceTest(t)
 
@@ -189,6 +227,20 @@ func TestGetAllOrganizationMemberRejectsNilCriteria(t *testing.T) {
 	)
 	if err == nil || !strings.Contains(err.Error(), "organization member criterion is required") {
 		t.Fatalf("GetAllOrganizationMember() error = %v, want required criterion error", err)
+	}
+}
+
+func TestGetAllOrganizationMemberRejectsUnsupportedLogic(t *testing.T) {
+	service, _, _ := newAssignmentServiceTest(t)
+
+	_, _, err := service.GetAllOrganizationMember(
+		context.Background(),
+		10,
+		[]*protos.Criteria{{Key: "email", Logic: "starts_with", Value: "member"}},
+		&protos.Paginate{Page: 1, PageSize: 20},
+	)
+	if err == nil || !strings.Contains(err.Error(), "unsupported logic") {
+		t.Fatalf("GetAllOrganizationMember() error = %v, want unsupported logic error", err)
 	}
 }
 
