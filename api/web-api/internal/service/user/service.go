@@ -974,7 +974,7 @@ func (aS *userService) GetAllOrganizationMember(ctx context.Context, organizatio
 				column = "user_auths.email"
 			}
 			switch criterion.GetLogic() {
-			case "":
+			case "", "=":
 				usersQuery = usersQuery.Where(column+" = ?", criterion.GetValue())
 			case "contains":
 				pattern := "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(criterion.GetValue()) + "%"
