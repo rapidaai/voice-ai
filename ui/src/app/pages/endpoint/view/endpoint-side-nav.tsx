@@ -17,11 +17,17 @@ import {
 } from '@carbon/react';
 import { Fragment, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import {
+  getSidenavExpanded,
+  setSidenavExpanded,
+} from '@/context/sidenav-storage';
 import { cn } from '@/utils';
 
 export function EndpointSideNav(props: { endpointId: string }) {
   const [expanded, setExpanded] = useState(
-    () => !window.matchMedia?.('(max-width: 767px)').matches,
+    () =>
+      getSidenavExpanded('endpoint') &&
+      !window.matchMedia?.('(max-width: 767px)').matches,
   );
   const { pathname } = useLocation();
   const basePath = `/deployment/endpoint/${props.endpointId}`;
@@ -44,6 +50,12 @@ export function EndpointSideNav(props: { endpointId: string }) {
       return true;
     }
     return pathname === `${basePath}/${path}`;
+  };
+
+  const toggleExpanded = () => {
+    const nextExpanded = !expanded;
+    setSidenavExpanded('endpoint', nextExpanded);
+    setExpanded(nextExpanded);
   };
 
   return (
@@ -143,7 +155,7 @@ export function EndpointSideNav(props: { endpointId: string }) {
           type="button"
           kind="ghost"
           size="sm"
-          onClick={() => setExpanded(current => !current)}
+          onClick={toggleExpanded}
           aria-label={
             expanded
               ? 'Collapse endpoint navigation'

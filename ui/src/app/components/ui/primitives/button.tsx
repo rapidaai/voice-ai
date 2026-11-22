@@ -151,9 +151,11 @@ export function TertiaryButton(props: CarbonButtonProps) {
 // Ghost
 
 /** Carbon Ghost button: no border or bg, text only. Low emphasis actions. */
-export function GhostButton(props: CarbonButtonProps) {
-  return <CarbonBtn kind="ghost" {...props} />;
-}
+export const GhostButton = forwardRef<HTMLButtonElement, CarbonButtonProps>(
+  function GhostButton(props, ref) {
+    return <CarbonBtn ref={ref} kind="ghost" {...props} />;
+  },
+);
 
 // Danger
 

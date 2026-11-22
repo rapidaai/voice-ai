@@ -81,6 +81,11 @@ const journeySubjourneys = [
     'journeys/dashboard/responsive.spec.js',
   ),
   covered(
+    'dashboard.interfaceTour',
+    'dashboard.home',
+    'journeys/dashboard/responsive.spec.js',
+  ),
+  covered(
     'deployment.assistant.empty',
     'deployment.assistant',
     'journeys/deployment/assistant-state-screenshots.spec.js',
@@ -104,6 +109,11 @@ const journeySubjourneys = [
     'deployment.assistant.createChooser',
     'deployment.createAssistant',
     'journey-viewport-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.interfaceTour',
+    'deployment.assistant',
+    'journeys/deployment/assistant-listing.spec.js',
   ),
   covered(
     'deployment.endpoint.overview',

@@ -14,6 +14,120 @@ const dashboardJourney = routeJourneys.find(
   journey => journey.id === 'dashboard.home',
 );
 
+test('dashboard guides a first visit through context, appearance, account, and navigation controls', async ({
+  page,
+}) => {
+  await gotoJourney(page, dashboardJourney, { showInterfaceTour: true });
+
+  const context = page.getByRole('region', {
+    name: 'Switch organization or project coachmark',
+  });
+  await expect(context).toBeVisible();
+  await expect(context.locator('.app-coachmark__content')).toHaveCSS(
+    'width',
+    '290px',
+  );
+  await expect(
+    page.getByRole('button', {
+      name: /Change organization or project\. Current organization:/,
+    }),
+  ).toHaveAttribute('aria-expanded', 'true');
+  await context.getByRole('button', { name: 'Next' }).click();
+
+  const appearance = page.getByRole('region', {
+    name: 'Choose your appearance coachmark',
+  });
+  await expect(appearance).toBeVisible();
+  await expect(appearance.locator('.app-coachmark__content')).toHaveCSS(
+    'width',
+    '290px',
+  );
+  await expect(
+    page.getByRole('button', { name: 'Switch to dark mode' }),
+  ).toHaveAttribute('aria-expanded', 'true');
+  await appearance.getByRole('button', { name: 'Next' }).click();
+
+  const account = page.getByRole('region', {
+    name: 'Open your account coachmark',
+  });
+  await expect(account).toBeVisible();
+  await expect(account.locator('.app-coachmark__content')).toHaveCSS(
+    'width',
+    '290px',
+  );
+  await expect(page.getByRole('button', { name: 'Account' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await account.getByRole('button', { name: 'Next' }).click();
+
+  const navigation = page.getByRole('region', {
+    name: 'Explore the side navigation coachmark',
+  });
+  await expect(navigation.locator('.app-coachmark__content')).toHaveCSS(
+    'width',
+    '290px',
+  );
+  await expect(
+    navigation.getByRole('heading', { name: 'Explore the side navigation' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-coachmark-target="navigation"]'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Collapse sidebar' }),
+  ).toHaveAttribute('aria-expanded', 'true');
+  await checkA11y(page, dashboardJourney);
+  await navigation.getByRole('button', { name: 'Next' }).click();
+
+  const sidebarToggleCoachmark = page.getByRole('region', {
+    name: 'Collapse or expand the side navigation coachmark',
+  });
+  await expect(sidebarToggleCoachmark).toBeVisible();
+  await expect(
+    sidebarToggleCoachmark.locator('.app-coachmark__content'),
+  ).toHaveCSS('width', '290px');
+  const sidebarToggle = page.getByRole('button', {
+    name: 'Collapse sidebar',
+  });
+  await expect(sidebarToggle).toHaveAttribute('aria-expanded', 'true');
+  const caret = page.locator('.cds--popover-caret:visible');
+  const sidebarToggleIcon = sidebarToggle.locator('svg');
+  await expect(
+    sidebarToggleCoachmark.getByRole('heading', {
+      name: 'Collapse or expand the side navigation',
+    }),
+  ).toBeVisible();
+  const [caretBounds, sidebarToggleBounds, sidebarIconBounds] =
+    await Promise.all([
+      caret.boundingBox(),
+      sidebarToggle.boundingBox(),
+      sidebarToggleIcon.boundingBox(),
+    ]);
+  expect(caretBounds).not.toBeNull();
+  expect(sidebarToggleBounds).not.toBeNull();
+  expect(sidebarIconBounds).not.toBeNull();
+  expect(caretBounds.y + caretBounds.height).toBeLessThanOrEqual(
+    sidebarToggleBounds.y,
+  );
+  expect(caretBounds.x + caretBounds.width / 2).toBeCloseTo(
+    sidebarIconBounds.x + sidebarIconBounds.width / 2,
+    0,
+  );
+  await sidebarToggleCoachmark.getByRole('button', { name: 'Done' }).click();
+
+  await expect(page.getByRole('region', { name: /coachmark$/ })).toHaveCount(0);
+  await expect(sidebarToggle).toBeFocused();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const stored = window.localStorage.getItem('rpd::__ui_tour');
+        return stored ? JSON.parse(stored).dashboard : null;
+      }),
+    )
+    .toBe('completed');
+});
+
 test('dashboard requests the default range exactly once', async ({ page }) => {
   await gotoJourney(page, dashboardJourney);
   await expect.poll(() => getDashboardRequests(page).length).toBe(1);

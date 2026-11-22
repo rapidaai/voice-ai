@@ -71,104 +71,135 @@ jest.mock('@carbon/icons-react', () => ({
   UserAvatar: () => <span>avatar</span>,
 }));
 
-jest.mock('@carbon/react', () => ({
-  Breadcrumb: ({ children }: any) => <ol>{children}</ol>,
-  BreadcrumbItem: ({
+jest.mock('@/app/components/ui/composites/coachmark', () => ({
+  Coachmark: ({
+    actionLabel,
     children,
-    className,
-    'aria-current': ariaCurrent,
-  }: any) => {
-    const react = jest.requireActual('react');
-    const content = react.isValidElement(children) ? (
-      react.cloneElement(children, {
-        'aria-current': ariaCurrent,
-        className: 'cds--link',
-      })
-    ) : (
-      <span aria-current={ariaCurrent} className="cds--link">
+    description,
+    onAction,
+    onClose,
+    open,
+    title,
+  }: any) =>
+    open ? (
+      <section aria-label={`${title} coachmark`}>
         {children}
-      </span>
-    );
-    return (
-      <li aria-current={ariaCurrent} className={className}>
-        {content}
-      </li>
-    );
-  },
-  BreadcrumbSkeleton: ({ className }: any) => (
-    <div className={className} data-testid="breadcrumb-skeleton" />
-  ),
-  OverflowMenu: ({ children, iconDescription }: any) => (
-    <div>
-      <button type="button" aria-label={iconDescription} />
-      {children}
-    </div>
-  ),
-  OverflowMenuItem: ({ href, itemText, onClick }: any) => (
-    <a href={href} onClick={onClick}>
-      {itemText}
-    </a>
-  ),
-  HeaderGlobalBar: ({ children }: any) => <div>{children}</div>,
-  HeaderGlobalAction: ({
-    children,
-    tooltipAlignment,
-    isActive,
-    ...props
-  }: any) => <button {...props}>{children}</button>,
-  HeaderPanel: ({ children, expanded }: any) =>
-    expanded ? <div>{children}</div> : null,
-  Switcher: ({ children }: any) => <ul>{children}</ul>,
-  SwitcherItem: ({ children, href, ...props }: any) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
-  DropdownSkeleton: ({ hideLabel, size }: any) => (
-    <div
-      data-hide-label={String(Boolean(hideLabel))}
-      data-size={size}
-      data-testid="dropdown-skeleton"
-    />
-  ),
-  Dropdown: ({
-    'aria-label': ariaLabel,
-    id,
-    label,
-    items,
-    selectedItem,
-    itemToString,
-    onChange,
-    isLoading,
-    className,
-  }: any) => {
-    const selectedIndex = Math.max(
-      items.findIndex((x: any) => x === selectedItem),
-      0,
-    );
-    return (
-      <select
-        id={id}
-        aria-label={ariaLabel ?? label}
-        data-testid={id}
-        data-loading={String(Boolean(isLoading))}
-        className={className}
-        value={String(selectedIndex)}
-        onChange={e => {
-          const idx = Number(e.target.value);
-          onChange({ selectedItem: items[idx] ?? null });
-        }}
-      >
-        <option value="-1">{itemToString(null) || 'No project'}</option>
-        {items.map((item: any, idx: number) => (
-          <option key={item.id || idx} value={String(idx)}>
-            {itemToString(item)}
-          </option>
-        ))}
-      </select>
-    );
-  },
+        <h2>{title}</h2>
+        <p>{description}</p>
+        <button type="button" onClick={onClose}>
+          Close tour
+        </button>
+        <button type="button" onClick={onAction}>
+          {actionLabel}
+        </button>
+      </section>
+    ) : (
+      children
+    ),
 }));
+
+jest.mock('@carbon/react', () => {
+  const mockReact = jest.requireActual('react');
+  return {
+    Breadcrumb: ({ children }: any) => <ol>{children}</ol>,
+    BreadcrumbItem: ({
+      children,
+      className,
+      'aria-current': ariaCurrent,
+    }: any) => {
+      const react = jest.requireActual('react');
+      const content = react.isValidElement(children) ? (
+        react.cloneElement(children, {
+          'aria-current': ariaCurrent,
+          className: 'cds--link',
+        })
+      ) : (
+        <span aria-current={ariaCurrent} className="cds--link">
+          {children}
+        </span>
+      );
+      return (
+        <li aria-current={ariaCurrent} className={className}>
+          {content}
+        </li>
+      );
+    },
+    BreadcrumbSkeleton: ({ className }: any) => (
+      <div className={className} data-testid="breadcrumb-skeleton" />
+    ),
+    OverflowMenu: ({ children, iconDescription }: any) => (
+      <div>
+        <button type="button" aria-label={iconDescription} />
+        {children}
+      </div>
+    ),
+    OverflowMenuItem: ({ href, itemText, onClick }: any) => (
+      <a href={href} onClick={onClick}>
+        {itemText}
+      </a>
+    ),
+    HeaderGlobalBar: ({ children }: any) => <div>{children}</div>,
+    HeaderGlobalAction: mockReact.forwardRef(
+      ({ children, tooltipAlignment, isActive, ...props }: any, ref: any) => (
+        <button ref={ref} {...props}>
+          {children}
+        </button>
+      ),
+    ),
+    HeaderPanel: ({ children, expanded }: any) =>
+      expanded ? <div>{children}</div> : null,
+    Switcher: ({ children }: any) => <ul>{children}</ul>,
+    SwitcherItem: ({ children, href, ...props }: any) => (
+      <a href={href} {...props}>
+        {children}
+      </a>
+    ),
+    DropdownSkeleton: ({ hideLabel, size }: any) => (
+      <div
+        data-hide-label={String(Boolean(hideLabel))}
+        data-size={size}
+        data-testid="dropdown-skeleton"
+      />
+    ),
+    Dropdown: ({
+      'aria-label': ariaLabel,
+      id,
+      label,
+      items,
+      selectedItem,
+      itemToString,
+      onChange,
+      isLoading,
+      className,
+    }: any) => {
+      const selectedIndex = Math.max(
+        items.findIndex((x: any) => x === selectedItem),
+        0,
+      );
+      return (
+        <select
+          id={id}
+          aria-label={ariaLabel ?? label}
+          data-testid={id}
+          data-loading={String(Boolean(isLoading))}
+          className={className}
+          value={String(selectedIndex)}
+          onChange={e => {
+            const idx = Number(e.target.value);
+            onChange({ selectedItem: items[idx] ?? null });
+          }}
+        >
+          <option value="-1">{itemToString(null) || 'No project'}</option>
+          {items.map((item: any, idx: number) => (
+            <option key={item.id || idx} value={String(idx)}>
+              {itemToString(item)}
+            </option>
+          ))}
+        </select>
+      );
+    },
+  };
+});
 
 jest.mock('@/app/components/ui/composites', () => ({
   OrganizationProjectSelector: ({
@@ -178,6 +209,7 @@ jest.mock('@/app/components/ui/composites', () => ({
     isCompact,
     isLoading,
     onChange,
+    triggerRef,
   }: any) => {
     const organization = organizations.find(
       (candidate: any) => candidate.id === selectedOrganizationId,
@@ -191,6 +223,7 @@ jest.mock('@/app/components/ui/composites', () => ({
     ) : (
       <div data-compact={String(Boolean(isCompact))}>
         <button
+          ref={triggerRef}
           type="button"
           aria-label="Organization and project switcher"
           onClick={() => onChange(organization, project)}
@@ -627,5 +660,62 @@ describe('Actionable header project switcher', () => {
     expect(
       screen.getByRole('button', { name: 'Switch to light mode' }),
     ).toBeInTheDocument();
+  });
+
+  it('anchors context, theme, and account tour steps to their existing controls', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    const next = jest.fn();
+    const dismiss = jest.fn();
+    const view = renderCustomerOptions(
+      {
+        getOrganizations: () => organizations,
+        getCurrentOrganization: () => organizations[1],
+        getCurrentProject: () => projects[0],
+        setCurrentContext: jest.fn(() => true),
+      },
+      {
+        interfaceTour: { step: 'context', next, dismiss },
+      },
+    );
+
+    expect(
+      screen.getByRole('region', {
+        name: 'Switch organization or project coachmark',
+      }),
+    ).toContainElement(
+      screen.getByRole('button', { name: 'Organization and project switcher' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(next).toHaveBeenCalledTimes(1);
+
+    view.rerender(
+      <AuthContext.Provider value={{}}>
+        <MemoryRouter>
+          <CustomerOptions interfaceTour={{ step: 'theme', next, dismiss }} />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
+
+    expect(
+      screen.getByRole('region', { name: 'Choose your appearance coachmark' }),
+    ).toContainElement(
+      screen.getByRole('button', { name: 'Switch to dark mode' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(next).toHaveBeenCalledTimes(2);
+
+    view.rerender(
+      <AuthContext.Provider value={{}}>
+        <MemoryRouter>
+          <CustomerOptions interfaceTour={{ step: 'account', next, dismiss }} />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
+
+    expect(
+      screen.getByRole('region', { name: 'Open your account coachmark' }),
+    ).toContainElement(screen.getByRole('button', { name: 'Account' }));
+    await user.click(screen.getByRole('button', { name: 'Close tour' }));
+    expect(dismiss).toHaveBeenCalledTimes(1);
   });
 });

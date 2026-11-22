@@ -149,15 +149,38 @@ async function installBrowserFixtures(page) {
   await installGrpcWebPreflightMock(page);
 }
 
-async function authenticatePage(page, options) {
-  await page.addInitScript(state => {
-    window.localStorage.setItem('rpd::__user', JSON.stringify(state));
-    window.localStorage.setItem('rapida-sidebar-open', 'true');
-  }, createAuthState(options));
+async function authenticatePage(page, options = {}) {
+  const { showInterfaceTour = false, ...authOptions } = options;
+  await page.addInitScript(
+    ({ state, showInterfaceTour }) => {
+      window.localStorage.setItem('rpd::__user', JSON.stringify(state));
+      window.localStorage.setItem(
+        'rpd::__ui_sidenav',
+        JSON.stringify({ main: true, assistant: true, endpoint: true }),
+      );
+      const userId = state.state.authentication.user?.id;
+      if (!userId) return;
+      const tourToShow =
+        showInterfaceTour === true ? 'dashboard' : showInterfaceTour;
+      const completedTours = {
+        dashboard: 'completed',
+        assistant: 'completed',
+      };
+      if (tourToShow) delete completedTours[tourToShow];
+      window.localStorage.setItem(
+        'rpd::__ui_tour',
+        JSON.stringify(completedTours),
+      );
+    },
+    {
+      state: createAuthState(authOptions),
+      showInterfaceTour,
+    },
+  );
 }
 
-async function gotoJourney(page, journey) {
-  if (journey.auth) await authenticatePage(page);
+async function gotoJourney(page, journey, options) {
+  if (journey.auth) await authenticatePage(page, options);
 
   const viewport = page.viewportSize();
   if (viewport) {
@@ -191,7 +214,7 @@ async function gotoJourney(page, journey) {
 
 async function setColorMode(page, colorMode) {
   await page.addInitScript(mode => {
-    window.localStorage.setItem('ui-theme-mode', mode);
+    window.localStorage.setItem('rpd::__ui_theme', mode);
   }, colorMode);
 }
 

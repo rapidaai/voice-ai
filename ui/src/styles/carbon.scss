@@ -65,6 +65,7 @@
 @use '@carbon/ibm-products/scss/components/EmptyStates';
 @use '@carbon/ibm-products/scss/components/FullPageError';
 @use '@carbon/ibm-products/scss/components/SidePanel';
+@use '@carbon/ibm-products/scss/components/Coachmark';
 
 .debugger-configuration-accordion > .cds--accordion__item:first-child {
   border-block-start: 0;
@@ -111,8 +112,39 @@
 }
 
 // ─── Popover width override ─────────────────────────────────────────────────
-.cds--popover-content {
+.cds--popover-content:not(.c4p--coachmark__next--coachmark-content) {
   max-inline-size: none;
+}
+
+// Match the Carbon for IBM Products coachmark story across every tour step.
+.app-coachmark__content {
+  inline-size: 290px;
+}
+
+.app-coachmark__content .c4p--coachmark__next--content-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-coachmark__content .c4p--coachmark__next--content-body > h2 {
+  margin: 0 0 0.5rem;
+  font-size: var(--cds-productive-heading-02-font-size, 1rem);
+  font-weight: var(--cds-productive-heading-02-font-weight, 600);
+  line-height: var(--cds-productive-heading-02-line-height, 1.375);
+  letter-spacing: var(--cds-productive-heading-02-letter-spacing, 0);
+}
+
+.app-coachmark__content .c4p--coachmark__next--content-body > p {
+  font-size: var(--cds-body-long-01-font-size, 0.875rem);
+  font-weight: var(--cds-body-long-01-font-weight, 400);
+  line-height: var(--cds-body-long-01-line-height, 1.42857);
+  letter-spacing: var(--cds-body-long-01-letter-spacing, 0.16px);
+}
+
+.app-coachmark__content .c4p--coachmark__next--content-body > button {
+  display: flex;
+  align-self: flex-end;
+  margin-block: 1rem;
 }
 
 // ─── Tooltip / popover z-index ──────────────────────────────────────────────

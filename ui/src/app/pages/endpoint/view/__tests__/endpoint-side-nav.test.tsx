@@ -5,6 +5,7 @@ import { EndpointSideNav } from '../endpoint-side-nav';
 
 describe('EndpointSideNav', () => {
   beforeEach(() => {
+    window.localStorage.clear();
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       value: jest.fn().mockReturnValue({
@@ -67,6 +68,38 @@ describe('EndpointSideNav', () => {
     });
     expect(toggle.querySelector('svg')).toBeInTheDocument();
     expect(toggle).toHaveTextContent('Expand');
+    expect(
+      JSON.parse(window.localStorage.getItem('rpd::__ui_sidenav')!),
+    ).toEqual({ endpoint: false });
+  });
+
+  it('persists endpoint navigation independently from the other sidenavs', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      'rpd::__ui_sidenav',
+      JSON.stringify({ main: false, assistant: true, endpoint: false }),
+    );
+
+    render(
+      <MemoryRouter
+        initialEntries={['/deployment/endpoint/endpoint-1/overview']}
+      >
+        <EndpointSideNav endpointId="endpoint-1" />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Expand endpoint navigation' }),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: 'Expand endpoint navigation' }),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Collapse endpoint navigation' }),
+    ).toBeInTheDocument();
+    expect(
+      JSON.parse(window.localStorage.getItem('rpd::__ui_sidenav')!),
+    ).toEqual({ main: false, assistant: true, endpoint: true });
   });
 
   it('starts collapsed on a small viewport', () => {
