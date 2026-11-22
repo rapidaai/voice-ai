@@ -91,4 +91,18 @@ describe('Carbon theme adapters', () => {
       /:root\[data-theme-schema='2'\]\s+\.app-onboarding-checklist\s*{[^}]*--app-checklist-foreground: var\(--brand-on-primary\)/,
     );
   });
+
+  it('keeps dashboard charts visually integrated with their Carbon layer', () => {
+    const styles = readStyles('carbon.scss');
+
+    expect(styles).toContain('.app-dashboard-chart {');
+    expect(styles).toContain(
+      '--app-dashboard-chart-grid-bg: var(--cds-layer-01)',
+    );
+    expect(styles).toContain(
+      '--app-dashboard-chart-grid-line: var(--cds-layer-accent-01)',
+    );
+    expect(styles).toContain('fill: var(--app-dashboard-chart-grid-bg)');
+    expect(styles).toContain('stroke: var(--app-dashboard-chart-grid-line)');
+  });
 });

@@ -31,7 +31,7 @@ const mockLineChart = jest.fn(
 
 jest.mock('@carbon/charts-react', () => ({
   Alignments: { RIGHT: 'right' },
-  ChartTheme: { G100: 'g100', WHITE: 'white' },
+  ChartTheme: { G10: 'g10', G90: 'g90' },
   LegendPositions: { TOP: 'top' },
   LineChart: (properties: unknown) => mockLineChart(properties as never),
   ScaleTypes: { LABELS: 'labels', LINEAR: 'linear' },
@@ -294,11 +294,17 @@ describe('Dashboard HomePage', () => {
       screen.getByText(
         'Monitor workspace performance, conversation activity, assistant health, and component usage across the selected time range.',
       ),
-    ).toBeInTheDocument();
+    ).toHaveClass('text-muted');
     expect(container.querySelector('[data-page-header]')).toHaveClass(
+      'bg-surface',
+    );
+    expect(container.querySelector('[data-page-header]')).not.toHaveClass(
       'border-b',
-      'border-border-subtle',
-      'bg-layer',
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Workspace Overview', level: 1 }),
+    ).toHaveClass('text-[1.25rem]', 'leading-[1.75rem]');
+    expect(container.querySelector('[data-page-header-content]')).toHaveClass(
       'px-5',
       'py-6',
     );
@@ -344,7 +350,11 @@ describe('Dashboard HomePage', () => {
 
     expect(await screen.findByText('12,486')).toBeInTheDocument();
     expect(container.querySelector('[data-dashboard-page]')).toHaveClass(
-      'bg-layer',
+      'bg-surface',
+    );
+    expect(container.querySelector('[data-page-header-content]')).toHaveClass(
+      'mx-auto',
+      'max-w-[1200px]',
     );
     expect(container.querySelector('[data-dashboard-kpi-strip]')).toHaveClass(
       'gap-4',
@@ -357,7 +367,9 @@ describe('Dashboard HomePage', () => {
         'min-h-[156px]',
         'border',
         'border-border-subtle',
-        'bg-surface',
+        'bg-layer',
+        'overflow-hidden',
+        'rounded-lg',
       );
       expect(card.querySelector('[data-dashboard-kpi-header]')).toHaveClass(
         'h-10',
@@ -373,13 +385,66 @@ describe('Dashboard HomePage', () => {
     });
     expect(container.querySelector('[data-dashboard-grid]')).toHaveClass(
       'gap-4',
+      'md:py-8',
     );
     const cards = container.querySelectorAll('[data-dashboard-card]');
     expect(cards).toHaveLength(5);
     cards.forEach(card => {
-      expect(card).toHaveClass('border', 'border-border-subtle', 'bg-surface');
+      expect(card).toHaveClass(
+        'border',
+        'border-border-subtle',
+        'bg-layer',
+        'overflow-hidden',
+        'rounded-lg',
+      );
       expect(card.querySelector('header')).toHaveClass('px-6', 'py-4');
+      expect(card.querySelector('header p')).toHaveClass(
+        'text-helper',
+        'text-[0.875rem]',
+        'font-normal',
+      );
     });
+
+    const healthItems = container.querySelectorAll(
+      '[data-dashboard-health-item]',
+    );
+    expect(healthItems).toHaveLength(3);
+    healthItems.forEach(item => {
+      expect(item).toHaveClass(
+        'grid',
+        'grid-cols-[24px_minmax(0,1fr)_minmax(4rem,auto)]',
+        'items-center',
+      );
+      expect(item.lastElementChild).toHaveClass('text-right');
+    });
+
+    expect(container.querySelector('.app-dashboard-chart')).toBeInTheDocument();
+
+    expect(
+      screen
+        .getByRole('heading', { name: 'Conversation Activity' })
+        .closest('[data-dashboard-card]'),
+    ).toHaveClass('h-full');
+
+    const recentFailures = screen.getByRole('table', {
+      name: 'Recent Failures',
+    });
+    expect(recentFailures.closest('[data-dashboard-card]')).not.toHaveClass(
+      'h-full',
+    );
+    expect(recentFailures.closest('.cds--data-table-container')).toHaveClass(
+      'p-0!',
+    );
+    expect(
+      within(screen.getByRole('columnheader', { name: /details/i })).getByText(
+        'Details',
+      ),
+    ).toHaveClass('text-[0.75rem]', 'font-normal', 'text-muted');
+    expect(screen.getByText('Phone · 2 min')).toHaveClass(
+      'text-[0.875rem]',
+      'font-normal',
+      'text-muted',
+    );
   });
 
   it.each(metricExplanations)(
@@ -436,21 +501,31 @@ describe('Dashboard HomePage', () => {
       screen.getByRole('heading', { name: 'Conversation Activity' }),
     ).toHaveClass(
       'text-[1rem]',
-      'font-[600]',
+      'font-semibold!',
       'leading-[1.5rem]',
       'tracking-[0]',
+      'text-foreground',
     );
+    expect(
+      screen.getByRole('heading', { name: 'Workspace Overview', level: 1 }),
+    ).toHaveClass('font-semibold!');
+    expect(screen.getByRole('heading', { name: 'Sessions' })).toHaveClass(
+      'font-semibold!',
+    );
+    expect(screen.getByText('Failed sessions')).toHaveClass('font-semibold!');
     expect(screen.getByText('Sessions and failures over time')).toHaveClass(
       'text-[0.875rem]',
       'font-normal',
       'leading-[1.125rem]',
       'tracking-[0.16px]',
+      'text-helper',
     );
     expect(screen.getByText('Based on success rate and latency')).toHaveClass(
       'text-[0.75rem]',
       'font-normal',
       'leading-[1rem]',
       'tracking-[0.32px]',
+      'text-helper',
     );
     expect(screen.getByText('Speech to text')).toHaveClass(
       'text-[0.875rem]',
@@ -468,7 +543,7 @@ describe('Dashboard HomePage', () => {
     screen.getAllByRole('link', { name: 'Support bot' }).forEach(link => {
       expect(link.firstElementChild).toHaveClass(
         'text-[0.875rem]',
-        'font-[600]',
+        'font-semibold!',
         'leading-[1.125rem]',
         'tracking-[0.16px]',
       );
@@ -498,6 +573,7 @@ describe('Dashboard HomePage', () => {
     );
     expect(loadingKpis).toHaveLength(4);
     loadingKpis.forEach(card => {
+      expect(card).toHaveClass('overflow-hidden', 'rounded-lg');
       expect(card.querySelector('[data-dashboard-kpi-header]')).toHaveClass(
         'h-10',
         'border-b',
@@ -658,7 +734,9 @@ describe('Dashboard HomePage', () => {
       within(checklist).getByText('Set up your dashboard'),
     ).toBeInTheDocument();
     expect(within(checklist).getByText('25% complete')).toBeInTheDocument();
-    expect(within(checklist).getByText('Workspace created')).toBeInTheDocument();
+    expect(
+      within(checklist).getByText('Workspace created'),
+    ).toBeInTheDocument();
     expect(
       within(checklist).getByRole('button', { name: 'Create an assistant' }),
     ).toBeInTheDocument();
@@ -801,9 +879,7 @@ describe('Dashboard HomePage', () => {
     await act(async () => {
       firstAssistantLookup.reject(new Error('unavailable'));
     });
-    await user.click(
-      screen.getByRole('button', { name: 'Refresh dashboard' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Refresh dashboard' }));
 
     expect(
       await screen.findByLabelText('Dashboard setup checklist'),
@@ -831,9 +907,7 @@ describe('Dashboard HomePage', () => {
     await waitFor(() =>
       expect(mockGetProjectDashboardRange).toHaveBeenCalledTimes(2),
     );
-    const checklist = await screen.findByLabelText(
-      'Dashboard setup checklist',
-    );
+    const checklist = await screen.findByLabelText('Dashboard setup checklist');
     await user.click(
       within(checklist).getByRole('button', {
         name: 'Return here to review performance',
@@ -989,9 +1063,23 @@ describe('Dashboard HomePage', () => {
           { group: 'Sessions', key: expect.any(String), value: 428 },
           { group: 'Failed', key: expect.any(String), value: 18 },
         ]),
-        options: expect.objectContaining({ theme: 'white' }),
+        options: expect.objectContaining({
+          axes: expect.objectContaining({
+            bottom: expect.objectContaining({
+              ticks: { values: expect.any(Array) },
+            }),
+          }),
+          curve: 'curveMonotoneX',
+          theme: 'g10',
+        }),
       }),
     );
+    const chartOptions = mockLineChart.mock.calls.at(-1)?.[0].options as {
+      axes: { bottom: { ticks: { values: string[] } } };
+    };
+    const chartTickValues = chartOptions.axes.bottom.ticks.values;
+    expect(chartTickValues).toHaveLength(2);
+    expect(chartTickValues.length).toBeLessThanOrEqual(7);
     expect(mockLineChart.mock.calls.at(-1)?.[0].options).not.toHaveProperty(
       'color',
     );

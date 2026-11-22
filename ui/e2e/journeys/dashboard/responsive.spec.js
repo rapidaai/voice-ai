@@ -257,6 +257,30 @@ test('dashboard stacks activity and health panels at lg width', async ({
   expect(healthBounds.width).toBe(activityBounds.width);
 });
 
+test('dashboard centers its header and content on ultra-wide screens', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 2560, height: 1200 });
+  await gotoJourney(page, dashboardJourney);
+
+  const [headerBounds, gridBounds, pageBounds] = await Promise.all([
+    page.locator('[data-page-header-content]').boundingBox(),
+    page.locator('[data-dashboard-grid]').boundingBox(),
+    page.locator('[data-dashboard-page]').boundingBox(),
+  ]);
+
+  expect(headerBounds).not.toBeNull();
+  expect(gridBounds).not.toBeNull();
+  expect(pageBounds).not.toBeNull();
+  expect(headerBounds.width).toBe(1200);
+  expect(gridBounds.width).toBe(1200);
+  expect(headerBounds.x).toBe(gridBounds.x);
+  expect(headerBounds.x).toBeGreaterThan(pageBounds.x);
+  expect(
+    pageBounds.x + pageBounds.width - (headerBounds.x + headerBounds.width),
+  ).toBeCloseTo(headerBounds.x - pageBounds.x, 0);
+});
+
 test('dashboard keeps the time range available in the compact header while scrolling', async ({
   page,
 }) => {

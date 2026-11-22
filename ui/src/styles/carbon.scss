@@ -497,6 +497,21 @@
   overflow: auto;
 }
 
+.app-dashboard-chart {
+  --app-dashboard-chart-grid-bg: var(--cds-layer-01);
+  --app-dashboard-chart-grid-line: var(--cds-layer-accent-01);
+
+  .cds--cc--grid rect.chart-grid-backdrop {
+    fill: var(--app-dashboard-chart-grid-bg);
+  }
+
+  .cds--cc--grid rect.chart-grid-backdrop.stroked,
+  .cds--cc--grid rect.stroke,
+  .cds--cc--grid :is(g.x.grid, g.y.grid) g.tick line {
+    stroke: var(--app-dashboard-chart-grid-line);
+  }
+}
+
 @media (max-width: 639px), (max-height: 700px) {
   [data-dashboard-empty] {
     flex-direction: column;
