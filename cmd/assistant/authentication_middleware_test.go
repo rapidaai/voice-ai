@@ -20,12 +20,16 @@ func TestSignalHandlerIsRegisteredBeforeServing(t *testing.T) {
 	file := parseCommandSource(t, "assistant.go")
 	var notifyPosition token.Pos
 	var servePosition token.Pos
+	var newMuxCalls int
+	var shutdownCalls int
 	ast.Inspect(file, func(node ast.Node) bool {
 		call, ok := node.(*ast.CallExpr)
 		if !ok {
 			return true
 		}
 		switch callName(call) {
+		case "NewMux":
+			newMuxCalls++
 		case "Notify":
 			if notifyPosition == 0 {
 				notifyPosition = call.Pos()
@@ -34,11 +38,16 @@ func TestSignalHandlerIsRegisteredBeforeServing(t *testing.T) {
 			if servePosition == 0 {
 				servePosition = call.Pos()
 			}
+		case "Shutdown":
+			shutdownCalls++
 		}
 		return true
 	})
 	if notifyPosition == 0 || servePosition == 0 || notifyPosition > servePosition {
 		t.Fatalf("signal Notify position = %d, first Serve position = %d; signal handling must be registered before serving", notifyPosition, servePosition)
+	}
+	if newMuxCalls != 1 || shutdownCalls != 1 {
+		t.Fatalf("NewMux calls = %d, Shutdown calls = %d, want 1 each", newMuxCalls, shutdownCalls)
 	}
 }
 

@@ -32,6 +32,7 @@ import (
 	web_authenticators "github.com/rapidaai/api/web-api/authenticator"
 	"github.com/rapidaai/api/web-api/config"
 	web_router "github.com/rapidaai/api/web-api/router"
+	command_lifecycle "github.com/rapidaai/cmd/internal/lifecycle"
 	"github.com/rapidaai/pkg/authentication/policy"
 	"github.com/rapidaai/pkg/authentication/resolver"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
@@ -126,7 +127,7 @@ func main() {
 		panic(err)
 	}
 
-	cmuxListener := cmux.New(listener)
+	cmuxListener := command_lifecycle.NewMux(listener, 10*time.Second)
 
 	// if application json
 	http2GRPCFilteredListener := cmuxListener.Match(cmux.HTTP2())
@@ -134,6 +135,15 @@ func main() {
 		cmux.HTTP1HeaderField("content-type", "application/grpc-web+proto"),
 		cmux.HTTP1HeaderField("x-grpc-web", "1"))
 	rpcFilteredListener := cmuxListener.Match(cmux.Any())
+	httpServer := &http.Server{
+		Handler:           appRunner.E,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	wrappedServer := grpcweb.WrapServer(appRunner.S, grpcweb.WithOriginFunc(func(origin string) bool { return true }))
+	grpcWebServer := &http.Server{
+		Handler:           wrappedServer,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
 	// rpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
 	// grpcFilteredListener := cmuxListener.Match(cmux.Any())
 
@@ -156,39 +166,22 @@ func main() {
 		if closeErr := listener.Close(); closeErr != nil && !errors.Is(closeErr, net.ErrClosed) {
 			appRunner.Logger.Errorf("Failed to close server listener: %v", closeErr)
 		}
-		grpcStopped := make(chan struct{})
-		go func() {
-			appRunner.S.GracefulStop()
-			close(grpcStopped)
-		}()
-		select {
-		case <-grpcStopped:
-		case <-time.After(10 * time.Second):
-			appRunner.S.Stop()
-			<-grpcStopped
+		shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancelShutdown()
+		if shutdownErr := command_lifecycle.Shutdown(shutdownContext, appRunner.S, httpServer, grpcWebServer); shutdownErr != nil {
+			appRunner.Logger.Errorf("Failed to drain servers: %v", shutdownErr)
 		}
 	}()
 
 	group.Go(func() error {
-		serveErr := appRunner.E.RunListener(rpcFilteredListener)
+		serveErr := httpServer.Serve(rpcFilteredListener)
 		if serveErr != nil && !errors.Is(serveErr, cmux.ErrServerClosed) && !errors.Is(serveErr, cmux.ErrListenerClosed) {
 			appRunner.Logger.Errorf("Failed to start gin server err: %v", serveErr)
 		}
 		return serveErr
 	})
 	group.Go(func() error {
-		//
-		wrappedServer := grpcweb.WrapServer(appRunner.S, grpcweb.WithOriginFunc(func(origin string) bool { return true }))
-		handler := func(resp http.ResponseWriter, req *http.Request) {
-			wrappedServer.ServeHTTP(resp, req)
-		}
-
-		httpServer := http.Server{
-			Handler:           http.HandlerFunc(handler),
-			ReadHeaderTimeout: 10 * time.Second,
-		}
-		//
-		serveErr := httpServer.Serve(grpcFilteredListener)
+		serveErr := grpcWebServer.Serve(grpcFilteredListener)
 		if serveErr != nil && !errors.Is(serveErr, cmux.ErrServerClosed) && !errors.Is(serveErr, cmux.ErrListenerClosed) && !errors.Is(serveErr, http.ErrServerClosed) {
 			appRunner.Logger.Errorf("Failed to start grpc-web server err: %v", serveErr)
 		}
