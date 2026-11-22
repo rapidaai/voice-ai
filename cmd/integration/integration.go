@@ -7,7 +7,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -27,7 +26,6 @@ import (
 
 	"github.com/rapidaai/api/integration-api/config"
 	integration_routers "github.com/rapidaai/api/integration-api/router"
-	command_lifecycle "github.com/rapidaai/cmd/internal/lifecycle"
 	authentication_resolver "github.com/rapidaai/pkg/authentication/resolver"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	middlewares "github.com/rapidaai/pkg/middlewares"
@@ -115,80 +113,60 @@ func main() {
 		panic(err)
 	}
 
-	cmuxListener := command_lifecycle.NewMux(listener, 10*time.Second)
+	cmuxListener := cmux.New(listener)
 	http2GRPCFilteredListener := cmuxListener.Match(cmux.HTTP2())
 	grpcFilteredListener := cmuxListener.Match(
 		cmux.HTTP1HeaderField("Content-type", "application/grpc-web+proto"),
 		cmux.HTTP1HeaderField("x-grpc-web", "1"))
 	rpcFilteredListener := cmuxListener.Match(cmux.Any())
-	httpServer := &http.Server{
-		Handler:           appRunner.E,
-		ReadHeaderTimeout: 10 * time.Second,
-	}
-	wrappedServer := grpcweb.WrapServer(appRunner.S, grpcweb.WithOriginFunc(func(origin string) bool { return true }))
-	grpcWebServer := command_lifecycle.NewHTTPServer(&http.Server{
-		Handler:           wrappedServer,
-		ReadHeaderTimeout: 10 * time.Second,
-	})
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(quit)
-
-	group, groupContext := errgroup.WithContext(ctx)
-	serveDone := make(chan struct{})
-	shutdownDone := make(chan struct{})
-	go func() {
-		defer close(shutdownDone)
-		select {
-		case <-quit:
-		case <-groupContext.Done():
-		case <-serveDone:
-		}
-		cmuxListener.Close()
-		if closeErr := listener.Close(); closeErr != nil && !errors.Is(closeErr, net.ErrClosed) {
-			appRunner.Logger.Errorf("Failed to close server listener: %v", closeErr)
-		}
-		shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancelShutdown()
-		if shutdownErr := command_lifecycle.Shutdown(shutdownContext, appRunner.S, httpServer, grpcWebServer); shutdownErr != nil {
-			appRunner.Logger.Errorf("Failed to drain servers: %v", shutdownErr)
-		}
-	}()
-
+	group, ctx := errgroup.WithContext(ctx)
 	group.Go(func() error {
-		serveErr := httpServer.Serve(rpcFilteredListener)
-		if serveErr != nil && !errors.Is(serveErr, cmux.ErrServerClosed) && !errors.Is(serveErr, cmux.ErrListenerClosed) {
-			appRunner.Logger.Errorf("Failed to start gin server err: %v", serveErr)
+		err = appRunner.E.RunListener(rpcFilteredListener)
+		if err != nil {
+			appRunner.Logger.Errorf("Failed to start gin server err: %v", err)
 		}
-		return serveErr
+		return err
 	})
 	group.Go(func() error {
-		serveErr := grpcWebServer.Serve(grpcFilteredListener)
-		if serveErr != nil && !errors.Is(serveErr, cmux.ErrServerClosed) && !errors.Is(serveErr, cmux.ErrListenerClosed) && !errors.Is(serveErr, http.ErrServerClosed) {
-			appRunner.Logger.Errorf("Failed to start grpc-web server err: %v", serveErr)
+		//
+		wrappedServer := grpcweb.WrapServer(appRunner.S, grpcweb.WithOriginFunc(func(origin string) bool { return true }))
+		handler := func(resp http.ResponseWriter, req *http.Request) {
+			wrappedServer.ServeHTTP(resp, req)
 		}
-		return serveErr
+
+		httpServer := http.Server{
+			Handler:           http.HandlerFunc(handler),
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		//
+		err = httpServer.Serve(grpcFilteredListener)
+		if err != nil {
+			appRunner.Logger.Errorf("Failed to start grpc server err: %v", err)
+		}
+		return err
 	})
 
 	group.Go(func() error {
-		serveErr := appRunner.S.Serve(http2GRPCFilteredListener)
-		if serveErr != nil && !errors.Is(serveErr, cmux.ErrServerClosed) && !errors.Is(serveErr, cmux.ErrListenerClosed) && !errors.Is(serveErr, grpc.ErrServerStopped) {
-			appRunner.Logger.Errorf("Failed to start grpc server err: %v", serveErr)
+		err = appRunner.S.Serve(http2GRPCFilteredListener)
+		if err != nil {
+			appRunner.Logger.Errorf("Failed to start grpc server err: %v", err)
 		}
-		return serveErr
+		return err
 	})
 	// serve now
-	serveErr := cmuxListener.Serve()
-	close(serveDone)
-	groupErr := command_lifecycle.WaitForServers(group, shutdownDone)
-	if serveErr != nil && !errors.Is(serveErr, net.ErrClosed) {
-		appRunner.Logger.Errorf("Failed to serve multiplexed listener: %v", serveErr)
-		panic(serveErr)
+	err = cmuxListener.Serve()
+	if err != nil {
+		appRunner.Logger.Errorf("Failed to start grpc server err: %v", err)
+		panic(err)
 	}
-	if groupErr != nil && !errors.Is(groupErr, cmux.ErrServerClosed) && !errors.Is(groupErr, cmux.ErrListenerClosed) && !errors.Is(groupErr, grpc.ErrServerStopped) && !errors.Is(groupErr, http.ErrServerClosed) {
-		panic(groupErr)
-	}
+
+	err = group.Wait()
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	// done with ctx
+	ctx.Done()
+	<-quit
 }
 
 func (app *AppRunner) Logging() error {
