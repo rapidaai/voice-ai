@@ -50,7 +50,8 @@ Current matrix:
 | Create, get, list, update, and archive assistant tools and configurations | Yes | Yes | Not available |
 | Create model, AgentKit, WebSocket, and AgentFlow providers | Yes | Yes | Yes |
 | Create, verify, version, and deploy endpoint | Not available | Yes | Not available |
-| Create vault credential | Yes | Yes | Not available |
+| Enforce project-key creation policy and invoke deployment with an existing automation key | Not available | Yes | Not available |
+| Reject vault credential creation without recent MFA | Yes | Yes | Not available |
 | Create assistant, phone deployment, and outbound call | Yes | Yes | Yes |
 
 Unless noted below, every assistant flow runs once with a personal access token and once with the project's `x-api-key`. SDK clients use `ConnectionConfig.WithPersonalToken` and `ConnectionConfig.WithSDK`; REST clients send the corresponding authentication headers directly.
@@ -61,13 +62,13 @@ The Node assistant lifecycle covers both authentication modes. Its React variant
 
 The assistant components flow covers tools, storage, analysis, authentication, webhook, and telemetry. Node covers tools with both authentication modes; configuration operations and the React web proxy currently allow personal access tokens only.
 
-The endpoint flow uses a personal access token because endpoint creation does not currently allow the SDK authentication scope.
+The endpoint lifecycle flow uses a personal access token because endpoint creation does not currently allow the SDK authentication scope. The project API key invocation flow confirms that project-key creation and secret inventory remain unavailable under the enforced recent-MFA prerequisite. It seeds an existing `automation_client` key and the internal provider-credential cache as isolated fixture state, creates the endpoint deployment with a personal token, then invokes it with the project key and verifies the offline provider request and response.
 
 The REST provider flow creates one assistant per provider because the REST surface accepts providers during assistant creation. The SDK flows additionally verify attaching providers to an existing assistant.
 
 The onboarding flow has no REST variant because organization and project creation are currently exposed through gRPC and gRPC-web only.
 
-Vault credential updates are not included because the current Vault service and released SDKs do not expose an update operation. They expose create, get/list, and archive/delete operations only.
+Provider-credential creation is covered as an unavailable policy boundary until the required recent-MFA contract exists. Vault credential updates are not included because the current Vault service and released SDKs do not expose an update operation.
 
 Run all flows locally with:
 
@@ -102,6 +103,8 @@ Set `FLOW_POSTGRES_HOST`, `WEB_API_ENDPOINT`, `ASSISTANT_API_ENDPOINT`,
 `WEB_API_REACT_ENDPOINT`, and `ASSISTANT_API_REACT_ENDPOINT` to override the
 localhost defaults provided by these recipes. When the assistant API runs in a
 container, set `FLOW_ARI_HOST` to a host address that the container can reach.
+Set `FLOW_MOCK_HOST` the same way when the integration API cannot reach the flow
+runner's automatically detected address for the project API key invocation flow.
 
 CI runs each client independently with:
 
