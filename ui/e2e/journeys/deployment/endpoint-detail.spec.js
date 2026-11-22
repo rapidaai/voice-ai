@@ -32,6 +32,16 @@ test('endpoint overview summarizes logs and opens the simplified playground', as
   await expect(endpointNav.getByRole('link', { name: 'Overview' })).toHaveClass(
     /cds--side-nav__link--current/,
   );
+  await expect(
+    endpointNav
+      .getByRole('link', { name: 'Logs' })
+      .locator('.cds--side-nav__link-text'),
+  ).toHaveCSS('font-weight', '400');
+  await expect(
+    endpointNav
+      .getByRole('link', { name: 'Overview' })
+      .locator('.cds--side-nav__link-text'),
+  ).toHaveCSS('font-weight', '400');
 
   await expect(
     page.getByRole('heading', { name: 'Endpoint activity' }),

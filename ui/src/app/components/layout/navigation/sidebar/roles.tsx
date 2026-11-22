@@ -15,7 +15,7 @@ export function Roles({ isLoading }: { isLoading?: boolean }) {
         loading={isLoading}
       >
         <SidebarIconWrapper>
-          <UserRole size={20} />
+          <UserRole size={16} />
         </SidebarIconWrapper>
         <SidebarLabel isLoading={isLoading}>Roles & Permissions</SidebarLabel>
       </SidebarSimpleListItem>

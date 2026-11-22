@@ -38,11 +38,11 @@ describe('Aside', () => {
       'custom-aside',
       'bg-shell',
       'border-border-subtle',
-      'w-64',
       'absolute',
       'md:relative',
       'overflow-x-hidden',
     );
+    expect(screen.getByTestId('aside')).toHaveStyle({ width: '13.5rem' });
     expect(screen.getByTestId('aside')).toHaveTextContent('Navigation');
   });
 
@@ -55,8 +55,8 @@ describe('Aside', () => {
       </Aside>,
     );
 
-    expect(screen.getByTestId('aside')).toHaveClass('relative', 'w-12');
-    expect(screen.getByTestId('aside')).not.toHaveClass('w-64');
+    expect(screen.getByTestId('aside')).toHaveClass('relative');
+    expect(screen.getByTestId('aside')).toHaveStyle({ width: '3rem' });
   });
 
   it('composes caller hover handlers with sidebar open state changes', async () => {

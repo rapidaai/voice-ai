@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AssistantSideNav } from '../assistant-side-nav';
+import { typographyClassNames } from '@/app/components/ui/primitives/text';
 
 const assistant = {
   hasAssistantprovidermodel: () => true,
@@ -60,17 +61,18 @@ describe('AssistantSideNav', () => {
     );
 
     const navigation = screen.getByLabelText('Assistant actions');
-    expect(navigation.parentElement).toHaveClass(
-      'bg-shell',
-      'text-foreground',
-      'w-64',
+    expect(navigation.parentElement).toHaveClass('bg-shell', 'text-foreground');
+    expect(navigation.parentElement).toHaveStyle({ width: '13.5rem' });
+    expect(navigation).toHaveClass('app-side-nav', 'bg-transparent!');
+    expect(navigation).toHaveClass(
+      ...typographyClassNames['body-compact-01'].split(' '),
     );
-    expect(navigation).toHaveClass('bg-transparent!');
 
     const toggle = screen.getByRole('button', {
       name: 'Collapse assistant navigation',
     });
     expect(toggle).toHaveClass('cds--btn--ghost');
+    expect(toggle).toHaveClass('app-side-navigation-collapse-control');
     expect(toggle.querySelector('svg')).toBeInTheDocument();
     expect(toggle).toHaveTextContent('Collapse');
 
@@ -91,7 +93,7 @@ describe('AssistantSideNav', () => {
     );
 
     const navigation = screen.getByLabelText('Assistant actions');
-    expect(navigation.parentElement).toHaveClass('w-12');
+    expect(navigation.parentElement).toHaveStyle({ width: '3rem' });
     expect(navigation).toHaveClass('transform-none!');
     expect(navigation).not.toHaveClass('translate-x-0!');
     expect(

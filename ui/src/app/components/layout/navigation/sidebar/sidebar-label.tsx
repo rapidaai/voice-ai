@@ -19,12 +19,12 @@ export function SidebarLabel({
     <span
       {...attributes}
       className={cn(
-        'flex-1 truncate text-sm font-semibold transition-all duration-200',
+        'flex-1 truncate transition-all duration-200',
         open ? 'opacity-100' : 'opacity-0 w-0',
         className,
       )}
     >
-      <Text isLoading={isLoading} skeletonWidth="70%">
+      <Text isLoading={isLoading} skeletonWidth="70%" variant="body-compact-01">
         {children}
       </Text>
     </span>

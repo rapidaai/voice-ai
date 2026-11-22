@@ -15,7 +15,7 @@ export function ExternalTool({ isLoading }: { isLoading?: boolean }) {
         loading={isLoading}
       >
         <SidebarIconWrapper>
-          <Plug size={20} />
+          <Plug size={16} />
         </SidebarIconWrapper>
         <SidebarLabel isLoading={isLoading}>External integrations</SidebarLabel>
       </SidebarSimpleListItem>

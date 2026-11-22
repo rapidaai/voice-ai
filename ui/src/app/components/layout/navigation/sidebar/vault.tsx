@@ -31,7 +31,7 @@ export function Vault({ isLoading }: { isLoading?: boolean }) {
       >
         <div className="flex items-center">
           <SidebarIconWrapper>
-            <Locked size={20} />
+            <Locked size={16} />
           </SidebarIconWrapper>
           <SidebarLabel isLoading={isLoading}>Credentials</SidebarLabel>
         </div>
@@ -56,7 +56,7 @@ export function Vault({ isLoading }: { isLoading?: boolean }) {
             loading={isLoading}
           >
             <SidebarIconWrapper>
-              <Locked size={20} />
+              <Locked size={16} />
             </SidebarIconWrapper>
             <SidebarLabel isLoading={isLoading}>
               Project Credential
@@ -69,7 +69,7 @@ export function Vault({ isLoading }: { isLoading?: boolean }) {
             loading={isLoading}
           >
             <SidebarIconWrapper>
-              <Key size={20} />
+              <Key size={16} />
             </SidebarIconWrapper>
             <SidebarLabel isLoading={isLoading}>Personal Token</SidebarLabel>
           </SidebarSimpleListItem>

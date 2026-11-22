@@ -192,7 +192,7 @@ test('mobile sidebar expands without reducing dashboard width', async ({
   await expect(dashboard).toHaveCSS('width', '342px');
 
   await page.getByRole('button', { name: 'Expand sidebar' }).click();
-  await expect(sidebar).toHaveCSS('width', '256px');
+  await expect(sidebar).toHaveCSS('width', '216px');
   await expect(dashboard).toHaveCSS('width', '390px');
   await expect(
     page.getByText('Dashboard', { exact: true }).first(),

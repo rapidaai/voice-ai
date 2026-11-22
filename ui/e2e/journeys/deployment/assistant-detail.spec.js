@@ -45,6 +45,20 @@ for (const colorMode of ['light', 'dark']) {
     await mockOrganizationCredentials(page);
     await gotoJourney(page, journey('deployment.assistantCreateVersion'));
 
+    const assistantNav = page.getByRole('navigation', {
+      name: 'Assistant actions',
+    });
+    await expect(
+      assistantNav
+        .getByRole('link', { name: 'Overview' })
+        .locator('.cds--side-nav__link-text'),
+    ).toHaveCSS('font-weight', '400');
+    await expect(
+      assistantNav
+        .getByRole('link', { name: 'Add new version' })
+        .locator('.cds--side-nav__link-text'),
+    ).toHaveCSS('font-weight', '400');
+
     await expect(
       page.getByText(
         'Unable to get latest assistant provider. Please try again later.',

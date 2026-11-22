@@ -3,12 +3,9 @@ import {
   Dashboard,
   Debug,
   Settings,
-  SidePanelClose,
-  SidePanelOpen,
   SourceControl,
 } from '@carbon/icons-react';
 import {
-  Button,
   SideNav,
   SideNavItems,
   SideNavLink,
@@ -21,6 +18,12 @@ import {
   getSidenavExpanded,
   setSidenavExpanded,
 } from '@/context/sidenav-storage';
+import {
+  SideNavigationCollapseControl,
+  SideNavigationPanel,
+  SideNavigationSectionLabel,
+} from '@/app/components/layout/navigation/side-navigation-patterns';
+import { typographyClassNames } from '@/app/components/ui/primitives/text';
 import { cn } from '@/utils';
 
 export function EndpointSideNav(props: { endpointId: string }) {
@@ -59,23 +62,18 @@ export function EndpointSideNav(props: { endpointId: string }) {
   };
 
   return (
-    <div
-      className={cn(
-        'relative shrink-0 flex flex-col h-full',
-        'bg-shell text-foreground',
-        'border-r border-border-subtle',
-        'transition-[width] duration-200 ease-in-out',
-        expanded ? 'w-64' : 'w-12',
-      )}
-    >
+    <SideNavigationPanel expanded={expanded}>
       <SideNav
         aria-label="Endpoint actions"
         expanded={expanded}
         isFixedNav
         isRail={!expanded}
-        className="relative! inset-auto! h-auto! flex-1 w-full! transform-none! border-none! bg-transparent! z-0!"
+        className={cn(
+          typographyClassNames['body-compact-01'],
+          'app-side-nav relative! inset-auto! h-auto! flex-1 w-full! transform-none! border-none! bg-transparent! z-0!',
+        )}
       >
-        <SideNavItems>
+        <SideNavItems className="pt-2">
           <SideNavLink
             renderIcon={Dashboard}
             href={`${basePath}/overview`}
@@ -111,15 +109,9 @@ export function EndpointSideNav(props: { endpointId: string }) {
           </SideNavMenu>
 
           <Fragment>
-            <li
-              className={cn(
-                'cds--switcher__item--divider transition-all duration-200',
-                !expanded &&
-                  'opacity-0 h-0 overflow-hidden !py-0 !my-0 !border-none',
-              )}
-            >
-              <span className="uppercase!">Settings</span>
-            </li>
+            <SideNavigationSectionLabel expanded={expanded}>
+              Settings
+            </SideNavigationSectionLabel>
             <SideNavLink
               renderIcon={Settings}
               href={`${basePath}/settings`}
@@ -130,15 +122,9 @@ export function EndpointSideNav(props: { endpointId: string }) {
           </Fragment>
 
           <Fragment>
-            <li
-              className={cn(
-                'cds--switcher__item--divider transition-all duration-200',
-                !expanded &&
-                  'opacity-0 h-0 overflow-hidden !py-0 !my-0 !border-none',
-              )}
-            >
-              <span className="uppercase!">Playground</span>
-            </li>
+            <SideNavigationSectionLabel expanded={expanded}>
+              Playground
+            </SideNavigationSectionLabel>
             <SideNavLink
               renderIcon={Debug}
               href={`${basePath}/playground`}
@@ -151,40 +137,16 @@ export function EndpointSideNav(props: { endpointId: string }) {
       </SideNav>
 
       <div className="shrink-0 border-t border-border-subtle">
-        <Button
-          type="button"
-          kind="ghost"
-          size="sm"
+        <SideNavigationCollapseControl
           onClick={toggleExpanded}
           aria-label={
             expanded
               ? 'Collapse endpoint navigation'
               : 'Expand endpoint navigation'
           }
-          className={cn(
-            '!flex !h-10 !w-full !max-w-none !items-center !justify-start !px-4',
-            '!text-muted',
-            'hover:!bg-layer-hover hover:!text-foreground',
-            '!transition-colors !duration-100',
-          )}
-        >
-          <span className="shrink-0">
-            {expanded ? (
-              <SidePanelClose size={16} />
-            ) : (
-              <SidePanelOpen size={16} />
-            )}
-          </span>
-          <span
-            className={cn(
-              'text-xs truncate transition-all duration-200 ml-3',
-              expanded ? 'opacity-100' : 'opacity-0 w-0 ml-0 overflow-hidden',
-            )}
-          >
-            {expanded ? 'Collapse' : 'Expand'}
-          </span>
-        </Button>
+          expanded={expanded}
+        />
       </div>
-    </div>
+    </SideNavigationPanel>
   );
 }

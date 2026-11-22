@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { EndpointSideNav } from '../endpoint-side-nav';
+import { typographyClassNames } from '@/app/components/ui/primitives/text';
 
 describe('EndpointSideNav', () => {
   beforeEach(() => {
@@ -26,17 +27,20 @@ describe('EndpointSideNav', () => {
     );
 
     const navigation = screen.getByLabelText('Endpoint actions');
-    expect(navigation.parentElement).toHaveClass(
-      'bg-shell',
-      'text-foreground',
-      'w-64',
+    expect(navigation.parentElement).toHaveClass('bg-shell', 'text-foreground');
+    expect(navigation.parentElement).toHaveStyle({ width: '13.5rem' });
+    expect(navigation).toHaveClass(
+      'app-side-nav',
+      'bg-transparent!',
+      'transform-none!',
+      ...typographyClassNames['body-compact-01'].split(' '),
     );
-    expect(navigation).toHaveClass('bg-transparent!', 'transform-none!');
 
     const toggle = screen.getByRole('button', {
       name: 'Collapse endpoint navigation',
     });
     expect(toggle).toHaveClass('cds--btn--ghost');
+    expect(toggle).toHaveClass('app-side-navigation-collapse-control');
     expect(toggle.querySelector('svg')).toBeInTheDocument();
     expect(toggle).toHaveTextContent('Collapse');
   });
@@ -56,7 +60,7 @@ describe('EndpointSideNav', () => {
     );
 
     const navigation = screen.getByLabelText('Endpoint actions');
-    expect(navigation.parentElement).toHaveClass('w-12');
+    expect(navigation.parentElement).toHaveStyle({ width: '3rem' });
     expect(navigation).toHaveClass('transform-none!');
     expect(navigation).not.toHaveClass('translate-x-0!');
     expect(
@@ -121,7 +125,7 @@ describe('EndpointSideNav', () => {
     );
 
     const navigation = screen.getByLabelText('Endpoint actions');
-    expect(navigation.parentElement).toHaveClass('w-12');
+    expect(navigation.parentElement).toHaveStyle({ width: '3rem' });
     expect(
       screen.getByRole('button', { name: 'Expand endpoint navigation' }),
     ).toBeInTheDocument();
@@ -157,7 +161,7 @@ describe('EndpointSideNav', () => {
     await waitFor(() => {
       expect(
         screen.getByLabelText('Endpoint actions').parentElement,
-      ).toHaveClass('w-12');
+      ).toHaveStyle({ width: '3rem' });
     });
   });
 });

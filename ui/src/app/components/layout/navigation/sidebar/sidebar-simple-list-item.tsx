@@ -27,9 +27,9 @@ export function SidebarSimpleListItem(props: SidebarLinkItemProps) {
 
   if (isLoading) {
     return (
-      <div className={cn('flex h-10 w-full items-center px-1', className)}>
+      <div className={cn('flex h-8 w-full items-center px-1', className)}>
         <div className="flex h-8 w-12 flex-shrink-0 items-center justify-center">
-          <SkeletonIcon className="!w-5 !h-5" />
+          <SkeletonIcon className="!h-4 !w-4" />
         </div>
         {open && <SkeletonText className="!mb-0 flex-1" width="70%" />}
       </div>
@@ -41,12 +41,13 @@ export function SidebarSimpleListItem(props: SidebarLinkItemProps) {
       <div
         {...dProps}
         className={cn(
-          'relative flex h-10 w-full cursor-pointer items-center',
+          'relative flex h-8 w-full cursor-pointer items-center',
           'text-muted',
+          'transition-colors duration-100',
           'hover:bg-layer-hover hover:text-foreground',
           active && [
-            'bg-layer-hover font-semibold text-foreground',
-            'before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary before:content-[""]',
+            'bg-layer-selected text-foreground',
+            'before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-primary before:content-[""]',
           ],
           className,
         )}

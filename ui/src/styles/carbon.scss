@@ -64,8 +64,7 @@
 @use '@carbon/ibm-products/scss/components/AddSelect';
 @use '@carbon/ibm-products/scss/components/EmptyStates';
 @use '@carbon/ibm-products/scss/components/FullPageError';
-@use '@carbon/ibm-products/scss/components/SidePanel';
-@use '@carbon/ibm-products/scss/components/Coachmark';
+@use '@carbon/ibm-products/scss/components/Coachmark/coachmark_next';
 
 .debugger-configuration-accordion > .cds--accordion__item:first-child {
   border-block-start: 0;
@@ -116,7 +115,6 @@
   max-inline-size: none;
 }
 
-// Match the Carbon for IBM Products coachmark story across every tour step.
 .app-coachmark__content {
   inline-size: 290px;
 }
@@ -128,17 +126,17 @@
 
 .app-coachmark__content .c4p--coachmark__next--content-body > h2 {
   margin: 0 0 0.5rem;
-  font-size: var(--cds-productive-heading-02-font-size, 1rem);
-  font-weight: var(--cds-productive-heading-02-font-weight, 600);
-  line-height: var(--cds-productive-heading-02-line-height, 1.375);
-  letter-spacing: var(--cds-productive-heading-02-letter-spacing, 0);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.375;
+  letter-spacing: 0;
 }
 
 .app-coachmark__content .c4p--coachmark__next--content-body > p {
-  font-size: var(--cds-body-long-01-font-size, 0.875rem);
-  font-weight: var(--cds-body-long-01-font-weight, 400);
-  line-height: var(--cds-body-long-01-line-height, 1.42857);
-  letter-spacing: var(--cds-body-long-01-letter-spacing, 0.16px);
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.42857;
+  letter-spacing: 0.16px;
 }
 
 .app-coachmark__content .c4p--coachmark__next--content-body > button {
@@ -454,9 +452,9 @@
   background-color: var(--cds-layer-01);
 }
 
-// ─── SideNav submenu items font weight ───────────────────────────────────────
-.cds--side-nav__menu-item .cds--side-nav__link-text {
-  font-weight: 500;
+.app-side-nav :is(a, button, span) {
+  font: inherit !important;
+  letter-spacing: inherit !important;
 }
 
 :root[data-theme-schema='1'] .app-onboarding-checklist {
