@@ -43,7 +43,7 @@ func TestAuditServiceClientUsesUnlimitedMessageSizesPerCall(t *testing.T) {
 		t.Fatal(err)
 	}
 	grpcClient := &auditGRPCClientStub{}
-	client := NewAuditServiceClientWithClient(&config.AppConfig{Secret: "test-secret"}, logger, nil, grpcClient)
+	client := NewAuditServiceClientWithClient(&config.AppConfig{}, logger, nil, grpcClient)
 	principal, err := authentication.NewDirectPrincipal(
 		authentication.Identity{Type: authentication.IdentityUser, ID: 1},
 		authentication.Tenant{OrganizationID: 2, ProjectID: 3},
