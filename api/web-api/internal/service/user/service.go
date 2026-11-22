@@ -950,18 +950,29 @@ func (aS *userService) GetAllActiveProjectMember(ctx context.Context, projectId 
 
 func (aS *userService) GetAllOrganizationMember(ctx context.Context, organizationId uint64, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_entity.UserOrganizationRole, error) {
 	db := aS.postgres.DB(ctx)
-	var rt []internal_entity.UserOrganizationRole
-	var cnt int64
+	var roles []internal_entity.UserOrganizationRole
+	var count int64
 
-	qry := db.Model(&internal_entity.UserOrganizationRole{}).
-		Where("organization_id = ? AND status IN ?", organizationId, []string{type_enums.RECORD_ACTIVE.String(), type_enums.RECORD_INVITED.String()})
-	for _, ct := range criteria {
-		qry = qry.Where(fmt.Sprintf("%s = ?", ct.GetKey()), ct.GetValue())
+	organizationMemberIDs := db.Model(&internal_entity.UserOrganizationRole{}).
+		Select("DISTINCT user_auth_id").
+		Where("organization_id = ? AND status IN ?", organizationId, currentAssignmentStates())
+	usersQuery := db.Model(&internal_entity.UserAuth{}).
+		Joins("JOIN (?) AS organization_members ON organization_members.user_auth_id = user_auths.id", organizationMemberIDs)
+	for _, criterion := range criteria {
+		switch criterion.GetKey() {
+		case "id":
+			usersQuery = usersQuery.Where("user_auths.id = ?", criterion.GetValue())
+		case "name":
+			usersQuery = usersQuery.Where("user_auths.name = ?", criterion.GetValue())
+		case "email":
+			usersQuery = usersQuery.Where("user_auths.email = ?", criterion.GetValue())
+		case "status":
+			usersQuery = usersQuery.Where("user_auths.status = ?", criterion.GetValue())
+		case "source":
+			usersQuery = usersQuery.Where("user_auths.source = ?", criterion.GetValue())
+		}
 	}
-	if err := qry.Distinct("user_auth_id").Count(&cnt).Error; err != nil {
-		aS.logger.Errorf("exception in DB transaction %v", err)
-		return cnt, &rt, err
-	}
+
 	page, pageSize := uint32(1), uint32(25)
 	if paginate != nil {
 		page, pageSize = paginate.GetPage(), paginate.GetPageSize()
@@ -972,24 +983,40 @@ func (aS *userService) GetAllOrganizationMember(ctx context.Context, organizatio
 	if pageSize == 0 {
 		pageSize = 25
 	}
-	var members []struct{ UserAuthId uint64 }
-	if err := qry.Select("user_auth_id").Group("user_auth_id").Order("MAX(created_date) DESC, user_auth_id ASC").
-		Limit(int(pageSize)).Offset(int((page - 1) * pageSize)).Scan(&members).Error; err != nil {
-		return cnt, &rt, err
+
+	var users []internal_entity.UserAuth
+	if err := usersQuery.Scopes(gorm_models.Paginate(gorm_models.NewPaginated(page, pageSize, &count, usersQuery))).
+		Order("user_auths.created_date DESC, user_auths.id ASC").Find(&users).Error; err != nil {
+		return count, &roles, err
 	}
-	userIDs := make([]uint64, 0, len(members))
-	for _, member := range members {
-		userIDs = append(userIDs, member.UserAuthId)
+	userIDs := make([]uint64, 0, len(users))
+	usersByID := make(map[uint64]internal_entity.UserAuth, len(users))
+	userPosition := make(map[uint64]int, len(users))
+	for _, user := range users {
+		userIDs = append(userIDs, user.Id)
+		usersByID[user.Id] = user
+		userPosition[user.Id] = len(userIDs) - 1
 	}
 	if len(userIDs) == 0 {
-		return cnt, &rt, nil
+		return count, &roles, nil
 	}
-	if err := db.Preload("Member").Preload("RoleDefinition").
+	if err := db.Preload("RoleDefinition").
 		Where("organization_id = ? AND user_auth_id IN ? AND status IN ?", organizationId, userIDs, currentAssignmentStates()).
-		Order("user_auth_id ASC, role_definition_id ASC").Find(&rt).Error; err != nil {
-		return cnt, &rt, err
+		Find(&roles).Error; err != nil {
+		return count, &roles, err
 	}
-	return cnt, &rt, nil
+	for index := range roles {
+		roles[index].Member = usersByID[roles[index].UserAuthId]
+	}
+	sort.Slice(roles, func(i, j int) bool {
+		leftPosition := userPosition[roles[i].UserAuthId]
+		rightPosition := userPosition[roles[j].UserAuthId]
+		if leftPosition != rightPosition {
+			return leftPosition < rightPosition
+		}
+		return roles[i].RoleDefinitionID < roles[j].RoleDefinitionID
+	})
+	return count, &roles, nil
 }
 
 func (uS *userService) GetAllUserRolesForOrg(ctx context.Context, organizationId uint64) ([]*internal_entity.UserOrganizationRole, error) {
