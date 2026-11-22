@@ -164,6 +164,50 @@ func TestGetAllOrganizationMemberAppliesCriteriaToUsers(t *testing.T) {
 	}
 }
 
+func TestGetAllOrganizationMemberAppliesStatusCriteriaToOrganizationRole(t *testing.T) {
+	service, db, _ := newAssignmentServiceTest(t)
+	if err := db.Create(&internal_entity.UserAuth{
+		Audited: gorm_models.Audited{Id: 2},
+		Mutable: gorm_models.Mutable{Status: type_enums.RECORD_INVITED},
+		Name:    "Member", Email: "member@example.com", Password: "hash", Source: "direct",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&internal_entity.UserOrganizationRole{
+		Mutable:    gorm_models.Mutable{Status: type_enums.RECORD_ACTIVE},
+		UserAuthId: 2, OrganizationId: 10, RoleDefinitionID: 102,
+		RoleScopeType: "ORGANIZATION", RoleSubjectType: "USER",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	count, roles, err := service.GetAllOrganizationMember(
+		context.Background(),
+		10,
+		[]*protos.Criteria{{Key: "status", Value: type_enums.RECORD_ACTIVE.String()}},
+		&protos.Paginate{Page: 1, PageSize: 20},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 || len(*roles) != 2 {
+		t.Fatalf("active count = %d, roles = %d, want owner and member", count, len(*roles))
+	}
+
+	count, roles, err = service.GetAllOrganizationMember(
+		context.Background(),
+		10,
+		[]*protos.Criteria{{Key: "status", Value: type_enums.RECORD_INVITED.String()}},
+		&protos.Paginate{Page: 1, PageSize: 20},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 || len(*roles) != 0 {
+		t.Fatalf("invited count = %d, roles = %d, want no organization roles", count, len(*roles))
+	}
+}
+
 func TestGetAllOrganizationMemberAppliesContainsCriteriaLiterally(t *testing.T) {
 	service, db, _ := newAssignmentServiceTest(t)
 	users := []internal_entity.UserAuth{

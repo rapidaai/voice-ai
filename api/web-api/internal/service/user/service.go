@@ -986,7 +986,7 @@ func (aS *userService) GetAllOrganizationMember(ctx context.Context, organizatio
 			if criterion.GetLogic() != "" && criterion.GetLogic() != "=" {
 				return 0, &roles, fmt.Errorf("unsupported logic %q for organization member criterion %q", criterion.GetLogic(), criterion.GetKey())
 			}
-			usersQuery = usersQuery.Where("user_auths.status = ?", criterion.GetValue())
+			organizationMemberIDs = organizationMemberIDs.Where("status = ?", criterion.GetValue())
 		case "source":
 			if criterion.GetLogic() != "" && criterion.GetLogic() != "=" {
 				return 0, &roles, fmt.Errorf("unsupported logic %q for organization member criterion %q", criterion.GetLogic(), criterion.GetKey())
