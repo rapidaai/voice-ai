@@ -115,7 +115,7 @@ describe('EndpointOverviewPage', () => {
   });
 
   it('builds an activity dashboard from endpoint logs', async () => {
-    render(
+    const { container } = render(
       <EndpointOverviewPage
         currentEndpoint={currentEndpoint}
         currentEndpointProviderModel={currentEndpointProviderModel}
@@ -137,8 +137,35 @@ describe('EndpointOverviewPage', () => {
       '/deployment/endpoint',
     );
     expect(
-      await screen.findByRole('heading', { name: 'Endpoint activity' }),
+      container.querySelector('[data-endpoint-overview-surface]'),
+    ).toHaveClass('w-full', 'bg-surface');
+    expect(
+      container.querySelector('[data-endpoint-overview-surface]'),
+    ).not.toHaveClass('max-w-[1200px]');
+    expect(screen.getByTestId('endpoint-overview-content')).toHaveClass(
+      'mx-auto',
+      'w-full',
+      'max-w-[1200px]',
+      'p-4',
+      'md:px-8',
+      'md:py-8',
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Endpoint Activity' }),
     ).toBeInTheDocument();
+    expect(screen.queryByText('Endpoint activity')).not.toBeInTheDocument();
+    for (const heading of ['Requests', 'Request details', 'Request latency']) {
+      const card = screen.getByRole('heading', { name: heading }).parentElement
+        ?.parentElement;
+      expect(card).toHaveClass(
+        'overflow-hidden',
+        'rounded-lg',
+        'border',
+        'border-border-subtle',
+        'bg-layer',
+      );
+      expect(card).not.toHaveClass('!rounded-none', '!bg-surface');
+    }
     expect(screen.getAllByText('128')).toHaveLength(2);
     expect(screen.getByText('67')).toBeInTheDocument();
     expect(screen.getByText('140')).toBeInTheDocument();

@@ -43,7 +43,10 @@ export function EndpointOverviewPage(props: {
         }}
       />
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div
+        data-endpoint-overview-surface
+        className="min-h-0 w-full flex-1 overflow-auto bg-surface"
+      >
         <EndpointActivityDashboard
           endpointId={endpointId}
           onOpenLogs={() => navigate(`/deployment/endpoint/${endpointId}/logs`)}

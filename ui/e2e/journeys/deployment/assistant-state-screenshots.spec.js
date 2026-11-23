@@ -76,7 +76,7 @@ const scenarios = [
     setup: async () => {},
     assert: async page => {
       await expect(
-        page.getByRole('heading', { name: 'Assistant activity' }),
+        page.getByRole('heading', { name: 'Assistant Activity' }),
       ).toBeVisible();
       await expect(
         page.getByLabel('Assistant deployment checklist'),

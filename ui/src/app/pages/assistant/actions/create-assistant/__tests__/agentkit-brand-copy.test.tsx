@@ -149,14 +149,17 @@ jest.mock('@/app/components/ui/composites/create-full-page', () => ({
     description,
     errorMessage,
     steps,
+    title,
   }: any) => {
     const active =
       steps.find((item: any) => item.code === activeStep) ?? steps[0];
     return (
       <div>
-        <h1>{description}</h1>
+        <h1>{title}</h1>
+        <p>{description}</p>
         {errorMessage ? <div>{errorMessage}</div> : null}
-        <p>{active.description}</p>
+        {!active.hideHeader ? <h2>{active.name}</h2> : null}
+        {!active.hideHeader ? <p>{active.description}</p> : null}
         <div>{active.body}</div>
         <div>
           {Array.isArray(active.actions)
@@ -456,8 +459,14 @@ describe('AgentKit brand copy', () => {
   it('renders the create AgentKit version page with the configured brand', async () => {
     renderWithTheme(<CreateAgentKitVersion />);
 
+    expect(
+      screen.getByRole('heading', { name: 'Create AgentKit Version' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Connect Configuration' }),
+    ).not.toBeInTheDocument();
     expect(document.body).toHaveTextContent(
-      'Provide the connection configuration for your Acme Voice AgentKit setup.',
+      'Create a new version of this AgentKit connection.',
     );
     expect(document.body).toHaveTextContent(
       'where your Acme Voice AgentKit is running',

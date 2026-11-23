@@ -72,6 +72,7 @@ export interface CreateFullPageWithHeaderProps {
     body: ReactElement;
     code: string;
     description?: string;
+    hideHeader?: boolean;
     name: string;
   }[];
   title: string;
@@ -101,8 +102,11 @@ export function CreateFullPageHeader({
   titleStart,
 }: CreateFullPageHeaderProps) {
   return (
-    <header className="shrink-0 border-b border-border-subtle bg-layer px-5 py-6 md:px-8">
-      <div className="max-w-2xl">
+    <header className="shrink-0 border-b border-border-subtle bg-surface px-5 py-6 md:px-8">
+      <div
+        data-create-page-header-content
+        className="max-w-2xl"
+      >
         {label && (
           <Text
             as="div"
@@ -112,16 +116,16 @@ export function CreateFullPageHeader({
             {label}
           </Text>
         )}
-        <div className="flex items-start gap-3 text-foreground">
+        <div className="flex items-start gap-2 text-foreground">
           {titleStart && <span className="shrink-0 pt-0.5">{titleStart}</span>}
-          <Text as="h1" variant="heading-04">
+          <Text as="h1" variant="heading-03" className="font-semibold!">
             {title}
           </Text>
         </div>
         {description && (
           <Text
             as="div"
-            className="mt-2 text-foreground"
+            className="mt-2 text-muted"
             variant="body-compact-01"
           >
             {description}
@@ -147,7 +151,7 @@ function CreateFullPageFrame({
         description={description}
         label={eyebrow}
         title={title}
-        titleStart={HeaderIcon ? <HeaderIcon size={32} /> : undefined}
+        titleStart={HeaderIcon ? <HeaderIcon size={24} /> : undefined}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden bg-surface">
@@ -391,23 +395,29 @@ export function CreateFullPageWithHeader({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {activeStepData && (
           <div className="flex flex-1 flex-col">
-            <header className="border-b border-border-subtle px-6 pb-6 pt-8">
-              <Text
-                as="p"
-                className="mb-1.5 text-muted xl:hidden"
-                variant="label-01"
-              >
-                Step {activeIndex + 1} of {steps.length}
-              </Text>
-              <Text as="h2" className="text-foreground" variant="heading-04">
-                {activeStepData.name}
-              </Text>
-              {activeStepData.description && (
-                <Text as="p" className="mt-1.5 text-muted" variant="body-01">
-                  {activeStepData.description}
+            {!activeStepData.hideHeader && (
+              <header className="border-b border-border-subtle px-6 pb-6 pt-8">
+                <Text
+                  as="p"
+                  className="mb-1.5 text-muted xl:hidden"
+                  variant="label-01"
+                >
+                  Step {activeIndex + 1} of {steps.length}
                 </Text>
-              )}
-            </header>
+                <Text
+                  as="h2"
+                  className="text-foreground"
+                  variant="heading-04"
+                >
+                  {activeStepData.name}
+                </Text>
+                {activeStepData.description && (
+                  <Text as="p" className="mt-1.5 text-muted" variant="body-01">
+                    {activeStepData.description}
+                  </Text>
+                )}
+              </header>
+            )}
 
             {activeStepData.body}
           </div>

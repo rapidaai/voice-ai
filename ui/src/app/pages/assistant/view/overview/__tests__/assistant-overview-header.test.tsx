@@ -83,10 +83,7 @@ jest.mock('@carbon/react', () => ({
   ),
 }));
 
-const makeAssistant = ({
-  deployed = true,
-  deploymentStatus = 'ACTIVE',
-} = {}) =>
+const makeAssistant = ({ deployed = true, deploymentStatus = 'ACTIVE' } = {}) =>
   ({
     getId: () => 'assistant-1',
     getName: () => 'Production assistant',
@@ -118,6 +115,12 @@ describe('Assistant overview header', () => {
       '[data-resource-detail-header]',
     );
     expect(resourceHeader).toHaveClass('h-12', 'bg-shell');
+
+    const overviewSurface = container.querySelector(
+      '[data-assistant-overview-surface]',
+    );
+    expect(overviewSurface).toHaveClass('flex-1', 'bg-layer');
+    expect(overviewSurface).not.toHaveClass('max-w-[1200px]');
 
     expect(screen.getByText('Assistants')).toHaveAttribute(
       'href',

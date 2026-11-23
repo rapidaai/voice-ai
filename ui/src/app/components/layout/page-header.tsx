@@ -55,9 +55,9 @@ export function PageHeader({
   pageActions,
   className,
   contentClassName,
-  descriptionClassName,
-  titleClassName,
-  titleVariant,
+  descriptionClassName = 'text-muted',
+  titleClassName = 'font-semibold!',
+  titleVariant = 'heading-03',
   showDivider = true,
 }: PageHeaderProps) {
   const collapseSentinel = useRef<HTMLSpanElement>(null);
@@ -100,15 +100,7 @@ export function PageHeader({
                     {titleStart}
                   </div>
                 )}
-                <Text
-                  as="h1"
-                  variant={titleVariant ?? 'heading-04'}
-                  className={cn(
-                    !titleVariant &&
-                      'text-[1.25rem]! leading-[1.75rem]! md:text-[1.75rem]! md:leading-[2.25rem]!',
-                    titleClassName,
-                  )}
-                >
+                <Text as="h1" variant={titleVariant} className={titleClassName}>
                   {title}
                 </Text>
                 {contextualActions}
@@ -116,7 +108,7 @@ export function PageHeader({
               {description && (
                 <Text
                   as="div"
-                  className={cn('mt-2 text-foreground', descriptionClassName)}
+                  className={cn('mt-2', descriptionClassName)}
                   variant="body-compact-01"
                 >
                   {description}

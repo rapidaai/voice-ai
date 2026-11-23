@@ -383,9 +383,9 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
   return (
     <>
       <ConfirmDialogComponent />
-      <Helmet title="Connect AgentKit"></Helmet>
+      <Helmet title="Create AgentKit Version"></Helmet>
       <CreateFullPageWithHeader
-        title="Create AgentKit version"
+        title="Create AgentKit Version"
         eyebrow="Assistant"
         description="Create a new version of this AgentKit connection."
         activeStep={activeTab}
@@ -395,6 +395,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
           {
             code: 'change-assistant',
             name: 'Connect Configuration',
+            hideHeader: true,
             description: `Provide the connection configuration for your ${theme.brand.name} AgentKit setup.`,
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">

@@ -148,7 +148,7 @@ test('assistant listing opens a populated assistant overview', async ({
 
   await expect(page).toHaveURL(/\/deployment\/assistant\/\d+\/overview$/);
   await expect(
-    page.getByRole('heading', { name: 'Assistant activity' }),
+    page.getByRole('heading', { name: 'Assistant Activity' }),
   ).toBeVisible();
 });
 

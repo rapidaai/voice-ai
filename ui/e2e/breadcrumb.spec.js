@@ -7,7 +7,7 @@ test('workspace breadcrumb uses route metadata and dynamic entity names', async 
 }) => {
   await authenticatePage(page);
   await page.goto(`/deployment/assistant/${ASSISTANT_ID}/overview`);
-  await expect(page.getByText('Assistant activity')).toBeVisible();
+  await expect(page.getByText('Assistant Activity')).toBeVisible();
 
   const breadcrumb = page.locator('.global-breadcrumb');
   await expect(

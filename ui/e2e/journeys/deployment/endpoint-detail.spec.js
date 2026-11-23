@@ -44,7 +44,7 @@ test('endpoint overview summarizes logs and opens the simplified playground', as
   ).toHaveCSS('font-weight', '400');
 
   await expect(
-    page.getByRole('heading', { name: 'Endpoint activity' }),
+    page.getByRole('heading', { name: 'Endpoint Activity' }),
   ).toBeVisible();
   await expect(page.getByText('128').first()).toBeVisible();
   await expect(page.getByText('Request details')).toBeVisible();

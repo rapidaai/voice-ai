@@ -37,9 +37,11 @@ describe('PageHeader', () => {
 
     expect(
       screen.getByRole('heading', { level: 1, name: 'Projects' }),
-    ).toBeInTheDocument();
+    ).toHaveClass('text-[1.25rem]', 'leading-[1.75rem]', 'font-semibold!');
     expect(screen.getByText('Organization')).toBeInTheDocument();
-    expect(screen.getByText('Manage workspace projects.')).toBeInTheDocument();
+    expect(screen.getByText('Manage workspace projects.')).toHaveClass(
+      'text-muted',
+    );
     expect(
       screen.getByRole('button', { name: 'Create project' }),
     ).toBeInTheDocument();
@@ -85,6 +87,25 @@ describe('PageHeader', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Dashboard' }),
     ).toHaveClass('font-semibold!');
+  });
+
+  it('allows pages to override the shared title and description typography', () => {
+    render(
+      <PageHeader
+        title="Projects"
+        description="Manage workspace projects."
+        titleVariant="heading-04"
+        titleClassName="font-normal!"
+        descriptionClassName="text-foreground"
+      />,
+    );
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Projects' }),
+    ).toHaveClass('text-[1.75rem]', 'leading-[2.25rem]', 'font-normal!');
+    expect(screen.getByText('Manage workspace projects.')).toHaveClass(
+      'text-foreground',
+    );
   });
 
   it('keeps a collapsed title visible on small screens when there are no actions', () => {

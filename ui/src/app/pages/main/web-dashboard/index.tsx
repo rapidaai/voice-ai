@@ -64,6 +64,10 @@ import {
 import { EmptyState } from '@/app/components/ui/feedback';
 import { PageHeader } from '@/app/components/layout/page-header';
 import {
+  pageCardSurfaceClassName,
+  pageContentBoundaryClassName,
+} from '@/app/components/layout/page-content';
+import {
   PrimaryButton,
   SecondaryButton,
   Text,
@@ -77,9 +81,6 @@ import { cn } from '@/utils';
 
 type DashboardRange = '30d' | '7d' | '24h';
 
-const dashboardContentBoundaryClassName = 'mx-auto w-full max-w-[1200px]';
-const dashboardSurfaceClassName =
-  'overflow-hidden rounded-lg border border-border-subtle bg-layer';
 const healthSummaryItemClassName =
   'grid min-h-[106px] grid-cols-[24px_minmax(0,1fr)_minmax(4rem,auto)] items-center gap-x-4 py-5';
 
@@ -290,7 +291,7 @@ function DashboardCard({
     <section
       data-dashboard-card
       className={cn(
-        dashboardSurfaceClassName,
+        pageCardSurfaceClassName,
         'min-w-0',
         fillHeight && 'h-full',
       )}
@@ -334,7 +335,7 @@ function DashboardNoActivity({
     >
       <div
         className={cn(
-          dashboardSurfaceClassName,
+          pageCardSurfaceClassName,
           'mx-auto w-full max-w-[640px] px-6 py-10 md:px-10 md:py-12',
         )}
       >
@@ -436,7 +437,7 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
   return (
     <article
       data-dashboard-kpi
-      className={cn(dashboardSurfaceClassName, 'flex min-h-[156px] flex-col')}
+      className={cn(pageCardSurfaceClassName, 'flex min-h-[156px] flex-col')}
     >
       <header
         data-dashboard-kpi-header
@@ -1024,7 +1025,7 @@ function DashboardLoading() {
             data-dashboard-loading-card
             data-dashboard-loading-kpi
             className={cn(
-              dashboardSurfaceClassName,
+              pageCardSurfaceClassName,
               'flex min-h-[156px] flex-col',
             )}
             key={item}
@@ -1050,7 +1051,7 @@ function DashboardLoading() {
         <div
           data-dashboard-loading-card
           className={cn(
-            dashboardSurfaceClassName,
+            pageCardSurfaceClassName,
             'h-[396px] p-6 xl:col-span-11',
           )}
         >
@@ -1061,7 +1062,7 @@ function DashboardLoading() {
         <div
           data-dashboard-loading-card
           className={cn(
-            dashboardSurfaceClassName,
+            pageCardSurfaceClassName,
             'h-[396px] p-6 xl:col-span-5',
           )}
         >
@@ -1076,7 +1077,7 @@ function DashboardLoading() {
         {[0, 1].map(item => (
           <div
             data-dashboard-loading-card
-            className={cn(dashboardSurfaceClassName, 'h-[260px] p-6')}
+            className={cn(pageCardSurfaceClassName, 'h-[260px] p-6')}
             key={item}
             aria-hidden="true"
           >
@@ -1323,10 +1324,7 @@ export const HomePage = () => {
       <div data-dashboard-content className="flex min-h-full flex-col">
         <PageHeader
           className="bg-surface"
-          contentClassName={dashboardContentBoundaryClassName}
-          descriptionClassName="text-muted"
-          titleClassName="font-semibold!"
-          titleVariant="heading-03"
+          contentClassName={pageContentBoundaryClassName}
           showDivider={false}
           eyebrow={
             <Text variant="label-01" className="text-primary">
@@ -1364,7 +1362,7 @@ export const HomePage = () => {
 
         <div
           data-dashboard-grid
-          className={`${dashboardContentBoundaryClassName} grid flex-1 grid-cols-4 gap-4 p-4 md:grid-cols-8 md:px-8 md:py-8 lg:grid-cols-16`}
+          className={`${pageContentBoundaryClassName} grid flex-1 grid-cols-4 gap-4 p-4 md:grid-cols-8 md:px-8 md:py-8 lg:grid-cols-16`}
         >
           {loadError && !dashboard ? (
             <div className="col-span-full flex min-h-[420px]">

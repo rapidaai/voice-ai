@@ -105,7 +105,11 @@ jest.mock('@/app/components/ui/primitives/dropdown', () => ({
 }));
 
 jest.mock('@/app/components/ui/primitives/tile', () => ({
-  Tile: ({ children }: any) => <div>{children}</div>,
+  Tile: ({ children, className, ...props }: any) => (
+    <div className={className} {...props}>
+      {children}
+    </div>
+  ),
 }));
 
 jest.mock('react-hot-toast/headless', () => ({
@@ -159,6 +163,15 @@ describe('AssistantAnalytics sessions toggletip', () => {
     const user = userEvent.setup({ writeToClipboard: false });
     const assistant = { getId: () => 'assistant-1' } as any;
     render(<AssistantAnalytics assistant={assistant} />);
+
+    expect(screen.getByTestId('assistant-overview-content')).toHaveClass(
+      'mx-auto',
+      'w-full',
+      'max-w-[1200px]',
+      'p-4',
+      'md:px-8',
+      'md:py-8',
+    );
 
     await waitFor(() => {
       expect(screen.getByText('500 tokens used')).toBeInTheDocument();
@@ -297,8 +310,20 @@ describe('AssistantAnalytics sessions toggletip', () => {
 
     await waitFor(() => {
       expect(screen.getByText('500 tokens used')).toBeInTheDocument();
-      expect(screen.getByText('Assistant activity')).toBeInTheDocument();
+      expect(screen.getByText('Assistant Activity')).toBeInTheDocument();
     });
+
+    expect(screen.queryByText('Assistant activity')).not.toBeInTheDocument();
+
+    const sessionsCard =
+      screen.getByText('Sessions').parentElement?.parentElement;
+    const sessionDetailsCard =
+      screen.getByText('Session details').parentElement?.parentElement
+        ?.parentElement;
+    expect(sessionsCard).toHaveClass('!rounded-lg');
+    expect(sessionsCard).not.toHaveClass('!rounded-none');
+    expect(sessionDetailsCard).toHaveClass('!rounded-lg');
+    expect(sessionDetailsCard).not.toHaveClass('!rounded-none');
 
     expect(screen.getByText('Total sessions')).toBeInTheDocument();
     expect(screen.getByText('Total messages')).toBeInTheDocument();

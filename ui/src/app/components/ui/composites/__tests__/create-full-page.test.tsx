@@ -96,7 +96,7 @@ const renderFlow = (props?: {
 
 describe('CreateFullPageHeader', () => {
   it('renders the Carbon tearsheet header content contract', () => {
-    render(
+    const { container } = render(
       <CreateFullPageHeader
         description="Create a new resource in two steps."
         label="resource"
@@ -118,9 +118,9 @@ describe('CreateFullPageHeader', () => {
       screen.getByRole('heading', { name: 'Create resource', level: 1 }),
     ).toHaveClass(
       'font-sans',
-      'text-[1.75rem]',
-      'font-normal',
-      'leading-[2.25rem]',
+      'text-[1.25rem]',
+      'font-semibold!',
+      'leading-[1.75rem]',
       'tracking-[0]',
     );
     expect(screen.getByText('Create a new resource in two steps.')).toHaveClass(
@@ -128,8 +128,20 @@ describe('CreateFullPageHeader', () => {
       'text-[0.875rem]',
       'leading-[1.125rem]',
       'tracking-[0.16px]',
+      'text-muted',
     );
-    expect(screen.getByRole('banner')).toHaveClass('bg-layer');
+    expect(screen.getByRole('banner')).toHaveClass('bg-surface');
+    expect(screen.getByRole('banner')).toHaveClass(
+      'px-5',
+      'py-6',
+      'md:px-8',
+    );
+    expect(
+      container.querySelector('[data-create-page-header-content]'),
+    ).toHaveClass('max-w-2xl');
+    expect(
+      container.querySelector('[data-create-page-header-content]'),
+    ).not.toHaveClass('mx-auto', 'max-w-[1200px]');
   });
 });
 
@@ -196,6 +208,24 @@ describe('CreateFullPageWithHeader', () => {
       'true',
     );
     expect(screen.getByText('Review body')).toBeInTheDocument();
+  });
+
+  it('can omit a controlled step header while retaining its body', () => {
+    render(
+      <CreateFullPageWithHeader
+        activeStep="details"
+        onChangeStep={jest.fn()}
+        steps={steps.map(step =>
+          step.code === 'details' ? { ...step, hideHeader: true } : step,
+        )}
+        title="Configure resource"
+      />,
+    );
+
+    expect(screen.getByText('Details body')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Details' }),
+    ).not.toBeInTheDocument();
   });
 });
 

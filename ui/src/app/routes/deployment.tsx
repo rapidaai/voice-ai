@@ -233,7 +233,7 @@ export const deploymentRoute: RouteObject = {
             {
               path: 'create-agentkit-version',
               element: <DeploymentCreateAgentKitVersionAssistantPage />,
-              handle: breadcrumb('Create AgentKit version'),
+              handle: breadcrumb('Create AgentKit Version'),
             },
             {
               path: 'create-agentflow-version',

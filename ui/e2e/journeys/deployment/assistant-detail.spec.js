@@ -303,7 +303,7 @@ test('populated assistant journeys expose overview, sessions, versions, and sett
 }) => {
   await gotoJourney(page, journey('deployment.assistantOverview'));
   await expect(
-    page.getByRole('heading', { name: 'Assistant activity' }),
+    page.getByRole('heading', { name: 'Assistant Activity' }),
   ).toBeVisible();
   const deploymentChecklist = page.getByLabel('Assistant deployment checklist');
   await expect(deploymentChecklist).toBeVisible();
@@ -336,7 +336,7 @@ test('assistant overview hides deployment onboarding after a deployment is enabl
   await gotoJourney(page, journey('deployment.assistantOverview'));
 
   await expect(
-    page.getByRole('heading', { name: 'Assistant activity' }),
+    page.getByRole('heading', { name: 'Assistant Activity' }),
   ).toBeVisible();
   await expect(page.getByLabel('Assistant deployment checklist')).toHaveCount(
     0,
@@ -602,7 +602,7 @@ test('dashboard assistant drilldowns reach assistant and failed-session detail',
     .getByRole('link', { name: 'Support bot' })
     .click();
   await expect(
-    page.getByRole('heading', { name: 'Assistant activity' }),
+    page.getByRole('heading', { name: 'Assistant Activity' }),
   ).toBeVisible();
 
   await gotoJourney(page, journey('dashboard.home'));
@@ -628,6 +628,6 @@ test('assistant transport failure renders the full unavailable state', async ({
   await expect(
     page.getByRole('button', { name: 'Back to assistants' }),
   ).toBeVisible();
-  await expect(page.getByText('Assistant activity')).toHaveCount(0);
+  await expect(page.getByText('Assistant Activity')).toHaveCount(0);
   await checkA11y(page, { id: 'deployment.assistantUnavailable' });
 });
