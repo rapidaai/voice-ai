@@ -31,7 +31,6 @@ import (
 	assistant_socket "github.com/rapidaai/api/assistant-api/socket"
 	authentication_resolver "github.com/rapidaai/pkg/authentication/resolver"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
-	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/middlewares"
@@ -89,10 +88,10 @@ func main() {
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
 
-			middleware_authentication.NewProjectStreamMiddleware(authentication_resolver.NewProjectPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
-			middleware_authentication.NewOrganizationStreamMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+			middleware_authentication.NewProjectStreamMiddleware(authentication_resolver.NewProjectPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
+			middleware_authentication.NewOrganizationStreamMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 			middleware_authentication.NewServiceStreamMiddleware(authentication_resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, appRunner.Cfg.ServiceAuthenticationKey()), appRunner.Logger),
-			middleware_authentication.NewUserStreamMiddleware(authentication_resolver.NewUserPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+			middleware_authentication.NewUserStreamMiddleware(authentication_resolver.NewUserPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 
 			middlewares.NewClientInformationStreamServerMiddleware(
 				appRunner.Logger,
@@ -102,10 +101,10 @@ func main() {
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.AppConfig.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
 
-			middleware_authentication.NewProjectUnaryMiddleware(authentication_resolver.NewProjectPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
-			middleware_authentication.NewOrganizationUnaryMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+			middleware_authentication.NewProjectUnaryMiddleware(authentication_resolver.NewProjectPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
+			middleware_authentication.NewOrganizationUnaryMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 			middleware_authentication.NewServiceUnaryMiddleware(authentication_resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, appRunner.Cfg.ServiceAuthenticationKey()), appRunner.Logger),
-			middleware_authentication.NewUserUnaryMiddleware(authentication_resolver.NewUserPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+			middleware_authentication.NewUserUnaryMiddleware(authentication_resolver.NewUserPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 
 			middlewares.NewClientInformationUnaryServerMiddleware(
 				appRunner.Logger,
@@ -121,10 +120,10 @@ func main() {
 	// add all middleware depends on configurations
 	appRunner.AllMiddlewares(ctx)
 	appRunner.E.Use(
-		middleware_authentication.NewProjectHTTPMiddleware(authentication_resolver.NewProjectPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
-		middleware_authentication.NewOrganizationHTTPMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+		middleware_authentication.NewProjectHTTPMiddleware(authentication_resolver.NewProjectPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
+		middleware_authentication.NewOrganizationHTTPMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 		middleware_authentication.NewServiceHTTPMiddleware(authentication_resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, appRunner.Cfg.ServiceAuthenticationKey()), appRunner.Logger),
-		middleware_authentication.NewUserHTTPMiddleware(authentication_resolver.NewUserPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+		middleware_authentication.NewUserHTTPMiddleware(authentication_resolver.NewUserPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 	)
 
 	// all router add all handlers which required to resolve the service request
@@ -282,7 +281,9 @@ func (app *AppRunner) Init(ctx context.Context) error {
 		return fmt.Errorf("initialize internal clients: %w", err)
 	}
 	app.Clients = clients
-	app.Closeable = append(app.Closeable, app.Clients.Close)
+	if app.Clients != nil {
+		app.Closeable = append(app.Closeable, app.Clients.Close)
+	}
 
 	return nil
 }

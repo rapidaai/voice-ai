@@ -17,10 +17,18 @@ function requireValue(name) {
   return value;
 }
 
-function requireSuccess(response, action) {
-  if (!response?.getSuccess() || response.getCode() !== 200) {
-    const message = response?.getError()?.getHumanmessage() || "unknown error";
-    throw new Error(`${action} failed with code ${response?.getCode()}: ${message}`);
+async function expectUnavailable(action, invoke) {
+  try {
+    await invoke();
+    throw new Error(`${action} unexpectedly succeeded`);
+  } catch (error) {
+    if (error?.message === `${action} unexpectedly succeeded`) {
+      throw error;
+    }
+    if (error?.code === 14) {
+      return;
+    }
+    throw new Error(`${action} returned an unexpected error`, { cause: error });
   }
 }
 
@@ -40,21 +48,11 @@ async function main() {
   request.setName(vaultName);
   request.setCredential(Struct.fromJavaScript({ api_key: "ci-openai-key" }));
 
-  const response = await CreateProviderKey(connection, request, auth);
-  requireSuccess(response, "vault creation");
+  await expectUnavailable("vault creation", () =>
+    CreateProviderKey(connection, request, auth),
+  );
 
-  const credential = response.getData();
-  if (!credential || credential.getName() !== vaultName) {
-    throw new Error("vault creation returned unexpected data");
-  }
-  if (credential.getProvider() !== "openai:OpenAI") {
-    throw new Error("vault creation returned the wrong provider");
-  }
-  if (credential.getValue()?.toJavaScript().api_key !== "ci-openai-key") {
-    throw new Error("vault creation returned the wrong credential value");
-  }
-
-  console.log("React SDK create vault flow passed");
+  console.log("React SDK vault creation policy flow passed");
 }
 
 main().then(

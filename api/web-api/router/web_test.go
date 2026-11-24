@@ -14,6 +14,7 @@ import (
 
 	web_config "github.com/rapidaai/api/web-api/config"
 	"github.com/rapidaai/pkg/authentication/policy"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 )
 
@@ -48,7 +49,7 @@ func TestWebAPIPolicyExactlyMatchesRegisteredRoutes(t *testing.T) {
 	}
 	HealthCheckRoutes(configuration, engine, logger, nil)
 	WebApiRoute(configuration, make([]byte, 32), engine, server, logger, nil, nil)
-	ProxyApiRoute(configuration, server, logger, nil, nil)
+	ProxyApiRoute(configuration, server, logger, nil, nil, &rapida_client.RapidaClient{})
 
 	servicePolicy, err := policy.NewWebAuthorizationPolicy()
 	if err != nil {

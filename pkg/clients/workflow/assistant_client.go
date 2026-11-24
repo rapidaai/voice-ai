@@ -125,12 +125,29 @@ func NewAssistantServiceClientGRPC(config *config.AppConfig, logger commons.Logg
 	if err != nil {
 		logger.Errorf("Unable to create connection %v", err)
 	}
+	return NewAssistantServiceClientWithClients(
+		config,
+		logger,
+		redis,
+		protos.NewAssistantServiceClient(conn),
+		protos.NewAssistantDeploymentServiceClient(conn),
+	)
+}
+
+// NewAssistantServiceClientWithClients constructs an assistant client around the provided gRPC clients.
+func NewAssistantServiceClientWithClients(
+	config *config.AppConfig,
+	logger commons.Logger,
+	redis connectors.RedisConnector,
+	assistantClient protos.AssistantServiceClient,
+	assistantDeploymentClient protos.AssistantDeploymentServiceClient,
+) AssistantServiceClient {
 	return &assistantServiceClient{
 		cfg:                       config,
 		logger:                    logger,
 		InternalClient:            clients.NewInternalClient(config, "workflow-api", logger, redis),
-		assistantClient:           protos.NewAssistantServiceClient(conn),
-		assistantDeploymentClient: protos.NewAssistantDeploymentServiceClient(conn),
+		assistantClient:           assistantClient,
+		assistantDeploymentClient: assistantDeploymentClient,
 	}
 }
 

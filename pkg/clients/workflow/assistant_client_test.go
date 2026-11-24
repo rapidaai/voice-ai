@@ -12,6 +12,43 @@ import (
 	"github.com/rapidaai/protos"
 )
 
+type assistantGRPCClientStub struct {
+	protos.AssistantServiceClient
+}
+
+type assistantDeploymentGRPCClientStub struct {
+	protos.AssistantDeploymentServiceClient
+}
+
+type knowledgeGRPCClientStub struct {
+	protos.KnowledgeServiceClient
+}
+
+type observabilityGRPCClientStub struct {
+	protos.ObservabilityServiceClient
+}
+
+func TestInjectedWorkflowClientsRetainProvidedGRPCClients(t *testing.T) {
+	assistant := &assistantGRPCClientStub{}
+	assistantDeployment := &assistantDeploymentGRPCClientStub{}
+	knowledge := &knowledgeGRPCClientStub{}
+	observability := &observabilityGRPCClientStub{}
+
+	assistantClient := NewAssistantServiceClientWithClients(&config.AppConfig{}, nil, nil, assistant, assistantDeployment)
+	knowledgeClient := NewKnowledgeServiceClientWithClient(&config.AppConfig{}, nil, nil, knowledge)
+	observabilityClient := NewObservabilityServiceClientWithClient(&config.AppConfig{}, nil, nil, observability)
+
+	if client := assistantClient.(*assistantServiceClient); client.assistantClient != assistant || client.assistantDeploymentClient != assistantDeployment {
+		t.Fatal("NewAssistantServiceClientWithClients() did not retain the provided gRPC clients")
+	}
+	if knowledgeClient.(*knowledgeServiceClient).knowledgeClient != knowledge {
+		t.Fatal("NewKnowledgeServiceClientWithClient() did not retain the provided gRPC client")
+	}
+	if observabilityClient.(*observabilityServiceClient).observabilityClient != observability {
+		t.Fatal("NewObservabilityServiceClientWithClient() did not retain the provided gRPC client")
+	}
+}
+
 func TestAssistantServiceClientStopsBeforeGRPCOnAuthError(t *testing.T) {
 	client := &assistantServiceClient{
 		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, "test-api", nil, nil),

@@ -28,14 +28,15 @@ type indexerGrpcApi struct {
 
 func NewDocumentGRPCApi(config *config.WebAppConfig, logger commons.Logger,
 	postgres connectors.PostgresConnector,
-	redis connectors.RedisConnector) knowledge_api.DocumentServiceServer {
+	redis connectors.RedisConnector,
+	indexerClient document_client.IndexerServiceClient) knowledge_api.DocumentServiceServer {
 	return &indexerGrpcApi{
 		indexerApi{
 			cfg:                  config,
 			logger:               logger,
 			postgres:             postgres,
 			redis:                redis,
-			indexerServiceClient: document_client.NewIndexerServiceClient(&config.AppConfig, logger, redis),
+			indexerServiceClient: indexerClient,
 		},
 	}
 }

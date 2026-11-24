@@ -24,11 +24,14 @@ func TestNewCreatesSeparateConnections(t *testing.T) {
 	if authenticationClient == nil {
 		t.Fatal("unified authentication client was not initialized")
 	}
-	if client.Integration == nil || client.Deployment == nil || client.Indexer == nil {
+	if client.Integration == nil || client.Audit == nil || client.Deployment == nil || client.Endpoint == nil || client.Indexer == nil {
 		t.Fatal("service clients were not initialized")
 	}
-	if len(client.connections) != 6 {
-		t.Fatalf("connection count = %d, want 6", len(client.connections))
+	if client.Assistant == nil || client.Knowledge == nil || client.Observability == nil {
+		t.Fatal("workflow clients were not initialized")
+	}
+	if len(client.connections) != 7 {
+		t.Fatalf("connection count = %d, want 7", len(client.connections))
 	}
 	seen := make(map[*grpc.ClientConn]struct{}, len(client.connections))
 	for _, connection := range client.connections {

@@ -30,7 +30,7 @@ type webEndpointGRPCApi struct {
 	webEndpointApi
 }
 
-func NewEndpointGRPC(config *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) protos.EndpointServiceServer {
+func NewEndpointGRPC(config *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector, endpointClient endpoint_client.EndpointServiceClient) protos.EndpointServiceServer {
 	return &webEndpointGRPCApi{
 		webEndpointApi{
 			WebApi:         web_api.NewWebApi(config, logger, postgres, redis),
@@ -38,7 +38,7 @@ func NewEndpointGRPC(config *config.WebAppConfig, logger commons.Logger, postgre
 			logger:         logger,
 			postgres:       postgres,
 			redis:          redis,
-			endpointClient: endpoint_client.NewEndpointServiceClientGRPC(&config.AppConfig, logger, redis),
+			endpointClient: endpointClient,
 		},
 	}
 }

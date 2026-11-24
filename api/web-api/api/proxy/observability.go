@@ -33,7 +33,7 @@ type webObservabilityGRPCApi struct {
 	webObservabilityApi
 }
 
-func NewObservabilityGRPC(config *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) protos.ObservabilityServiceServer {
+func NewObservabilityGRPC(config *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector, observabilityClient workflow_client.ObservabilityServiceClient) protos.ObservabilityServiceServer {
 	return &webObservabilityGRPCApi{
 		webObservabilityApi{
 			WebApi:              web_api.NewWebApi(config, logger, postgres, redis),
@@ -41,7 +41,7 @@ func NewObservabilityGRPC(config *config.WebAppConfig, logger commons.Logger, po
 			logger:              logger,
 			postgres:            postgres,
 			redis:               redis,
-			observabilityClient: workflow_client.NewObservabilityServiceClientGRPC(&config.AppConfig, logger, redis),
+			observabilityClient: observabilityClient,
 		},
 	}
 }

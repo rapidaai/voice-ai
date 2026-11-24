@@ -19,3 +19,4 @@ register_flow_cleanup cleanup_project_fixture
 seed_project_fixture
 
 run_flow_process timeout 30s node "$script_directory/create-vault.js"
+verify_vault_creation_blocked_fixture

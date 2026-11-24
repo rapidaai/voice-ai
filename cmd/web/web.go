@@ -33,6 +33,7 @@ import (
 	web_router "github.com/rapidaai/api/web-api/router"
 	"github.com/rapidaai/pkg/authentication/policy"
 	"github.com/rapidaai/pkg/authentication/resolver"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/middlewares"
@@ -48,6 +49,7 @@ type AppRunner struct {
 	Logger    commons.Logger
 	Postgres  connectors.PostgresConnector
 	Redis     connectors.RedisConnector
+	Clients   *rapida_client.RapidaClient
 	Closeable []func(context.Context) error
 }
 
@@ -73,6 +75,11 @@ func main() {
 		appRunner.Logger.Errorf("Warning: Migration failed: %v", err)
 		panic(err)
 	}
+	if err := appRunner.Init(ctx); err != nil {
+		appRunner.Close(ctx)
+		panic(err)
+	}
+	defer appRunner.Close(ctx)
 
 	authorizationPolicy, err := policy.NewWebAuthorizationPolicy()
 	if err != nil {
@@ -100,10 +107,6 @@ func main() {
 		grpc.MaxRecvMsgSize(commons.MaxRecvMsgSize), // 10 MB
 		grpc.MaxSendMsgSize(commons.MaxSendMsgSize), // 10 MB
 	)
-	if err := appRunner.Init(ctx); err != nil {
-		panic(err)
-	}
-
 	// add all middleware depends on configurations
 	appRunner.AllMiddlewares(
 		authentication.NewProjectHTTPMiddleware(web_authenticators.NewProjectResolver(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
@@ -122,7 +125,6 @@ func main() {
 		panic(err)
 	}
 
-	defer appRunner.Close(ctx)
 	cmuxListener := cmux.New(listener)
 
 	// if application json
@@ -228,18 +230,29 @@ func (app *AppRunner) ResolveConfig() error {
 
 // init for app close
 func (app *AppRunner) Init(ctx context.Context) error {
-	err := app.Postgres.Connect(ctx)
-	if err != nil {
-		app.Logger.Error("error while connecting to postgres.", err)
-		return err
+	if app.Postgres != nil {
+		err := app.Postgres.Connect(ctx)
+		if err != nil {
+			app.Logger.Error("error while connecting to postgres.", err)
+			return err
+		}
+		app.Closeable = append(app.Closeable, app.Postgres.Disconnect)
 	}
-	err = app.Redis.Connect(ctx)
-	if err != nil {
-		app.Logger.Error("error while connecting to redis.", err)
-		return err
+	if app.Redis != nil {
+		err := app.Redis.Connect(ctx)
+		if err != nil {
+			app.Logger.Error("error while connecting to redis.", err)
+			return err
+		}
+		app.Closeable = append(app.Closeable, app.Redis.Disconnect)
 	}
-	app.Closeable = append(app.Closeable, app.Postgres.Disconnect)
-	app.Closeable = append(app.Closeable, app.Redis.Disconnect)
+
+	clients, err := rapida_client.New(&app.Cfg.AppConfig, app.Logger, app.Redis)
+	if err != nil {
+		return fmt.Errorf("initialize internal clients: %w", err)
+	}
+	app.Clients = clients
+	app.Closeable = append(app.Closeable, app.Clients.Close)
 	return nil
 }
 
@@ -263,7 +276,7 @@ func (g *AppRunner) AllRouters(organizationCredentialKey []byte) {
 }
 
 func (g *AppRunner) AllProxyRouter() {
-	web_router.ProxyApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis)
+	web_router.ProxyApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Clients)
 }
 
 // all middleware

@@ -46,6 +46,18 @@ CREATE TEMP TABLE flow_endpoint_models AS
 SELECT id FROM endpoint_provider_models
 WHERE endpoint_id IN (SELECT id FROM flow_endpoints);
 
+CREATE TEMP TABLE flow_endpoint_logs AS
+SELECT id FROM endpoint_logs WHERE project_id = :'project_id';
+
+DELETE FROM endpoint_log_arguments
+WHERE endpoint_log_id IN (SELECT id FROM flow_endpoint_logs);
+DELETE FROM endpoint_log_metadata
+WHERE endpoint_log_id IN (SELECT id FROM flow_endpoint_logs);
+DELETE FROM endpoint_log_metrics
+WHERE endpoint_log_id IN (SELECT id FROM flow_endpoint_logs);
+DELETE FROM endpoint_log_options
+WHERE endpoint_log_id IN (SELECT id FROM flow_endpoint_logs);
+DELETE FROM endpoint_logs WHERE id IN (SELECT id FROM flow_endpoint_logs);
 DELETE FROM endpoint_provider_model_options
 WHERE endpoint_provider_model_id IN (SELECT id FROM flow_endpoint_models);
 DELETE FROM endpoint_provider_models
@@ -178,14 +190,22 @@ format_flow_ari_host() {
 }
 
 seed_project_api_key_fixture() {
+  project_api_key_role=${FLOW_API_KEY_ROLE_KEY:-project_token_full_access}
   psql -v ON_ERROR_STOP=1 -h "${FLOW_POSTGRES_HOST:-postgres}" -U rapida_user -d web_db \
     -v fixture_id="$FLOW_FIXTURE_ID" \
     -v project_id="$FLOW_PROJECT_ID" \
-    -v api_key="$FLOW_API_KEY" >/dev/null <<'SQL'
+    -v api_key="$FLOW_API_KEY" \
+    -v role_key="$project_api_key_role" >/dev/null <<'SQL'
 INSERT INTO project_credentials (
-  id, organization_id, project_id, name, key, status, created_actor_type
+  id, organization_id, project_id, name, key, status, created_actor_type,
+  role_definition_id, role_subject_type
 ) VALUES (
-  :'fixture_id', :'fixture_id', :'project_id', 'CI flow project API key', :'api_key', 'ACTIVE', 'unknown'
+  :'fixture_id', :'fixture_id', :'project_id', 'CI flow project API key', :'api_key', 'ACTIVE', 'unknown',
+  (SELECT id FROM role_definitions
+   WHERE organization_id IS NULL
+     AND key = :'role_key'
+     AND definition_type = 'BUILT_IN'),
+  'PROJECT_TOKEN'
 );
 SQL
 }
@@ -240,14 +260,18 @@ INSERT INTO user_auth_tokens (
   :'fixture_id', :'fixture_id', 'auth-token', :'token', now() + interval '1 hour', 'ACTIVE', 'unknown'
 );
 INSERT INTO user_organization_roles (
-  id, user_auth_id, organization_id, role, status, created_actor_type
+  id, user_auth_id, organization_id, role_definition_id, role_scope_type,
+  role_subject_type, status, created_actor_type
 ) VALUES (
-  :'fixture_id', :'fixture_id', :'fixture_id', 'owner', 'ACTIVE', 'unknown'
+  :'fixture_id', :'fixture_id', :'fixture_id', 101, 'ORGANIZATION',
+  'USER', 'ACTIVE', 'unknown'
 );
 INSERT INTO user_project_roles (
-  id, project_id, user_auth_id, role, status, created_actor_type
+  id, project_id, user_auth_id, role_definition_id, role_scope_type,
+  role_subject_type, status, created_actor_type
 ) VALUES (
-  :'fixture_id', :'project_id', :'fixture_id', 'owner', 'ACTIVE', 'unknown'
+  :'fixture_id', :'project_id', :'fixture_id', 109, 'PROJECT',
+  'USER', 'ACTIVE', 'unknown'
 );
 SQL
 }
@@ -434,6 +458,42 @@ SQL
   expected="$expected_count|$expected_count|$expected_count|$expected_count|$expected_count|$expected_count"
   if [ "$counts" != "$expected" ]; then
     printf 'unexpected endpoint provider counts: %s\n' "$counts" >&2
+    return 1
+  fi
+}
+
+verify_endpoint_invocation_fixture() {
+  attempts=0
+  while [ "$attempts" -lt 10 ]; do
+    counts=$(psql -v ON_ERROR_STOP=1 -At -F '|' -h "${FLOW_POSTGRES_HOST:-postgres}" \
+      -U rapida_user -d endpoint_db \
+      -v project_id="$FLOW_PROJECT_ID" <<'SQL'
+SELECT
+  (SELECT count(*) FROM endpoint_logs WHERE project_id = :'project_id'),
+  (SELECT count(*) FROM endpoint_log_metrics
+   WHERE endpoint_log_id IN (
+     SELECT id FROM endpoint_logs WHERE project_id = :'project_id'
+   ));
+SQL
+)
+    case "$counts" in
+      1\|[1-9]*) return 0 ;;
+    esac
+    attempts=$((attempts + 1))
+    sleep 1
+  done
+  printf 'endpoint invocation log was not completed: %s\n' "$counts" >&2
+  return 1
+}
+
+verify_vault_creation_blocked_fixture() {
+  count=$(psql -v ON_ERROR_STOP=1 -At -h "${FLOW_POSTGRES_HOST:-postgres}" \
+    -U rapida_user -d web_db -v project_id="$FLOW_PROJECT_ID" <<'SQL'
+SELECT count(*) FROM vaults WHERE project_id = :'project_id';
+SQL
+)
+  if [ "$count" != '0' ]; then
+    printf 'disabled vault creation persisted %s rows\n' "$count" >&2
     return 1
   fi
 }

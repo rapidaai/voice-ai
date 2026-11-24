@@ -58,11 +58,16 @@ func NewKnowledgeServiceClientGRPC(config *config.AppConfig, logger commons.Logg
 	if err != nil {
 		logger.Fatalf("Unable to create connection %v", err)
 	}
+	return NewKnowledgeServiceClientWithClient(config, logger, redis, knowledge_api.NewKnowledgeServiceClient(conn))
+}
+
+// NewKnowledgeServiceClientWithClient constructs a knowledge client around the provided gRPC client.
+func NewKnowledgeServiceClientWithClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, knowledgeClient knowledge_api.KnowledgeServiceClient) KnowledgeServiceClient {
 	return &knowledgeServiceClient{
 		InternalClient:  clients.NewInternalClient(config, "workflow-api", logger, redis),
 		cfg:             config,
 		logger:          logger,
-		knowledgeClient: knowledge_api.NewKnowledgeServiceClient(conn),
+		knowledgeClient: knowledgeClient,
 	}
 }
 

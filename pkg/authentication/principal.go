@@ -235,17 +235,15 @@ func (principal Principal) withAuthorities(authorities []PermissionKey) (Princip
 		if !utf8.ValidString(value) || !validator.NotBlank(value) || strings.TrimSpace(value) != value || strings.ContainsRune(value, '\x00') {
 			return Principal{}, false
 		}
-		isOrganization := strings.HasPrefix(value, "organization.")
-		isProject := strings.HasPrefix(value, "project.")
 		switch principal.subject.Type {
 		case IdentityUser:
 			if !validator.NonZero(principal.tenant.OrganizationID) ||
-				(!validator.NonZero(principal.tenant.ProjectID) && !isOrganization) ||
-				(validator.NonZero(principal.tenant.ProjectID) && !isOrganization && !isProject) {
+				(!validator.NonZero(principal.tenant.ProjectID) && !strings.HasPrefix(value, "organization.")) ||
+				(validator.NonZero(principal.tenant.ProjectID) && !strings.HasPrefix(value, "organization.") && !strings.HasPrefix(value, "project.")) {
 				return Principal{}, false
 			}
 		case IdentityProjectCredential:
-			if !isProject {
+			if !strings.HasPrefix(value, "project.") {
 				return Principal{}, false
 			}
 		case IdentityOrganizationCredential, IdentityService:

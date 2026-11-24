@@ -9,6 +9,7 @@ package policy
 import (
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/rapidaai/pkg/authentication"
@@ -63,10 +64,174 @@ func TestNewWebAuthorizationPolicyRouteAlternatives(t *testing.T) {
 			t.Fatal("ListRoles retained authenticated-only selector alternative")
 		}
 	}
-	create, exists := servicePolicy.GRPCPolicy("/web_api.ProjectService/CreateProjectCredential")
-	if !exists || create.Authorization != authorizer.AuthorizationDisabled {
-		t.Fatalf("CreateProjectCredential policy = %+v, exists = %v", create, exists)
+	for _, route := range []string{
+		"/web_api.ProjectService/CreateProjectCredential",
+		"/web_api.ProjectService/GetAllProjectCredential",
+	} {
+		credentialPolicy, exists := servicePolicy.GRPCPolicy(route)
+		if !exists || credentialPolicy.Authorization != authorizer.AuthorizationDisabled {
+			t.Fatalf("%s policy = %+v, exists = %v", route, credentialPolicy, exists)
+		}
 	}
+}
+
+func TestWebAccessManagementAuthorizationMatrix(t *testing.T) {
+	servicePolicy, err := NewWebAuthorizationPolicy()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	principals := map[string]authentication.Principal{
+		"organization reader":     webPolicyUserPrincipal(t, authentication.Tenant{OrganizationID: 8}, "organization.roles.read"),
+		"organization creator":    webPolicyUserPrincipal(t, authentication.Tenant{OrganizationID: 8}, "organization.roles.create"),
+		"organization updater":    webPolicyUserPrincipal(t, authentication.Tenant{OrganizationID: 8}, "organization.roles.update"),
+		"organization archiver":   webPolicyUserPrincipal(t, authentication.Tenant{OrganizationID: 8}, "organization.roles.archive"),
+		"project reader":          webPolicyUserPrincipal(t, authentication.Tenant{OrganizationID: 8, ProjectID: 9}, "project.roles.read"),
+		"project credential":      webPolicyProjectPrincipal(t, false),
+		"runtime project":         webPolicyProjectPrincipal(t, true),
+		"organization credential": webPolicyOrganizationPrincipal(t),
+		"service":                 webPolicyServicePrincipal(t),
+		"unprivileged user":       webPolicyUserPrincipal(t, authentication.Tenant{OrganizationID: 8}),
+	}
+
+	tests := []struct {
+		route   string
+		allowed []string
+	}{
+		{route: "/web_api.AccessManagementService/ListPermissions", allowed: []string{"organization reader", "project reader", "project credential"}},
+		{route: "/web_api.AccessManagementService/ListRoles", allowed: []string{"organization reader", "project reader", "project credential"}},
+		{route: "/web_api.AccessManagementService/GetRole", allowed: []string{"organization reader", "project reader", "project credential"}},
+		{route: "/web_api.AccessManagementService/CreateCustomRole", allowed: []string{"organization creator"}},
+		{route: "/web_api.AccessManagementService/UpdateCustomRole", allowed: []string{"organization updater"}},
+		{route: "/web_api.AccessManagementService/ReduceCustomRolePermissions", allowed: []string{"organization updater"}},
+		{route: "/web_api.AccessManagementService/ArchiveCustomRole", allowed: []string{"organization archiver"}},
+	}
+
+	routeAuthorizer := authorizer.RouteAuthorizer{}
+	for _, test := range tests {
+		t.Run(test.route, func(t *testing.T) {
+			routePolicy, exists := servicePolicy.GRPCPolicy(test.route)
+			if !exists {
+				t.Fatal("route policy is missing")
+			}
+			allowed := make(map[string]struct{}, len(test.allowed))
+			for _, name := range test.allowed {
+				allowed[name] = struct{}{}
+			}
+			for name, principal := range principals {
+				_, wantAllowed := allowed[name]
+				err := routeAuthorizer.Authorize(&principal, routePolicy)
+				if wantAllowed && err != nil {
+					t.Errorf("%s was denied: %v", name, err)
+				}
+				if !wantAllowed && err == nil {
+					t.Errorf("%s was allowed", name)
+				}
+			}
+			if err := routeAuthorizer.Authorize(nil, routePolicy); err == nil {
+				t.Error("unauthenticated request was allowed")
+			}
+		})
+	}
+
+	accessManagementRoutes := 0
+	for _, route := range servicePolicy.GRPCRoutes() {
+		if strings.HasPrefix(route, "/web_api.AccessManagementService/") {
+			accessManagementRoutes++
+		}
+	}
+	if accessManagementRoutes != len(tests) {
+		t.Fatalf("Access Management policy routes = %d, tested routes = %d", accessManagementRoutes, len(tests))
+	}
+}
+
+func webPolicyUserPrincipal(t *testing.T, tenant authentication.Tenant, authorities ...authentication.PermissionKey) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: 7},
+		tenant,
+		authentication.Proof{
+			Method: authentication.AuthenticationUserSession,
+			Reference: authentication.ProofReference{
+				Type: authentication.ProofReferenceUserSession, Value: "session-7",
+			},
+		},
+		authorities,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return principal
+}
+
+func webPolicyProjectPrincipal(t *testing.T, delegated bool) authentication.Principal {
+	t.Helper()
+	subject := authentication.Identity{Type: authentication.IdentityProjectCredential, ID: 9}
+	tenant := authentication.Tenant{OrganizationID: 8, ProjectID: 9}
+	authorities := []authentication.PermissionKey{"project.roles.read"}
+	if delegated {
+		principal, err := authentication.NewDelegatedPrincipal(
+			subject,
+			authentication.ServiceActor{ID: 1, Issuer: "internal"},
+			tenant,
+			authentication.Proof{
+				Method: authentication.AuthenticationServiceAssertion, Audience: authentication.AudienceRapidaInternal,
+				Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "internal-key"},
+			},
+			authorities,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return principal
+	}
+	principal, err := authentication.NewDirectPrincipal(
+		subject,
+		tenant,
+		authentication.Proof{
+			Method: authentication.AuthenticationProjectCredential, Audience: authentication.AudienceManagement,
+			Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: "9"},
+		},
+		authorities,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return principal
+}
+
+func webPolicyOrganizationPrincipal(t *testing.T) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityOrganizationCredential, ID: 10},
+		authentication.Tenant{OrganizationID: 8},
+		authentication.Proof{
+			Method:    authentication.AuthenticationOrganizationCredential,
+			Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: "10"},
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return principal
+}
+
+func webPolicyServicePrincipal(t *testing.T) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityService, ID: 11, Issuer: "internal"},
+		authentication.Tenant{OrganizationID: 8},
+		authentication.Proof{
+			Method: authentication.AuthenticationServiceAssertion, Audience: authentication.AudienceRapidaInternal,
+			Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "internal-key"},
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return principal
 }
 
 func TestNewWebAuthorizationPolicyUsesGenericInternalServiceCaller(t *testing.T) {

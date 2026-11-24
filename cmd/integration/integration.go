@@ -27,7 +27,7 @@ import (
 	"github.com/rapidaai/api/integration-api/config"
 	integration_routers "github.com/rapidaai/api/integration-api/router"
 	authentication_resolver "github.com/rapidaai/pkg/authentication/resolver"
-	web_client "github.com/rapidaai/pkg/clients/web"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	middlewares "github.com/rapidaai/pkg/middlewares"
 	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 
@@ -48,6 +48,7 @@ type AppRunner struct {
 	Logger    commons.Logger
 	Postgres  connectors.PostgresConnector
 	Redis     connectors.RedisConnector
+	Clients   *rapida_client.RapidaClient
 	Closeable []func(context.Context) error
 }
 
@@ -74,31 +75,32 @@ func main() {
 		panic(err)
 	}
 
+	if err := appRunner.Init(ctx); err != nil {
+		appRunner.Close(ctx)
+		panic(err)
+	}
+	defer appRunner.Close(ctx)
+
 	// interservice communication is authenticated now
 	appRunner.S = grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
 
-			middleware_authentication.NewProjectUnaryMiddleware(authentication_resolver.NewProjectPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
-			middleware_authentication.NewOrganizationUnaryMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+			middleware_authentication.NewProjectUnaryMiddleware(authentication_resolver.NewProjectPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
+			middleware_authentication.NewOrganizationUnaryMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 			middleware_authentication.NewServiceUnaryMiddleware(authentication_resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, appRunner.Cfg.ServiceAuthenticationKey()), appRunner.Logger),
-			middleware_authentication.NewUserUnaryMiddleware(authentication_resolver.NewUserPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+			middleware_authentication.NewUserUnaryMiddleware(authentication_resolver.NewUserPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 		),
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
-			middleware_authentication.NewProjectStreamMiddleware(authentication_resolver.NewProjectPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
-			middleware_authentication.NewOrganizationStreamMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+			middleware_authentication.NewProjectStreamMiddleware(authentication_resolver.NewProjectPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
+			middleware_authentication.NewOrganizationStreamMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 			middleware_authentication.NewServiceStreamMiddleware(authentication_resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, appRunner.Cfg.ServiceAuthenticationKey()), appRunner.Logger),
-			middleware_authentication.NewUserStreamMiddleware(authentication_resolver.NewUserPrincipalResolver(web_client.NewAuthenticationClient(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)), appRunner.Logger),
+			middleware_authentication.NewUserStreamMiddleware(authentication_resolver.NewUserPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 		),
 	)
-	// init
-	if err := appRunner.Init(ctx); err != nil {
-		panic(err)
-	}
-
 	// all routers add all handlers which required to resolve the service request
 	appRunner.AllRouters()
 
@@ -111,7 +113,6 @@ func main() {
 		panic(err)
 	}
 
-	defer appRunner.Close(ctx)
 	cmuxListener := cmux.New(listener)
 	http2GRPCFilteredListener := cmuxListener.Match(cmux.HTTP2())
 	grpcFilteredListener := cmuxListener.Match(
@@ -211,19 +212,31 @@ func (app *AppRunner) ResolveConfig() error {
 
 // init for app close
 func (app *AppRunner) Init(ctx context.Context) error {
-	err := app.Postgres.Connect(ctx)
-	if err != nil {
-		app.Logger.Error("error while connecting to postgres.", err)
-		return err
+	if app.Postgres != nil {
+		err := app.Postgres.Connect(ctx)
+		if err != nil {
+			app.Logger.Error("error while connecting to postgres.", err)
+			return err
+		}
+		app.Closeable = append(app.Closeable, app.Postgres.Disconnect)
 	}
-	err = app.Redis.Connect(ctx)
-	if err != nil {
-		app.Logger.Error("error while connecting to redis.", err)
-		return err
+	if app.Redis != nil {
+		err := app.Redis.Connect(ctx)
+		if err != nil {
+			app.Logger.Error("error while connecting to redis.", err)
+			return err
+		}
+		app.Closeable = append(app.Closeable, app.Redis.Disconnect)
 	}
 
-	app.Closeable = append(app.Closeable, app.Redis.Disconnect)
-	app.Closeable = append(app.Closeable, app.Postgres.Disconnect)
+	clients, err := rapida_client.New(&app.Cfg.AppConfig, app.Logger, app.Redis)
+	if err != nil {
+		return fmt.Errorf("initialize internal clients: %w", err)
+	}
+	app.Clients = clients
+	if app.Clients != nil {
+		app.Closeable = append(app.Closeable, app.Clients.Close)
+	}
 
 	return nil
 }
