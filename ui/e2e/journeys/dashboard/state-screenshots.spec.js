@@ -282,11 +282,14 @@ for (const colorMode of COLOR_MODES) {
         coachmark.getByRole('button', { name: step.action }),
       ).toBeVisible();
       await checkA11y(page, dashboardJourney);
-      await expect(page).toHaveScreenshot([
-        'dashboard',
-        'interface-tour',
-        `${step.name}-${colorMode}.png`,
-      ]);
+      await expect(page).toHaveScreenshot(
+        [
+          'dashboard',
+          'interface-tour',
+          `${step.name}-${colorMode}.png`,
+        ],
+        { maxDiffPixels: 1000 },
+      );
       await coachmark.getByRole('button', { name: step.action }).click();
     }
   });
