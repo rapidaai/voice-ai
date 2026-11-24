@@ -457,6 +457,7 @@ export function CreateAssistantPage() {
                 ref={templateTourTargetRef}
                 data-coachmark-target="create-assistant-template"
                 className="w-full"
+                tabIndex={-1}
               >
                 <ActionCard
                   className="group relative w-full flex items-start justify-between gap-4 p-4 text-left bg-surface border border-border-subtle hover:bg-layer transition-colors duration-100"
@@ -498,6 +499,7 @@ export function CreateAssistantPage() {
                 ref={modelTourTargetRef}
                 data-coachmark-target="create-assistant-model"
                 className="w-full"
+                tabIndex={-1}
               >
                 <TextProvider
                   onChangeParameter={onChangeParameter}

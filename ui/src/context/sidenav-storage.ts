@@ -29,11 +29,15 @@ export function getSidenavExpanded(sidenavId: SidenavId) {
 }
 
 export function setSidenavExpanded(sidenavId: SidenavId, expanded: boolean) {
-  window.localStorage.setItem(
-    SIDENAV_STORAGE_KEY,
-    JSON.stringify({
-      ...readSidenavState(),
-      [sidenavId]: expanded,
-    }),
-  );
+  try {
+    window.localStorage.setItem(
+      SIDENAV_STORAGE_KEY,
+      JSON.stringify({
+        ...readSidenavState(),
+        [sidenavId]: expanded,
+      }),
+    );
+  } catch {
+    return;
+  }
 }

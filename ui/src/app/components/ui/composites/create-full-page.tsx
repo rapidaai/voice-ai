@@ -424,6 +424,29 @@ export function CreateFullPageWithHeader({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {activeStepData && (
           <div className="flex flex-1 flex-col">
+            {activeStepData.hideHeader && (
+              <div className="border-b border-border-subtle px-6 py-4 xl:hidden">
+                <Text as="div" className="text-muted" variant="label-01">
+                  Step {activeIndex + 1} of {steps.length}
+                </Text>
+                <Text
+                  as="div"
+                  className="mt-1 text-foreground"
+                  variant="heading-compact-01"
+                >
+                  {activeStepData.name}
+                </Text>
+                {activeStepData.description && (
+                  <Text
+                    as="div"
+                    className="mt-1 text-muted"
+                    variant="body-compact-01"
+                  >
+                    {activeStepData.description}
+                  </Text>
+                )}
+              </div>
+            )}
             {!activeStepData.hideHeader && (
               <header className="border-b border-border-subtle px-6 pb-6 pt-8">
                 <Text

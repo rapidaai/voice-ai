@@ -227,6 +227,9 @@ describe('CreateFullPageWithHeader', () => {
     expect(
       screen.queryByRole('heading', { name: 'Details' }),
     ).not.toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 2').parentElement).toHaveClass(
+      'xl:hidden',
+    );
   });
 });
 

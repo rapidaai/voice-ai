@@ -1,4 +1,5 @@
 import {
+  Component,
   lazy,
   Suspense,
   type ComponentProps,
@@ -13,6 +14,21 @@ const LazyCoachmarkContent = lazy(() =>
     default: module.CoachmarkContent,
   })),
 );
+
+class CoachmarkErrorBoundary extends Component<
+  { children: ReactElement; fallback: ReactElement },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
 
 export function Coachmark({
   actionLabel,
@@ -40,22 +56,24 @@ export function Coachmark({
   if (!open) return children;
 
   return (
-    <Suspense fallback={children}>
-      <LazyCoachmarkContent
-        actionLabel={actionLabel}
-        align={align}
-        description={description}
-        launcherButtonRef={launcherButtonRef}
-        onAction={onAction}
-        onClose={onClose}
-        targetClassName={cn(
-          '[&>.cds--popover-container]:w-full',
-          targetClassName,
-        )}
-        title={title}
-      >
-        {children}
-      </LazyCoachmarkContent>
-    </Suspense>
+    <CoachmarkErrorBoundary fallback={children}>
+      <Suspense fallback={children}>
+        <LazyCoachmarkContent
+          actionLabel={actionLabel}
+          align={align}
+          description={description}
+          launcherButtonRef={launcherButtonRef}
+          onAction={onAction}
+          onClose={onClose}
+          targetClassName={cn(
+            '[&>.cds--popover-container]:w-full',
+            targetClassName,
+          )}
+          title={title}
+        >
+          {children}
+        </LazyCoachmarkContent>
+      </Suspense>
+    </CoachmarkErrorBoundary>
   );
 }

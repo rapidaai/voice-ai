@@ -29,7 +29,7 @@ test('create assistant tour explains the first configuration step', async ({
   await expect(templateCoachmark).toBeVisible();
   await expect(
     page.locator('[data-coachmark-target="create-assistant-template"]'),
-  ).toBeVisible();
+  ).toHaveAttribute('tabindex', '-1');
   await templateCoachmark.getByRole('button', { name: 'Next' }).click();
 
   const modelCoachmark = page.getByRole('region', {
@@ -38,7 +38,7 @@ test('create assistant tour explains the first configuration step', async ({
   await expect(modelCoachmark).toBeVisible();
   await expect(
     page.locator('[data-coachmark-target="create-assistant-model"]'),
-  ).toBeVisible();
+  ).toHaveAttribute('tabindex', '-1');
   await modelCoachmark.getByRole('button', { name: 'Next' }).click();
 
   const continueCoachmark = page.getByRole('region', {
