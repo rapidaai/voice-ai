@@ -22,7 +22,7 @@ fi
 git cat-file -e "${target_sha}^{commit}"
 
 mapfile -t protobuf_files < <(
-  git ls-tree -r --name-only "${target_sha}" -- protos | grep -E '^protos/[^/]+\.go$' || true
+  git ls-tree -r --name-only "${target_sha}" -- protos | grep -E '^protos/.+\.go$' || true
 )
 if (( ${#protobuf_files[@]} == 0 )); then
   echo "Target commit has no tracked protos/*.go files" >&2
