@@ -47,6 +47,8 @@ func TestNewWebAuthorizationPolicyRouteAlternatives(t *testing.T) {
 		"/web_api.AccessManagementService/ListPermissions":     2,
 		"/web_api.AccessManagementService/ListRoles":           2,
 		"/web_api.AccessManagementService/GetRole":             2,
+		"/web_api.ProjectService/CreateProjectCredential":      2,
+		"/web_api.ProjectService/GetAllProjectCredential":      2,
 		"/web_api.ProjectService/RevokeProjectCredential":      2,
 	}
 	for route, alternatives := range want {
@@ -64,14 +66,81 @@ func TestNewWebAuthorizationPolicyRouteAlternatives(t *testing.T) {
 			t.Fatal("ListRoles retained authenticated-only selector alternative")
 		}
 	}
+}
+
+func TestWebProjectCredentialAuthorizationMatrix(t *testing.T) {
+	servicePolicy, err := NewWebAuthorizationPolicy()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantAlternatives := []authorizer.AlternativePolicy{
+		{
+			Actors:      []authentication.IdentityType{authentication.IdentityUser},
+			Context:     authorizer.ContextProject,
+			Permissions: []authentication.PermissionKey{"organization.access.manage"},
+		},
+		{
+			Actors:      []authentication.IdentityType{authentication.IdentityUser},
+			Context:     authorizer.ContextProject,
+			Permissions: []authentication.PermissionKey{"project.access.manage"},
+		},
+	}
+	principals := map[string]authentication.Principal{
+		"direct organization manager": webPolicyUserPrincipal(t, authentication.Tenant{OrganizationID: 8, ProjectID: 9}, "organization.access.manage"),
+		"direct project manager":      webPolicyUserPrincipal(t, authentication.Tenant{OrganizationID: 8, ProjectID: 9}, "project.access.manage"),
+		"direct manager with both":    webPolicyUserPrincipal(t, authentication.Tenant{OrganizationID: 8, ProjectID: 9}, "organization.access.manage", "project.access.manage"),
+		"delegated organization manager": webPolicyDelegatedUserPrincipal(
+			t, authentication.Tenant{OrganizationID: 8, ProjectID: 9}, "organization.access.manage",
+		),
+		"delegated project manager": webPolicyDelegatedUserPrincipal(
+			t, authentication.Tenant{OrganizationID: 8, ProjectID: 9}, "project.access.manage",
+		),
+		"delegated manager with both": webPolicyDelegatedUserPrincipal(
+			t, authentication.Tenant{OrganizationID: 8, ProjectID: 9}, "organization.access.manage", "project.access.manage",
+		),
+		"unprivileged user":          webPolicyUserPrincipal(t, authentication.Tenant{OrganizationID: 8, ProjectID: 9}),
+		"organization-only user":     webPolicyUserPrincipal(t, authentication.Tenant{OrganizationID: 8}, "organization.access.manage"),
+		"project credential":         webPolicyProjectPrincipal(t, false),
+		"organization credential":    webPolicyOrganizationPrincipal(t),
+		"service":                    webPolicyServicePrincipal(t),
+		"delegated non-user subject": webPolicyProjectPrincipal(t, true),
+	}
+	allowed := map[string]bool{
+		"direct organization manager":    true,
+		"direct project manager":         true,
+		"direct manager with both":       true,
+		"delegated organization manager": true,
+		"delegated project manager":      true,
+		"delegated manager with both":    true,
+	}
+
+	routeAuthorizer := authorizer.RouteAuthorizer{}
 	for _, route := range []string{
 		"/web_api.ProjectService/CreateProjectCredential",
 		"/web_api.ProjectService/GetAllProjectCredential",
 	} {
-		credentialPolicy, exists := servicePolicy.GRPCPolicy(route)
-		if !exists || credentialPolicy.Authorization != authorizer.AuthorizationDisabled {
-			t.Fatalf("%s policy = %+v, exists = %v", route, credentialPolicy, exists)
-		}
+		t.Run(route, func(t *testing.T) {
+			routePolicy, exists := servicePolicy.GRPCPolicy(route)
+			if !exists {
+				t.Fatal("route policy is missing")
+			}
+			if routePolicy.Authorization != authorizer.AuthorizationAnyOf || !reflect.DeepEqual(routePolicy.AnyOf, wantAlternatives) {
+				t.Fatalf("route policy = %#v, want alternatives %#v", routePolicy, wantAlternatives)
+			}
+			for name, principal := range principals {
+				err := routeAuthorizer.Authorize(&principal, routePolicy)
+				if allowed[name] && err != nil {
+					t.Errorf("%s was denied: %v", name, err)
+				}
+				if !allowed[name] && err == nil {
+					t.Errorf("%s was allowed", name)
+				}
+			}
+			if err := routeAuthorizer.Authorize(nil, routePolicy); err == nil {
+				t.Error("missing Principal was allowed")
+			}
+		})
 	}
 }
 
@@ -155,6 +224,24 @@ func webPolicyUserPrincipal(t *testing.T, tenant authentication.Tenant, authorit
 			Reference: authentication.ProofReference{
 				Type: authentication.ProofReferenceUserSession, Value: "session-7",
 			},
+		},
+		authorities,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return principal
+}
+
+func webPolicyDelegatedUserPrincipal(t *testing.T, tenant authentication.Tenant, authorities ...authentication.PermissionKey) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDelegatedPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: 7},
+		authentication.ServiceActor{ID: 1, Issuer: "internal"},
+		tenant,
+		authentication.Proof{
+			Method: authentication.AuthenticationServiceAssertion, Audience: authentication.AudienceRapidaInternal,
+			Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "internal-key"},
 		},
 		authorities,
 	)

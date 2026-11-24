@@ -75,8 +75,8 @@ No registered Web API currently maps to `organization.delete`,
 | `ProjectService/ArchiveProject` | `project.archive` |
 | `ProjectService/AddUserToProjects` | `project.access.manage` in every target Project + every permission in each target role |
 | `ProjectService/DeleteUserFromProject` | `project.access.manage` + the applicable protected-role and removal ceilings |
-| `ProjectService/CreateProjectCredential` | `organization.project_access_tokens.create` or `project.access_tokens.create` |
-| `ProjectService/GetAllProjectCredential` | `organization.project_access_tokens.read_metadata` or `project.access_tokens.read_metadata` |
+| `ProjectService/CreateProjectCredential` | `organization.access.manage` or `project.access.manage` |
+| `ProjectService/GetAllProjectCredential` | `organization.access.manage` or `project.access.manage` |
 | `ProjectService/RevokeProjectCredential` | `organization.project_access_tokens.revoke` or `project.access_tokens.revoke` |
 
 Every new project credential must select one active Project-scoped `PROJECT_TOKEN` role. The
@@ -84,9 +84,10 @@ credential stores that immutable role ID, while migration `000016` assigns the b
 `project_token_full_access` compatibility role to credentials that existed before the migration.
 The server never uses that compatibility role as a default for a new credential. An active
 credential reference prevents archival of its custom role; archived credential references do not.
-Credential create and list responses continue returning keys as before. List responses include the
-assigned role ID and current role name, and new consumers use explicit pagination and name-or-role
-search.
+Creating or listing Project credentials requires a selected Project and either broad access-management
+permission shown above. Create responses retain the new plaintext key, and list responses retain the
+plaintext key for every matching active credential. List responses also include the assigned role ID
+and current role name, and new consumers use explicit pagination and name-or-role search.
 
 The current `ProjectService` has no rotate or reduce-access RPC. Revoke is temporarily restricted to
 active Organization owners and admins until permission enforcement is activated. Future token

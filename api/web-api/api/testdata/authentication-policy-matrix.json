@@ -2511,6 +2511,23 @@
     {
       "api": "web-api",
       "file": "api/web-api/api/project.go",
+      "handler": "CreateProjectCredential",
+      "route": "/web_api.ProjectService/CreateProjectCredential",
+      "transport": "grpc",
+      "existing_accessor": "Principal",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/project.go",
       "handler": "DeleteUserFromProject",
       "route": "/web_api.ProjectService/DeleteUserFromProject",
       "transport": "grpc",
@@ -2544,6 +2561,24 @@
       "required_contexts": [
         "user",
         "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/project.go",
+      "handler": "GetAllProjectCredential",
+      "route": "/web_api.ProjectService/GetAllProjectCredential",
+      "transport": "grpc",
+      "existing_accessor": "Principal",
+      "existing_checks": [
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "project"
       ]
     },
     {

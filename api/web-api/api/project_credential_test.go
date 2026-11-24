@@ -165,6 +165,7 @@ func TestGetAllProjectCredentialValidatesAndMapsRoleMetadata(t *testing.T) {
 	require.Equal(t, uint32(1), response.GetPaginated().GetCurrentPage())
 	require.Equal(t, uint32(1), response.GetPaginated().GetTotalItem())
 	require.Len(t, response.GetData(), 1)
+	require.Equal(t, "rpx_secret", response.GetData()[0].GetKey())
 	require.Equal(t, uint64(117), response.GetData()[0].GetRoleDefinitionId())
 	require.Equal(t, "Runtime", response.GetData()[0].GetRoleName())
 	require.Equal(t, uint64(7), response.GetData()[0].GetCreatedActor().GetId())
