@@ -44,6 +44,7 @@ export interface CreateFullPageStepProps {
 export interface CreateFullPageHeaderProps {
   description?: ReactNode;
   label?: ReactNode;
+  mobileProgress?: ReactNode;
   title: ReactNode;
   titleStart?: ReactNode;
 }
@@ -93,6 +94,7 @@ interface CreateFullPageFrameProps {
   description?: ReactNode;
   eyebrow?: ReactNode;
   headerIcon?: CarbonIconType;
+  mobileProgress?: ReactNode;
   steps: {
     code: string;
     complete?: boolean;
@@ -107,20 +109,34 @@ interface CreateFullPageFrameProps {
 export function CreateFullPageHeader({
   description,
   label,
+  mobileProgress,
   title,
   titleStart,
 }: CreateFullPageHeaderProps) {
   return (
     <header className="shrink-0 border-b border-border-subtle bg-surface px-5 py-6 md:px-8">
       <div data-create-page-header-content className="max-w-2xl">
-        {label && (
-          <Text
-            as="div"
-            className="mb-1 capitalize text-primary"
-            variant="label-01"
-          >
-            {label}
-          </Text>
+        {(label || mobileProgress) && (
+          <div className="mb-1 flex items-center justify-between gap-4">
+            {label && (
+              <Text
+                as="div"
+                className="capitalize text-primary"
+                variant="label-01"
+              >
+                {label}
+              </Text>
+            )}
+            {mobileProgress && (
+              <Text
+                as="div"
+                className="ml-auto text-muted xl:hidden"
+                variant="label-01"
+              >
+                {mobileProgress}
+              </Text>
+            )}
+          </div>
         )}
         <div className="flex items-start gap-2 text-foreground">
           {titleStart && <span className="shrink-0 pt-0.5">{titleStart}</span>}
@@ -145,6 +161,7 @@ function CreateFullPageFrame({
   description,
   eyebrow,
   headerIcon: HeaderIcon,
+  mobileProgress,
   steps,
   title,
 }: CreateFullPageFrameProps) {
@@ -164,6 +181,7 @@ function CreateFullPageFrame({
           <CreateFullPageHeader
             description={description}
             label={eyebrow}
+            mobileProgress={mobileProgress}
             title={title}
             titleStart={HeaderIcon ? <HeaderIcon size={24} /> : undefined}
           />
@@ -412,6 +430,11 @@ export function CreateFullPageWithHeader({
       description={description}
       eyebrow={eyebrow}
       headerIcon={headerIcon}
+      mobileProgress={
+        activeStepData?.hideHeader
+          ? `Step ${activeIndex + 1} of ${steps.length}`
+          : undefined
+      }
       steps={steps.map((step, index) => ({
         code: step.code,
         complete: index < activeIndex,
@@ -424,29 +447,6 @@ export function CreateFullPageWithHeader({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {activeStepData && (
           <div className="flex flex-1 flex-col">
-            {activeStepData.hideHeader && (
-              <div className="border-b border-border-subtle px-6 py-4 xl:hidden">
-                <Text as="div" className="text-muted" variant="label-01">
-                  Step {activeIndex + 1} of {steps.length}
-                </Text>
-                <Text
-                  as="div"
-                  className="mt-1 text-foreground"
-                  variant="heading-compact-01"
-                >
-                  {activeStepData.name}
-                </Text>
-                {activeStepData.description && (
-                  <Text
-                    as="div"
-                    className="mt-1 text-muted"
-                    variant="body-compact-01"
-                  >
-                    {activeStepData.description}
-                  </Text>
-                )}
-              </div>
-            )}
             {!activeStepData.hideHeader && (
               <header className="border-b border-border-subtle px-6 pb-6 pt-8">
                 <Text

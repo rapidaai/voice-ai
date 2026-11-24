@@ -227,9 +227,13 @@ describe('CreateFullPageWithHeader', () => {
     expect(
       screen.queryByRole('heading', { name: 'Details' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Step 1 of 2').parentElement).toHaveClass(
-      'xl:hidden',
-    );
+    expect(screen.getByText('Step 1 of 2')).toHaveClass('xl:hidden');
+    const pageHeader = screen
+      .getByText('Step 1 of 2')
+      .closest('[data-create-page-header-content]');
+    expect(pageHeader).toBeInTheDocument();
+    expect(pageHeader).not.toHaveTextContent('Details');
+    expect(pageHeader).not.toHaveTextContent('Add the required details.');
   });
 });
 
