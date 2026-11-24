@@ -283,6 +283,7 @@ export const UpdateAssistantAnalysis: FC<{ assistantId: string }> = ({
     <>
       <ConfirmDialogComponent />
       <CreateFullPageWithHeader
+        alignHeaderWithStepRail
         title="Update analysis"
         eyebrow="Assistant"
         description="Update all steps to reconfigure your analysis."
@@ -293,6 +294,7 @@ export const UpdateAssistantAnalysis: FC<{ assistantId: string }> = ({
           {
             code: 'configure',
             name: 'Configure',
+            hideHeader: true,
             description:
               'Select the endpoint and map the data parameters for analysis.',
             actions: [
@@ -355,6 +357,7 @@ export const UpdateAssistantAnalysis: FC<{ assistantId: string }> = ({
           {
             code: 'profile',
             name: 'Profile',
+            hideHeader: true,
             description: 'Provide a name and set the execution priority.',
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">

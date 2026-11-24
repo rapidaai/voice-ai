@@ -73,6 +73,7 @@ const renderFlow = (props?: {
 }) =>
   render(
     <CreateFullPageWithGlobalHeader
+      alignHeaderWithStepRail
       title="Create resource"
       description="Create a new resource in two steps."
       errorMessage="Resolve the highlighted value."
@@ -131,11 +132,7 @@ describe('CreateFullPageHeader', () => {
       'text-muted',
     );
     expect(screen.getByRole('banner')).toHaveClass('bg-surface');
-    expect(screen.getByRole('banner')).toHaveClass(
-      'px-5',
-      'py-6',
-      'md:px-8',
-    );
+    expect(screen.getByRole('banner')).toHaveClass('px-5', 'py-6', 'md:px-8');
     expect(
       container.querySelector('[data-create-page-header-content]'),
     ).toHaveClass('max-w-2xl');
@@ -169,6 +166,7 @@ describe('CreateFullPageWithHeader', () => {
 
     render(
       <CreateFullPageWithHeader
+        alignHeaderWithStepRail
         activeStep="details"
         description="Configure a reusable resource."
         errorMessage="Resolve the highlighted value."
@@ -182,6 +180,9 @@ describe('CreateFullPageWithHeader', () => {
     expect(
       screen.getByRole('heading', { name: 'Configure resource' }),
     ).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-create-page-header-rail]'),
+    ).toHaveClass('xl:block', 'xl:w-80', 'xl:border-r', 'xl:bg-layer');
     expect(screen.getByText('Details body')).toBeInTheDocument();
     expect(screen.queryByText('Review body')).not.toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(
@@ -226,6 +227,19 @@ describe('CreateFullPageWithHeader', () => {
     expect(
       screen.queryByRole('heading', { name: 'Details' }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('CreateFullPageWithGlobalHeader', () => {
+  it('aligns the desktop header background and content with the step layout', () => {
+    renderFlow();
+
+    expect(
+      document.querySelector('[data-create-page-header-rail]'),
+    ).toHaveClass('xl:block', 'xl:w-80', 'xl:border-r', 'xl:bg-layer');
+    expect(
+      document.querySelector('[data-create-page-header-main]'),
+    ).toHaveClass('min-w-0', 'flex-1');
   });
 });
 
@@ -291,6 +305,51 @@ describe('CreateFullPageStep', () => {
 });
 
 describe('CreateFullPageWithGlobalHeader', () => {
+  it('allows the primary action to be decorated without changing its behavior', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    const onNext = jest.fn(() => true);
+
+    render(
+      <CreateFullPageWithGlobalHeader
+        title="Create resource"
+        description="Create a new resource in two steps."
+        eyebrow="Resource"
+        onCancel={jest.fn()}
+        onRequestSubmit={jest.fn()}
+        renderPrimaryAction={(action, launcherButtonRef) => (
+          <div
+            data-has-launcher-ref={Boolean(launcherButtonRef).toString()}
+            data-testid="primary-action-decoration"
+          >
+            {action}
+          </div>
+        )}
+        submitButtonText="Create resource"
+      >
+        <CreateFullPageStep
+          title="Configure"
+          description="Configure the resource."
+          onNext={onNext}
+        >
+          <div>Configuration fields</div>
+        </CreateFullPageStep>
+        <CreateFullPageStep title="Review" description="Review the resource.">
+          <div>Review fields</div>
+        </CreateFullPageStep>
+      </CreateFullPageWithGlobalHeader>,
+    );
+
+    const decoration = screen.getByTestId('primary-action-decoration');
+    expect(decoration).toHaveAttribute('data-has-launcher-ref', 'true');
+    expect(decoration).toContainElement(
+      screen.getByRole('button', { name: 'Next' }),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Review fields')).toBeInTheDocument();
+  });
+
   it('moves forward, returns to the prior step, and submits', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     const onNext = jest.fn(() => true);

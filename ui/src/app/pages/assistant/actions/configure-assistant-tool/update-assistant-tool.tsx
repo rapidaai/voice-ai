@@ -190,6 +190,7 @@ export const UpdateTool: FC<{ assistantId: string }> = ({ assistantId }) => {
     <>
       <ConfirmDialogComponent />
       <CreateFullPageWithHeader
+        alignHeaderWithStepRail
         title="Update tool"
         eyebrow="Assistant"
         description="Update all steps to reconfigure your tool."
@@ -200,6 +201,7 @@ export const UpdateTool: FC<{ assistantId: string }> = ({ assistantId }) => {
           {
             code: 'action',
             name: 'Action',
+            hideHeader: true,
             description:
               'Select the action type and configure its connection options.',
             actions: [
@@ -241,6 +243,7 @@ export const UpdateTool: FC<{ assistantId: string }> = ({ assistantId }) => {
                 {
                   code: 'definition',
                   name: 'Definition',
+                  hideHeader: true,
                   description:
                     'Define the tool name, description, and JSON parameter schema.',
                   actions: [

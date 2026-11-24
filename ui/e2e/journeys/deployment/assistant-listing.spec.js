@@ -82,7 +82,11 @@ test('assistant listing guides a first visit through assistant creation options'
         return stored ? JSON.parse(stored) : null;
       }),
     )
-    .toEqual({ dashboard: 'completed', assistant: 'completed' });
+    .toEqual({
+      dashboard: 'completed',
+      assistant: 'completed',
+      createAssistant: 'completed',
+    });
 });
 
 test('assistant tour keeps the type chooser scrollable on mobile', async ({

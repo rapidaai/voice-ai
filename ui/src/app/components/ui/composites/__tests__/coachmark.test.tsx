@@ -68,6 +68,36 @@ function FocusRestorationHarness({ onDismiss }: { onDismiss: () => void }) {
 }
 
 describe('Coachmark', () => {
+  it('keeps the Carbon popover target at the launcher width while open', async () => {
+    const launcherButtonRef = createRef<HTMLButtonElement>();
+
+    render(
+      <Coachmark
+        actionLabel="Next"
+        align="bottom"
+        description="Description"
+        launcherButtonRef={launcherButtonRef}
+        onAction={jest.fn()}
+        onClose={jest.fn()}
+        open
+        targetClassName="flex-1"
+        title="Title"
+      >
+        <button ref={launcherButtonRef} type="button">
+          Target
+        </button>
+      </Coachmark>,
+    );
+
+    const region = await screen.findByRole('region', {
+      name: 'Title coachmark',
+    });
+    expect(region.parentElement).toHaveClass(
+      'flex-1',
+      '[&>.cds--popover-container]:w-full',
+    );
+  });
+
   it('renders only its target while closed', () => {
     render(
       <Coachmark

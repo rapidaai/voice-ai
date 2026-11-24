@@ -441,6 +441,18 @@ describe('CreateAssistantAuthenticationPage', () => {
     expect(CreateAssistantConfiguration).not.toHaveBeenCalled();
   });
 
+  it('uses the shared create-page header', async () => {
+    const { container } = render(<CreateAssistantAuthenticationPage />);
+    await waitUntilReady();
+
+    expect(
+      screen.getByRole('heading', { name: 'Add Authentication' }),
+    ).toBeVisible();
+    expect(
+      container.querySelector('[data-create-page-header-content]'),
+    ).toBeInTheDocument();
+  });
+
   it('supports add and edit for authentication parameter mapping', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateAssistantAuthenticationPage />);

@@ -132,6 +132,7 @@ jest.mock('@/app/components/ui/composites/create-full-page', () => ({
       <div>
         <h1>{description}</h1>
         {errorMessage ? <div>{errorMessage}</div> : null}
+        {!active.hideHeader ? <h2>{active.name}</h2> : null}
         <div>{active.body}</div>
         <div>
           {Array.isArray(active.actions)
@@ -244,6 +245,10 @@ describe('CreateAssistantAnalysis', () => {
   it('shows endpoint validation error when continuing without endpoint', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateAssistantAnalysis assistantId="assistant-1" />);
+
+    expect(
+      screen.queryByRole('heading', { name: 'Configure' }),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Continue' }));
 

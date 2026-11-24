@@ -163,6 +163,17 @@ describe('Create assistant telemetry flow', () => {
     });
   });
 
+  it('uses the shared create-page header', () => {
+    const { container } = render(
+      <CreateAssistantTelemetry assistantId="assistant-1" />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Telemetry' })).toBeVisible();
+    expect(
+      container.querySelector('[data-create-page-header-content]'),
+    ).toBeInTheDocument();
+  });
+
   it('shows validation error when telemetry config is invalid', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     (ValidateTelemetry as jest.Mock).mockReturnValue(

@@ -102,7 +102,7 @@ jest.mock('@carbon/react', () => ({
       </select>
     </div>
   ),
-  Stack: ({ children }: any) => <div>{children}</div>,
+  Stack: ({ children, gap }: any) => <div data-gap={gap}>{children}</div>,
 }));
 
 const createMetadata = (key: string, value: string): Metadata => {
@@ -126,6 +126,22 @@ beforeEach(() => {
   );
   mockGetDefaultsFromConfig.mockImplementation(
     (_config, _category, current: Metadata[]) => current,
+  );
+});
+
+it('uses the standard form spacing between model and credential fields', () => {
+  render(
+    <TextProvider
+      onChangeParameter={jest.fn()}
+      onChangeProvider={jest.fn()}
+      parameters={[]}
+      provider="openai"
+    />,
+  );
+
+  expect(screen.getByText('Pick credential').parentElement).toHaveAttribute(
+    'data-gap',
+    '6',
   );
 });
 

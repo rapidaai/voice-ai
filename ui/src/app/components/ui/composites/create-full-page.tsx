@@ -4,7 +4,9 @@ import {
   type ComponentType,
   type ReactElement,
   type ReactNode,
+  type RefObject,
   useId,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -47,6 +49,7 @@ export interface CreateFullPageHeaderProps {
 }
 
 export interface CreateFullPageWithGlobalHeaderProps {
+  alignHeaderWithStepRail?: boolean;
   children: ReactNode;
   cancelButtonText?: string;
   description: string;
@@ -56,12 +59,17 @@ export interface CreateFullPageWithGlobalHeaderProps {
   nextButtonText?: string;
   onCancel: () => void;
   onRequestSubmit: () => void | Promise<void>;
+  renderPrimaryAction?: (
+    action: ReactElement,
+    launcherButtonRef: RefObject<HTMLButtonElement>,
+  ) => ReactElement;
   submitButtonText: string;
   title: string;
 }
 
 export interface CreateFullPageWithHeaderProps {
   activeStep?: string;
+  alignHeaderWithStepRail?: boolean;
   description?: string;
   errorMessage?: string;
   eyebrow?: string;
@@ -79,6 +87,7 @@ export interface CreateFullPageWithHeaderProps {
 }
 
 interface CreateFullPageFrameProps {
+  alignHeaderWithStepRail?: boolean;
   children: ReactNode;
   currentIndex: number;
   description?: ReactNode;
@@ -103,10 +112,7 @@ export function CreateFullPageHeader({
 }: CreateFullPageHeaderProps) {
   return (
     <header className="shrink-0 border-b border-border-subtle bg-surface px-5 py-6 md:px-8">
-      <div
-        data-create-page-header-content
-        className="max-w-2xl"
-      >
+      <div data-create-page-header-content className="max-w-2xl">
         {label && (
           <Text
             as="div"
@@ -123,11 +129,7 @@ export function CreateFullPageHeader({
           </Text>
         </div>
         {description && (
-          <Text
-            as="div"
-            className="mt-2 text-muted"
-            variant="body-compact-01"
-          >
+          <Text as="div" className="mt-2 text-muted" variant="body-compact-01">
             {description}
           </Text>
         )}
@@ -137,6 +139,7 @@ export function CreateFullPageHeader({
 }
 
 function CreateFullPageFrame({
+  alignHeaderWithStepRail = false,
   children,
   currentIndex,
   description,
@@ -147,12 +150,25 @@ function CreateFullPageFrame({
 }: CreateFullPageFrameProps) {
   return (
     <section aria-label={title} className="flex min-h-0 flex-1 flex-col">
-      <CreateFullPageHeader
-        description={description}
-        label={eyebrow}
-        title={title}
-        titleStart={HeaderIcon ? <HeaderIcon size={24} /> : undefined}
-      />
+      <div className="flex shrink-0">
+        <div
+          aria-hidden="true"
+          className={
+            alignHeaderWithStepRail
+              ? 'hidden border-b border-border-subtle xl:block xl:w-80 xl:shrink-0 xl:border-r xl:bg-layer'
+              : 'hidden'
+          }
+          data-create-page-header-rail
+        />
+        <div className="min-w-0 flex-1" data-create-page-header-main>
+          <CreateFullPageHeader
+            description={description}
+            label={eyebrow}
+            title={title}
+            titleStart={HeaderIcon ? <HeaderIcon size={24} /> : undefined}
+          />
+        </div>
+      </div>
 
       <div className="flex min-h-0 flex-1 overflow-hidden bg-surface">
         <aside className="hidden w-80 shrink-0 flex-col border-r border-border-subtle bg-layer xl:flex">
@@ -230,6 +246,7 @@ export function CreateFullPageStep({
 }
 
 function CreateFullPageContent({
+  alignHeaderWithStepRail,
   children,
   cancelButtonText = 'Cancel',
   description,
@@ -239,6 +256,7 @@ function CreateFullPageContent({
   nextButtonText = 'Next',
   onCancel,
   onRequestSubmit,
+  renderPrimaryAction,
   submitButtonText,
   title,
 }: CreateFullPageWithGlobalHeaderProps) {
@@ -246,6 +264,7 @@ function CreateFullPageContent({
     useStepContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [flowError, setFlowError] = useState('');
+  const primaryActionButtonRef = useRef<HTMLButtonElement>(null);
   const steps = Children.toArray(children).filter(
     (child): child is ReactElement<CreateFullPageStepProps> =>
       isValidElement<CreateFullPageStepProps>(child),
@@ -280,8 +299,24 @@ function CreateFullPageContent({
     }
   };
 
+  const primaryAction = (
+    <Button
+      ref={primaryActionButtonRef}
+      disabled={currentStepData?.disableSubmit || isSubmitting}
+      kind="primary"
+      onClick={handlePrimaryAction}
+      size="lg"
+      type="button"
+    >
+      {isLastStep
+        ? submitButtonText
+        : currentStepData?.nextButtonText ?? nextButtonText}
+    </Button>
+  );
+
   return (
     <CreateFullPageFrame
+      alignHeaderWithStepRail={alignHeaderWithStepRail}
       currentIndex={currentStep - 1}
       description={description}
       eyebrow={eyebrow}
@@ -345,17 +380,9 @@ function CreateFullPageContent({
                 Back
               </Button>
             )}
-            <Button
-              disabled={currentStepData?.disableSubmit || isSubmitting}
-              kind="primary"
-              onClick={handlePrimaryAction}
-              size="lg"
-              type="button"
-            >
-              {isLastStep
-                ? submitButtonText
-                : currentStepData?.nextButtonText ?? nextButtonText}
-            </Button>
+            {renderPrimaryAction
+              ? renderPrimaryAction(primaryAction, primaryActionButtonRef)
+              : primaryAction}
           </ButtonSet>
         </div>
       </Form>
@@ -365,6 +392,7 @@ function CreateFullPageContent({
 
 export function CreateFullPageWithHeader({
   activeStep,
+  alignHeaderWithStepRail,
   description,
   errorMessage,
   eyebrow,
@@ -379,6 +407,7 @@ export function CreateFullPageWithHeader({
 
   return (
     <CreateFullPageFrame
+      alignHeaderWithStepRail={alignHeaderWithStepRail}
       currentIndex={currentIndex}
       description={description}
       eyebrow={eyebrow}
@@ -404,11 +433,7 @@ export function CreateFullPageWithHeader({
                 >
                   Step {activeIndex + 1} of {steps.length}
                 </Text>
-                <Text
-                  as="h2"
-                  className="text-foreground"
-                  variant="heading-04"
-                >
+                <Text as="h2" className="text-foreground" variant="heading-04">
                   {activeStepData.name}
                 </Text>
                 {activeStepData.description && (

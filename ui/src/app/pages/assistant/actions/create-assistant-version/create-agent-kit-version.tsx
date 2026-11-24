@@ -385,6 +385,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
       <ConfirmDialogComponent />
       <Helmet title="Create AgentKit Version"></Helmet>
       <CreateFullPageWithHeader
+        alignHeaderWithStepRail
         title="Create AgentKit Version"
         eyebrow="Assistant"
         description="Create a new version of this AgentKit connection."

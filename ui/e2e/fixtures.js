@@ -165,6 +165,7 @@ async function authenticatePage(page, options = {}) {
       const completedTours = {
         dashboard: 'completed',
         assistant: 'completed',
+        createAssistant: 'completed',
       };
       if (tourToShow) delete completedTours[tourToShow];
       window.localStorage.setItem(

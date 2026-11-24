@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { useRapidaStore } from '@/stores/app';
 import {
@@ -58,7 +58,6 @@ import { Struct } from 'google-protobuf/google/protobuf/struct_pb';
 import { ChatCompletePrompt } from '@/utils/prompt';
 import toast from 'react-hot-toast/headless';
 import { ConfigureAssistantNextDialog } from '@/app/components/dialogs/assistant';
-import { SectionDivider } from '@/app/components/layout/blocks/section-divider';
 import { ActionCard } from '@/app/components/ui/primitives';
 import {
   Add,
@@ -73,6 +72,8 @@ import {
   ConfigureAssistantTemplateDialog,
 } from '@/app/components/dialogs/assistant';
 import { createAssistantWithDebuggerFromRequest } from '@/clients/assistant.client';
+import { Coachmark } from '@/app/components/ui/composites/coachmark';
+import { useCreateAssistantInterfaceTour } from './create-assistant-interface-tour';
 
 /**
  *
@@ -83,6 +84,9 @@ export function CreateAssistantPage() {
    * credentils and authentication parameters
    */
   const { authId, token, projectId } = useCurrentCredential();
+  const interfaceTour = useCreateAssistantInterfaceTour(authId);
+  const templateTourTargetRef = useRef<HTMLDivElement>(null);
+  const modelTourTargetRef = useRef<HTMLDivElement>(null);
 
   /**
    * global reloading
@@ -342,7 +346,7 @@ export function CreateAssistantPage() {
   //
   return (
     <>
-      <Helmet title="Create assistant"></Helmet>
+      <Helmet title="Create Assistant"></Helmet>
       <ConfirmDialogComponent />
 
       <ConfigureAssistantTemplateDialog
@@ -402,7 +406,8 @@ export function CreateAssistantPage() {
         }}
       />
       <CreateFullPageWithGlobalHeader
-        title="Create assistant"
+        alignHeaderWithStepRail
+        title="Create Assistant"
         description="Configure the model and instruction, optionally add tools, then define the assistant profile."
         errorMessage={errorMessage}
         eyebrow="Assistant"
@@ -410,6 +415,23 @@ export function CreateAssistantPage() {
         nextButtonText="Continue"
         onCancel={() => showDialog(goBack)}
         onRequestSubmit={createAssistant}
+        renderPrimaryAction={(action, launcherButtonRef) => (
+          <div className="flex min-w-0 flex-1 [&>.cds--btn]:w-full [&>.cds--btn]:max-w-none!">
+            <Coachmark
+              actionLabel="Got it"
+              align="top-end"
+              description="Continue when your model, credential, and prompt configuration are ready."
+              launcherButtonRef={launcherButtonRef}
+              onAction={interfaceTour.dismiss}
+              onClose={interfaceTour.dismiss}
+              open={interfaceTour.step === 'continue'}
+              targetClassName="flex w-full [&>.cds--popover-container>.cds--btn]:w-full [&>.cds--popover-container>.cds--btn]:max-w-none!"
+              title="Continue your setup"
+            >
+              {action}
+            </Coachmark>
+          </div>
+        )}
         submitButtonText="Create assistant"
       >
         <CreateFullPageStep
@@ -420,42 +442,74 @@ export function CreateAssistantPage() {
         >
           <div className="flex max-w-4xl flex-col gap-8 px-8 pb-8 pt-6">
             {/* Quick start Usecase Template tile */}
-            <ActionCard
-              className="group relative w-full flex items-start justify-between gap-4 p-4 text-left bg-surface border border-border-subtle hover:bg-layer transition-colors duration-100"
-              onClick={() => setTemplateModalOpen(true)}
+            <Coachmark
+              actionLabel="Next"
+              align="bottom-start"
+              description="Select a pre-configured usecase template for a quick start, or continue with your own configuration."
+              launcherButtonRef={templateTourTargetRef}
+              onAction={interfaceTour.showModel}
+              onClose={interfaceTour.dismiss}
+              open={interfaceTour.step === 'template'}
+              targetClassName="block w-full"
+              title="Choose a usecase template"
             >
-              <div className="flex flex-col gap-1 min-w-0">
-                <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted">
-                  Quick start
-                </span>
-                <span className="text-sm font-medium text-foreground ">
-                  Usecase Template
-                </span>
-                <span className="text-xs text-muted leading-relaxed">
-                  Browse 8 pre-configured assistant templates and auto-fill your
-                  form.
-                </span>
+              <div
+                ref={templateTourTargetRef}
+                data-coachmark-target="create-assistant-template"
+                className="w-full"
+              >
+                <ActionCard
+                  className="group relative w-full flex items-start justify-between gap-4 p-4 text-left bg-surface border border-border-subtle hover:bg-layer transition-colors duration-100"
+                  onClick={() => setTemplateModalOpen(true)}
+                >
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted">
+                      Quick start
+                    </span>
+                    <span className="text-sm font-medium text-foreground ">
+                      Usecase Template
+                    </span>
+                    <span className="text-xs text-muted leading-relaxed">
+                      Browse 8 pre-configured assistant templates and auto-fill
+                      your form.
+                    </span>
+                  </div>
+                  <ArrowUpRight
+                    className="shrink-0 mt-0.5 text-muted group-hover:text-primary transition-colors"
+                    size={16}
+                  />
+                </ActionCard>
               </div>
-              <ArrowUpRight
-                className="shrink-0 mt-0.5 text-muted group-hover:text-primary transition-colors"
-                size={16}
-              />
-            </ActionCard>
+            </Coachmark>
 
             {/* Model configuration section */}
-            <div className="flex flex-col gap-6">
-              <SectionDivider label="Model Configuration" />
-              <TextProvider
-                onChangeParameter={onChangeParameter}
-                onChangeProvider={onChangeProvider}
-                parameters={selectedModel.parameters}
-                provider={selectedModel.provider}
-              />
-            </div>
+            <Coachmark
+              actionLabel="Next"
+              align="bottom-start"
+              description="Choose the model provider, model, and credential the assistant will use."
+              launcherButtonRef={modelTourTargetRef}
+              onAction={interfaceTour.showContinue}
+              onClose={interfaceTour.dismiss}
+              open={interfaceTour.step === 'model'}
+              targetClassName="block w-full"
+              title="Select a model and credential"
+            >
+              <div
+                ref={modelTourTargetRef}
+                data-coachmark-target="create-assistant-model"
+                className="w-full"
+              >
+                <TextProvider
+                  onChangeParameter={onChangeParameter}
+                  onChangeProvider={onChangeProvider}
+                  parameters={selectedModel.parameters}
+                  provider={selectedModel.provider}
+                />
+              </div>
+            </Coachmark>
 
             {/* Prompt template section */}
             <div className="flex flex-col gap-6">
-              <SectionDivider label="Prompt Template" />
               <DocNoticeBlock docPath="/assistants/prompt-templating">
                 Prompt variables and system arguments are resolved at runtime.
                 Read the prompt templating guide before finalizing your

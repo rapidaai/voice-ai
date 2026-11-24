@@ -155,7 +155,7 @@ export const deploymentRoute: RouteObject = {
         {
           path: 'create-assistant',
           element: <DeploymentCreateAssistantPage />,
-          handle: breadcrumb('Create assistant'),
+          handle: breadcrumb('Create Assistant'),
         },
         {
           path: 'connect-websocket',

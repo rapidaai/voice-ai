@@ -215,6 +215,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
           {
             code: 'change-assistant',
             name: 'Configure Connection',
+            hideHeader: true,
             description:
               'Set up a new WebSocket connection to the server where your agent is running.',
             actions: [
@@ -283,6 +284,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
           {
             code: 'commit-assistant',
             name: 'Change Definition',
+            hideHeader: true,
             description:
               'Provide a clear description of the changes made in this version to help others understand what has been updated.',
             actions: [

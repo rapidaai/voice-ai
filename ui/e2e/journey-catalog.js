@@ -116,6 +116,11 @@ const journeySubjourneys = [
     'journeys/deployment/assistant-listing.spec.js',
   ),
   covered(
+    'deployment.createAssistant.interfaceTour',
+    'deployment.createAssistant',
+    'journeys/deployment/assistant-create-tour.spec.js',
+  ),
+  covered(
     'deployment.endpoint.overview',
     'deployment.endpointOverview',
     'journeys/deployment/endpoint-detail.spec.js',

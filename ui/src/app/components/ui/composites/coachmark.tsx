@@ -6,6 +6,7 @@ import {
   type RefObject,
 } from 'react';
 import type { Coachmark as CarbonCoachmark } from '@carbon/ibm-products/lib/components/Coachmark/next/Coachmark/Coachmark';
+import { cn } from '@/utils';
 
 const LazyCoachmarkContent = lazy(() =>
   import('./coachmark-content').then(module => ({
@@ -47,7 +48,10 @@ export function Coachmark({
         launcherButtonRef={launcherButtonRef}
         onAction={onAction}
         onClose={onClose}
-        targetClassName={targetClassName}
+        targetClassName={cn(
+          '[&>.cds--popover-container]:w-full',
+          targetClassName,
+        )}
         title={title}
       >
         {children}
