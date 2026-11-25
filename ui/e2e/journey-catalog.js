@@ -360,6 +360,11 @@ const journeySubjourneys = [
     'account.settings',
     'journeys/account/settings.spec.js',
   ),
+  covered(
+    'logs.llm.activityDetail',
+    'logs.llm',
+    'journeys/observability/activity-log-code-panel.spec.js',
+  ),
   ...[
     'list',
     'create',
