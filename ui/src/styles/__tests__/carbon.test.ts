@@ -81,6 +81,16 @@ describe('Carbon theme adapters', () => {
     );
   });
 
+  it('uses one complete border reset for batch action controls', () => {
+    const styles = readStyles('carbon.scss');
+    const batchActionReset = styles.match(
+      /\.cds--batch-actions \.cds--action-list \.cds--btn,[\s\S]*?\{([\s\S]*?)\n\}/,
+    )?.[1];
+
+    expect(batchActionReset).toContain('border: 0;');
+    expect(batchActionReset).not.toContain('border-left: none;');
+  });
+
   it('uses the configured brand contrast for onboarding checklists', () => {
     const styles = readStyles('carbon.scss');
 
