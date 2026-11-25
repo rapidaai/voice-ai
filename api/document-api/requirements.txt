@@ -135,7 +135,7 @@ pydantic==2.9.2
 pydantic-settings==2.9.1
 pydantic_core==2.23.4
 Pygments==2.19.1
-PyJWT==2.4.0
+PyJWT==2.15.0
 PyMuPDF==1.26.0
 pyparsing==3.2.3
 pypdf==5.5.0
@@ -159,7 +159,7 @@ s3transfer==0.11.3
 safetensors==0.5.3
 scipy==1.15.3
 semantic-router==0.0.72
-setuptools==80.9.0
+setuptools==84.1.0
 shellingham==1.5.4
 six==1.17.0
 smart-open==7.1.0
