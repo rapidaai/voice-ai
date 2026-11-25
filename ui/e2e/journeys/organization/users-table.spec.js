@@ -114,6 +114,23 @@ test('organization users show assigned roles and multi-role management', async (
   ).toHaveCount(0);
 });
 
+test('organization users do not send project context when no project is selected', async ({
+  page,
+}) => {
+  await authenticatePage(page, { project: false });
+  let requestHeaders;
+  await page.route(USER_LIST_PATH, async route => {
+    requestHeaders = await route.request().allHeaders();
+    return fulfillGrpcWeb(route, buildUserListResponse());
+  });
+
+  await page.goto(usersPath);
+
+  await expect(page.getByText('Ada Lovelace', { exact: true })).toBeVisible();
+  expect(requestHeaders['x-organization-id']).toBe('202');
+  expect(requestHeaders).not.toHaveProperty('x-project-id');
+});
+
 for (const colorMode of ['light', 'dark']) {
   test(`organization users loading in ${colorMode} mode`, async ({ page }) => {
     await page.setViewportSize(viewport);
