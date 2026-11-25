@@ -42,7 +42,7 @@ interface LogCodePanelProps {
 
 export function LogCodePanel({ value }: LogCodePanelProps) {
   return (
-    <div className="h-full min-h-0">
+    <div className="h-full min-h-0 w-full">
       <CodeHighlighting
         className="!h-full !min-h-0"
         language="json"
