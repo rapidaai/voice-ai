@@ -137,54 +137,52 @@ export function TextProvider({
   const selectedProvider = textProviders.find(x => x.code === provider) || null;
 
   return (
-    <>
-      <Stack>
-        <div className="w-full">
-          <div className="cds--label text-provider-label-row !flex w-full items-center">
-            <div className="w-48 shrink-0">
-              <span className="inline-flex items-center gap-1">
-                Model provider
-                <HelpToggletip
-                  label="Model provider"
-                  helpText="Select the provider and model configuration used by this agent."
-                />
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <span>Model</span>
-            </div>
+    <Stack gap={6}>
+      <div className="w-full">
+        <div className="cds--label text-provider-label-row !flex w-full items-center">
+          <div className="w-48 shrink-0">
+            <span className="inline-flex items-center gap-1">
+              Model provider
+              <HelpToggletip
+                label="Model provider"
+                helpText="Select the provider and model configuration used by this agent."
+              />
+            </span>
           </div>
-          <div className="text-provider-combo-row flex w-full items-stretch border-b border-b-border-strong bg-field">
-            <div className="w-48 shrink-0 border-r border-border-subtle">
-              <Dropdown
-                id="text-provider"
-                titleText="Model provider"
-                hideLabel
-                label="Select provider"
-                size="md"
-                items={textProviders}
-                selectedItem={selectedProvider}
-                itemToString={getProviderName}
-                onChange={({
-                  selectedItem,
-                }: ProviderSelectionChange<RapidaProvider>) => {
-                  if (selectedItem) onChangeProvider(selectedItem.code);
-                }}
-              />
-            </div>
-            {provider ? (
-              <TextProviderConfigComponent
-                parameters={parameters}
-                provider={provider}
-                onChangeParameter={onChangeParameter}
-                onChangeProvider={onChangeProvider}
-              />
-            ) : (
-              <TextProviderModelPlaceholder />
-            )}
+          <div className="flex-1 min-w-0">
+            <span>Model</span>
           </div>
         </div>
-      </Stack>
+        <div className="text-provider-combo-row flex w-full items-stretch border-b border-b-border-strong bg-field">
+          <div className="w-48 shrink-0 border-r border-border-subtle">
+            <Dropdown
+              id="text-provider"
+              titleText="Model provider"
+              hideLabel
+              label="Select provider"
+              size="md"
+              items={textProviders}
+              selectedItem={selectedProvider}
+              itemToString={getProviderName}
+              onChange={({
+                selectedItem,
+              }: ProviderSelectionChange<RapidaProvider>) => {
+                if (selectedItem) onChangeProvider(selectedItem.code);
+              }}
+            />
+          </div>
+          {provider ? (
+            <TextProviderConfigComponent
+              parameters={parameters}
+              provider={provider}
+              onChangeParameter={onChangeParameter}
+              onChangeProvider={onChangeProvider}
+            />
+          ) : (
+            <TextProviderModelPlaceholder />
+          )}
+        </div>
+      </div>
       {provider && (
         <CredentialDropdown
           onChangeCredential={(c: VaultCredential) => {
@@ -194,6 +192,6 @@ export function TextProvider({
           currentCredential={getParamValue('rapida.credential_id')}
         />
       )}
-    </>
+    </Stack>
   );
 }

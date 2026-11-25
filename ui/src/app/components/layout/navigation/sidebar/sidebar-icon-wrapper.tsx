@@ -11,7 +11,7 @@ export function SidebarIconWrapper({
       {...attributes}
       className={cn(
         'flex h-8 w-12 flex-shrink-0 items-center justify-center',
-        '[&_svg]:w-5 [&_svg]:h-5',
+        '[&_svg]:h-4 [&_svg]:w-4',
         className,
       )}
     >

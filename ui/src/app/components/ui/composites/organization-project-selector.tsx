@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type Ref } from 'react';
 import {
   ContainedList,
   ContainedListItem,
@@ -34,6 +34,7 @@ interface OrganizationProjectSelectorProps {
   isCompact?: boolean;
   isLoading?: boolean;
   className?: string;
+  triggerRef?: Ref<HTMLButtonElement>;
   onChange: (
     organization: OrganizationProjectSelectorOrganization,
     project?: OrganizationProjectSelectorProject,
@@ -48,6 +49,7 @@ export function OrganizationProjectSelector({
   isCompact = false,
   isLoading = false,
   className,
+  triggerRef,
   onChange,
 }: OrganizationProjectSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -94,6 +96,7 @@ export function OrganizationProjectSelector({
     >
       <span className={cn('inline-flex h-12', isCompact ? 'w-12' : 'w-72')}>
         <GhostButton
+          ref={triggerRef}
           aria-expanded={isOpen}
           aria-label={`Change organization or project. ${accessibleContext}`}
           className={cn('h-12! w-full! justify-between!', className)}

@@ -106,16 +106,20 @@ describe('deployment listing page headers', () => {
 
     const pageHeader = container.querySelector('[data-page-header]');
     expect(pageHeader).not.toBeNull();
+    expect(pageHeader).toHaveClass('border-b');
+    expect(
+      container.querySelector('[data-page-header-content]'),
+    ).not.toHaveClass('mx-auto', 'max-w-[1200px]');
     expect(
       within(pageHeader as HTMLElement).getByRole('heading', {
         name: 'Assistants',
       }),
-    ).toBeInTheDocument();
+    ).toHaveClass('text-[1.25rem]', 'leading-[1.75rem]', 'font-semibold!');
     expect(
       within(pageHeader as HTMLElement).getByText(
         'Create and manage assistants, versions, deployments, and connected experiences across your workspace.',
       ),
-    ).toBeInTheDocument();
+    ).toHaveClass('text-muted');
     expect(within(pageHeader as HTMLElement).getByText('0 of 0')).toBeVisible();
     expect(
       within(pageHeader as HTMLElement).getByRole('button', {

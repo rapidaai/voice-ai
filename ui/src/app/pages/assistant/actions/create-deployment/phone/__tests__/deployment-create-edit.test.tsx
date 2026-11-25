@@ -176,6 +176,7 @@ jest.mock('@/clients/assistant.client', () => ({
 jest.mock('@/app/components/app-shell/helmet', () => ({ Helmet: () => null }));
 
 jest.mock('@/app/components/ui/composites/create-full-page', () => ({
+  CreateFullPageHeader: ({ title }: any) => <h1>{title}</h1>,
   CreateFullPageWithHeader: ({
     activeStep,
     steps,

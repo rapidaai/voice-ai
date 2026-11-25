@@ -183,6 +183,7 @@ export const CreateAssistantAnalysis: FC<{ assistantId: string }> = ({
     <>
       <ConfirmDialogComponent />
       <CreateFullPageWithHeader
+        alignHeaderWithStepRail
         title="Configure analysis"
         eyebrow="Assistant"
         description="Complete all steps to configure your analysis."
@@ -193,6 +194,7 @@ export const CreateAssistantAnalysis: FC<{ assistantId: string }> = ({
           {
             code: 'configure',
             name: 'Configure',
+            hideHeader: true,
             description:
               'Select the endpoint and map data parameters for analysis.',
             actions: [
@@ -255,6 +257,7 @@ export const CreateAssistantAnalysis: FC<{ assistantId: string }> = ({
           {
             code: 'profile',
             name: 'Profile',
+            hideHeader: true,
             description: 'Provide a name and set the execution priority.',
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">

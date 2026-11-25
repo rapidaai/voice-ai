@@ -73,9 +73,7 @@ const dashboardStates = [
       await expect(
         page.getByRole('link', { name: 'Open assistants' }),
       ).toHaveAttribute('href', '/deployment/assistant');
-      await expect(
-        page.getByLabel('Dashboard setup checklist'),
-      ).toBeVisible();
+      await expect(page.getByLabel('Dashboard setup checklist')).toBeVisible();
       await expect(page.getByLabel('Dashboard setup checklist')).toHaveCSS(
         'position',
         'fixed',
@@ -244,6 +242,58 @@ for (const dashboardState of dashboardStates) {
 }
 
 for (const colorMode of COLOR_MODES) {
+  test(`dashboard interface tour in ${colorMode} mode`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setColorMode(page, colorMode);
+    await gotoJourney(page, dashboardJourney, { showInterfaceTour: true });
+    await page.evaluate(() => document.fonts.ready);
+
+    const steps = [
+      {
+        name: 'context',
+        region: 'Switch organization or project coachmark',
+        action: 'Next',
+      },
+      {
+        name: 'theme',
+        region: 'Choose your appearance coachmark',
+        action: 'Next',
+      },
+      {
+        name: 'account',
+        region: 'Open your account coachmark',
+        action: 'Next',
+      },
+      {
+        name: 'navigation',
+        region: 'Explore the side navigation coachmark',
+        action: 'Next',
+      },
+      {
+        name: 'sidebar-toggle',
+        region: 'Collapse or expand the side navigation coachmark',
+        action: 'Done',
+      },
+    ];
+
+    for (const step of steps) {
+      const coachmark = page.getByRole('region', { name: step.region });
+      await expect(
+        coachmark.getByRole('button', { name: step.action }),
+      ).toBeVisible();
+      await checkA11y(page, dashboardJourney);
+      await expect(page).toHaveScreenshot(
+        [
+          'dashboard',
+          'interface-tour',
+          `${step.name}-${colorMode}.png`,
+        ],
+        { maxDiffPixels: 1000 },
+      );
+      await coachmark.getByRole('button', { name: step.action }).click();
+    }
+  });
+
   test(`dashboard empty state below sm in ${colorMode} mode`, async ({
     page,
   }) => {

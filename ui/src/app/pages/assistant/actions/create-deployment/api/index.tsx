@@ -369,6 +369,7 @@ const ConfigureAssistantApiDeployment: FC<{ assistantId: string }> = ({
       <ConfirmDialogComponent />
       <div className="flex flex-col flex-1 min-h-0 bg-surface ">
         <CreateFullPageWithHeader
+          alignHeaderWithStepRail
           title="Deploy API"
           eyebrow="Deployment"
           description="Complete all steps to configure your SDK / API deployment."
@@ -379,6 +380,7 @@ const ConfigureAssistantApiDeployment: FC<{ assistantId: string }> = ({
             {
               code: 'experience',
               name: 'General Experience',
+              hideHeader: true,
               description:
                 'Define how the assistant greets users and handles sessions.',
               body: (
@@ -412,6 +414,7 @@ const ConfigureAssistantApiDeployment: FC<{ assistantId: string }> = ({
             {
               code: 'voice-input',
               name: 'Voice Input',
+              hideHeader: true,
               description:
                 'Configure the speech-to-text provider for capturing user audio.',
               body: (
@@ -471,6 +474,7 @@ const ConfigureAssistantApiDeployment: FC<{ assistantId: string }> = ({
             {
               code: 'voice-output',
               name: 'Voice Output',
+              hideHeader: true,
               description:
                 'Configure the text-to-speech provider for audio responses.',
               body: (

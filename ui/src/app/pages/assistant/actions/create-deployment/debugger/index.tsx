@@ -34,7 +34,10 @@ import {
 } from '@/app/components/domain/providers/text-to-speech/provider';
 import { useConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-confirmation';
 import { DebuggerDeploymentSuccessDialog } from '@/app/components/dialogs/assistant';
-import { CreateFullPageWithHeader } from '@/app/components/ui/composites';
+import {
+  CreateFullPageHeader,
+  CreateFullPageWithHeader,
+} from '@/app/components/ui/composites';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -540,11 +543,9 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
       <div className="flex flex-col flex-1 min-h-0 bg-surface ">
         {isSectionMode && editSection ? (
           <div className="flex flex-col flex-1 min-h-0">
-            <div className="px-6 pt-6 pb-4 border-b border-border-subtle ">
-              <h2 className="text-2xl font-light tracking-tight">
-                Edit {sectionTitleMap[editSection]} settings
-              </h2>
-            </div>
+            <CreateFullPageHeader
+              title={`Edit ${sectionTitleMap[editSection]} settings`}
+            />
             <div className="flex-1 overflow-auto">
               {sectionBodyMap[editSection]}
             </div>
@@ -576,6 +577,7 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
           </div>
         ) : (
           <CreateFullPageWithHeader
+            alignHeaderWithStepRail
             title="Deploy debugger"
             eyebrow="Deployment"
             description="Complete all steps to configure your debugger deployment."
@@ -586,6 +588,7 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
               {
                 code: 'experience',
                 name: 'General Experience',
+                hideHeader: true,
                 description:
                   'Define how the assistant greets users and handles sessions.',
                 body: experienceBody,
@@ -608,6 +611,7 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
               {
                 code: 'voice-input',
                 name: 'Voice Input',
+                hideHeader: true,
                 description:
                   'Configure the speech-to-text provider for capturing user audio.',
                 body: voiceInputBody,
@@ -633,6 +637,7 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
               {
                 code: 'voice-output',
                 name: 'Voice Output',
+                hideHeader: true,
                 description:
                   'Configure the text-to-speech provider for audio responses.',
                 body: voiceOutputBody,

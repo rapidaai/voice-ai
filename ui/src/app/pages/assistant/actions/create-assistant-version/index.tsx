@@ -247,6 +247,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
       <ConfirmDialogComponent />
       <Helmet title="Create version"></Helmet>
       <CreateFullPageWithGlobalHeader
+        alignHeaderWithStepRail
         title="Create version"
         description="Update the assistant configuration, then add a version note describing what changed. New versions are not deployed automatically."
         errorMessage={errorMessage}

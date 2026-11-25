@@ -310,6 +310,7 @@ export function CreateAgentKit() {
       <Helmet title="Connect AgentKit"></Helmet>
       <ConfirmDialogComponent />
       <CreateFullPageWithGlobalHeader
+        alignHeaderWithStepRail
         title="Connect AgentKit"
         description="Connect an AgentKit endpoint, define its assistant profile, then choose how to deploy it."
         errorMessage={errorMessage}

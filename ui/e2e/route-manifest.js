@@ -175,7 +175,7 @@ const routeJourneys = [
     id: 'deployment.assistantOverview',
     path: '/deployment/assistant/2301664620831571968/overview',
     auth: true,
-    expectText: 'Assistant activity',
+    expectText: 'Assistant Activity',
     readyText: '1,284',
     checks: ['smoke', 'a11y', 'screenshot'],
     screenshotOwner: 'focused',
@@ -357,7 +357,7 @@ const routeJourneys = [
     id: 'deployment.endpointOverview',
     path: '/deployment/endpoint/2301664620831571968/overview',
     auth: true,
-    expectText: 'Endpoint activity',
+    expectText: 'Endpoint Activity',
     checks: ['smoke', 'a11y', 'screenshot'],
   },
   {

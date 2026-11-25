@@ -49,8 +49,18 @@ jest.mock('@/hooks/use-global-navigator', () => ({
 }));
 
 jest.mock('../assistant-side-nav', () => ({
-  AssistantSideNav: ({ expanded }: { expanded: boolean }) => (
-    <nav aria-label="Assistant navigation" data-expanded={String(expanded)} />
+  AssistantSideNav: ({
+    expanded,
+    onToggle,
+  }: {
+    expanded: boolean;
+    onToggle: () => void;
+  }) => (
+    <nav aria-label="Assistant navigation" data-expanded={String(expanded)}>
+      <button type="button" onClick={onToggle}>
+        Toggle assistant navigation
+      </button>
+    </nav>
   ),
 }));
 
@@ -109,6 +119,7 @@ describe('AssistantViewLayout', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    window.localStorage.clear();
     window.matchMedia = originalMatchMedia;
   });
 
@@ -207,5 +218,31 @@ describe('AssistantViewLayout', () => {
     expect(
       await screen.findByRole('navigation', { name: 'Assistant navigation' }),
     ).toHaveAttribute('data-expanded', 'false');
+  });
+
+  it('persists assistant navigation independently from the other sidenavs', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      'rpd::__ui_sidenav',
+      JSON.stringify({ main: false, assistant: false, endpoint: true }),
+    );
+    mockedGetAssistantById.mockResolvedValue({
+      getSuccess: () => true,
+      getData: () => ({ getId: () => 'assistant-1' }),
+    } as any);
+
+    renderLayout();
+
+    const navigation = await screen.findByRole('navigation', {
+      name: 'Assistant navigation',
+    });
+    expect(navigation).toHaveAttribute('data-expanded', 'false');
+    await user.click(
+      screen.getByRole('button', { name: 'Toggle assistant navigation' }),
+    );
+    expect(navigation).toHaveAttribute('data-expanded', 'true');
+    expect(
+      JSON.parse(window.localStorage.getItem('rpd::__ui_sidenav')!),
+    ).toEqual({ main: false, assistant: true, endpoint: true });
   });
 });

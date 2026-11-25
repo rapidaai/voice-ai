@@ -182,6 +182,7 @@ jest.mock('@/app/components/ui/primitives/switch', () => ({
 }));
 
 jest.mock('@/app/components/ui/composites/create-full-page', () => ({
+  CreateFullPageHeader: ({ title }: any) => <h1>{title}</h1>,
   CreateFullPageWithHeader: ({ activeStep, steps, errorMessage }: any) => {
     const active = steps.find((x: any) => x.code === activeStep);
     return (

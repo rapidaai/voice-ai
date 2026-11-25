@@ -53,7 +53,7 @@ describe('workspace route breadcrumb metadata', () => {
     ['/logs/conversation', ['Logs', 'Conversations']],
     [
       '/deployment/assistant/create-assistant',
-      ['Deployment', 'Assistants', 'Create assistant'],
+      ['Deployment', 'Assistants', 'Create Assistant'],
     ],
   ])('declares static metadata for %s', (pathname, expectedLabels) => {
     const labels = getBreadcrumbs(pathname).map(definition =>

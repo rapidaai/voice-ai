@@ -25,6 +25,7 @@ import {
 } from '@/app/components/domain/tools/common';
 import { SourceConditionRule } from '@/app/components/domain/conditions/source-condition-rule';
 import { Stack, TextInput } from '@/app/components/ui/primitives';
+import { CreateFullPageHeader } from '@/app/components/ui/composites';
 
 import {
   AUTH_KEY_OPTIONS_BY_TYPE,
@@ -348,14 +349,12 @@ const AuthenticationFormBase: FC<SharedAuthenticationFormProps> = ({
     <>
       <ConfirmDialogComponent />
       <div className="flex flex-col flex-1 min-h-0 bg-surface ">
-        <header className="px-4 pt-8 pb-6 border-b border-border-subtle ">
-          <h1 className="text-xl font-semibold text-foreground leading-tight">
-            {hasAuthentication ? 'Edit Authentication' : 'Add Authentication'}
-          </h1>
-          <p className="text-sm text-muted mt-1.5 leading-relaxed">
-            Configure the authentication for your assistant.
-          </p>
-        </header>
+        <CreateFullPageHeader
+          title={
+            hasAuthentication ? 'Edit Authentication' : 'Add Authentication'
+          }
+          description="Configure the authentication for your assistant."
+        />
 
         <div className="flex-1 min-h-0 overflow-auto">
           <InputGroup title="Condition">

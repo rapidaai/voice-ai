@@ -14,6 +14,120 @@ const dashboardJourney = routeJourneys.find(
   journey => journey.id === 'dashboard.home',
 );
 
+test('dashboard guides a first visit through context, appearance, account, and navigation controls', async ({
+  page,
+}) => {
+  await gotoJourney(page, dashboardJourney, { showInterfaceTour: true });
+
+  const context = page.getByRole('region', {
+    name: 'Switch organization or project coachmark',
+  });
+  await expect(context).toBeVisible();
+  await expect(context.locator('.app-coachmark__content')).toHaveCSS(
+    'width',
+    '290px',
+  );
+  await expect(
+    page.getByRole('button', {
+      name: /Change organization or project\. Current organization:/,
+    }),
+  ).toHaveAttribute('aria-expanded', 'true');
+  await context.getByRole('button', { name: 'Next' }).click();
+
+  const appearance = page.getByRole('region', {
+    name: 'Choose your appearance coachmark',
+  });
+  await expect(appearance).toBeVisible();
+  await expect(appearance.locator('.app-coachmark__content')).toHaveCSS(
+    'width',
+    '290px',
+  );
+  await expect(
+    page.getByRole('button', { name: 'Switch to dark mode' }),
+  ).toHaveAttribute('aria-expanded', 'true');
+  await appearance.getByRole('button', { name: 'Next' }).click();
+
+  const account = page.getByRole('region', {
+    name: 'Open your account coachmark',
+  });
+  await expect(account).toBeVisible();
+  await expect(account.locator('.app-coachmark__content')).toHaveCSS(
+    'width',
+    '290px',
+  );
+  await expect(page.getByRole('button', { name: 'Account' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await account.getByRole('button', { name: 'Next' }).click();
+
+  const navigation = page.getByRole('region', {
+    name: 'Explore the side navigation coachmark',
+  });
+  await expect(navigation.locator('.app-coachmark__content')).toHaveCSS(
+    'width',
+    '290px',
+  );
+  await expect(
+    navigation.getByRole('heading', { name: 'Explore the side navigation' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-coachmark-target="navigation"]'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Collapse sidebar' }),
+  ).toHaveAttribute('aria-expanded', 'true');
+  await checkA11y(page, dashboardJourney);
+  await navigation.getByRole('button', { name: 'Next' }).click();
+
+  const sidebarToggleCoachmark = page.getByRole('region', {
+    name: 'Collapse or expand the side navigation coachmark',
+  });
+  await expect(sidebarToggleCoachmark).toBeVisible();
+  await expect(
+    sidebarToggleCoachmark.locator('.app-coachmark__content'),
+  ).toHaveCSS('width', '290px');
+  const sidebarToggle = page.getByRole('button', {
+    name: 'Collapse sidebar',
+  });
+  await expect(sidebarToggle).toHaveAttribute('aria-expanded', 'true');
+  const caret = page.locator('.cds--popover-caret:visible');
+  const sidebarToggleIcon = sidebarToggle.locator('svg');
+  await expect(
+    sidebarToggleCoachmark.getByRole('heading', {
+      name: 'Collapse or expand the side navigation',
+    }),
+  ).toBeVisible();
+  const [caretBounds, sidebarToggleBounds, sidebarIconBounds] =
+    await Promise.all([
+      caret.boundingBox(),
+      sidebarToggle.boundingBox(),
+      sidebarToggleIcon.boundingBox(),
+    ]);
+  expect(caretBounds).not.toBeNull();
+  expect(sidebarToggleBounds).not.toBeNull();
+  expect(sidebarIconBounds).not.toBeNull();
+  expect(caretBounds.y + caretBounds.height).toBeLessThanOrEqual(
+    sidebarToggleBounds.y,
+  );
+  expect(caretBounds.x + caretBounds.width / 2).toBeCloseTo(
+    sidebarIconBounds.x + sidebarIconBounds.width / 2,
+    0,
+  );
+  await sidebarToggleCoachmark.getByRole('button', { name: 'Done' }).click();
+
+  await expect(page.getByRole('region', { name: /coachmark$/ })).toHaveCount(0);
+  await expect(sidebarToggle).toBeFocused();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const stored = window.localStorage.getItem('rpd::__ui_tour');
+        return stored ? JSON.parse(stored).dashboard : null;
+      }),
+    )
+    .toBe('completed');
+});
+
 test('dashboard requests the default range exactly once', async ({ page }) => {
   await gotoJourney(page, dashboardJourney);
   await expect.poll(() => getDashboardRequests(page).length).toBe(1);
@@ -78,7 +192,7 @@ test('mobile sidebar expands without reducing dashboard width', async ({
   await expect(dashboard).toHaveCSS('width', '342px');
 
   await page.getByRole('button', { name: 'Expand sidebar' }).click();
-  await expect(sidebar).toHaveCSS('width', '256px');
+  await expect(sidebar).toHaveCSS('width', '216px');
   await expect(dashboard).toHaveCSS('width', '390px');
   await expect(
     page.getByText('Dashboard', { exact: true }).first(),
@@ -141,6 +255,30 @@ test('dashboard stacks activity and health panels at lg width', async ({
   );
   expect(healthBounds.x).toBe(activityBounds.x);
   expect(healthBounds.width).toBe(activityBounds.width);
+});
+
+test('dashboard centers its header and content on ultra-wide screens', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 2560, height: 1200 });
+  await gotoJourney(page, dashboardJourney);
+
+  const [headerBounds, gridBounds, pageBounds] = await Promise.all([
+    page.locator('[data-page-header-content]').boundingBox(),
+    page.locator('[data-dashboard-grid]').boundingBox(),
+    page.locator('[data-dashboard-page]').boundingBox(),
+  ]);
+
+  expect(headerBounds).not.toBeNull();
+  expect(gridBounds).not.toBeNull();
+  expect(pageBounds).not.toBeNull();
+  expect(headerBounds.width).toBe(1200);
+  expect(gridBounds.width).toBe(1200);
+  expect(headerBounds.x).toBe(gridBounds.x);
+  expect(headerBounds.x).toBeGreaterThan(pageBounds.x);
+  expect(
+    pageBounds.x + pageBounds.width - (headerBounds.x + headerBounds.width),
+  ).toBeCloseTo(headerBounds.x - pageBounds.x, 0);
 });
 
 test('dashboard keeps the time range available in the compact header while scrolling', async ({

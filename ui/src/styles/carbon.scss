@@ -64,7 +64,7 @@
 @use '@carbon/ibm-products/scss/components/AddSelect';
 @use '@carbon/ibm-products/scss/components/EmptyStates';
 @use '@carbon/ibm-products/scss/components/FullPageError';
-@use '@carbon/ibm-products/scss/components/SidePanel';
+@use '@carbon/ibm-products/scss/components/Coachmark/coachmark_next';
 
 .debugger-configuration-accordion > .cds--accordion__item:first-child {
   border-block-start: 0;
@@ -111,8 +111,38 @@
 }
 
 // ─── Popover width override ─────────────────────────────────────────────────
-.cds--popover-content {
+.cds--popover-content:not(.c4p--coachmark__next--coachmark-content) {
   max-inline-size: none;
+}
+
+.app-coachmark__content {
+  inline-size: 290px;
+}
+
+.app-coachmark__content .c4p--coachmark__next--content-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-coachmark__content .c4p--coachmark__next--content-body > h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.375;
+  letter-spacing: 0;
+}
+
+.app-coachmark__content .c4p--coachmark__next--content-body > p {
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.42857;
+  letter-spacing: 0.16px;
+}
+
+.app-coachmark__content .c4p--coachmark__next--content-body > button {
+  display: flex;
+  align-self: flex-end;
+  margin-block: 1rem;
 }
 
 // ─── Tooltip / popover z-index ──────────────────────────────────────────────
@@ -421,9 +451,9 @@
   background-color: var(--cds-layer-01);
 }
 
-// ─── SideNav submenu items font weight ───────────────────────────────────────
-.cds--side-nav__menu-item .cds--side-nav__link-text {
-  font-weight: 500;
+.app-side-nav :is(a, button, span) {
+  font: inherit !important;
+  letter-spacing: inherit !important;
 }
 
 :root[data-theme-schema='1'] .app-onboarding-checklist {
@@ -464,6 +494,21 @@
   max-width: 25rem;
   max-height: calc(100vh - 2rem);
   overflow: auto;
+}
+
+.app-dashboard-chart {
+  --app-dashboard-chart-grid-bg: var(--cds-layer-01);
+  --app-dashboard-chart-grid-line: var(--cds-layer-accent-01);
+
+  .cds--cc--grid rect.chart-grid-backdrop {
+    fill: var(--app-dashboard-chart-grid-bg);
+  }
+
+  .cds--cc--grid rect.chart-grid-backdrop.stroked,
+  .cds--cc--grid rect.stroke,
+  .cds--cc--grid :is(g.x.grid, g.y.grid) g.tick line {
+    stroke: var(--app-dashboard-chart-grid-line);
+  }
 }
 
 @media (max-width: 639px), (max-height: 700px) {

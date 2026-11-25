@@ -35,14 +35,23 @@ describe('Carbon component styles', () => {
     expect(carbonStyles).toContain(
       "@use '@carbon/react/scss/components/data-table/skeleton';",
     );
-    expect(carbonStyles).toContain(
-      "@use '@carbon/ibm-products/scss/components/SidePanel';",
-    );
     expect(carbonStyles).toContain('.debugger-configuration-accordion');
     expect(carbonStyles).toContain('border-block-start: 0;');
     expect(carbonStyles).toContain('margin-inline-start: 0;');
     expect(carbonStyles).toContain('padding-inline: 0;');
     expect(carbonStyles).toContain('padding-block: 0;');
+  });
+
+  it('loads only the next coachmark styles', () => {
+    const coachmarkStyles = readFileSync(
+      resolve(process.cwd(), 'src/styles/carbon.scss'),
+      'utf8',
+    );
+
+    expect(coachmarkStyles).toContain(
+      "@use '@carbon/ibm-products/scss/components/Coachmark/coachmark_next';",
+    );
+    expect(coachmarkStyles).toContain('inline-size: 290px;');
   });
 
   it('keeps connected provider model controls on one bottom border', () => {
@@ -81,5 +90,19 @@ describe('Carbon component styles', () => {
       "@use '@carbon/ibm-products/scss/components/FullPageError';",
     );
     expect(carbonStyles).not.toContain('.role-create-modal');
+  });
+
+  it('inherits shared contextual navigation typography for every item state', () => {
+    const navigationStyles = readFileSync(
+      resolve(process.cwd(), 'src/styles/carbon.scss'),
+      'utf8',
+    );
+
+    expect(navigationStyles).toMatch(
+      /\.app-side-nav :is\(a, button, span\)\s*{\s*font: inherit !important;\s*letter-spacing: inherit !important;/,
+    );
+    expect(navigationStyles).not.toContain(
+      '.cds--side-nav__menu-item .cds--side-nav__link-text',
+    );
   });
 });

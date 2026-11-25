@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "storageKey": "ui-theme-mode",
+  "storageKey": "rpd::__ui_theme",
   "documentAttributes": {
     "brand": "data-brand",
     "colorMode": "data-color-mode",

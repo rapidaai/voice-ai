@@ -7,6 +7,8 @@ import { ProviderContextProvider } from '@/context/provider-context';
 import { SidebarProvider } from '@/context/sidebar-context';
 import type { HTMLAttributes } from 'react';
 import { cn } from '@/utils';
+import { useTheme } from '@/theme/theme-provider';
+import { useDashboardInterfaceTour } from '@/app/components/layout/navigation/dashboard-interface-tour';
 
 export function MissionBox({
   children,
@@ -14,6 +16,10 @@ export function MissionBox({
   ...attributes
 }: HTMLAttributes<HTMLDivElement>) {
   useRapidaStore();
+  const { theme } = useTheme();
+  const interfaceTour = useDashboardInterfaceTour({
+    hasThemeModeAction: theme.allowModeSelection,
+  });
   return (
     <ProviderContextProvider>
       <SidebarProvider>
@@ -21,10 +27,10 @@ export function MissionBox({
           {...attributes}
           className={cn('relative flex h-[100dvh] w-[100dvw]', className)}
         >
-          <SidebarNavigation />
+          <SidebarNavigation interfaceTour={interfaceTour} />
           <main className="relative flex min-w-0 flex-1 overflow-hidden bg-surface font-sans text-sm text-foreground antialiased">
             <div className="flex h-full w-full flex-col">
-              <ActionableHeader />
+              <ActionableHeader interfaceTour={interfaceTour} />
               <div className="relative flex flex-1 flex-col overflow-hidden bg-surface">
                 <div className="absolute left-0 right-0 top-0 z-10 flex w-full">
                   <Loader />

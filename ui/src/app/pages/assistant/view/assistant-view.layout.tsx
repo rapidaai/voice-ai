@@ -1,13 +1,17 @@
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { useRapidaStore } from '@/stores/app';
 import { useCredential } from '@/hooks/use-credential';
-import { FC, HTMLAttributes, useEffect, useState } from 'react';
+import { FC, HTMLAttributes, useCallback, useEffect, useState } from 'react';
 import { Outlet, useParams } from 'react-router-dom';
 import { cn } from '@/utils';
 import { useAssistantPageStore } from '@/stores/assistant/assistant.store';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { ErrorContainer } from '@/app/components/ui/feedback/error-container';
 import { getAssistantById } from '@/clients/assistant.client';
+import {
+  getSidenavExpanded,
+  setSidenavExpanded,
+} from '@/context/sidenav-storage';
 import { AssistantSideNav } from './assistant-side-nav';
 
 export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
@@ -25,7 +29,9 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
   );
   const { assistantId } = useParams();
   const [navExpanded, setNavExpanded] = useState(
-    () => !window.matchMedia?.('(max-width: 767px)').matches,
+    () =>
+      getSidenavExpanded('assistant') &&
+      !window.matchMedia?.('(max-width: 767px)').matches,
   );
 
   const { goToAssistantListing } = useGlobalNavigation();
@@ -43,6 +49,12 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
     media.addEventListener('change', collapseOnMobile);
     return () => media.removeEventListener('change', collapseOnMobile);
   }, []);
+
+  const toggleNav = useCallback(() => {
+    const nextExpanded = !navExpanded;
+    setSidenavExpanded('assistant', nextExpanded);
+    setNavExpanded(nextExpanded);
+  }, [navExpanded]);
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -118,7 +130,7 @@ export const AssistantViewLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
           assistantId={assistantId}
           assistant={currentAssistant}
           expanded={navExpanded}
-          onToggle={() => setNavExpanded(expanded => !expanded)}
+          onToggle={toggleNav}
         />
       )}
 

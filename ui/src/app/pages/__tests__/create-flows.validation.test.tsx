@@ -663,7 +663,12 @@ describe('Requested create/update flow pages', () => {
   it('create assistant renders the template action with a Carbon icon', () => {
     renderWithTheme(<CreateAssistantPage />);
 
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Create Assistant' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Usecase Template')).toBeInTheDocument();
+    expect(screen.queryByText('Model Configuration')).not.toBeInTheDocument();
+    expect(screen.queryByText('Prompt Template')).not.toBeInTheDocument();
     expect(screen.getByTestId('arrow-up-right-icon')).toHaveAttribute(
       'data-size',
       '16',

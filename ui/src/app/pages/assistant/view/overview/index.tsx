@@ -45,7 +45,10 @@ export const Overview: FC<{ currentAssistant: Assistant }> = ({
   }
 
   return (
-    <div className="flex flex-col flex-1 grow">
+    <div
+      data-assistant-overview-surface
+      className="flex flex-1 grow flex-col bg-layer"
+    >
       <ResourceDetailHeader
         collectionHref="/deployment/assistant"
         collectionLabel="Assistants"

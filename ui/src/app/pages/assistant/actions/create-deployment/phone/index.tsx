@@ -413,6 +413,7 @@ const ConfigureAssistantCallDeployment: FC<{ assistantId: string }> = ({
     <div className="flex flex-col flex-1 min-h-0 bg-surface ">
       <ConfirmDialogComponent />
       <CreateFullPageWithHeader
+        alignHeaderWithStepRail
         title="Deploy phone"
         eyebrow="Deployment"
         description="Complete all steps to configure your phone call deployment."
@@ -423,6 +424,7 @@ const ConfigureAssistantCallDeployment: FC<{ assistantId: string }> = ({
           {
             code: 'telephony',
             name: 'Telephony',
+            hideHeader: true,
             description:
               'Select and configure your telephony provider for inbound and outbound calls.',
             body: (
@@ -476,6 +478,7 @@ const ConfigureAssistantCallDeployment: FC<{ assistantId: string }> = ({
           {
             code: 'experience',
             name: 'General Experience',
+            hideHeader: true,
             description:
               'Define how the assistant greets users and handles sessions.',
             body: (
@@ -516,6 +519,7 @@ const ConfigureAssistantCallDeployment: FC<{ assistantId: string }> = ({
           {
             code: 'voice-input',
             name: 'Voice Input',
+            hideHeader: true,
             description:
               'Configure the speech-to-text provider for capturing caller audio.',
             body: (
@@ -556,6 +560,7 @@ const ConfigureAssistantCallDeployment: FC<{ assistantId: string }> = ({
           {
             code: 'voice-output',
             name: 'Voice Output',
+            hideHeader: true,
             description:
               'Configure the text-to-speech provider for audio responses.',
             body: (

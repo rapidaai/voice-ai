@@ -14,7 +14,10 @@ const meta = {
     Story => (
       <MemoryRouter initialEntries={['/dashboard']}>
         <SidebarProvider>
-          <div className="w-64 border border-border-subtle bg-shell">
+          <div
+            className="border border-border-subtle bg-shell"
+            style={{ width: '13.5rem' }}
+          >
             <Story />
           </div>
         </SidebarProvider>
@@ -35,7 +38,7 @@ const meta = {
     children: (
       <>
         <SidebarIconWrapper>
-          <Dashboard size={20} />
+          <Dashboard size={16} />
         </SidebarIconWrapper>
         <SidebarLabel>Dashboard</SidebarLabel>
       </>

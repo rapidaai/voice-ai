@@ -168,6 +168,7 @@ jest.mock('@/app/components/ui/composites/create-full-page', () => ({
       <div>
         <h1>{description}</h1>
         {errorMessage ? <div>{errorMessage}</div> : null}
+        {!active.hideHeader ? <h2>{active.name}</h2> : null}
         <div>{active.body}</div>
         <div>
           {Array.isArray(active.actions)
@@ -381,6 +382,10 @@ describe('UpdateAssistantAnalysis', () => {
   it('loads analysis on mount and pre-fills fields', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     render(<UpdateAssistantAnalysis assistantId="assistant-1" />);
+
+    expect(
+      screen.queryByRole('heading', { name: 'Configure' }),
+    ).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(GetAssistantConfiguration).toHaveBeenCalled();

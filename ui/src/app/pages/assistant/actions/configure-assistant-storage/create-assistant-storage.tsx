@@ -21,6 +21,7 @@ import { STORAGE_PROVIDER } from '@/providers';
 import { InputGroup } from '@/app/components/ui/primitives';
 import { Notification } from '@/app/components/ui/feedback';
 import { createAssistantConfigurationForAssistant } from '@/clients/assistant.client';
+import { CreateFullPageHeader } from '@/app/components/ui/composites';
 
 const storageConfigurationType = 'storage';
 
@@ -103,14 +104,10 @@ export const CreateAssistantStorage: FC<{ assistantId: string }> = ({
         <div className="flex-1 min-h-0 flex flex-col bg-surface ">
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
             <div className="flex flex-col flex-1">
-              <header className="px-4 pt-8 pb-6 border-b border-border-subtle ">
-                <h1 className="text-xl font-semibold text-foreground leading-tight">
-                  Storage
-                </h1>
-                <p className="text-sm text-muted mt-1.5 leading-relaxed">
-                  Configure the provider and destination.
-                </p>
-              </header>
+              <CreateFullPageHeader
+                title="Storage"
+                description="Configure the provider and destination."
+              />
 
               <div className="pb-8 flex flex-col">
                 <InputGroup

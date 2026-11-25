@@ -76,7 +76,7 @@ const scenarios = [
     setup: async () => {},
     assert: async page => {
       await expect(
-        page.getByRole('heading', { name: 'Assistant activity' }),
+        page.getByRole('heading', { name: 'Assistant Activity' }),
       ).toBeVisible();
       await expect(
         page.getByLabel('Assistant deployment checklist'),
@@ -213,4 +213,34 @@ for (const scenario of scenarios) {
       });
     }
   }
+}
+
+for (const colorMode of COLOR_MODES) {
+  test(`assistant interface tour in ${colorMode} mode`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setColorMode(page, colorMode);
+    await authenticatePage(page, { showInterfaceTour: 'assistant' });
+    await page.goto(assistantPath);
+    await expect(
+      page.getByRole('region', { name: 'Create an assistant coachmark' }),
+    ).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+
+    await expect(page).toHaveScreenshot(
+      ['assistant', 'interface-tour', `create-${colorMode}.png`],
+      { fullPage: true, maxDiffPixelRatio: 0.01 },
+    );
+
+    await page.getByRole('button', { name: 'Show assistant types' }).click();
+    await expect(
+      page.getByRole('region', {
+        name: 'Choose an assistant type coachmark',
+      }),
+    ).toBeVisible();
+
+    await expect(page).toHaveScreenshot(
+      ['assistant', 'interface-tour', `types-${colorMode}.png`],
+      { fullPage: true, maxDiffPixelRatio: 0.01 },
+    );
+  });
 }

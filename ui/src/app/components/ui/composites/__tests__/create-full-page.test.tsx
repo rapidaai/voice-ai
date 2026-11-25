@@ -73,6 +73,7 @@ const renderFlow = (props?: {
 }) =>
   render(
     <CreateFullPageWithGlobalHeader
+      alignHeaderWithStepRail
       title="Create resource"
       description="Create a new resource in two steps."
       errorMessage="Resolve the highlighted value."
@@ -96,7 +97,7 @@ const renderFlow = (props?: {
 
 describe('CreateFullPageHeader', () => {
   it('renders the Carbon tearsheet header content contract', () => {
-    render(
+    const { container } = render(
       <CreateFullPageHeader
         description="Create a new resource in two steps."
         label="resource"
@@ -118,9 +119,9 @@ describe('CreateFullPageHeader', () => {
       screen.getByRole('heading', { name: 'Create resource', level: 1 }),
     ).toHaveClass(
       'font-sans',
-      'text-[1.75rem]',
-      'font-normal',
-      'leading-[2.25rem]',
+      'text-[1.25rem]',
+      'font-semibold!',
+      'leading-[1.75rem]',
       'tracking-[0]',
     );
     expect(screen.getByText('Create a new resource in two steps.')).toHaveClass(
@@ -128,8 +129,16 @@ describe('CreateFullPageHeader', () => {
       'text-[0.875rem]',
       'leading-[1.125rem]',
       'tracking-[0.16px]',
+      'text-muted',
     );
-    expect(screen.getByRole('banner')).toHaveClass('bg-layer');
+    expect(screen.getByRole('banner')).toHaveClass('bg-surface');
+    expect(screen.getByRole('banner')).toHaveClass('px-5', 'py-6', 'md:px-8');
+    expect(
+      container.querySelector('[data-create-page-header-content]'),
+    ).toHaveClass('max-w-2xl');
+    expect(
+      container.querySelector('[data-create-page-header-content]'),
+    ).not.toHaveClass('mx-auto', 'max-w-[1200px]');
   });
 });
 
@@ -157,6 +166,7 @@ describe('CreateFullPageWithHeader', () => {
 
     render(
       <CreateFullPageWithHeader
+        alignHeaderWithStepRail
         activeStep="details"
         description="Configure a reusable resource."
         errorMessage="Resolve the highlighted value."
@@ -170,6 +180,9 @@ describe('CreateFullPageWithHeader', () => {
     expect(
       screen.getByRole('heading', { name: 'Configure resource' }),
     ).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-create-page-header-rail]'),
+    ).toHaveClass('xl:block', 'xl:w-80', 'xl:border-r', 'xl:bg-layer');
     expect(screen.getByText('Details body')).toBeInTheDocument();
     expect(screen.queryByText('Review body')).not.toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(
@@ -196,6 +209,44 @@ describe('CreateFullPageWithHeader', () => {
       'true',
     );
     expect(screen.getByText('Review body')).toBeInTheDocument();
+  });
+
+  it('can omit a controlled step header while retaining its body', () => {
+    render(
+      <CreateFullPageWithHeader
+        activeStep="details"
+        onChangeStep={jest.fn()}
+        steps={steps.map(step =>
+          step.code === 'details' ? { ...step, hideHeader: true } : step,
+        )}
+        title="Configure resource"
+      />,
+    );
+
+    expect(screen.getByText('Details body')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Details' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 2')).toHaveClass('xl:hidden');
+    const pageHeader = screen
+      .getByText('Step 1 of 2')
+      .closest('[data-create-page-header-content]');
+    expect(pageHeader).toBeInTheDocument();
+    expect(pageHeader).not.toHaveTextContent('Details');
+    expect(pageHeader).not.toHaveTextContent('Add the required details.');
+  });
+});
+
+describe('CreateFullPageWithGlobalHeader', () => {
+  it('aligns the desktop header background and content with the step layout', () => {
+    renderFlow();
+
+    expect(
+      document.querySelector('[data-create-page-header-rail]'),
+    ).toHaveClass('xl:block', 'xl:w-80', 'xl:border-r', 'xl:bg-layer');
+    expect(
+      document.querySelector('[data-create-page-header-main]'),
+    ).toHaveClass('min-w-0', 'flex-1');
   });
 });
 
@@ -261,6 +312,51 @@ describe('CreateFullPageStep', () => {
 });
 
 describe('CreateFullPageWithGlobalHeader', () => {
+  it('allows the primary action to be decorated without changing its behavior', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    const onNext = jest.fn(() => true);
+
+    render(
+      <CreateFullPageWithGlobalHeader
+        title="Create resource"
+        description="Create a new resource in two steps."
+        eyebrow="Resource"
+        onCancel={jest.fn()}
+        onRequestSubmit={jest.fn()}
+        renderPrimaryAction={(action, launcherButtonRef) => (
+          <div
+            data-has-launcher-ref={Boolean(launcherButtonRef).toString()}
+            data-testid="primary-action-decoration"
+          >
+            {action}
+          </div>
+        )}
+        submitButtonText="Create resource"
+      >
+        <CreateFullPageStep
+          title="Configure"
+          description="Configure the resource."
+          onNext={onNext}
+        >
+          <div>Configuration fields</div>
+        </CreateFullPageStep>
+        <CreateFullPageStep title="Review" description="Review the resource.">
+          <div>Review fields</div>
+        </CreateFullPageStep>
+      </CreateFullPageWithGlobalHeader>,
+    );
+
+    const decoration = screen.getByTestId('primary-action-decoration');
+    expect(decoration).toHaveAttribute('data-has-launcher-ref', 'true');
+    expect(decoration).toContainElement(
+      screen.getByRole('button', { name: 'Next' }),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Review fields')).toBeInTheDocument();
+  });
+
   it('moves forward, returns to the prior step, and submits', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     const onNext = jest.fn(() => true);

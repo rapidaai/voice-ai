@@ -49,6 +49,10 @@ describe('ThemeProvider', () => {
       .forEach(icon => icon.remove());
   });
 
+  it('uses the namespaced UI theme storage key', () => {
+    expect(THEME_STORAGE_KEY).toBe('rpd::__ui_theme');
+  });
+
   it('applies brand tokens and toggles the resolved color mode', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     document.documentElement.classList.add('application-root');

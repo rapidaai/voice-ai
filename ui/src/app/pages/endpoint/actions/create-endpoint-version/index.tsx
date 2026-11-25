@@ -284,6 +284,7 @@ export const CreateNewVersionEndpointPage: FC = () => {
       />
 
       <CreateFullPageWithGlobalHeader
+        alignHeaderWithStepRail
         title="Create endpoint version"
         description="Update the endpoint configuration, then add a version note describing what changed. New versions are not deployed automatically."
         errorMessage={errorMessage}

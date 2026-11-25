@@ -1,9 +1,9 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { SidebarIconWrapper } from '../sidebar-icon-wrapper';
 import { SidebarLabel } from '../sidebar-label';
 import { SidebarSimpleListItem } from '../sidebar-simple-list-item';
+import { typographyClassNames } from '@/app/components/ui/primitives/text';
 
 let mockOpen = true;
 
@@ -30,10 +30,6 @@ jest.mock('@carbon/react', () => ({
   ),
 }));
 
-jest.mock('@/app/components/ui/primitives/text', () => ({
-  Text: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
 describe('sidebar navigation primitives', () => {
   beforeEach(() => {
     mockOpen = true;
@@ -50,6 +46,8 @@ describe('sidebar navigation primitives', () => {
       'custom-icon',
       'h-8',
       'w-12',
+      '[&_svg]:w-4',
+      '[&_svg]:h-4',
     );
   });
 
@@ -64,7 +62,9 @@ describe('sidebar navigation primitives', () => {
       'custom-label',
       'opacity-100',
     );
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard')).toHaveClass(
+      ...typographyClassNames['body-compact-01'].split(' '),
+    );
   });
 
   it('collapses labels when the sidebar is closed', () => {
@@ -72,7 +72,7 @@ describe('sidebar navigation primitives', () => {
 
     render(<SidebarLabel>Dashboard</SidebarLabel>);
 
-    expect(screen.getByText('Dashboard').closest('span')).toHaveClass(
+    expect(screen.getByText('Dashboard').parentElement).toHaveClass(
       'opacity-0',
       'w-0',
     );
@@ -98,7 +98,8 @@ describe('sidebar navigation primitives', () => {
     );
     expect(screen.getByTestId('sidebar-item')).toHaveClass(
       'custom-item',
-      'bg-layer-hover',
+      'h-8',
+      'bg-layer-selected',
       'text-foreground',
     );
   });
@@ -117,7 +118,7 @@ describe('sidebar navigation primitives', () => {
     );
 
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    expect(screen.getByTestId('skeleton-icon')).toBeInTheDocument();
+    expect(screen.getByTestId('skeleton-icon')).toHaveClass('!h-4', '!w-4');
     expect(screen.getByTestId('skeleton-text')).toHaveAttribute(
       'data-width',
       '70%',

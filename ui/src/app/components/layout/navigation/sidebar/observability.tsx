@@ -28,7 +28,7 @@ export const Observability = memo(({ isLoading }: { isLoading?: boolean }) => {
           loading={isLoading}
         >
           <SidebarIconWrapper>
-            <DataCheck size={20} />
+            <DataCheck size={16} />
           </SidebarIconWrapper>
           <SidebarLabel isLoading={isLoading}>Trace</SidebarLabel>
         </SidebarSimpleListItem>
@@ -39,7 +39,7 @@ export const Observability = memo(({ isLoading }: { isLoading?: boolean }) => {
         loading={isLoading}
       >
         <SidebarIconWrapper>
-          <Activity size={20} />
+          <Activity size={16} />
         </SidebarIconWrapper>
         <SidebarLabel isLoading={isLoading}>LLM logs</SidebarLabel>
       </SidebarSimpleListItem>
@@ -50,7 +50,7 @@ export const Observability = memo(({ isLoading }: { isLoading?: boolean }) => {
         loading={isLoading}
       >
         <SidebarIconWrapper>
-          <ToolKit size={20} />
+          <ToolKit size={16} />
         </SidebarIconWrapper>
         <SidebarLabel isLoading={isLoading}>Tool logs</SidebarLabel>
       </SidebarSimpleListItem>
@@ -60,7 +60,7 @@ export const Observability = memo(({ isLoading }: { isLoading?: boolean }) => {
         loading={isLoading}
       >
         <SidebarIconWrapper>
-          <EventSchedule size={20} />
+          <EventSchedule size={16} />
         </SidebarIconWrapper>
         <SidebarLabel isLoading={isLoading}>Request logs</SidebarLabel>
       </SidebarSimpleListItem>
@@ -71,7 +71,7 @@ export const Observability = memo(({ isLoading }: { isLoading?: boolean }) => {
           loading={isLoading}
         >
           <SidebarIconWrapper>
-            <DataBase size={20} />
+            <DataBase size={16} />
           </SidebarIconWrapper>
           <SidebarLabel isLoading={isLoading}>Knowledge logs</SidebarLabel>
         </SidebarSimpleListItem>
@@ -82,7 +82,7 @@ export const Observability = memo(({ isLoading }: { isLoading?: boolean }) => {
         loading={isLoading}
       >
         <SidebarIconWrapper>
-          <Chat size={20} />
+          <Chat size={16} />
         </SidebarIconWrapper>
         <SidebarLabel isLoading={isLoading}>Conversation logs</SidebarLabel>
       </SidebarSimpleListItem>

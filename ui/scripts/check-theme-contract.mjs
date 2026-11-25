@@ -25,7 +25,8 @@ export const SHELL_CONTRACTS = Object.freeze({
     'bg-shell',
     'border-border-subtle',
   ],
-  'ui/src/app/components/layout/navigation/sidebar.tsx': [
+  'ui/src/app/components/layout/navigation/side-navigation-patterns.tsx': [
+    'bg-shell',
     'border-border-subtle',
     'text-muted',
     'text-foreground',
@@ -413,9 +414,7 @@ export const THEME_STYLE_EXCEPTIONS = Object.freeze({
     }),
   'ui/src/app/pages/main/web-dashboard/index.tsx': Object.freeze({
     'component-stylesheet': Object.freeze({
-      matches: Object.freeze([
-        "import '@carbon/charts-react/styles.css'",
-      ]),
+      matches: Object.freeze(["import '@carbon/charts-react/styles.css'"]),
       reason:
         'Carbon Charts requires its package stylesheet, scoped to the dashboard route to preserve the initial CSS budget',
     }),
@@ -1249,8 +1248,8 @@ export function validateBrandLiterals(repoRoot = DEFAULT_REPO_ROOT) {
 
   for (const { filePath, sourcePath } of collectBrandScanFiles(repoRoot)) {
     let source = readFileSync(filePath, 'utf8');
-    for (const allowedMatch of
-      BRAND_LITERAL_ALLOWLIST[sourcePath]?.matches ?? []) {
+    for (const allowedMatch of BRAND_LITERAL_ALLOWLIST[sourcePath]?.matches ??
+      []) {
       const matchIndex = source.indexOf(allowedMatch);
       if (matchIndex === -1) {
         pushDiagnostic(
@@ -1266,7 +1265,6 @@ export function validateBrandLiterals(repoRoot = DEFAULT_REPO_ROOT) {
     }
 
     for (const literal of findHardcodedBrandLiterals(source)) {
-
       pushDiagnostic(
         diagnostics,
         sourcePath,
