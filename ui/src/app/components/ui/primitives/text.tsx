@@ -57,8 +57,11 @@ export type TypographyVariant = keyof typeof typographyClassNames;
 
 export interface CarbonTextProps extends HTMLAttributes<HTMLElement> {
   children: ReactNode;
+  /** Optional className for the text element. */
   className?: string;
+  /** Optional id for the text element. */
   id?: string;
+  /** Show a skeleton placeholder instead of children. */
   isLoading?: boolean;
   /** Show skeleton as a heading block (taller). */
   heading?: boolean;
