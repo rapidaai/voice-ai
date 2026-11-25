@@ -64,7 +64,7 @@ Rapida is written in **Go**, using the highly optimized [gRPC](https://github.co
 
 - **Docker** & **Docker Compose** ([Install](https://www.docker.com/))
 - **Just** command runner ([Install](https://github.com/casey/just#installation))
-- **Go 1.26.10**, **Node.js 22**, and **Yarn 1.22.22** for `just ci`
+- **Go 1.26.11**, **Node.js 22**, and **Yarn 1.22.22** for `just ci`
 - **Process Compose** ([Install](https://f1bonacc1.github.io/process-compose/installation/)) for host-native development
 - **16GB+ RAM** (for all services)
 
@@ -227,7 +227,7 @@ yarn --version
 process-compose version
 ```
 
-Expected development versions are Go 1.26.10, Node.js 22, and Yarn 1.22.22.
+Expected development versions are Go 1.26.11, Node.js 22, and Yarn 1.22.22.
 
 ### Prepare Local Dependencies
 
