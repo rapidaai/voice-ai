@@ -9,18 +9,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"strings"
 	"time"
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/clients/rest"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
 	gorm_generator "github.com/rapidaai/pkg/models/gorm/generators"
 	"github.com/rapidaai/pkg/storages"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -55,7 +56,7 @@ func NewAssistantHTTPLogService(
 
 func (s *assistantHTTPLogService) CreateLog(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	source string,
 	sourceRefId uint64,
 	sourceEvent string,
@@ -72,9 +73,9 @@ func (s *assistantHTTPLogService) CreateLog(
 	request []byte,
 	response []byte,
 ) (*internal_assistant_entity.AssistantHTTPLog, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	start := time.Now()
 	db := s.postgres.DB(ctx)
@@ -114,8 +115,8 @@ func (s *assistantHTTPLogService) CreateLog(
 		},
 		Mutable: gorm_models.Mutable{
 			Status:           status,
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(auth.Caller().Type),
+			CreatedActorID:   auth.Caller().ID,
 		},
 	}
 
@@ -132,13 +133,13 @@ func (s *assistantHTTPLogService) CreateLog(
 
 func (s *assistantHTTPLogService) GetLog(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	projectId uint64,
 	httpLogId uint64,
 ) (*internal_assistant_entity.AssistantHTTPLog, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	if projectId != projectContext.ProjectID {
 		return nil, fmt.Errorf("project %d does not match authenticated project %d", projectId, projectContext.ProjectID)
@@ -161,15 +162,15 @@ func (s *assistantHTTPLogService) GetLog(
 
 func (s *assistantHTTPLogService) GetAllLog(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	projectId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 	order *protos.Ordering,
 ) (int64, []*internal_assistant_entity.AssistantHTTPLog, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return 0, nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return 0, nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	if projectId != projectContext.ProjectID {
 		return 0, nil, fmt.Errorf("project %d does not match authenticated project %d", projectId, projectContext.ProjectID)
@@ -299,12 +300,12 @@ func (s *assistantHTTPLogService) GetAllLog(
 
 func (s *assistantHTTPLogService) GetLogObject(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	httpLogId uint64,
 ) (requestData []byte, responseData []byte, err error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	keyPrefix := s.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID)
 	responseKey := s.ObjectKey(keyPrefix, httpLogId, "response.json")
@@ -365,7 +366,7 @@ func (s *assistantHTTPLogService) GetLogObject(
 
 func (s *assistantHTTPLogService) RetryLog(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	projectId uint64,
 	httpLogId uint64,
 ) (*internal_assistant_entity.AssistantHTTPLog, error) {

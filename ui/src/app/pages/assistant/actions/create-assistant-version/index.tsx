@@ -17,7 +17,7 @@ import type { GetAssistantProviderResponse } from '@rapidaai/react';
 import { FormLabel } from '@/app/components/ui/primitives';
 import { Textarea } from '@/app/components/ui/primitives';
 import { ConfigPrompt } from '@/app/components/domain/configuration/config-prompt';
-import { ErrorContainer } from '@/app/components/ui/feedback';
+import { ErrorContainer } from '@/app/components/ui/feedback/error-container';
 import { ChatCompletePrompt, Prompt } from '@/utils/prompt';
 import {
   GetDefaultTextProviderConfigIfInvalid,
@@ -47,7 +47,7 @@ export function CreateVersionAssistantPage() {
         <ErrorContainer
           onAction={goToAssistantListing}
           code="403"
-          actionLabel="Go to listing"
+          actionLabel="Back to assistants"
           title="Assistant not available"
           description="This assistant may be archived or you don't have access to it. Please check with your administrator or try another assistant."
         />
@@ -247,6 +247,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
       <ConfirmDialogComponent />
       <Helmet title="Create version"></Helmet>
       <CreateFullPageWithGlobalHeader
+        alignHeaderWithStepRail
         title="Create version"
         description="Update the assistant configuration, then add a version note describing what changed. New versions are not deployed automatically."
         errorMessage={errorMessage}

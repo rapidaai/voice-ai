@@ -19,6 +19,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_twilio "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/twilio/internal"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -400,7 +401,7 @@ func TestStatusCallback(t *testing.T) {
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			c.Request = req
 
-			statusInfo, err := telephony.StatusCallback(c, nil, 1, 1)
+			statusInfo, err := telephony.StatusCallback(c, authentication.Principal{}, 1, 1)
 
 			require.NoError(t, err)
 			tt.checkStatus(t, statusInfo)

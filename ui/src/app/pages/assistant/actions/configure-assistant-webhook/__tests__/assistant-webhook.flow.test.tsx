@@ -187,6 +187,7 @@ jest.mock('@/app/components/ui/composites/create-full-page', () => ({
       <div>
         <h1>{description}</h1>
         {errorMessage ? <div>{errorMessage}</div> : null}
+        {!active.hideHeader ? <h2>{active.name}</h2> : null}
         <div>{active.body}</div>
         <div>
           {Array.isArray(active.actions)
@@ -524,6 +525,10 @@ describe('Assistant webhook flows', () => {
     const user = userEvent.setup({ writeToClipboard: false });
     render(<CreateAssistantWebhook assistantId="assistant-1" />);
 
+    expect(
+      screen.queryByRole('heading', { name: 'Events' }),
+    ).not.toBeInTheDocument();
+
     await selectFirstEventAndContinue();
 
     await user.click(screen.getByTestId('webhook-endpoint'));
@@ -609,6 +614,10 @@ describe('Assistant webhook flows', () => {
   it('update webhook validates invalid destination url', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     render(<UpdateAssistantWebhook assistantId="assistant-1" />);
+
+    expect(
+      screen.queryByRole('heading', { name: 'Events' }),
+    ).not.toBeInTheDocument();
 
     await continueWithLoadedEvent();
 

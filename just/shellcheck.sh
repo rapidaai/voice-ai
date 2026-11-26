@@ -40,6 +40,7 @@ else
     tests/flows/*/*/run.sh
     tests/smoke/run.sh
     scripts/contracts/check-compatibility.sh
+    scripts/contracts/materialize-baseline-test.sh
     scripts/contracts/materialize-baseline.sh
     scripts/contracts/bin/buf
     scripts/contracts/bin/oasdiff

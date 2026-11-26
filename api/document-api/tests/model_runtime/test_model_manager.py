@@ -36,6 +36,10 @@ def _make_manager(
     provider: str = "openai",
     params: dict = None,
 ) -> ModelManager:
+    web_issuer = MagicMock()
+    web_issuer.issue.return_value = "web-assertion"
+    integration_issuer = MagicMock()
+    integration_issuer.issue.return_value = "integration-assertion"
     return ModelManager(
         vault_service_client=vault_client,
         integration_service_client=integration_client,
@@ -44,6 +48,8 @@ def _make_manager(
         model_provider_name=provider,
         model_parameters=params if params is not None else {"rapida.credential_id": "42", "model": "text-embedding-3-small"},
         references={"knowledge_id": 1, "knowledge_document_id": 2},
+        web_service_assertion_issuer=web_issuer,
+        integration_service_assertion_issuer=integration_issuer,
     )
 
 
@@ -177,6 +183,37 @@ class TestCredentialFetching:
         await manager.invoke_text_embedding(["text"])
 
         vault_client.get_credential.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_outbound_assertions_are_destination_bound(self):
+        vault_client = AsyncMock()
+        integration_client = AsyncMock()
+        vault_client.get_credential.return_value = _make_credential()
+        integration_client.get_embedding.return_value = ([], [])
+        web_issuer = MagicMock()
+        web_issuer.issue.return_value = "web-assertion"
+        integration_issuer = MagicMock()
+        integration_issuer.issue.return_value = "integration-assertion"
+        manager = ModelManager(
+            vault_service_client=vault_client,
+            integration_service_client=integration_client,
+            project_id=100,
+            organization_id=200,
+            model_provider_name="openai",
+            model_parameters={"rapida.credential_id": "42"},
+            references={},
+            web_service_assertion_issuer=web_issuer,
+            integration_service_assertion_issuer=integration_issuer,
+        )
+
+        await manager.invoke_text_embedding(["text"])
+
+        web_issuer.issue.assert_called_once()
+        integration_issuer.issue.assert_called_once()
+        assert "destination" not in web_issuer.issue.call_args.kwargs
+        assert "destination" not in integration_issuer.issue.call_args.kwargs
+        assert vault_client.get_credential.call_args.kwargs["auth_token"] == "web-assertion"
+        assert integration_client.get_embedding.call_args.kwargs["auth_token"] == "integration-assertion"
 
     @pytest.mark.asyncio
     async def test_credential_cached_across_calls(self):

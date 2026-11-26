@@ -19,7 +19,7 @@ import (
 	external_emailer "github.com/rapidaai/pkg/clients/external/emailer"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	protos "github.com/rapidaai/protos"
@@ -81,15 +81,10 @@ func NewOrganizationGRPC(config *config.WebAppConfig, logger commons.Logger,
 }
 
 func (orgR *webOrganizationRPCApi) CreateOrganization(c *gin.Context) {
-	iAuth, authErr := types.AuthorizeUser(c.Request.Context())
-	if authErr != nil {
-		_ = c.Error(status.Error(codes.Unauthenticated, authErr.Error()))
+	principal, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
+		_ = c.Error(status.Error(codes.Unauthenticated, "valid authentication is required"))
 		c.AbortWithStatusJSON(401, "illegal request.")
-		return
-	}
-	userContext, authErr := iAuth.UserContext()
-	if authErr != nil {
-		c.JSON(401, "illegal request.")
 		return
 	}
 
@@ -106,7 +101,7 @@ func (orgR *webOrganizationRPCApi) CreateOrganization(c *gin.Context) {
 		return
 	}
 
-	aOrg, err := orgR.organizationService.Create(c, iAuth, irRequest.OrganizationName, irRequest.OrganizationSize, irRequest.OrganizationIndustry)
+	aOrg, err := orgR.organizationService.Create(c, principal, irRequest.OrganizationName, irRequest.OrganizationSize, irRequest.OrganizationIndustry)
 	if err != nil {
 		c.JSON(500, commons.Response{
 			Code:    500,
@@ -116,7 +111,7 @@ func (orgR *webOrganizationRPCApi) CreateOrganization(c *gin.Context) {
 		return
 	}
 
-	oRole, err := orgR.userService.CreateOrganizationRole(c, iAuth, type_enums.ORGANIZATION_ROLE_OWNER.String(), userContext.UserID, aOrg.Id, type_enums.RECORD_ACTIVE)
+	oRole, err := orgR.userService.CreateOrganizationRole(c, principal, internal_service.OrganizationOwnerRoleDefinitionID, principal.Subject().ID, aOrg.Id, type_enums.RECORD_ACTIVE)
 	if err != nil {
 		c.JSON(500, commons.Response{
 			Code:    500,
@@ -136,16 +131,12 @@ func (orgR *webOrganizationRPCApi) CreateOrganization(c *gin.Context) {
 For creation of organization and
 */
 func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequest *protos.CreateOrganizationRequest) (*protos.CreateOrganizationResponse, error) {
-	iAuth, authErr := types.AuthorizeUser(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-
-	userContext, err := iAuth.UserContext()
-	if err != nil {
-		return nil, err
-	}
-	if _, err := iAuth.OrganizationContext(); err == nil {
+	userID := principal.Subject().ID
+	if principal.Tenant().OrganizationID != 0 {
 		orgG.logger.Errorf("current org is not null, you can't create multiple organization at same time.")
 		return &protos.CreateOrganizationResponse{
 			Code:    400,
@@ -158,7 +149,7 @@ func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequ
 	}
 
 	// Creation of organization
-	aOrg, err := orgG.organizationService.Create(c, iAuth, irRequest.OrganizationName, irRequest.OrganizationSize, irRequest.OrganizationIndustry)
+	aOrg, err := orgG.organizationService.Create(c, principal, irRequest.OrganizationName, irRequest.OrganizationSize, irRequest.OrganizationIndustry)
 	if err != nil {
 		orgG.logger.Errorf("CreateOrganization from grpc with erro %v", err)
 		return &protos.CreateOrganizationResponse{
@@ -172,7 +163,7 @@ func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequ
 	}
 
 	// creation of organization role
-	aRole, err := orgG.userService.CreateOrganizationRole(c, iAuth, type_enums.ORGANIZATION_ROLE_OWNER.String(), userContext.UserID, aOrg.Id, type_enums.RECORD_ACTIVE)
+	_, err = orgG.userService.CreateOrganizationRole(c, principal, internal_service.OrganizationOwnerRoleDefinitionID, userID, aOrg.Id, type_enums.RECORD_ACTIVE)
 	if err != nil {
 		orgG.logger.Errorf("CreateOrganizationRole from grpc with erro %v", err)
 		return &protos.CreateOrganizationResponse{
@@ -186,12 +177,7 @@ func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequ
 	}
 
 	org := &protos.Organization{}
-	orgRole := &protos.OrganizationRole{}
 	err = utils.Cast(aOrg, org)
-	if err != nil {
-		orgG.logger.Errorf("unable to cast organization to proto org err %v", err)
-	}
-	err = utils.Cast(aRole, orgRole)
 	if err != nil {
 		orgG.logger.Errorf("unable to cast organization to proto org err %v", err)
 	}
@@ -199,22 +185,20 @@ func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequ
 		Code:    200,
 		Success: true,
 		Data:    org,
-		Role:    orgRole,
 	}, nil
 }
 
 func (orgG *webOrganizationGRPCApi) UpdateOrganization(c context.Context, irRequest *protos.UpdateOrganizationRequest) (*protos.UpdateOrganizationResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	if irRequest.GetOrganizationId() != principal.Tenant().OrganizationID {
+		return nil, status.Error(codes.PermissionDenied, "organization context does not match request")
 	}
 
 	// updating organization
-	_, err := orgG.organizationService.Update(c, iAuth, irRequest.OrganizationId, irRequest.OrganizationName, irRequest.OrganizationIndustry, irRequest.OrganizationContact)
+	_, err := orgG.organizationService.Update(c, principal, irRequest.OrganizationId, irRequest.OrganizationName, irRequest.OrganizationIndustry, irRequest.OrganizationContact)
 	if err != nil {
 		orgG.logger.Errorf("UpdateOrganization from grpc with erro %v", err)
 		return &protos.UpdateOrganizationResponse{
@@ -235,33 +219,13 @@ func (orgG *webOrganizationGRPCApi) UpdateOrganization(c context.Context, irRequ
 
 // getting all the organization
 func (orgG *webOrganizationGRPCApi) GetOrganization(c context.Context, irRequest *protos.GetOrganizationRequest) (*protos.GetOrganizationResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	userContext, err := iAuth.UserContext()
-	if err != nil {
-		return nil, err
-	}
-	aRole, err := orgG.userService.GetOrganizationRole(c, userContext.UserID)
-	if err != nil {
-		orgG.logger.Errorf("userService.GetOrganizationRole from grpc with erro %v", err)
-		return &protos.GetOrganizationResponse{
-			Code:    400,
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    400,
-				ErrorMessage: err.Error(),
-				HumanMessage: "Unable to find role your organization, please try again later.",
-			}}, nil
-	}
-
-	aOrg, err := orgG.organizationService.Get(c, aRole.OrganizationId)
+	tenant := principal.Tenant()
+	aOrg, err := orgG.organizationService.Get(c, tenant.OrganizationID)
 	if err != nil {
 		orgG.logger.Errorf("organizationService.Get from grpc with erro %v", err)
 		return &protos.GetOrganizationResponse{
@@ -275,23 +239,24 @@ func (orgG *webOrganizationGRPCApi) GetOrganization(c context.Context, irRequest
 	}
 
 	org := &protos.Organization{}
-	orgRole := &protos.OrganizationRole{}
 	err = utils.Cast(aOrg, org)
 	if err != nil {
 		orgG.logger.Errorf("unable to cast organization to proto org err %v", err)
-	}
-	err = utils.Cast(aRole, orgRole)
-	if err != nil {
-		orgG.logger.Errorf("unable to cast organization role to proto org role err %v", err)
 	}
 	return &protos.GetOrganizationResponse{
 		Code:    200,
 		Success: true,
 		Data:    org,
-		Role:    orgRole,
 	}, nil
 }
 
 func (orgG *webOrganizationGRPCApi) UpdateBillingInformation(c context.Context, irRequest *protos.UpdateBillingInformationRequest) (*protos.BaseResponse, error) {
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
+	}
+	if principal.Tenant().OrganizationID == 0 {
+		return nil, status.Error(codes.PermissionDenied, "organization context is required")
+	}
 	return nil, nil
 }

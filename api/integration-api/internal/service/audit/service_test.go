@@ -10,9 +10,10 @@ import (
 	"gorm.io/gorm/logger"
 
 	internal_gorm "github.com/rapidaai/api/integration-api/internal/entity"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 )
 
@@ -80,41 +81,51 @@ func newAuditServiceTest(t *testing.T) (*auditService, *gorm.DB) {
 	return NewAuditService(applicationLogger, &testPostgresConnector{db: database}).(*auditService), database
 }
 
-func auditContext(actorType types.AuthType, actorID uint64) context.Context {
-	authentication := &types.Authentication{
-		AuthType:   actorType,
-		ActorValue: &types.ActorIdentity{Type: types.ActorType(actorType), ID: actorID},
-	}
-	if actorType != types.AuthTypeSystem {
-		authentication.OrganizationValue = &types.OrganizationContext{OrganizationID: 7}
-	}
-	return context.WithValue(context.Background(), types.CTX_, authentication)
+func auditContext(t *testing.T, actorID uint64) context.Context {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityService, ID: actorID, Issuer: "integration-test"},
+		authentication.Tenant{},
+		authentication.Proof{
+			Method:   authentication.AuthenticationServiceAssertion,
+			Audience: authentication.AudienceRapidaInternal,
+			Reference: authentication.ProofReference{
+				Type:  authentication.ProofReferenceSigningKey,
+				Value: "test-key",
+			},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+	ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), principal)
+	require.NoError(t, err)
+	return ctx
 }
 
 func TestCreatePersistsAndUpdatesActorIdentity(t *testing.T) {
 	service, database := newAuditServiceTest(t)
 
-	created, err := service.Create(auditContext(types.AuthTypeService, 41), 100, 7, 8, 9, "test", "prefix", nil, type_enums.RECORD_ACTIVE)
+	created, err := service.Create(auditContext(t, 41), 100, 7, 8, 9, "test", "prefix", nil, type_enums.RECORD_ACTIVE)
 	require.NoError(t, err)
 	require.Equal(t, uint64(41), created.CreatedActorID)
 
-	_, err = service.Create(auditContext(types.AuthTypeSystem, 42), 100, 7, 8, 9, "test", "prefix", nil, type_enums.RECORD_COMPLETE)
+	_, err = service.Create(auditContext(t, 42), 100, 7, 8, 9, "test", "prefix", nil, type_enums.RECORD_COMPLETE)
 	require.NoError(t, err)
 
 	var stored internal_gorm.ExternalAudit
 	require.NoError(t, database.First(&stored, "id = ?", 100).Error)
 	require.Equal(t, "service", stored.CreatedActorType)
 	require.Equal(t, uint64(41), stored.CreatedActorID)
-	require.Equal(t, "system", stored.UpdatedActorType)
+	require.Equal(t, "service", stored.UpdatedActorType)
 	require.Equal(t, uint64(42), stored.UpdatedActorID)
 }
 
 func TestCreateMetadataPreservesCreationActorOnConflict(t *testing.T) {
 	service, database := newAuditServiceTest(t)
 
-	_, err := service.CreateMetadata(auditContext(types.AuthTypeService, 41), 100, map[string]string{"source": "first"})
+	_, err := service.CreateMetadata(auditContext(t, 41), 100, map[string]string{"source": "first"})
 	require.NoError(t, err)
-	_, err = service.UpdateMetadata(auditContext(types.AuthTypeSystem, 42), 100, map[string]string{"source": "second"})
+	_, err = service.UpdateMetadata(auditContext(t, 42), 100, map[string]string{"source": "second"})
 	require.NoError(t, err)
 
 	var stored internal_gorm.ExternalAuditMetadata
@@ -122,6 +133,6 @@ func TestCreateMetadataPreservesCreationActorOnConflict(t *testing.T) {
 	require.Equal(t, "second", stored.Value)
 	require.Equal(t, "service", stored.CreatedActorType)
 	require.Equal(t, uint64(41), stored.CreatedActorID)
-	require.Equal(t, "system", stored.UpdatedActorType)
+	require.Equal(t, "service", stored.UpdatedActorType)
 	require.Equal(t, uint64(42), stored.UpdatedActorID)
 }

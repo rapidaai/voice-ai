@@ -55,7 +55,14 @@ jest.mock('@rapidaai/react', () => {
 
   return {
     ConnectionConfig: {
-      WithDebugger: jest.fn(metadata => ({ debugger: metadata })),
+      WithDebugger: jest.fn(
+        ({ authorization, userId, organizationId, projectId }) => ({
+          authorization,
+          'x-auth-id': userId,
+          ...(organizationId ? { 'x-organization-id': organizationId } : {}),
+          'x-project-id': projectId,
+        }),
+      ),
     },
     GetAllUser: jest.fn(),
     GetNotificationSetting: jest.fn(),
@@ -81,6 +88,7 @@ describe('user client', () => {
       pageSize: 25,
       criteria,
       auth: {
+        organizationId: 'organization-1',
         projectId: 'project-1',
         token: 'token-1',
         userId: 'user-1',
@@ -101,7 +109,32 @@ describe('user client', () => {
     expect(ConnectionConfig.WithDebugger).toHaveBeenCalledWith({
       authorization: 'token-1',
       userId: 'user-1',
+      organizationId: 'organization-1',
       projectId: 'project-1',
+    });
+  });
+
+  it('omits empty project context when listing organization users', () => {
+    const callback = jest.fn();
+
+    listUsers({
+      page: 1,
+      pageSize: 25,
+      criteria: [],
+      auth: {
+        organizationId: 'organization-1',
+        projectId: '',
+        token: 'token-1',
+        userId: 'user-1',
+      },
+      callback,
+    });
+
+    const metadata = (GetAllUser as jest.Mock).mock.calls[0][5];
+    expect(metadata).toEqual({
+      authorization: 'token-1',
+      'x-auth-id': 'user-1',
+      'x-organization-id': 'organization-1',
     });
   });
 
@@ -115,6 +148,7 @@ describe('user client', () => {
         ignored: 'not-boolean',
       },
       auth: {
+        organizationId: 'organization-1',
         projectId: 'project-1',
         token: 'token-1',
         userId: 'user-1',
@@ -135,6 +169,7 @@ describe('user client', () => {
     expect(ConnectionConfig.WithDebugger).toHaveBeenCalledWith({
       authorization: 'token-1',
       userId: 'user-1',
+      organizationId: 'organization-1',
       projectId: 'project-1',
     });
     expect(UpdateNotificationSetting).toHaveBeenCalledWith(

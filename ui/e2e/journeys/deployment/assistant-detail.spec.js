@@ -1,6 +1,7 @@
 const {
   ASSISTANT_DETAIL_PATH,
   authenticatePage,
+  checkA11y,
   expect,
   gotoJourney,
   setColorMode,
@@ -44,6 +45,20 @@ for (const colorMode of ['light', 'dark']) {
     await mockOrganizationCredentials(page);
     await gotoJourney(page, journey('deployment.assistantCreateVersion'));
 
+    const assistantNav = page.getByRole('navigation', {
+      name: 'Assistant actions',
+    });
+    await expect(
+      assistantNav
+        .getByRole('link', { name: 'Overview' })
+        .locator('.cds--side-nav__link-text'),
+    ).toHaveCSS('font-weight', '400');
+    await expect(
+      assistantNav
+        .getByRole('link', { name: 'Add new version' })
+        .locator('.cds--side-nav__link-text'),
+    ).toHaveCSS('font-weight', '400');
+
     await expect(
       page.getByText(
         'Unable to get latest assistant provider. Please try again later.',
@@ -61,9 +76,11 @@ for (const colorMode of ['light', 'dark']) {
 
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(
-      page.getByText(
-        'Write a brief note describing what changed in this version.',
-      ).first(),
+      page
+        .getByText(
+          'Write a brief note describing what changed in this version.',
+        )
+        .first(),
     ).toBeVisible();
     const versionNote = page.locator('#model-version-note');
     await expect(versionNote).toBeVisible();
@@ -150,6 +167,9 @@ for (const colorMode of ['light', 'dark']) {
       await expect(
         page.getByText('Edit deployment', { exact: true }),
       ).toBeHidden();
+      await expect(
+        drawer.getByText('rpx_e2e_web_widget', { exact: true }),
+      ).toBeVisible();
       await page.evaluate(() => document.activeElement?.blur());
       await page.mouse.move(0, 0);
       await expect(page.getByRole('tooltip')).toBeHidden();
@@ -159,7 +179,11 @@ for (const colorMode of ['light', 'dark']) {
         { animations: 'disabled', maxDiffPixelRatio: 0.01 },
       );
 
-      await drawer.getByLabel('Close').click();
+      await drawer
+        .getByRole('heading', { name: deployment.dialogName, exact: true })
+        .locator('..')
+        .getByRole('button', { name: 'Close', exact: true })
+        .click();
       await expect(drawer).toBeHidden();
     }
   });
@@ -279,7 +303,7 @@ test('populated assistant journeys expose overview, sessions, versions, and sett
 }) => {
   await gotoJourney(page, journey('deployment.assistantOverview'));
   await expect(
-    page.getByRole('heading', { name: 'Assistant activity' }),
+    page.getByRole('heading', { name: 'Assistant Activity' }),
   ).toBeVisible();
   const deploymentChecklist = page.getByLabel('Assistant deployment checklist');
   await expect(deploymentChecklist).toBeVisible();
@@ -312,7 +336,7 @@ test('assistant overview hides deployment onboarding after a deployment is enabl
   await gotoJourney(page, journey('deployment.assistantOverview'));
 
   await expect(
-    page.getByRole('heading', { name: 'Assistant activity' }),
+    page.getByRole('heading', { name: 'Assistant Activity' }),
   ).toBeVisible();
   await expect(page.getByLabel('Assistant deployment checklist')).toHaveCount(
     0,
@@ -554,7 +578,7 @@ for (const colorMode of ['light', 'dark']) {
     await expect(
       page.getByRole('heading', { name: 'Session unavailable' }),
     ).toBeVisible();
-    await expect(page.getByText('503')).toBeVisible();
+    await expect(page.getByText('503', { exact: true })).toHaveCount(0);
     await expect(
       page.getByText("We couldn't load this session. Try again in a moment."),
     ).toBeVisible();
@@ -578,7 +602,7 @@ test('dashboard assistant drilldowns reach assistant and failed-session detail',
     .getByRole('link', { name: 'Support bot' })
     .click();
   await expect(
-    page.getByRole('heading', { name: 'Assistant activity' }),
+    page.getByRole('heading', { name: 'Assistant Activity' }),
   ).toBeVisible();
 
   await gotoJourney(page, journey('dashboard.home'));
@@ -604,5 +628,6 @@ test('assistant transport failure renders the full unavailable state', async ({
   await expect(
     page.getByRole('button', { name: 'Back to assistants' }),
   ).toBeVisible();
-  await expect(page.getByText('Assistant activity')).toHaveCount(0);
+  await expect(page.getByText('Assistant Activity')).toHaveCount(0);
+  await checkA11y(page, { id: 'deployment.assistantUnavailable' });
 });

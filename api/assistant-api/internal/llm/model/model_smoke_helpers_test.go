@@ -10,11 +10,11 @@ import (
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	internal_agent_tool "github.com/rapidaai/api/assistant-api/internal/tool"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	integration_client "github.com/rapidaai/pkg/clients/integration"
 	integration_client_builders "github.com/rapidaai/pkg/clients/integration/builders"
 	"github.com/rapidaai/pkg/commons"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -73,7 +73,7 @@ type testComm struct {
 	assistant         *internal_assistant_entity.Assistant
 	conversation      *internal_conversation_entity.AssistantConversation
 	integrationCaller integration_client.IntegrationServiceClient
-	auth              *types.Authentication
+	auth              authentication.Principal
 	options           utils.Option
 	pkts              []internal_type.Packet
 }
@@ -87,7 +87,7 @@ func (m *testComm) OnPacket(_ context.Context, pkts ...internal_type.Packet) err
 func (m *testComm) IntegrationCaller() integration_client.IntegrationServiceClient {
 	return m.integrationCaller
 }
-func (m *testComm) Auth() *types.Authentication { return m.auth }
+func (m *testComm) Auth() authentication.Principal { return m.auth }
 func (m *testComm) Assistant() (*internal_assistant_entity.Assistant, error) {
 	return m.assistant, nil
 }
@@ -112,7 +112,7 @@ type testIntegrationClient struct {
 	calls  int
 }
 
-func (m *testIntegrationClient) StreamChat(context.Context, *types.Authentication, string) (grpc.BidiStreamingClient[protos.StreamChatRequest, protos.StreamChatResponse], error) {
+func (m *testIntegrationClient) StreamChat(context.Context, authentication.Principal, string) (grpc.BidiStreamingClient[protos.StreamChatRequest, protos.StreamChatResponse], error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++

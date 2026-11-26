@@ -1,130 +1,170 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { AuthenticationType } from '@/types/types.authentication';
-import {
-  Authentication,
-  Token,
-  ProjectRole,
-  OrganizationRole,
+import type {
   AuthenticateResponse,
+  Authentication,
+  ServiceError,
+  Token,
 } from '@rapidaai/react';
-import { User } from '@rapidaai/react';
-import { ServiceError } from '@rapidaai/react';
 import { authorizeUser } from '@/clients/authentication.client';
 
+type AuthenticationState = Pick<
+  AuthenticationType,
+  'authentication' | 'token' | 'selectedOrganizationID' | 'selectedProjectID'
+>;
+
+const emptyAuthenticationState: AuthenticationState = {
+  authentication: {} as Authentication.AsObject,
+  token: {} as Token.AsObject,
+  selectedOrganizationID: '',
+  selectedProjectID: '',
+};
+
 export const useAuthenticationStore = create<AuthenticationType>()(
-  persist(
+  persist<AuthenticationType, [], [], AuthenticationState>(
     (set, get) => ({
-      currentUser: {} as User.AsObject,
-      setCurrentUser: (u: User.AsObject) => set({ currentUser: u }),
-      token: {} as Token.AsObject,
-      setToken: (t: Token.AsObject) => set({ token: t }),
+      ...emptyAuthenticationState,
+
       setAuthentication: (
-        a: Authentication | undefined,
+        authentication: Authentication | undefined,
+        token: Token | undefined,
         callback: () => void,
       ) => {
-        if (a) {
-          const projectRoles = a.getProjectrolesList().map(pr => pr.toObject());
-          const currentProjectRole = get().currentProjectRole;
-
-          let newCurrentProjectRole = currentProjectRole;
-          if (
-            Object.keys(currentProjectRole).length === 0 &&
-            projectRoles.length > 0
-          ) {
-            newCurrentProjectRole = projectRoles[0];
-          } else if (projectRoles.length > 0) {
-            const matchedRole = projectRoles.find(
-              role => role.id === currentProjectRole.id,
-            );
-            newCurrentProjectRole = matchedRole || projectRoles[0];
-          }
-
-          set({
-            currentUser: a.getUser()?.toObject(),
-            token: a.getToken()?.toObject(),
-            organizationRole: a.getOrganizationrole()?.toObject(),
-            projectRoles: a.getProjectrolesList().map(pr => pr.toObject()),
-            currentProjectRole: newCurrentProjectRole,
-            featurePermissions: a
-              .getFeaturepermissionsList()
-              .map(p => p.toObject()),
-          });
-        } else {
-          set({});
+        if (!authentication || !token) {
+          set(emptyAuthenticationState);
+          return false;
         }
+
+        const authenticationValue = authentication.toObject();
+        const principalOrganizationID =
+          authenticationValue.principal?.selectedtenant?.organizationid;
+        const previousOrganizationID = get().selectedOrganizationID;
+        const organizations = authenticationValue.organizationsList || [];
+        const currentOrganization =
+          organizations.find(
+            organization => organization.id === principalOrganizationID,
+          ) ||
+          organizations.find(
+            organization => organization.id === previousOrganizationID,
+          ) ||
+          (organizations.length === 1 ? organizations[0] : undefined);
+        const selectedOrganizationID = currentOrganization?.id || '';
+        const projects = currentOrganization?.projectsList || [];
+        const principalProjectID =
+          authenticationValue.principal?.selectedtenant?.projectid;
+        const previousProjectID = get().selectedProjectID;
+        const selectedProjectID =
+          projects.find(project => project.id === principalProjectID)?.id ||
+          projects.find(project => project.id === previousProjectID)?.id ||
+          projects[0]?.id ||
+          '';
+
+        set({
+          authentication: authenticationValue,
+          token: token.toObject(),
+          selectedOrganizationID,
+          selectedProjectID,
+        });
         callback();
+        return true;
       },
+
+      setCurrentContext: (organization, project) => {
+        const selected = get()
+          .getOrganizations()
+          .find(candidate => candidate.id === organization.id);
+        if (!selected) return false;
+        if (
+          project &&
+          !selected.projectsList.some(candidate => candidate.id === project.id)
+        )
+          return false;
+        const selectedProjectID =
+          project?.id ||
+          (selected.projectsList.some(
+            candidate => candidate.id === get().selectedProjectID,
+          )
+            ? get().selectedProjectID
+            : selected.projectsList[0]?.id || '');
+        set({ selectedOrganizationID: selected.id, selectedProjectID });
+        return true;
+      },
+      getOrganizations: () => get().authentication.organizationsList || [],
+      getCurrentOrganization: () => {
+        const { selectedOrganizationID } = get();
+        return get()
+          .getOrganizations()
+          .find(organization => organization.id === selectedOrganizationID);
+      },
+      getProjects: () => get().getCurrentOrganization()?.projectsList || [],
+      getCurrentProject: () => {
+        const { selectedProjectID } = get();
+        return get()
+          .getProjects()
+          .find(project => project.id === selectedProjectID);
+      },
+
       isAuthenticated: () => !!get().token.token,
-      authorize: (
-        onSuccess: () => void,
-        onFailure: (error: string) => void,
-      ) => {
-        const { token, currentUser } = get();
+      authorize: (onSuccess, onFailure) => {
+        const { authentication, selectedOrganizationID, token } = get();
         if (!token.token) {
           onFailure('Missing token');
           return;
         }
         authorizeUser(
-          (err: ServiceError | null, auth: AuthenticateResponse | null) => {
-            if (err) {
-              onFailure(err.message);
+          (
+            error: ServiceError | null,
+            response: AuthenticateResponse | null,
+          ) => {
+            if (error) {
+              onFailure(error.message);
               return;
             }
-            if (auth?.getSuccess()) {
-              get().setAuthentication(auth.getData(), onSuccess);
-              onSuccess();
-            } else {
+            if (!response?.getSuccess()) {
+              onFailure('Authorization failed');
+              return;
+            }
+            if (
+              !get().setAuthentication(
+                response.getAuthentication(),
+                response.getToken(),
+                onSuccess,
+              )
+            ) {
               onFailure('Authorization failed');
             }
           },
           {
             authorization: token.token,
-            'x-auth-id': currentUser.id,
+            'x-auth-id': authentication.user?.id || '',
+            ...(selectedOrganizationID
+              ? { 'x-organization-id': selectedOrganizationID }
+              : {}),
           },
         );
       },
-      projectRoles: [],
-      organizationRole: {} as OrganizationRole.AsObject,
-      currentProjectRole: {} as ProjectRole.AsObject,
-      setCurrentProjectRole: (p: ProjectRole.AsObject) =>
-        set({ currentProjectRole: p }),
-      isThereOrganization: () => {
-        const state = get();
-        return (
-          state.organizationRole &&
-          Object.keys(state.organizationRole).length > 0
-        );
-      },
-      isThereProject: () => {
-        return get().projectRoles && Object.keys(get().projectRoles).length > 0;
-      },
-      featurePermissions: [],
-      isFeatureEnable: (feature: string) => {
-        for (const permission of get().featurePermissions) {
-          const pattern = new RegExp(permission.feature);
-          if (pattern.test(feature)) {
-            return permission.isenable;
-          }
-        }
-        return false;
-      },
 
+      hasOrganizations: () => get().getOrganizations().length > 0,
+      isThereOrganization: () => !!get().getCurrentOrganization()?.id,
+      isThereProject: () => !!get().getCurrentProject()?.id,
       unauthenticate: () => {
         localStorage.clear();
-        set({
-          currentUser: {} as User.AsObject,
-          token: {} as Token.AsObject,
-          organizationRole: {} as OrganizationRole.AsObject,
-          projectRoles: [],
-          currentProjectRole: {} as ProjectRole.AsObject,
-          featurePermissions: [],
-        });
+        set(emptyAuthenticationState);
       },
     }),
     {
-      version: 1,
-      onRehydrateStorage: () => state => {},
+      version: 3,
+      migrate: (_persistedState, version) =>
+        version < 3
+          ? (emptyAuthenticationState as unknown as AuthenticationType)
+          : (_persistedState as AuthenticationType),
+      partialize: state => ({
+        authentication: state.authentication,
+        token: state.token,
+        selectedOrganizationID: state.selectedOrganizationID,
+        selectedProjectID: state.selectedProjectID,
+      }),
       name: 'rpd::__user',
     },
   ),

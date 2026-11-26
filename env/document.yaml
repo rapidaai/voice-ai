@@ -1,12 +1,12 @@
-service_name: "Document API"
+service_name: "document-api"
+service_id: 9010
 host: "0.0.0.0"
 port: 9010
+secret: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
 
 authentication_config:
-  strict: false
-  type: "jwt"
-  config:
-    secret_key: "rpd_pks"
+  user:
+    auth_host: "localhost:9001"
 
 elastic_search:
   host: "localhost"

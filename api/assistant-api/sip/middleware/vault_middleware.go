@@ -23,7 +23,7 @@ func NewVaultMiddleware(options ...func(*middlewareOption)) sip_runtime.Middlewa
 		}
 	}
 	return func(ctx *sip_runtime.SIPRequestContext) error {
-		if !validator.NonNil(ctx.Auth) || !validator.NonNil(ctx.Assistant) {
+		if !validator.NonZero(ctx.Auth.Subject().ID) || !validator.NonNil(ctx.Assistant) {
 			return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageMiddlewareChainIncomplete, Err: errMiddlewareChainIncomplete}
 		}
 		if !validator.NonNil(ctx.Assistant.AssistantPhoneDeployment) {

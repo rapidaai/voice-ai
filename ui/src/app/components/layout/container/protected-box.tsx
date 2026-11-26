@@ -4,8 +4,7 @@ import { AuthContext } from '@/context/auth-context';
 
 export function ProtectedBox({ children }: { children: React.ReactElement }) {
   const { pathname, search } = useLocation();
-  const { isAuthenticated, isThereOrganization, isThereProject } =
-    useContext(AuthContext);
+  const { hasOrganizations, isAuthenticated } = useContext(AuthContext);
 
   if (isAuthenticated && !isAuthenticated()) {
     return <Navigate to={`/auth/signin${search}`} />;
@@ -15,15 +14,12 @@ export function ProtectedBox({ children }: { children: React.ReactElement }) {
     return children;
   }
 
-  if (isThereOrganization && !isThereOrganization())
+  if (hasOrganizations && !hasOrganizations())
     return <Navigate to="/onboarding/organization" />;
 
   if (pathname === '/onboarding/project') {
     return children;
   }
-
-  if (isThereProject && !isThereProject())
-    return <Navigate to="/onboarding/project" />;
 
   return children;
 }

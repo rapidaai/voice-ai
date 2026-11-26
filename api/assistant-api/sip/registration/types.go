@@ -11,6 +11,8 @@ import (
 
 	"github.com/rapidaai/api/assistant-api/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	authentication_jwt "github.com/rapidaai/pkg/authentication/jwt"
+	authentication_resolver "github.com/rapidaai/pkg/authentication/resolver"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -25,7 +27,7 @@ const (
 	MaxTransientRetries = 10
 
 	OptKeyPhone            = "phone"
-	OptKeyCredentialID     = "rapida.credential_id"
+	OptKeyCredentialID     = "rapida.credential_id" // #nosec G101, this is a metadata key, not a secret.
 	OptKeySIPStatus        = "rapida.sip_status"
 	OptKeySIPError         = "rapida.sip_error"
 	OptKeySIPRetry         = "rapida.sip_retry_count"
@@ -141,12 +143,14 @@ const (
 
 // ManagerOptions wires the registration manager's external dependencies.
 type ManagerOptions struct {
-	Logger             commons.Logger
-	Postgres           connectors.PostgresConnector
-	Redis              connectors.RedisConnector
-	RegistrationClient *sip_runtime.RegistrationClient
-	AssistantConfig    *config.AssistantConfig
-	RapidaClient       *rapida_client.RapidaClient
+	Logger                   commons.Logger
+	Postgres                 connectors.PostgresConnector
+	Redis                    connectors.RedisConnector
+	RegistrationClient       *sip_runtime.RegistrationClient
+	AssistantConfig          *config.AssistantConfig
+	ServiceAssertionIssuer   *authentication_jwt.Issuer
+	ServicePrincipalResolver *authentication_resolver.ServicePrincipalResolver
+	RapidaClient             *rapida_client.RapidaClient
 }
 
 type ManagerOption func(*ManagerOptions)
@@ -178,6 +182,13 @@ func WithRegistrationClient(registrationClient *sip_runtime.RegistrationClient) 
 func WithAssistantConfig(assistantConfig *config.AssistantConfig) ManagerOption {
 	return func(options *ManagerOptions) {
 		options.AssistantConfig = assistantConfig
+	}
+}
+
+func WithServiceAuthentication(issuer *authentication_jwt.Issuer, resolver *authentication_resolver.ServicePrincipalResolver) ManagerOption {
+	return func(options *ManagerOptions) {
+		options.ServiceAssertionIssuer = issuer
+		options.ServicePrincipalResolver = resolver
 	}
 }
 

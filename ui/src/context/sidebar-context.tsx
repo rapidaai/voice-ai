@@ -1,6 +1,5 @@
 import * as React from 'react';
-
-const SIDEBAR_COOKIE_NAME = 'sidebar:state';
+import { getSidenavExpanded, setSidenavExpanded } from './sidenav-storage';
 
 type SidebarContextType = {
   open: boolean;
@@ -38,7 +37,7 @@ const SidebarProvider = React.forwardRef<
 >(
   (
     {
-      defaultOpen = localStorage.getItem(SIDEBAR_COOKIE_NAME) !== 'false',
+      defaultOpen = getSidenavExpanded('main'),
       open: openProp,
       onOpenChange: setOpenProp,
       className,
@@ -54,10 +53,7 @@ const SidebarProvider = React.forwardRef<
     const open = openProp ?? _open;
 
     const [locked, setLockedState] = React.useState(() => {
-      return (
-        !isMobileViewport() &&
-        localStorage.getItem(SIDEBAR_COOKIE_NAME) !== 'false'
-      );
+      return !isMobileViewport() && getSidenavExpanded('main');
     });
 
     React.useEffect(() => {
@@ -75,8 +71,7 @@ const SidebarProvider = React.forwardRef<
     const setLocked = React.useCallback((value: boolean) => {
       setLockedState(value);
 
-      // Persist the locked state in a cookie
-      localStorage.setItem(SIDEBAR_COOKIE_NAME, value ? 'true' : 'false');
+      setSidenavExpanded('main', value);
       _setOpen(value); // Force open when locked
     }, []);
 

@@ -8,11 +8,11 @@ package assistant_deployment_api
 import (
 	"context"
 	"errors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	assistant_api "github.com/rapidaai/protos"
@@ -20,13 +20,9 @@ import (
 
 // CreateAssistantDebuggerDeployment implements assistant_api.AssistantDeploymentServiceServer.
 func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantDebuggerDeployment(ctx context.Context, deployment *assistant_api.CreateAssistantDeploymentRequest) (*assistant_api.GetAssistantDebuggerDeploymentResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 	if deployment.GetDebugger() == nil {
 		return utils.Error[assistant_api.GetAssistantDebuggerDeploymentResponse](
@@ -46,7 +42,7 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantDebuggerDeployme
 			},
 		}, errors.New(pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.Error)
 	}
-	if !validator.Between(int(deployment.GetDebugger().GetIdealTimeout()), 5, 120) {
+	if !validator.Between(deployment.GetDebugger().GetIdealTimeout(), 5, 120) {
 		return &assistant_api.GetAssistantDebuggerDeploymentResponse{
 			Code:    pkg_errors.CreateAssistantDebuggerDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32(),
 			Success: false,
@@ -57,7 +53,7 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantDebuggerDeployme
 			},
 		}, errors.New(pkg_errors.CreateAssistantDebuggerDeploymentInvalidIdealTimeout.Error)
 	}
-	if !validator.Between(int(deployment.GetDebugger().GetIdealTimeoutBackoff()), 0, 5) {
+	if !validator.Between(deployment.GetDebugger().GetIdealTimeoutBackoff(), 0, 5) {
 		return &assistant_api.GetAssistantDebuggerDeploymentResponse{
 			Code:    pkg_errors.CreateAssistantDebuggerDeploymentInvalidTimeoutBackoff.HTTPStatusCodeInt32(),
 			Success: false,
@@ -68,7 +64,7 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantDebuggerDeployme
 			},
 		}, errors.New(pkg_errors.CreateAssistantDebuggerDeploymentInvalidTimeoutBackoff.Error)
 	}
-	if !validator.Between(int(deployment.GetDebugger().GetMaxSessionDuration()), 180, 600) {
+	if !validator.Between(deployment.GetDebugger().GetMaxSessionDuration(), 180, 600) {
 		return &assistant_api.GetAssistantDebuggerDeploymentResponse{
 			Code:    pkg_errors.CreateAssistantDebuggerDeploymentInvalidSessionDuration.HTTPStatusCodeInt32(),
 			Success: false,

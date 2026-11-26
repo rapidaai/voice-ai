@@ -53,7 +53,7 @@ export const UpdateProjectDialog = ({
     },
   });
   const [error, setError] = useState<string>();
-  const [userId, token] = useCredential();
+  const [userId, token, , organizationId] = useCredential();
   const { loading, showLoader, hideLoader } = useRapidaStore();
   const { authorize } = useContext(AuthContext);
 
@@ -112,7 +112,7 @@ export const UpdateProjectDialog = ({
       projectId: existingProject.id,
       name: data.projectName,
       description: data.projectDescription,
-      auth: { token, userId },
+      auth: { organizationId, token, userId },
       callback: handleUpdateProject,
     });
   };

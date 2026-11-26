@@ -7,14 +7,11 @@
 package internal_callcontext
 
 import (
-	"errors"
-	"fmt"
-	"strings"
 	"time"
 
+	"github.com/rapidaai/pkg/authentication"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	gorm_generator "github.com/rapidaai/pkg/models/gorm/generators"
-	"github.com/rapidaai/pkg/types"
-	"github.com/rapidaai/pkg/utils"
 	"gorm.io/gorm"
 )
 
@@ -50,23 +47,35 @@ const (
 // Stored in Postgres (call_contexts table). The status field provides atomic
 // claiming: only one caller can transition pending→claimed.
 type CallContext struct {
-	Id             uint64    `json:"id" gorm:"type:bigint;primaryKey;<-:create"`
-	ContextID      string    `json:"contextId" gorm:"column:context_id;type:varchar(36);not null;uniqueIndex"`
-	Status         string    `json:"status" gorm:"column:status;type:varchar(20);not null;default:pending"`
-	AssistantID    uint64    `json:"assistantId" gorm:"column:assistant_id;type:bigint;not null"`
-	ConversationID uint64    `json:"conversationId" gorm:"column:conversation_id;type:bigint;not null"`
-	ProjectID      uint64    `json:"projectId" gorm:"column:project_id;type:bigint;not null;default:0"`
-	OrganizationID uint64    `json:"organizationId" gorm:"column:organization_id;type:bigint;not null;default:0"`
-	AuthType       string    `json:"authType" gorm:"column:auth_type;type:varchar(50);not null;default:''"`
-	AuthUserID     *uint64   `json:"authUserId,omitempty" gorm:"column:auth_user_id;type:bigint"`
-	AuthActorType  *string   `json:"authActorType,omitempty" gorm:"column:auth_actor_type;type:varchar(50)"`
-	AuthActorID    *uint64   `json:"authActorId,omitempty" gorm:"column:auth_actor_id;type:bigint"`
-	Provider       string    `json:"provider" gorm:"column:provider;type:varchar(50);not null;default:''"`
-	Direction      string    `json:"direction" gorm:"column:direction;type:varchar(20);not null;default:''"`
-	CallerNumber   string    `json:"callerNumber" gorm:"column:caller_number;type:varchar(50);not null;default:''"`
-	FromNumber     string    `json:"fromNumber" gorm:"column:from_number;type:varchar(50);not null;default:''"`
-	CreatedDate    time.Time `json:"createdDate" gorm:"type:timestamp;not null;default:NOW();<-:create"`
-	UpdatedDate    time.Time `json:"updatedDate" gorm:"type:timestamp;default:null"`
+	Id             uint64  `json:"id" gorm:"type:bigint;primaryKey;<-:create"`
+	ContextID      string  `json:"contextId" gorm:"column:context_id;type:varchar(36);not null;uniqueIndex"`
+	Status         string  `json:"status" gorm:"column:status;type:varchar(20);not null;default:pending"`
+	AssistantID    uint64  `json:"assistantId" gorm:"column:assistant_id;type:bigint;not null"`
+	ConversationID uint64  `json:"conversationId" gorm:"column:conversation_id;type:bigint;not null"`
+	ProjectID      uint64  `json:"projectId" gorm:"column:project_id;type:bigint;not null;default:0"`
+	OrganizationID uint64  `json:"organizationId" gorm:"column:organization_id;type:bigint;not null;default:0"`
+	AuthType       string  `json:"authType" gorm:"column:auth_type;type:varchar(50);not null;default:''"`
+	AuthUserID     *uint64 `json:"authUserId,omitempty" gorm:"column:auth_user_id;type:bigint"`
+	AuthActorType  *string `json:"authActorType,omitempty" gorm:"column:auth_actor_type;type:varchar(50)"`
+	AuthActorID    *uint64 `json:"authActorId,omitempty" gorm:"column:auth_actor_id;type:bigint"`
+
+	AuthPrincipalVersion    int16     `json:"authPrincipalVersion" gorm:"column:auth_principal_version;type:smallint;not null;default:1"`
+	AuthSubjectType         string    `json:"authSubjectType" gorm:"column:auth_subject_type;type:varchar(32)"`
+	AuthSubjectID           uint64    `json:"authSubjectId" gorm:"column:auth_subject_id;type:bigint"`
+	AuthSubjectIssuer       string    `json:"authSubjectIssuer" gorm:"column:auth_subject_issuer;type:varchar(200)"`
+	AuthServiceActorID      *uint64   `json:"authServiceActorId,omitempty" gorm:"column:auth_service_actor_id;type:bigint"`
+	AuthServiceActorIssuer  *string   `json:"authServiceActorIssuer,omitempty" gorm:"column:auth_service_actor_issuer;type:varchar(200)"`
+	AuthProofMethod         string    `json:"authProofMethod" gorm:"column:auth_proof_method;type:varchar(50)"`
+	AuthProofAudience       string    `json:"authProofAudience" gorm:"column:auth_proof_audience;type:varchar(100)"`
+	AuthProofReferenceType  string    `json:"authProofReferenceType" gorm:"column:auth_proof_reference_type;type:varchar(50)"`
+	AuthProofReferenceValue string    `json:"authProofReferenceValue" gorm:"column:auth_proof_reference_value;type:varchar(200)"`
+	AuthAuthorities         []string  `json:"authAuthorities" gorm:"column:auth_authorities;type:jsonb;not null;default:'[]';serializer:json"`
+	Provider                string    `json:"provider" gorm:"column:provider;type:varchar(50);not null;default:''"`
+	Direction               string    `json:"direction" gorm:"column:direction;type:varchar(20);not null;default:''"`
+	CallerNumber            string    `json:"callerNumber" gorm:"column:caller_number;type:varchar(50);not null;default:''"`
+	FromNumber              string    `json:"fromNumber" gorm:"column:from_number;type:varchar(50);not null;default:''"`
+	CreatedDate             time.Time `json:"createdDate" gorm:"type:timestamp;not null;default:NOW();<-:create"`
+	UpdatedDate             time.Time `json:"updatedDate" gorm:"type:timestamp;default:null"`
 
 	// AssistantProviderId is the version identifier for the assistant provider.
 	AssistantProviderId uint64 `json:"assistantProviderId" gorm:"column:assistant_provider_id;type:bigint;not null;default:0"`
@@ -97,51 +106,60 @@ func (cc *CallContext) BeforeCreate(tx *gorm.DB) (err error) {
 	return nil
 }
 
-func (cc *CallContext) SetAuthentication(auth *types.Authentication) error {
-	if auth == nil || !auth.IsAuthenticated() {
-		return types.ErrUnauthenticated
+func (cc *CallContext) SetAuthentication(auth authentication.Principal) error {
+	if auth.Subject().ID == 0 {
+		return pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
-	cc.AuthType = auth.AuthType.String()
-	if userContext, err := auth.UserContext(); err == nil {
-		cc.AuthUserID = &userContext.UserID
+	subject := auth.Subject()
+	tenant := auth.Tenant()
+	proof := auth.Proof()
+	cc.AuthPrincipalVersion = 1
+	cc.AuthSubjectType = string(subject.Type)
+	cc.AuthSubjectID = subject.ID
+	cc.AuthSubjectIssuer = subject.Issuer
+	cc.OrganizationID = tenant.OrganizationID
+	cc.ProjectID = tenant.ProjectID
+	cc.AuthProofMethod = string(proof.Method)
+	cc.AuthProofAudience = string(proof.Audience)
+	cc.AuthProofReferenceType = string(proof.Reference.Type)
+	cc.AuthProofReferenceValue = proof.Reference.Value
+	cc.AuthAuthorities = make([]string, 0, len(auth.Authorities()))
+	for _, authority := range auth.Authorities() {
+		cc.AuthAuthorities = append(cc.AuthAuthorities, string(authority))
 	}
-	if organizationContext, err := auth.OrganizationContext(); err == nil {
-		cc.OrganizationID = organizationContext.OrganizationID
+	if actor, delegated := auth.Actor(); delegated {
+		cc.AuthServiceActorID = &actor.ID
+		cc.AuthServiceActorIssuer = &actor.Issuer
+	} else {
+		cc.AuthServiceActorID = nil
+		cc.AuthServiceActorIssuer = nil
 	}
-	if projectContext, err := auth.ProjectContext(); err == nil {
-		cc.ProjectID = projectContext.ProjectID
-	}
-	cc.AuthActorType = utils.Ptr(auth.Actor().Type.String())
-	cc.AuthActorID = utils.Ptr(auth.Actor().ID)
 	return nil
 }
 
-func (cc *CallContext) ToAuthentication() (*types.Authentication, error) {
-	if cc == nil {
-		return nil, types.ErrUnauthenticated
+func (cc *CallContext) ToAuthentication() (authentication.Principal, error) {
+	if cc == nil || cc.AuthPrincipalVersion != 1 {
+		return authentication.Principal{}, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
-
-	auth := &types.Authentication{AuthType: types.AuthType(cc.AuthType)}
-	if cc.AuthUserID != nil && *cc.AuthUserID != 0 {
-		auth.UserValue = &types.UserContext{UserID: *cc.AuthUserID}
+	authorities := make([]authentication.PermissionKey, 0, len(cc.AuthAuthorities))
+	for _, authority := range cc.AuthAuthorities {
+		authorities = append(authorities, authentication.PermissionKey(authority))
 	}
-	if cc.OrganizationID != 0 {
-		auth.OrganizationValue = &types.OrganizationContext{OrganizationID: cc.OrganizationID}
+	subject := authentication.Identity{Type: authentication.IdentityType(cc.AuthSubjectType), ID: cc.AuthSubjectID, Issuer: cc.AuthSubjectIssuer}
+	tenant := authentication.Tenant{OrganizationID: cc.OrganizationID, ProjectID: cc.ProjectID}
+	proof := authentication.Proof{
+		Method:   authentication.AuthenticationMethod(cc.AuthProofMethod),
+		Audience: authentication.Audience(cc.AuthProofAudience),
+		Reference: authentication.ProofReference{
+			Type:  authentication.ProofReferenceType(cc.AuthProofReferenceType),
+			Value: cc.AuthProofReferenceValue,
+		},
 	}
-	if cc.ProjectID != 0 {
-		auth.ProjectValue = &types.ProjectContext{OrganizationID: cc.OrganizationID, ProjectID: cc.ProjectID}
+	if cc.AuthServiceActorID != nil && cc.AuthServiceActorIssuer != nil {
+		return authentication.NewDelegatedPrincipal(subject, authentication.ServiceActor{ID: *cc.AuthServiceActorID, Issuer: *cc.AuthServiceActorIssuer}, tenant, proof, authorities)
 	}
-	actorType := ""
-	if cc.AuthActorType != nil {
-		actorType = strings.TrimSpace(*cc.AuthActorType)
+	if cc.AuthServiceActorID != nil || cc.AuthServiceActorIssuer != nil {
+		return authentication.Principal{}, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
-	if actorType == "" || cc.AuthActorID == nil {
-		return nil, errors.New("call context authentication actor is incomplete")
-	}
-	auth.ActorValue = &types.ActorIdentity{Type: types.ActorType(actorType), ID: *cc.AuthActorID}
-	if !auth.IsAuthenticated() {
-		return nil, fmt.Errorf("call context authentication is invalid for auth type %q: %w", cc.AuthType, types.ErrUnauthenticated)
-	}
-
-	return auth, nil
+	return authentication.NewDirectPrincipal(subject, tenant, proof, authorities)
 }

@@ -16,7 +16,7 @@ export function Team({ isLoading }: { isLoading?: boolean }) {
         loading={isLoading}
       >
         <SidebarIconWrapper>
-          <UserMultiple size={20} />
+          <UserMultiple size={16} />
         </SidebarIconWrapper>
         <SidebarLabel isLoading={isLoading}>Users and Teams</SidebarLabel>
       </SidebarSimpleListItem>

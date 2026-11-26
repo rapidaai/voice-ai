@@ -13,15 +13,15 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	clients "github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
 
 type ObservabilityServiceClient interface {
-	GetAllTelemetry(ctx context.Context, auth *types.Authentication, in *protos.GetAllTelemetryRequest) (*protos.GetAllTelemetryResponse, error)
+	GetAllTelemetry(ctx context.Context, auth authentication.Principal, in *protos.GetAllTelemetryRequest) (*protos.GetAllTelemetryResponse, error)
 }
 
 type observabilityServiceClient struct {
@@ -36,15 +36,20 @@ func NewObservabilityServiceClientGRPC(config *config.AppConfig, logger commons.
 	if err != nil {
 		logger.Errorf("Unable to create connection %v", err)
 	}
+	return NewObservabilityServiceClientWithClient(config, logger, redis, protos.NewObservabilityServiceClient(conn))
+}
+
+// NewObservabilityServiceClientWithClient constructs an observability client around the provided gRPC client.
+func NewObservabilityServiceClientWithClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, observabilityClient protos.ObservabilityServiceClient) ObservabilityServiceClient {
 	return &observabilityServiceClient{
 		cfg:                 config,
 		logger:              logger,
-		InternalClient:      clients.NewInternalClient(config, logger, redis),
-		observabilityClient: protos.NewObservabilityServiceClient(conn),
+		InternalClient:      clients.NewInternalClient(config, "workflow-api", logger, redis),
+		observabilityClient: observabilityClient,
 	}
 }
 
-func (client *observabilityServiceClient) GetAllTelemetry(ctx context.Context, auth *types.Authentication, in *protos.GetAllTelemetryRequest) (*protos.GetAllTelemetryResponse, error) {
+func (client *observabilityServiceClient) GetAllTelemetry(ctx context.Context, auth authentication.Principal, in *protos.GetAllTelemetryRequest) (*protos.GetAllTelemetryResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(ctx, auth)
 	if err != nil {

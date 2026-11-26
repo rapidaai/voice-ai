@@ -1,4 +1,5 @@
 export * from './activity.client';
+export * from './access-management.client';
 export * from './assistant.client';
 export * from './authentication.client';
 export * from './connect.client';

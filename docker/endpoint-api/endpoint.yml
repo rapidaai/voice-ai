@@ -3,7 +3,7 @@ service_id: 9005
 host: "0.0.0.0"
 port: 9005
 log_level: "debug"
-secret: "rpd_pks"
+secret: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
 env: "development"
 
 postgres:

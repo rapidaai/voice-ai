@@ -80,12 +80,22 @@ function renderPage() {
   return render(
     <AuthContext.Provider
       value={{
-        projectRoles: [
+        getProjects: () => [
           {
-            id: 'project-role-1',
-            projectid: 'project-1',
-            projectname: 'Customer support',
-            role: 'admin',
+            id: 'project-1',
+            name: 'Customer support',
+            rolesList: [
+              {
+                id: 'role-admin',
+                key: 'project_admin',
+                name: 'Project Admin',
+                description: '',
+                scope: 'PROJECT',
+                subject: 'USER',
+                definitiontype: 'CUSTOM',
+                permissionsList: [],
+              },
+            ],
           },
         ],
       }}
@@ -108,6 +118,7 @@ describe('ProjectPage', () => {
     const { container } = renderPage();
 
     await screen.findByText('Customer support');
+    expect(screen.getByText('Project Admin')).toBeInTheDocument();
     const selection = screen.getByRole('radio', { name: 'Select row' });
     expect(selection.closest('td')).toHaveClass('cds--table-column-radio');
     expect(container.querySelector('.cds--batch-actions')).toBeNull();
@@ -186,5 +197,25 @@ describe('ProjectPage', () => {
       'overflow-x-auto',
     );
     expect(pagination?.previousElementSibling).not.toHaveClass('flex-1');
+  });
+
+  it('uses field-aware search to filter loaded projects', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const search = await screen.findByPlaceholderText(
+      'Search for name, role, collaborator, status',
+    );
+    await user.click(search);
+    await user.click(screen.getByRole('button', { name: 'name contains' }));
+    await user.type(screen.getByRole('textbox'), 'Missing{Enter}');
+
+    expect(screen.queryByText('Customer support')).not.toBeInTheDocument();
+    expect(screen.getByText('No projects found')).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Remove name filter' }),
+    );
+    expect(screen.getByText('Customer support')).toBeInTheDocument();
   });
 });

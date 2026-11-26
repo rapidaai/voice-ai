@@ -24,6 +24,7 @@ import (
 	internal_telnyx "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/telnyx/internal"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	configs "github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -213,7 +214,7 @@ func TestStatusCallback(t *testing.T) {
 			c, _ := gin.CreateTestContext(w)
 			c.Request = httptest.NewRequest("POST", "/telnyx/event", strings.NewReader(string(body)))
 
-			statusInfo, err := telephony.StatusCallback(c, nil, 1, 1)
+			statusInfo, err := telephony.StatusCallback(c, authentication.Principal{}, 1, 1)
 
 			if tt.expectErr {
 				if err == nil {
@@ -349,7 +350,7 @@ func TestInboundCall(t *testing.T) {
 	c.Set("contextId", "test-context-123")
 	c.Request = httptest.NewRequest("POST", "/telnyx/incoming?call_control_id=call-123", nil)
 
-	err := telephony.InboundCall(c, nil, 1, "+15551234567", 1)
+	err := telephony.InboundCall(c, authentication.Principal{}, 1, "+15551234567", 1)
 
 	if err != nil {
 		t.Errorf("InboundCall returned error: %v", err)
@@ -533,7 +534,7 @@ func TestOutboundCall_MissingCredentials(t *testing.T) {
 	telephony, _ := NewTelnyxTelephony(cfg, logger)
 	var statusUpdate internal_type.ProviderCallStatusUpdate
 
-	info, err := telephony.OutboundCall(context.Background(), nil, "+15551234567", "+15559876543", nil, 1, nil, func(update internal_type.ProviderCallStatusUpdate) {
+	info, err := telephony.OutboundCall(context.Background(), authentication.Principal{}, "+15551234567", "+15559876543", nil, 1, nil, func(update internal_type.ProviderCallStatusUpdate) {
 		statusUpdate = update
 	}, utils.Option{})
 	if err == nil {

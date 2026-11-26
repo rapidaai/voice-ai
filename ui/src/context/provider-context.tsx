@@ -1,16 +1,6 @@
 import { createContext, useContext } from 'use-context-selector';
-import { useCallback, useEffect, useState } from 'react';
-import { ServiceError } from '@rapidaai/react';
-import {
-  GetAllOrganizationCredentialResponse,
-  VaultCredential,
-} from '@rapidaai/react';
-
-import {
-  LOCAL_STORAGE_PROVIDER_CREDENTIALS,
-  serializeProto,
-  useLocalStorageSync,
-} from '@/hooks/use-storage-sync';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { VaultCredential } from '@rapidaai/react';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { listOrganizationCredentials } from '@/clients';
 
@@ -36,68 +26,40 @@ export const ProviderContextProvider = ({
     VaultCredential[]
   >([]);
   const { authId, projectId, token } = useCurrentCredential();
-  useLocalStorageSync(
-    LOCAL_STORAGE_PROVIDER_CREDENTIALS,
-    setProviderCredentials,
-    VaultCredential,
-  );
+  const latestRequestRef = useRef(0);
 
-  /**
-   *
-   */
-  useEffect(() => {
-    if (token && authId && projectId) {
-      getAllOrganizationCredential();
-    }
-  }, [token, authId, projectId]);
-
-  /**
-   * after getting all the credentials to store in the local storage
-   */
-  const afterGettingAllCredential = useCallback(
-    (
-      err: ServiceError | null,
-      gapcr: GetAllOrganizationCredentialResponse | null,
-    ) => {
-      if (gapcr?.getSuccess()) {
-        const credentials = gapcr.getDataList();
-        setProviderCredentials(credentials);
-        localStorage.setItem(
-          LOCAL_STORAGE_PROVIDER_CREDENTIALS,
-          JSON.stringify(
-            credentials.map((cred: any) => Array.from(serializeProto(cred))),
-          ),
-        );
-      }
-    },
-    [],
-  );
-
-  /**
-   * gettung all the organization
-   */
-  const getAllOrganizationCredential = () => {
+  const getAllOrganizationCredential = useCallback(() => {
+    if (!token || !authId || !projectId) return;
+    const requestId = ++latestRequestRef.current;
     listOrganizationCredentials({
       page: 1,
       pageSize: 100,
       criteria: [],
       auth: { token, userId: authId, projectId },
-      callback: afterGettingAllCredential,
+      callback: (_error, response) => {
+        if (requestId !== latestRequestRef.current) return;
+        if (response?.getSuccess()) {
+          setProviderCredentials(response.getDataList());
+        }
+      },
     });
-  };
+  }, [authId, projectId, token]);
 
-  /**
-   * reload provider credentials
-   */
-  const reloadProviderCredentials = () => {
+  useEffect(() => {
+    latestRequestRef.current += 1;
+    setProviderCredentials([]);
     getAllOrganizationCredential();
-  };
+
+    return () => {
+      latestRequestRef.current += 1;
+    };
+  }, [getAllOrganizationCredential]);
 
   return (
     <ProviderContext.Provider
       value={{
         providerCredentials,
-        reloadProviderCredentials,
+        reloadProviderCredentials: getAllOrganizationCredential,
       }}
     >
       {children}

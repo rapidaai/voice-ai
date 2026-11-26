@@ -2,10 +2,10 @@ import {
   useState,
   useContext,
   useEffect,
+  useRef,
   type HTMLAttributes,
   type MouseEvent,
 } from 'react';
-import { ProjectRole } from '@rapidaai/react';
 import { cn } from '@/utils';
 import { useMatches, useNavigate, type UIMatch } from 'react-router-dom';
 import { CustomLink } from '@/app/components/ui/primitives';
@@ -19,15 +19,20 @@ import {
   SwitcherItem,
 } from '@carbon/react';
 import { Breadcrumb } from '@/app/components/ui/primitives';
-import { Dropdown } from '@/app/components/ui/primitives';
 import { useRapidaStore } from '@/stores/app';
 import { useTheme } from '@/theme/theme-provider';
 import type { AppRouteHandle } from '@/app/routes/breadcrumb-handle';
+import { OrganizationProjectSelector } from '@/app/components/ui/composites';
+import type { DashboardInterfaceTour } from '@/app/components/layout/navigation/dashboard-interface-tour';
+import { Coachmark } from '@/app/components/ui/composites/coachmark';
 
 export function ActionableHeader({
   className,
+  interfaceTour,
   ...attributes
-}: HTMLAttributes<HTMLElement>) {
+}: HTMLAttributes<HTMLElement> & {
+  interfaceTour?: DashboardInterfaceTour;
+}) {
   const matches = useMatches() as UIMatch<unknown, AppRouteHandle>[];
   const navigate = useNavigate();
   const { loading, loadingType } = useRapidaStore();
@@ -104,67 +109,141 @@ export function ActionableHeader({
         className="global-breadcrumb min-w-0 overflow-hidden pl-4"
         items={breadcrumbs}
       />
-      <CustomerOptions isLoading={isLoading} />
+      <CustomerOptions
+        interfaceTour={interfaceTour}
+        isCompact={maxVisibleBreadcrumbItems === 2}
+        isLoading={isLoading}
+      />
     </header>
   );
 }
 
 export function CustomerOptions({
+  isCompact = false,
+  interfaceTour,
   isLoading,
-  showProjectSelector = true,
+  showContextSwitcher = true,
 }: {
+  isCompact?: boolean;
+  interfaceTour?: DashboardInterfaceTour;
   isLoading?: boolean;
-  showProjectSelector?: boolean;
+  showContextSwitcher?: boolean;
 }) {
-  const { projectRoles, currentProjectRole, setCurrentProjectRole } =
-    useContext(AuthContext);
+  const {
+    getOrganizations,
+    getCurrentOrganization,
+    getCurrentProject,
+    setCurrentContext,
+  } = useContext(AuthContext);
+  const organizations = getOrganizations?.() || [];
+  const currentOrganization = getCurrentOrganization?.();
+  const currentProject = getCurrentProject?.();
+  const navigate = useNavigate();
 
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
+  const contextSwitcherButtonRef = useRef<HTMLButtonElement>(null);
+  const themeButtonRef = useRef<HTMLButtonElement>(null);
+  const profileButtonRef = useRef<HTMLButtonElement>(null);
   const { resolvedMode, theme, toggleMode } = useTheme();
   const isDarkMode = resolvedMode === 'dark';
 
   return (
     <HeaderGlobalBar>
-      {showProjectSelector && projectRoles && setCurrentProjectRole && (
-        <Dropdown
-          id="project-selector"
-          aria-label="Select project"
-          titleText=""
-          hideLabel
-          label="Select a Project"
-          size="sm"
-          direction="bottom"
-          items={projectRoles}
-          selectedItem={currentProjectRole}
-          itemToString={(item: ProjectRole.AsObject | null) =>
-            item?.projectname || ''
-          }
-          onChange={({ selectedItem }) => {
-            if (selectedItem) setCurrentProjectRole(selectedItem);
-          }}
-          className="project-selector-dropdown max-sm:w-12! max-sm:min-w-12!"
-          isLoading={isLoading}
-        />
+      {showContextSwitcher && setCurrentContext && (
+        <Coachmark
+          actionLabel="Next"
+          align="bottom-end"
+          description="Switch organizations or projects from this menu."
+          launcherButtonRef={contextSwitcherButtonRef}
+          onAction={interfaceTour?.next ?? (() => undefined)}
+          onClose={interfaceTour?.dismiss ?? (() => undefined)}
+          open={interfaceTour?.step === 'context'}
+          targetClassName="inline-flex h-full"
+          title="Switch organization or project"
+        >
+          <span className="inline-flex h-full">
+            <OrganizationProjectSelector
+              organizations={organizations.map(organization => ({
+                id: organization.id,
+                name: organization.name,
+                projects: organization.projectsList.map(project => ({
+                  id: project.id,
+                  name: project.name,
+                })),
+              }))}
+              selectedOrganizationId={currentOrganization?.id}
+              selectedProjectId={currentProject?.id}
+              isCompact={isCompact}
+              isLoading={isLoading}
+              triggerRef={contextSwitcherButtonRef}
+              onChange={(organization, project) => {
+                const selectedOrganization = organizations.find(
+                  candidate => candidate.id === organization.id,
+                );
+                if (!selectedOrganization) return;
+                const selectedProject = project
+                  ? selectedOrganization.projectsList.find(
+                      candidate => candidate.id === project.id,
+                    )
+                  : undefined;
+                if (project && !selectedProject) return;
+                if (
+                  selectedOrganization.id === currentOrganization?.id &&
+                  selectedProject?.id === currentProject?.id
+                )
+                  return;
+                if (setCurrentContext(selectedOrganization, selectedProject))
+                  navigate('/dashboard');
+              }}
+            />
+          </span>
+        </Coachmark>
       )}
 
       {theme.allowModeSelection && (
-        <HeaderGlobalAction
-          aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
-          onClick={toggleMode}
-          tooltipAlignment="end"
+        <Coachmark
+          actionLabel="Next"
+          align="bottom-end"
+          description="Switch between light and dark mode whenever you want."
+          launcherButtonRef={themeButtonRef}
+          onAction={interfaceTour?.next ?? (() => undefined)}
+          onClose={interfaceTour?.dismiss ?? (() => undefined)}
+          open={interfaceTour?.step === 'theme'}
+          targetClassName="inline-flex h-full"
+          title="Choose your appearance"
         >
-          {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-        </HeaderGlobalAction>
+          <HeaderGlobalAction
+            ref={themeButtonRef}
+            aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
+            onClick={toggleMode}
+            tooltipAlignment="end"
+          >
+            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+          </HeaderGlobalAction>
+        </Coachmark>
       )}
 
-      <HeaderGlobalAction
-        aria-label="Account"
-        isActive={accountDropdownOpen}
-        onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-        tooltipAlignment="end"
+      <Coachmark
+        actionLabel="Next"
+        align="bottom-end"
+        description="Open account settings, resources, and session controls here."
+        launcherButtonRef={profileButtonRef}
+        onAction={interfaceTour?.next ?? (() => undefined)}
+        onClose={interfaceTour?.dismiss ?? (() => undefined)}
+        open={interfaceTour?.step === 'account'}
+        targetClassName="inline-flex h-full"
+        title="Open your account"
       >
-        <UserAvatar size={20} />
-      </HeaderGlobalAction>
+        <HeaderGlobalAction
+          ref={profileButtonRef}
+          aria-label="Account"
+          isActive={accountDropdownOpen}
+          onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+          tooltipAlignment="end"
+        >
+          <UserAvatar size={20} />
+        </HeaderGlobalAction>
+      </Coachmark>
 
       <HeaderPanel expanded={accountDropdownOpen}>
         <Switcher

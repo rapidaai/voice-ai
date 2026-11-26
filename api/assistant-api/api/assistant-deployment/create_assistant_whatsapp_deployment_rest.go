@@ -6,21 +6,21 @@
 package assistant_deployment_api
 
 import (
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/openapi"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	assistant_api "github.com/rapidaai/protos"
 )
 
 func (deploymentApi *AssistantDeploymentApi) CreateAssistantWhatsappDeploymentRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		c.JSON(pkg_errors.CreateAssistantWhatsappDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantWhatsappDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -28,19 +28,6 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWhatsappDeploymentRe
 				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.CreateAssistantWhatsappDeploymentUnauthenticated.CodeString())),
 				ErrorMessage: utils.Ptr(pkg_errors.CreateAssistantWhatsappDeploymentUnauthenticated.Error),
 				HumanMessage: utils.Ptr(pkg_errors.CreateAssistantWhatsappDeploymentUnauthenticated.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		c.JSON(pkg_errors.CreateAssistantWhatsappDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(pkg_errors.CreateAssistantWhatsappDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.CreateAssistantWhatsappDeploymentMissingAuthScope.CodeString())),
-				ErrorMessage: utils.Ptr(pkg_errors.CreateAssistantWhatsappDeploymentMissingAuthScope.Error),
-				HumanMessage: utils.Ptr(pkg_errors.CreateAssistantWhatsappDeploymentMissingAuthScope.ErrorMessage),
 			},
 		})
 		return
@@ -98,7 +85,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWhatsappDeploymentRe
 		})
 		return
 	}
-	if validator.NonNil(request.IdealTimeout) && !validator.Between(int(*request.IdealTimeout), 5, 120) {
+	if validator.NonNil(request.IdealTimeout) && !validator.Between(*request.IdealTimeout, 5, 120) {
 		c.JSON(pkg_errors.CreateAssistantWhatsappDeploymentInvalidIdealTimeout.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantWhatsappDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -110,7 +97,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWhatsappDeploymentRe
 		})
 		return
 	}
-	if validator.NonNil(request.IdealTimeoutBackoff) && !validator.Between(int(*request.IdealTimeoutBackoff), 0, 5) {
+	if validator.NonNil(request.IdealTimeoutBackoff) && !validator.Between(*request.IdealTimeoutBackoff, 0, 5) {
 		c.JSON(pkg_errors.CreateAssistantWhatsappDeploymentInvalidTimeoutBackoff.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantWhatsappDeploymentInvalidTimeoutBackoff.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -122,7 +109,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWhatsappDeploymentRe
 		})
 		return
 	}
-	if validator.NonNil(request.MaxSessionDuration) && !validator.Between(int(*request.MaxSessionDuration), 180, 600) {
+	if validator.NonNil(request.MaxSessionDuration) && !validator.Between(*request.MaxSessionDuration, 180, 600) {
 		c.JSON(pkg_errors.CreateAssistantWhatsappDeploymentInvalidSessionDuration.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantWhatsappDeploymentInvalidSessionDuration.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),

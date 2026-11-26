@@ -2,6 +2,7 @@ import datetime
 
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 import app.bridges.artifacts.protos.common_pb2 as _common_pb2
+import app.bridges.artifacts.protos.authentication_pb2 as _authentication_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
@@ -41,100 +42,19 @@ class Token(_message.Message):
     isExpired: bool
     def __init__(self, id: _Optional[int] = ..., token: _Optional[str] = ..., tokenType: _Optional[str] = ..., isExpired: bool = ...) -> None: ...
 
-class OrganizationRole(_message.Message):
-    __slots__ = ("id", "organizationId", "role", "organizationName")
-    ID_FIELD_NUMBER: _ClassVar[int]
-    ORGANIZATIONID_FIELD_NUMBER: _ClassVar[int]
-    ROLE_FIELD_NUMBER: _ClassVar[int]
-    ORGANIZATIONNAME_FIELD_NUMBER: _ClassVar[int]
-    id: int
-    organizationId: int
-    role: str
-    organizationName: str
-    def __init__(self, id: _Optional[int] = ..., organizationId: _Optional[int] = ..., role: _Optional[str] = ..., organizationName: _Optional[str] = ...) -> None: ...
-
-class ProjectRole(_message.Message):
-    __slots__ = ("id", "projectId", "role", "projectName")
-    ID_FIELD_NUMBER: _ClassVar[int]
-    PROJECTID_FIELD_NUMBER: _ClassVar[int]
-    ROLE_FIELD_NUMBER: _ClassVar[int]
-    PROJECTNAME_FIELD_NUMBER: _ClassVar[int]
-    id: int
-    projectId: int
-    role: str
-    projectName: str
-    def __init__(self, id: _Optional[int] = ..., projectId: _Optional[int] = ..., role: _Optional[str] = ..., projectName: _Optional[str] = ...) -> None: ...
-
-class FeaturePermission(_message.Message):
-    __slots__ = ("id", "feature", "isEnable")
-    ID_FIELD_NUMBER: _ClassVar[int]
-    FEATURE_FIELD_NUMBER: _ClassVar[int]
-    ISENABLE_FIELD_NUMBER: _ClassVar[int]
-    id: int
-    feature: str
-    isEnable: bool
-    def __init__(self, id: _Optional[int] = ..., feature: _Optional[str] = ..., isEnable: bool = ...) -> None: ...
-
-class AuthBillingPlan(_message.Message):
-    __slots__ = ("planSlug", "planName", "quotas")
-    class QuotasEntry(_message.Message):
-        __slots__ = ("key", "value")
-        KEY_FIELD_NUMBER: _ClassVar[int]
-        VALUE_FIELD_NUMBER: _ClassVar[int]
-        key: str
-        value: int
-        def __init__(self, key: _Optional[str] = ..., value: _Optional[int] = ...) -> None: ...
-    PLANSLUG_FIELD_NUMBER: _ClassVar[int]
-    PLANNAME_FIELD_NUMBER: _ClassVar[int]
-    QUOTAS_FIELD_NUMBER: _ClassVar[int]
-    planSlug: str
-    planName: str
-    quotas: _containers.ScalarMap[str, int]
-    def __init__(self, planSlug: _Optional[str] = ..., planName: _Optional[str] = ..., quotas: _Optional[_Mapping[str, int]] = ...) -> None: ...
-
-class Authentication(_message.Message):
-    __slots__ = ("user", "token", "organizationRole", "projectRoles", "featurePermissions", "billingPlan")
-    USER_FIELD_NUMBER: _ClassVar[int]
-    TOKEN_FIELD_NUMBER: _ClassVar[int]
-    ORGANIZATIONROLE_FIELD_NUMBER: _ClassVar[int]
-    PROJECTROLES_FIELD_NUMBER: _ClassVar[int]
-    FEATUREPERMISSIONS_FIELD_NUMBER: _ClassVar[int]
-    BILLINGPLAN_FIELD_NUMBER: _ClassVar[int]
-    user: _common_pb2.User
-    token: Token
-    organizationRole: OrganizationRole
-    projectRoles: _containers.RepeatedCompositeFieldContainer[ProjectRole]
-    featurePermissions: _containers.RepeatedCompositeFieldContainer[FeaturePermission]
-    billingPlan: AuthBillingPlan
-    def __init__(self, user: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., token: _Optional[_Union[Token, _Mapping]] = ..., organizationRole: _Optional[_Union[OrganizationRole, _Mapping]] = ..., projectRoles: _Optional[_Iterable[_Union[ProjectRole, _Mapping]]] = ..., featurePermissions: _Optional[_Iterable[_Union[FeaturePermission, _Mapping]]] = ..., billingPlan: _Optional[_Union[AuthBillingPlan, _Mapping]] = ...) -> None: ...
-
-class ScopedAuthentication(_message.Message):
-    __slots__ = ("userId", "organizationId", "projectId", "status", "actorType", "actorId")
-    USERID_FIELD_NUMBER: _ClassVar[int]
-    ORGANIZATIONID_FIELD_NUMBER: _ClassVar[int]
-    PROJECTID_FIELD_NUMBER: _ClassVar[int]
-    STATUS_FIELD_NUMBER: _ClassVar[int]
-    ACTORTYPE_FIELD_NUMBER: _ClassVar[int]
-    ACTORID_FIELD_NUMBER: _ClassVar[int]
-    userId: int
-    organizationId: int
-    projectId: int
-    status: str
-    actorType: str
-    actorId: str
-    def __init__(self, userId: _Optional[int] = ..., organizationId: _Optional[int] = ..., projectId: _Optional[int] = ..., status: _Optional[str] = ..., actorType: _Optional[str] = ..., actorId: _Optional[str] = ...) -> None: ...
-
 class AuthenticateResponse(_message.Message):
-    __slots__ = ("code", "success", "data", "error")
+    __slots__ = ("code", "success", "error", "authentication", "token")
     CODE_FIELD_NUMBER: _ClassVar[int]
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
-    DATA_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
+    AUTHENTICATION_FIELD_NUMBER: _ClassVar[int]
+    TOKEN_FIELD_NUMBER: _ClassVar[int]
     code: int
     success: bool
-    data: Authentication
     error: _common_pb2.Error
-    def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Union[Authentication, _Mapping]] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ...) -> None: ...
+    authentication: _authentication_pb2.Authentication
+    token: Token
+    def __init__(self, code: _Optional[int] = ..., success: bool = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ..., authentication: _Optional[_Union[_authentication_pb2.Authentication, _Mapping]] = ..., token: _Optional[_Union[Token, _Mapping]] = ...) -> None: ...
 
 class ForgotPasswordRequest(_message.Message):
     __slots__ = ("email",)
@@ -189,44 +109,45 @@ class CreatePasswordResponse(_message.Message):
     def __init__(self, code: _Optional[int] = ..., success: bool = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ...) -> None: ...
 
 class VerifyTokenRequest(_message.Message):
-    __slots__ = ("tokenType", "token")
-    TOKENTYPE_FIELD_NUMBER: _ClassVar[int]
-    TOKEN_FIELD_NUMBER: _ClassVar[int]
-    tokenType: str
-    token: str
-    def __init__(self, tokenType: _Optional[str] = ..., token: _Optional[str] = ...) -> None: ...
+    __slots__ = ("user", "project", "organization")
+    class UserCredential(_message.Message):
+        __slots__ = ("token", "userId", "selectedOrganizationId", "selectedProjectId")
+        TOKEN_FIELD_NUMBER: _ClassVar[int]
+        USERID_FIELD_NUMBER: _ClassVar[int]
+        SELECTEDORGANIZATIONID_FIELD_NUMBER: _ClassVar[int]
+        SELECTEDPROJECTID_FIELD_NUMBER: _ClassVar[int]
+        token: str
+        userId: int
+        selectedOrganizationId: int
+        selectedProjectId: int
+        def __init__(self, token: _Optional[str] = ..., userId: _Optional[int] = ..., selectedOrganizationId: _Optional[int] = ..., selectedProjectId: _Optional[int] = ...) -> None: ...
+    class ProjectCredential(_message.Message):
+        __slots__ = ("token",)
+        TOKEN_FIELD_NUMBER: _ClassVar[int]
+        token: str
+        def __init__(self, token: _Optional[str] = ...) -> None: ...
+    class OrganizationCredential(_message.Message):
+        __slots__ = ("token",)
+        TOKEN_FIELD_NUMBER: _ClassVar[int]
+        token: str
+        def __init__(self, token: _Optional[str] = ...) -> None: ...
+    USER_FIELD_NUMBER: _ClassVar[int]
+    PROJECT_FIELD_NUMBER: _ClassVar[int]
+    ORGANIZATION_FIELD_NUMBER: _ClassVar[int]
+    user: VerifyTokenRequest.UserCredential
+    project: VerifyTokenRequest.ProjectCredential
+    organization: VerifyTokenRequest.OrganizationCredential
+    def __init__(self, user: _Optional[_Union[VerifyTokenRequest.UserCredential, _Mapping]] = ..., project: _Optional[_Union[VerifyTokenRequest.ProjectCredential, _Mapping]] = ..., organization: _Optional[_Union[VerifyTokenRequest.OrganizationCredential, _Mapping]] = ...) -> None: ...
 
 class VerifyTokenResponse(_message.Message):
-    __slots__ = ("code", "success", "data")
-    CODE_FIELD_NUMBER: _ClassVar[int]
-    SUCCESS_FIELD_NUMBER: _ClassVar[int]
-    DATA_FIELD_NUMBER: _ClassVar[int]
-    code: int
-    success: bool
-    data: Token
-    def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Union[Token, _Mapping]] = ...) -> None: ...
+    __slots__ = ("authentication",)
+    AUTHENTICATION_FIELD_NUMBER: _ClassVar[int]
+    authentication: _authentication_pb2.Authentication
+    def __init__(self, authentication: _Optional[_Union[_authentication_pb2.Authentication, _Mapping]] = ...) -> None: ...
 
 class AuthorizeRequest(_message.Message):
     __slots__ = ()
     def __init__(self) -> None: ...
-
-class ScopeAuthorizeRequest(_message.Message):
-    __slots__ = ("scope",)
-    SCOPE_FIELD_NUMBER: _ClassVar[int]
-    scope: str
-    def __init__(self, scope: _Optional[str] = ...) -> None: ...
-
-class ScopedAuthenticationResponse(_message.Message):
-    __slots__ = ("code", "success", "data", "error")
-    CODE_FIELD_NUMBER: _ClassVar[int]
-    SUCCESS_FIELD_NUMBER: _ClassVar[int]
-    DATA_FIELD_NUMBER: _ClassVar[int]
-    ERROR_FIELD_NUMBER: _ClassVar[int]
-    code: int
-    success: bool
-    data: ScopedAuthentication
-    error: _common_pb2.Error
-    def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Union[ScopedAuthentication, _Mapping]] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ...) -> None: ...
 
 class GetUserRequest(_message.Message):
     __slots__ = ()
@@ -319,32 +240,28 @@ class GetOrganizationRequest(_message.Message):
     def __init__(self) -> None: ...
 
 class GetOrganizationResponse(_message.Message):
-    __slots__ = ("code", "success", "data", "role", "error")
+    __slots__ = ("code", "success", "data", "error")
     CODE_FIELD_NUMBER: _ClassVar[int]
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
     DATA_FIELD_NUMBER: _ClassVar[int]
-    ROLE_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
     code: int
     success: bool
     data: _common_pb2.Organization
-    role: OrganizationRole
     error: _common_pb2.Error
-    def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Union[_common_pb2.Organization, _Mapping]] = ..., role: _Optional[_Union[OrganizationRole, _Mapping]] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ...) -> None: ...
+    def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Union[_common_pb2.Organization, _Mapping]] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ...) -> None: ...
 
 class CreateOrganizationResponse(_message.Message):
-    __slots__ = ("code", "success", "data", "role", "error")
+    __slots__ = ("code", "success", "data", "error")
     CODE_FIELD_NUMBER: _ClassVar[int]
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
     DATA_FIELD_NUMBER: _ClassVar[int]
-    ROLE_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
     code: int
     success: bool
     data: _common_pb2.Organization
-    role: OrganizationRole
     error: _common_pb2.Error
-    def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Union[_common_pb2.Organization, _Mapping]] = ..., role: _Optional[_Union[OrganizationRole, _Mapping]] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ...) -> None: ...
+    def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Union[_common_pb2.Organization, _Mapping]] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ...) -> None: ...
 
 class UpdateOrganizationResponse(_message.Message):
     __slots__ = ("code", "success", "error")
@@ -475,22 +392,22 @@ class GetAllProjectResponse(_message.Message):
     def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Iterable[_Union[Project, _Mapping]]] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ..., paginated: _Optional[_Union[_common_pb2.Paginated, _Mapping]] = ...) -> None: ...
 
 class ProjectRoleAssignment(_message.Message):
-    __slots__ = ("projectId", "projectRole")
+    __slots__ = ("projectId", "roleDefinitionIds")
     PROJECTID_FIELD_NUMBER: _ClassVar[int]
-    PROJECTROLE_FIELD_NUMBER: _ClassVar[int]
+    ROLEDEFINITIONIDS_FIELD_NUMBER: _ClassVar[int]
     projectId: int
-    projectRole: str
-    def __init__(self, projectId: _Optional[int] = ..., projectRole: _Optional[str] = ...) -> None: ...
+    roleDefinitionIds: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, projectId: _Optional[int] = ..., roleDefinitionIds: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class InviteUserToOrganizationRequest(_message.Message):
-    __slots__ = ("email", "organizationRole", "projectRoles")
+    __slots__ = ("email", "projectRoles", "organizationRoleDefinitionIds")
     EMAIL_FIELD_NUMBER: _ClassVar[int]
-    ORGANIZATIONROLE_FIELD_NUMBER: _ClassVar[int]
     PROJECTROLES_FIELD_NUMBER: _ClassVar[int]
+    ORGANIZATIONROLEDEFINITIONIDS_FIELD_NUMBER: _ClassVar[int]
     email: str
-    organizationRole: str
     projectRoles: _containers.RepeatedCompositeFieldContainer[ProjectRoleAssignment]
-    def __init__(self, email: _Optional[str] = ..., organizationRole: _Optional[str] = ..., projectRoles: _Optional[_Iterable[_Union[ProjectRoleAssignment, _Mapping]]] = ...) -> None: ...
+    organizationRoleDefinitionIds: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, email: _Optional[str] = ..., projectRoles: _Optional[_Iterable[_Union[ProjectRoleAssignment, _Mapping]]] = ..., organizationRoleDefinitionIds: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class InviteUserToOrganizationResponse(_message.Message):
     __slots__ = ("code", "success", "data", "error")
@@ -513,12 +430,12 @@ class AddUserToProjectsRequest(_message.Message):
     def __init__(self, userId: _Optional[int] = ..., projectRoles: _Optional[_Iterable[_Union[ProjectRoleAssignment, _Mapping]]] = ...) -> None: ...
 
 class UpdateUserOrganizationRoleRequest(_message.Message):
-    __slots__ = ("userId", "organizationRole")
+    __slots__ = ("userId", "roleDefinitionIds")
     USERID_FIELD_NUMBER: _ClassVar[int]
-    ORGANIZATIONROLE_FIELD_NUMBER: _ClassVar[int]
+    ROLEDEFINITIONIDS_FIELD_NUMBER: _ClassVar[int]
     userId: int
-    organizationRole: str
-    def __init__(self, userId: _Optional[int] = ..., organizationRole: _Optional[str] = ...) -> None: ...
+    roleDefinitionIds: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, userId: _Optional[int] = ..., roleDefinitionIds: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class UpdateUserOrganizationRoleResponse(_message.Message):
     __slots__ = ("code", "success", "error")
@@ -599,7 +516,7 @@ class AddUserToProjectsResponse(_message.Message):
     def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Iterable[_Union[Project, _Mapping]]] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ...) -> None: ...
 
 class ProjectCredential(_message.Message):
-    __slots__ = ("id", "projectId", "organizationId", "name", "key", "status", "createdActor", "updatedActor", "createdDate", "updatedDate")
+    __slots__ = ("id", "projectId", "organizationId", "name", "key", "status", "createdActor", "updatedActor", "createdDate", "updatedDate", "roleDefinitionId", "roleName")
     ID_FIELD_NUMBER: _ClassVar[int]
     PROJECTID_FIELD_NUMBER: _ClassVar[int]
     ORGANIZATIONID_FIELD_NUMBER: _ClassVar[int]
@@ -610,6 +527,8 @@ class ProjectCredential(_message.Message):
     UPDATEDACTOR_FIELD_NUMBER: _ClassVar[int]
     CREATEDDATE_FIELD_NUMBER: _ClassVar[int]
     UPDATEDDATE_FIELD_NUMBER: _ClassVar[int]
+    ROLEDEFINITIONID_FIELD_NUMBER: _ClassVar[int]
+    ROLENAME_FIELD_NUMBER: _ClassVar[int]
     id: int
     projectId: int
     organizationId: int
@@ -620,15 +539,19 @@ class ProjectCredential(_message.Message):
     updatedActor: _common_pb2.AuditActor
     createdDate: _timestamp_pb2.Timestamp
     updatedDate: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[int] = ..., projectId: _Optional[int] = ..., organizationId: _Optional[int] = ..., name: _Optional[str] = ..., key: _Optional[str] = ..., status: _Optional[str] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    roleDefinitionId: int
+    roleName: str
+    def __init__(self, id: _Optional[int] = ..., projectId: _Optional[int] = ..., organizationId: _Optional[int] = ..., name: _Optional[str] = ..., key: _Optional[str] = ..., status: _Optional[str] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., roleDefinitionId: _Optional[int] = ..., roleName: _Optional[str] = ...) -> None: ...
 
 class CreateProjectCredentialRequest(_message.Message):
-    __slots__ = ("projectId", "name")
+    __slots__ = ("projectId", "name", "roleDefinitionId")
     PROJECTID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
+    ROLEDEFINITIONID_FIELD_NUMBER: _ClassVar[int]
     projectId: int
     name: str
-    def __init__(self, projectId: _Optional[int] = ..., name: _Optional[str] = ...) -> None: ...
+    roleDefinitionId: int
+    def __init__(self, projectId: _Optional[int] = ..., name: _Optional[str] = ..., roleDefinitionId: _Optional[int] = ...) -> None: ...
 
 class GetAllProjectCredentialRequest(_message.Message):
     __slots__ = ("paginate", "criterias", "projectId")
@@ -639,6 +562,14 @@ class GetAllProjectCredentialRequest(_message.Message):
     criterias: _containers.RepeatedCompositeFieldContainer[_common_pb2.Criteria]
     projectId: int
     def __init__(self, paginate: _Optional[_Union[_common_pb2.Paginate, _Mapping]] = ..., criterias: _Optional[_Iterable[_Union[_common_pb2.Criteria, _Mapping]]] = ..., projectId: _Optional[int] = ...) -> None: ...
+
+class RevokeProjectCredentialRequest(_message.Message):
+    __slots__ = ("projectId", "credentialId")
+    PROJECTID_FIELD_NUMBER: _ClassVar[int]
+    CREDENTIALID_FIELD_NUMBER: _ClassVar[int]
+    projectId: int
+    credentialId: int
+    def __init__(self, projectId: _Optional[int] = ..., credentialId: _Optional[int] = ...) -> None: ...
 
 class CreateProjectCredentialResponse(_message.Message):
     __slots__ = ("code", "success", "data", "error")
@@ -665,3 +596,15 @@ class GetAllProjectCredentialResponse(_message.Message):
     error: _common_pb2.Error
     paginated: _common_pb2.Paginated
     def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Iterable[_Union[ProjectCredential, _Mapping]]] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ..., paginated: _Optional[_Union[_common_pb2.Paginated, _Mapping]] = ...) -> None: ...
+
+class RevokeProjectCredentialResponse(_message.Message):
+    __slots__ = ("code", "success", "id", "error")
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    SUCCESS_FIELD_NUMBER: _ClassVar[int]
+    ID_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    code: int
+    success: bool
+    id: int
+    error: _common_pb2.Error
+    def __init__(self, code: _Optional[int] = ..., success: bool = ..., id: _Optional[int] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ...) -> None: ...

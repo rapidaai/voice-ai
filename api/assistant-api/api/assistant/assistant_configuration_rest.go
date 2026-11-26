@@ -13,31 +13,18 @@ import (
 	"github.com/gin-gonic/gin"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/openapi"
+	"github.com/rapidaai/pkg/authentication"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
 )
 
 func (assistantApi *assistantGrpcApi) CreateAssistantConfigurationRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		platformError := pkg_errors.AssistantConfigurationUnauthenticated
-		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(platformError.CodeString())),
-				ErrorMessage: utils.Ptr(platformError.Error),
-				HumanMessage: utils.Ptr(platformError.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -173,23 +160,9 @@ func (assistantApi *assistantGrpcApi) CreateAssistantConfigurationRest(c *gin.Co
 }
 
 func (assistantApi *assistantGrpcApi) UpdateAssistantConfigurationRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		platformError := pkg_errors.AssistantConfigurationUnauthenticated
-		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(platformError.CodeString())),
-				ErrorMessage: utils.Ptr(platformError.Error),
-				HumanMessage: utils.Ptr(platformError.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -340,23 +313,9 @@ func (assistantApi *assistantGrpcApi) UpdateAssistantConfigurationRest(c *gin.Co
 }
 
 func (assistantApi *assistantGrpcApi) GetAssistantConfigurationRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		platformError := pkg_errors.AssistantConfigurationUnauthenticated
-		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(platformError.CodeString())),
-				ErrorMessage: utils.Ptr(platformError.Error),
-				HumanMessage: utils.Ptr(platformError.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -420,23 +379,9 @@ func (assistantApi *assistantGrpcApi) GetAssistantConfigurationRest(c *gin.Conte
 }
 
 func (assistantApi *assistantGrpcApi) GetAllAssistantConfigurationRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		platformError := pkg_errors.AssistantConfigurationUnauthenticated
-		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(platformError.CodeString())),
-				ErrorMessage: utils.Ptr(platformError.Error),
-				HumanMessage: utils.Ptr(platformError.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -545,35 +490,31 @@ func (assistantApi *assistantGrpcApi) GetAllAssistantConfigurationRest(c *gin.Co
 			out = append(out, *mapped)
 		}
 	}
+	totalItem, err := utils.Int64ToUint32(cnt)
+	if err != nil {
+		assistantApi.logger.Errorf("unable to convert assistant configuration count: %v", err)
+		platformError := pkg_errors.AssistantConfigurationGetAll
+		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
+			Code: utils.Ptr(platformError.HTTPStatusCodeInt32()), Success: utils.Ptr(false),
+			Error: &openapi.Error{ErrorCode: utils.Ptr(openapi.Uint64String(platformError.CodeString())), ErrorMessage: utils.Ptr(platformError.Error), HumanMessage: utils.Ptr(platformError.ErrorMessage)},
+		})
+		return
+	}
 	c.JSON(http.StatusOK, openapi.GetAllAssistantConfigurationResponse{
 		Code:    utils.Ptr(int32(http.StatusOK)),
 		Success: utils.Ptr(true),
 		Data:    &out,
 		Paginated: &openapi.Paginated{
 			CurrentPage: utils.Ptr(page),
-			TotalItem:   utils.Ptr(uint32(cnt)),
+			TotalItem:   utils.Ptr(totalItem),
 		},
 	})
 }
 
 func (assistantApi *assistantGrpcApi) DeleteAssistantConfigurationRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		platformError := pkg_errors.AssistantConfigurationUnauthenticated
-		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(platformError.CodeString())),
-				ErrorMessage: utils.Ptr(platformError.Error),
-				HumanMessage: utils.Ptr(platformError.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -680,26 +621,26 @@ func assistantConfigurationOpenAPI(configuration *internal_assistant_entity.Assi
 		})
 	}
 	var createdActor *openapi.AuditActor
-	createdActorIdentity := types.ActorIdentity{
-		Type: types.ActorType(configuration.CreatedActorType),
+	createdActorIdentity := authentication.Identity{
+		Type: authentication.IdentityType(configuration.CreatedActorType),
 		ID:   configuration.CreatedActorID,
 	}
-	if createdActorIdentity.Validate() == nil {
+	if validator.OneOf(createdActorIdentity.Type, authentication.IdentityUser, authentication.IdentityProjectCredential, authentication.IdentityOrganizationCredential, authentication.IdentityService) && validator.NonZero(createdActorIdentity.ID) {
 		createdActor = &openapi.AuditActor{}
 		_ = utils.Cast(map[string]string{
-			"type": createdActorIdentity.Type.String(),
+			"type": string(createdActorIdentity.Type),
 			"id":   strconv.FormatUint(createdActorIdentity.ID, 10),
 		}, createdActor)
 	}
 	var updatedActor *openapi.AuditActor
-	updatedActorIdentity := types.ActorIdentity{
-		Type: types.ActorType(configuration.UpdatedActorType),
+	updatedActorIdentity := authentication.Identity{
+		Type: authentication.IdentityType(configuration.UpdatedActorType),
 		ID:   configuration.UpdatedActorID,
 	}
-	if updatedActorIdentity.Validate() == nil {
+	if validator.OneOf(updatedActorIdentity.Type, authentication.IdentityUser, authentication.IdentityProjectCredential, authentication.IdentityOrganizationCredential, authentication.IdentityService, authentication.IdentityType("system")) && validator.NonZero(updatedActorIdentity.ID) {
 		updatedActor = &openapi.AuditActor{}
 		_ = utils.Cast(map[string]string{
-			"type": updatedActorIdentity.Type.String(),
+			"type": string(updatedActorIdentity.Type),
 			"id":   strconv.FormatUint(updatedActorIdentity.ID, 10),
 		}, updatedActor)
 	}

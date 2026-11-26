@@ -9,11 +9,11 @@ import (
 	"context"
 
 	"github.com/rapidaai/api/assistant-api/config"
+	"github.com/rapidaai/pkg/authentication"
 	integration_client "github.com/rapidaai/pkg/clients/integration"
 	integration_client_builders "github.com/rapidaai/pkg/clients/integration/builders"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
 
@@ -33,7 +33,7 @@ func NewQueryEmbedding(logger commons.Logger, cfg *config.AssistantConfig, redis
 
 func (qe *defaultQueryEmbedding) TextQueryEmbedding(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	query string, opts *TextEmbeddingOption,
 ) (*protos.EmbeddingResponse, error) {
 

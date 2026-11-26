@@ -4,7 +4,8 @@ import {
   CreateProviderKey,
   DeleteProviderKey,
   GetAllOrganizationCredential,
-  GetAllProjectCredential,
+  ListProjectCredentials as ListProjectCredentialsApi,
+  RevokeProjectCredential,
 } from '@rapidaai/react';
 import { Struct } from 'google-protobuf/google/protobuf/struct_pb';
 
@@ -14,6 +15,7 @@ import {
   deleteProviderCredential,
   listOrganizationCredentials,
   listProjectCredentials,
+  revokeProjectCredential,
 } from '@/clients';
 
 jest.mock('@/configs', () => ({
@@ -21,6 +23,55 @@ jest.mock('@/configs', () => ({
 }));
 
 jest.mock('@rapidaai/react', () => {
+  class Criteria {
+    key = '';
+    logic = '';
+    value = '';
+
+    setKey(value: string) {
+      this.key = value;
+    }
+
+    setLogic(value: string) {
+      this.logic = value;
+    }
+
+    setValue(value: string) {
+      this.value = value;
+    }
+  }
+
+  class Paginate {
+    page = 0;
+    pageSize = 0;
+
+    setPage(value: number) {
+      this.page = value;
+    }
+
+    setPagesize(value: number) {
+      this.pageSize = value;
+    }
+  }
+
+  class GetAllProjectCredentialRequest {
+    criterias: Criteria[] = [];
+    paginate?: Paginate;
+    projectId = '';
+
+    addCriterias(value: Criteria) {
+      this.criterias.push(value);
+    }
+
+    setPaginate(value: Paginate) {
+      this.paginate = value;
+    }
+
+    setProjectid(value: string) {
+      this.projectId = value;
+    }
+  }
+
   class CreateProviderCredentialRequest {
     private credential: unknown;
     private name = '';
@@ -55,12 +106,16 @@ jest.mock('@rapidaai/react', () => {
     ConnectionConfig: {
       WithDebugger: jest.fn(metadata => ({ debugger: metadata })),
     },
+    Criteria,
     CreateProjectCredential: jest.fn(),
     CreateProviderCredentialRequest,
     CreateProviderKey: jest.fn(),
     DeleteProviderKey: jest.fn(),
     GetAllOrganizationCredential: jest.fn(),
-    GetAllProjectCredential: jest.fn(),
+    GetAllProjectCredentialRequest,
+    ListProjectCredentials: jest.fn(),
+    Paginate,
+    RevokeProjectCredential: jest.fn(),
   };
 });
 
@@ -71,6 +126,7 @@ jest.mock('google-protobuf/google/protobuf/struct_pb', () => ({
 }));
 
 const auth = {
+  organizationId: 'org-1',
   projectId: 'project-1',
   token: 'token-1',
   userId: 'user-1',
@@ -79,6 +135,7 @@ const auth = {
 const headers = {
   authorization: 'token-1',
   'x-auth-id': 'user-1',
+  'x-organization-id': 'org-1',
 };
 
 describe('credential client', () => {
@@ -110,6 +167,7 @@ describe('credential client', () => {
     );
     expect(ConnectionConfig.WithDebugger).toHaveBeenCalledWith({
       authorization: 'token-1',
+      organizationId: 'org-1',
       userId: 'user-1',
       projectId: 'project-1',
     });
@@ -158,17 +216,21 @@ describe('credential client', () => {
     );
   });
 
-  it('creates and lists project publishable credentials with auth headers', () => {
+  it('creates and lists project API keys with auth headers', () => {
     const callback = jest.fn();
 
     createProjectPublishableCredential({
       projectId: 'project-1',
       name: 'publishable key',
+      roleDefinitionId: '117',
       auth,
       callback,
     });
     listProjectCredentials({
       projectId: 'project-1',
+      page: 2,
+      pageSize: 25,
+      criteria: [{ key: 'role', value: 'runtime', logic: 'contains' }],
       auth,
       callback,
     });
@@ -177,14 +239,69 @@ describe('credential client', () => {
       { endpoint: 'test-endpoint' },
       'project-1',
       'publishable key',
+      '117',
       callback,
       headers,
     );
-    expect(GetAllProjectCredential).toHaveBeenCalledWith(
+    expect(ListProjectCredentialsApi).toHaveBeenCalledWith(
       { endpoint: 'test-endpoint' },
-      'project-1',
+      expect.objectContaining({
+        projectId: 'project-1',
+        paginate: expect.objectContaining({ page: 2, pageSize: 25 }),
+        criterias: [
+          expect.objectContaining({
+            key: 'role',
+            value: 'runtime',
+            logic: 'contains',
+          }),
+        ],
+      }),
       callback,
       headers,
+    );
+  });
+
+  it('revokes a project API key with auth headers', () => {
+    const callback = jest.fn();
+
+    revokeProjectCredential({
+      projectId: 'project-1',
+      credentialId: 'credential-1',
+      auth,
+      callback,
+    });
+
+    expect(RevokeProjectCredential).toHaveBeenCalledWith(
+      { endpoint: 'test-endpoint' },
+      'project-1',
+      'credential-1',
+      callback,
+      {
+        ...headers,
+        'x-project-id': 'project-1',
+      },
+    );
+  });
+
+  it('selects the revoke request project instead of stale auth state', () => {
+    const callback = jest.fn();
+
+    revokeProjectCredential({
+      projectId: 'project-2',
+      credentialId: 'credential-1',
+      auth,
+      callback,
+    });
+
+    expect(RevokeProjectCredential).toHaveBeenCalledWith(
+      { endpoint: 'test-endpoint' },
+      'project-2',
+      'credential-1',
+      callback,
+      {
+        ...headers,
+        'x-project-id': 'project-2',
+      },
     );
   });
 });

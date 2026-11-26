@@ -2,12 +2,13 @@ package internal_assistant_service
 
 import (
 	"context"
+	"strconv"
 	"testing"
 
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/storages"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -51,10 +52,7 @@ func (auditTestStorage) GetUrl(context.Context, string) storages.StorageOutput {
 
 func TestScopeReadRequiresProjectCapability(t *testing.T) {
 	organizationID := uint64(11)
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeOrg,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-	}
+	auth := directOrganizationPrincipal(organizationID, organizationID)
 
 	service := &assistantToolService{}
 	if _, err := service.GetLog(context.Background(), auth, 22, 33); err == nil {
@@ -65,11 +63,7 @@ func TestScopeReadRequiresProjectCapability(t *testing.T) {
 func TestScopeReadRejectsMismatchedProject(t *testing.T) {
 	organizationID := uint64(11)
 	projectID := uint64(22)
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeProject,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
-	}
+	auth := directProjectPrincipal(projectID, organizationID, projectID)
 
 	service := &assistantToolService{}
 	if _, err := service.GetLog(context.Background(), auth, 23, 33); err == nil {
@@ -92,14 +86,7 @@ func TestAssistantCreatesSetOnlyCreatedActor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create logger: %v", err)
 	}
-	auth := &types.Authentication{
-		AuthType: types.AuthTypeProject,
-		ActorValue: &types.ActorIdentity{
-			Type: types.ActorTypeProject,
-			ID:   22,
-		},
-		ProjectValue: &types.ProjectContext{OrganizationID: 11, ProjectID: 22},
-	}
+	auth := directProjectPrincipal(22, 11, 22)
 	service := &assistantConversationService{
 		logger:   applicationLogger,
 		postgres: &auditTestPostgresConnector{db: database},
@@ -181,12 +168,7 @@ func TestConversationMetadataUpsertSetsUpdatedActor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create logger: %v", err)
 	}
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: 41},
-		UserValue:         &types.UserContext{UserID: 41},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 11},
-	}
+	auth := directUserPrincipal(41, authentication.Tenant{OrganizationID: 11})
 	service := &assistantConversationService{
 		logger:   applicationLogger,
 		postgres: &auditTestPostgresConnector{db: database},
@@ -197,8 +179,7 @@ func TestConversationMetadataUpsertSetsUpdatedActor(t *testing.T) {
 	); err != nil {
 		t.Fatalf("initial metadata create: %v", err)
 	}
-	auth.AuthType = types.AuthTypeService
-	auth.ActorValue = &types.ActorIdentity{Type: types.ActorTypeService, ID: 52}
+	auth = directServicePrincipal(52, authentication.Tenant{OrganizationID: 11})
 	if _, err := service.CreateOrUpdateConversationMetadata(
 		context.Background(), auth, 33, 44, []*protos.Metadata{{Key: "language", Value: "fr"}},
 	); err != nil {
@@ -224,4 +205,50 @@ func TestConversationMetadataUpsertSetsUpdatedActor(t *testing.T) {
 	if row.UpdatedActorType != "service" || row.UpdatedActorID != 52 {
 		t.Fatalf("updated actor = (%v, %v)", row.UpdatedActorType, row.UpdatedActorID)
 	}
+}
+
+func directUserPrincipal(userID uint64, tenant authentication.Tenant) authentication.Principal {
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: userID}, tenant,
+		authentication.Proof{Method: authentication.AuthenticationUserSession, Reference: authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: strconv.FormatUint(userID, 10)}}, nil,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return principal
+}
+
+func directProjectPrincipal(credentialID, organizationID, projectID uint64) authentication.Principal {
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityProjectCredential, ID: credentialID},
+		authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID},
+		authentication.Proof{Method: authentication.AuthenticationProjectCredential, Audience: authentication.AudienceManagement, Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: strconv.FormatUint(credentialID, 10)}}, nil,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return principal
+}
+
+func directOrganizationPrincipal(credentialID, organizationID uint64) authentication.Principal {
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityOrganizationCredential, ID: credentialID},
+		authentication.Tenant{OrganizationID: organizationID},
+		authentication.Proof{Method: authentication.AuthenticationOrganizationCredential, Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: strconv.FormatUint(credentialID, 10)}}, nil,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return principal
+}
+
+func directServicePrincipal(serviceID uint64, tenant authentication.Tenant) authentication.Principal {
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityService, ID: serviceID, Issuer: "assistant-api"}, tenant,
+		authentication.Proof{Method: authentication.AuthenticationServiceAssertion, Audience: authentication.AudienceRapidaInternal, Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "assistant-test-1"}}, nil,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return principal
 }

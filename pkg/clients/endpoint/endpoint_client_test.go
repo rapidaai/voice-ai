@@ -2,18 +2,31 @@ package endpoint_client
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	endpoint_api "github.com/rapidaai/protos"
 )
 
 type deploymentGRPCClientStub struct {
 	endpoint_api.DeploymentClient
+}
+
+type endpointGRPCClientStub struct {
+	endpoint_api.EndpointServiceClient
+}
+
+func TestNewEndpointServiceClientWithClientUsesProvidedGRPCClient(t *testing.T) {
+	grpcClient := &endpointGRPCClientStub{}
+	client := NewEndpointServiceClientWithClient(&config.AppConfig{}, nil, nil, grpcClient)
+
+	if client.(*endpointServiceClient).endpointClient != grpcClient {
+		t.Fatal("NewEndpointServiceClientWithClient() did not retain the provided gRPC client")
+	}
 }
 
 func TestNewDeploymentServiceClientWithClientUsesProvidedGRPCClient(t *testing.T) {
@@ -31,21 +44,21 @@ func TestEndpointServiceClientStopsBeforeGRPCOnAuthError(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := &endpointServiceClient{
-		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, nil, nil),
+		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, "test-api", nil, nil),
 		logger:         logger,
 	}
-	_, err = client.GetEndpoint(context.Background(), &types.Authentication{}, &endpoint_api.GetEndpointRequest{})
-	if !errors.Is(err, types.ErrUnauthenticated) {
+	_, err = client.GetEndpoint(context.Background(), authentication.Principal{}, &endpoint_api.GetEndpointRequest{})
+	if _, ok := err.(pkg_errors.AuthenticationPrincipalInvalidError); !ok {
 		t.Fatalf("GetEndpoint() error = %v", err)
 	}
 }
 
 func TestDeploymentServiceClientStopsBeforeGRPCOnAuthError(t *testing.T) {
 	client := &deploymentServiceClient{
-		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, nil, nil),
+		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, "test-api", nil, nil),
 	}
-	_, err := client.Invoke(context.Background(), &types.Authentication{}, &endpoint_api.InvokeRequest{})
-	if !errors.Is(err, types.ErrUnauthenticated) {
+	_, err := client.Invoke(context.Background(), authentication.Principal{}, &endpoint_api.InvokeRequest{})
+	if _, ok := err.(pkg_errors.AuthenticationPrincipalInvalidError); !ok {
 		t.Fatalf("Invoke() error = %v", err)
 	}
 }

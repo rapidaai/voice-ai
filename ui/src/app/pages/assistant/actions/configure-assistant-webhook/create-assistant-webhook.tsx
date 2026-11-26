@@ -231,6 +231,7 @@ export const CreateAssistantWebhook: FC<{ assistantId: string }> = ({
     <>
       <ConfirmDialogComponent />
       <CreateFullPageWithHeader
+        alignHeaderWithStepRail
         title="Configure webhook"
         eyebrow="Assistant"
         description="Complete all steps to configure your webhook."
@@ -241,6 +242,7 @@ export const CreateAssistantWebhook: FC<{ assistantId: string }> = ({
           {
             code: 'events',
             name: 'Events',
+            hideHeader: true,
             description:
               'Choose which call, conversation, and WebRTC events trigger the webhook.',
             actions: [
@@ -310,6 +312,7 @@ export const CreateAssistantWebhook: FC<{ assistantId: string }> = ({
           {
             code: 'delivery',
             name: 'Delivery',
+            hideHeader: true,
             description:
               'Configure the HTTP destination, headers, and delivery behavior.',
             actions: [

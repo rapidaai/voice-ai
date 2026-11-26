@@ -11,7 +11,6 @@ const { genericScreenshotJourneys } = require('./route-manifest');
 const emptyJourneyIds = new Set([
   'deployment.endpoint',
   'deployment.endpointVersions',
-  'integration.projectCredential',
   'integration.personalCredential',
   'logs.traces',
   'organization.users',

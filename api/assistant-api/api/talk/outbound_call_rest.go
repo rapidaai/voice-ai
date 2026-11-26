@@ -8,6 +8,7 @@ package assistant_talk_api
 import (
 	"context"
 	"fmt"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"net/http"
 	"strconv"
 
@@ -18,7 +19,6 @@ import (
 	"github.com/rapidaai/openapi"
 	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/pkg/preset"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
@@ -26,8 +26,8 @@ import (
 
 // CreatePhoneCallRest initiates an outbound phone call from the REST API.
 func (cApi *ConversationApi) CreatePhoneCallRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		c.JSON(pkg_errors.CreatePhoneCallUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreatePhoneCallUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -37,11 +37,6 @@ func (cApi *ConversationApi) CreatePhoneCallRest(c *gin.Context) {
 				HumanMessage: utils.Ptr(pkg_errors.CreatePhoneCallUnauthenticated.ErrorMessage),
 			},
 		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": scopeErr.Error()})
 		return
 	}
 

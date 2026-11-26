@@ -4,14 +4,11 @@ import (
 	"context"
 
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 )
 
 type OrganizationService interface {
-	Create(ctx context.Context, auth *types.Authentication, name string, size string, industry string) (*internal_entity.Organization, error)
+	Create(ctx context.Context, auth authentication.Principal, name string, size string, industry string) (*internal_entity.Organization, error)
 	Get(ctx context.Context, organizationId uint64) (*internal_entity.Organization, error)
-	Update(ctx context.Context, auth *types.Authentication, organizationId uint64, name *string, industry *string, email *string) (*internal_entity.Organization, error)
-	CreateCredential(ctx context.Context, auth *types.Authentication, organizationId uint64, name string) (*internal_entity.OrganizationCredential, string, error)
-	RotateCredential(ctx context.Context, auth *types.Authentication, organizationId, credentialId uint64) (*internal_entity.OrganizationCredential, string, error)
-	ArchiveCredential(ctx context.Context, auth *types.Authentication, organizationId, credentialId uint64) (*internal_entity.OrganizationCredential, error)
+	Update(ctx context.Context, auth authentication.Principal, organizationId uint64, name *string, industry *string, email *string) (*internal_entity.Organization, error)
 }

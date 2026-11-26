@@ -1,5 +1,5 @@
 import type { GetAssistantResponse, ServiceError } from '@rapidaai/react';
-import { ErrorContainer } from '@/app/components/ui/feedback';
+import { ErrorContainer } from '@/app/components/ui/feedback/error-container';
 import { useDeleteConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-delete-confirmation';
 import { useRapidaStore } from '@/stores/app';
 import { useCurrentCredential } from '@/hooks/use-credential';
@@ -60,9 +60,9 @@ export function EditAssistantPage() {
         <ErrorContainer
           onAction={goToAssistantListing}
           code="403"
-          actionLabel="Go to listing"
+          actionLabel="Back to assistants"
           title="Assistant not available"
-          description="This assistant may be archived or you don't have access to it."
+          description="This assistant may be archived or you don't have access to it. Please check with your administrator or try another assistant."
         />
       </div>
     );

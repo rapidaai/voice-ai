@@ -13,7 +13,7 @@ import { CreateAssistantProviderRequest } from '@rapidaai/react';
 import type { GetAssistantProviderResponse } from '@rapidaai/react';
 import { FormLabel } from '@/app/components/ui/primitives';
 import { Textarea } from '@/app/components/ui/primitives';
-import { ErrorContainer } from '@/app/components/ui/feedback';
+import { ErrorContainer } from '@/app/components/ui/feedback/error-container';
 import { DocNoticeBlock } from '@/app/components/layout/container/message/notice-block/doc-notice-block';
 import { Input } from '@/app/components/ui/primitives';
 import { APiParameter } from '@/app/components/domain/external-api/api-parameter';
@@ -32,7 +32,7 @@ export function CreateWebsocketVersion() {
         <ErrorContainer
           onAction={goToAssistantListing}
           code="403"
-          actionLabel="Go to listing"
+          actionLabel="Back to assistants"
           title="Assistant not available"
           description="This assistant may be archived or you don't have access to it. Please check with your administrator or try another assistant."
         />
@@ -215,6 +215,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
           {
             code: 'change-assistant',
             name: 'Configure Connection',
+            hideHeader: true,
             description:
               'Set up a new WebSocket connection to the server where your agent is running.',
             actions: [
@@ -283,6 +284,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
           {
             code: 'commit-assistant',
             name: 'Change Definition',
+            hideHeader: true,
             description:
               'Provide a clear description of the changes made in this version to help others understand what has been updated.',
             actions: [

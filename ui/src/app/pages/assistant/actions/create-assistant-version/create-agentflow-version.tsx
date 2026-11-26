@@ -3,7 +3,7 @@ import {
   AgentflowDefinition,
   AgentflowVersionBuilder,
 } from '@/app/pages/assistant/actions/create-assistant-version/agentflow-version-builder';
-import { ErrorContainer } from '@/app/components/ui/feedback';
+import { ErrorContainer } from '@/app/components/ui/feedback/error-container';
 import { useRapidaStore } from '@/stores/app';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
@@ -45,7 +45,7 @@ export function CreateAgentflowVersion() {
         <ErrorContainer
           onAction={navigator.goToAssistantListing}
           code="403"
-          actionLabel="Go to listing"
+          actionLabel="Back to assistants"
           title="Assistant not available"
           description="This assistant may be archived or you don't have access to it. Please check with your administrator or try another assistant."
         />

@@ -192,6 +192,7 @@ export function CreateWebsocket() {
             name: 'Configuration',
             description: 'Configure and connect the agent using a websocket',
             code: 'configure-websocket',
+            hideHeader: true,
             body: (
               <div className="">
                 <YellowNoticeBlock className="flex items-center">
@@ -269,6 +270,7 @@ export function CreateWebsocket() {
           {
             code: 'define-assistant',
             name: 'Profile',
+            hideHeader: true,
             description:
               'Provide the name, a brief description, and relevant tags for your assistant to help identify and categorize it.',
             actions: [
@@ -327,6 +329,7 @@ export function CreateWebsocket() {
             name: 'Deployment',
             description: 'Enable assistant to start engaging with user',
             code: 'deployment',
+            hideHeader: true,
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
                 <SecondaryButton

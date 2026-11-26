@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { useCredential } from '@/hooks/use-credential';
 import { useRapidaStore } from '@/stores/app';
@@ -40,6 +40,11 @@ import {
   AssistantQuerySearch,
   getAssistantSearchCriteria,
 } from './assistant-query-search';
+import { Coachmark } from '@/app/components/ui/composites/coachmark';
+import {
+  type AssistantInterfaceTour,
+  useAssistantInterfaceTour,
+} from './assistant-interface-tour';
 
 const CREATE_ASSISTANT_LABEL = 'Create new assistant';
 
@@ -93,6 +98,18 @@ export function AssistantPage() {
   const [createAssistantModalOpen, setCreateAssistantModalOpen] =
     useState(false);
   const [querySearchValue, setQuerySearchValue] = useState('');
+  const createAssistantButtonRef = useRef<HTMLButtonElement>(null);
+  const interfaceTour = useAssistantInterfaceTour(userId);
+
+  const openCreateAssistantDialog = useCallback(() => {
+    setCreateAssistantModalOpen(true);
+    interfaceTour.showTypes();
+  }, [interfaceTour.showTypes]);
+
+  const closeCreateAssistantDialog = () => {
+    setCreateAssistantModalOpen(false);
+    if (interfaceTour.step === 'types') interfaceTour.dismiss();
+  };
 
   useEffect(() => {
     if (searchParams) {
@@ -158,14 +175,27 @@ export function AssistantPage() {
           </Text>
         }
         pageActions={
-          <PrimaryButton
-            className="w-full md:w-auto"
-            size="md"
-            renderIcon={Add}
-            onClick={() => setCreateAssistantModalOpen(true)}
+          <Coachmark
+            actionLabel="Show assistant types"
+            align="bottom-end"
+            description="Start here to choose the kind of assistant you want to build or connect."
+            launcherButtonRef={createAssistantButtonRef}
+            onAction={openCreateAssistantDialog}
+            onClose={interfaceTour.dismiss}
+            open={interfaceTour.step === 'create'}
+            targetClassName="inline-flex w-full md:w-auto"
+            title="Create an assistant"
           >
-            {CREATE_ASSISTANT_LABEL}
-          </PrimaryButton>
+            <PrimaryButton
+              ref={createAssistantButtonRef}
+              className="w-full md:w-auto"
+              size="md"
+              renderIcon={Add}
+              onClick={openCreateAssistantDialog}
+            >
+              {CREATE_ASSISTANT_LABEL}
+            </PrimaryButton>
+          </Coachmark>
         }
       />
       <PageHeaderStickyToolbar>
@@ -229,7 +259,7 @@ export function AssistantPage() {
             subtitle="No assistants match your current filters."
             action={CREATE_ASSISTANT_LABEL}
             actionIcon={Add}
-            onAction={() => setCreateAssistantModalOpen(true)}
+            onAction={openCreateAssistantDialog}
           />
         </div>
       ) : (
@@ -240,7 +270,7 @@ export function AssistantPage() {
             subtitle="Create assistants for each client, brand, or business unit from one controlled platform."
             action={CREATE_ASSISTANT_LABEL}
             actionIcon={Add}
-            onAction={() => setCreateAssistantModalOpen(true)}
+            onAction={openCreateAssistantDialog}
           />
         </div>
       )}
@@ -267,9 +297,11 @@ export function AssistantPage() {
 
       <CreateAssistantDialog
         open={createAssistantModalOpen}
-        onClose={() => setCreateAssistantModalOpen(false)}
+        interfaceTour={interfaceTour}
+        onClose={closeCreateAssistantDialog}
         onSelect={path => {
           setCreateAssistantModalOpen(false);
+          if (interfaceTour.step === 'types') interfaceTour.dismiss();
           navigate(path);
         }}
       />
@@ -392,14 +424,18 @@ const createAssistantOptions = [
 ];
 
 function CreateAssistantDialog({
+  interfaceTour,
   open,
   onClose,
   onSelect,
 }: {
+  interfaceTour: AssistantInterfaceTour;
   open: boolean;
   onClose: () => void;
   onSelect: (path: string) => void;
 }) {
+  const assistantTypesLauncherRef = useRef<HTMLAnchorElement>(null);
+
   return (
     <Modal
       open={open}
@@ -412,44 +448,65 @@ function CreateAssistantDialog({
         title="Create an assistant"
         onClose={onClose}
       />
-      <ModalBody>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {createAssistantOptions.map(option => {
-            const Icon = option.icon;
-            return (
-              <ClickableTile
-                key={option.title}
-                onClick={() => onSelect(option.path)}
-                className="group !flex !min-h-[220px] !flex-col !rounded-none !border !border-border-subtle !bg-layer !p-0 transition-colors hover:!border-primary "
-              >
-                <div className="flex flex-1 flex-col p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-primary/10 text-primary ">
-                      <Icon size={24} />
+      <ModalBody
+        className={
+          interfaceTour.step === 'types' ? 'md:!overflow-visible' : undefined
+        }
+      >
+        <Coachmark
+          actionLabel="Got it"
+          align="bottom"
+          description="Select From Prompt, AgentKit, or Agentflow based on how you want to build and manage the assistant."
+          launcherButtonRef={assistantTypesLauncherRef}
+          onAction={interfaceTour.dismiss}
+          onClose={interfaceTour.dismiss}
+          open={interfaceTour.step === 'types'}
+          targetClassName="block w-full"
+          title="Choose an assistant type"
+        >
+          <div
+            data-coachmark-target="assistant-types"
+            className="grid grid-cols-1 gap-4 md:grid-cols-3"
+          >
+            {createAssistantOptions.map((option, index) => {
+              const Icon = option.icon;
+              return (
+                <ClickableTile
+                  key={option.title}
+                  ref={index === 0 ? assistantTypesLauncherRef : undefined}
+                  role="button"
+                  onClick={() => onSelect(option.path)}
+                  className="group !flex !min-h-[220px] !flex-col !rounded-none !border !border-border-subtle !bg-layer !p-0 transition-colors hover:!border-primary "
+                >
+                  <div className="flex flex-1 flex-col p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-primary/10 text-primary ">
+                        <Icon size={24} />
+                      </div>
+                      <ArrowRight
+                        size={20}
+                        className="mt-1 shrink-0 text-muted transition-transform group-hover:translate-x-1 group-hover:text-primary "
+                      />
                     </div>
-                    <ArrowRight
-                      size={20}
-                      className="mt-1 shrink-0 text-muted transition-transform group-hover:translate-x-1 group-hover:text-primary "
-                    />
+                    <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-muted ">
+                      {option.eyebrow}
+                    </p>
+                    <h2 className="mt-2 text-xl font-semibold leading-tight text-foreground ">
+                      {option.title}
+                    </h2>
+                    <p className="mt-3 flex-1 text-sm leading-5 text-muted ">
+                      {option.description}
+                    </p>
+                    <span className="mt-6 inline-flex items-center gap-1 text-sm font-medium text-primary">
+                      Select option
+                      <ArrowRight size={14} />
+                    </span>
                   </div>
-                  <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-muted ">
-                    {option.eyebrow}
-                  </p>
-                  <h2 className="mt-2 text-xl font-semibold leading-tight text-foreground ">
-                    {option.title}
-                  </h2>
-                  <p className="mt-3 flex-1 text-sm leading-5 text-muted ">
-                    {option.description}
-                  </p>
-                  <span className="mt-6 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                    Select option
-                    <ArrowRight size={14} />
-                  </span>
-                </div>
-              </ClickableTile>
-            );
-          })}
-        </div>
+                </ClickableTile>
+              );
+            })}
+          </div>
+        </Coachmark>
       </ModalBody>
     </Modal>
   );

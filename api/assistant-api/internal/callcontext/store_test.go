@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -46,6 +46,17 @@ func newTestStore(t *testing.T) (Store, context.Context) {
 			auth_user_id BIGINT,
 			auth_actor_type TEXT,
 			auth_actor_id INTEGER,
+			auth_principal_version INTEGER NOT NULL DEFAULT 1,
+			auth_subject_type TEXT NOT NULL DEFAULT '',
+			auth_subject_id BIGINT NOT NULL DEFAULT 0,
+			auth_subject_issuer TEXT NOT NULL DEFAULT '',
+			auth_service_actor_id BIGINT,
+			auth_service_actor_issuer TEXT,
+			auth_proof_method TEXT NOT NULL DEFAULT '',
+			auth_proof_audience TEXT NOT NULL DEFAULT '',
+			auth_proof_reference_type TEXT NOT NULL DEFAULT '',
+			auth_proof_reference_value TEXT NOT NULL DEFAULT '',
+			auth_authorities JSON NOT NULL DEFAULT '[]',
 			provider TEXT NOT NULL DEFAULT '',
 			direction TEXT NOT NULL DEFAULT '',
 			caller_number TEXT NOT NULL DEFAULT '',
@@ -141,7 +152,7 @@ func TestStoreSaveInitializesPendingContext(t *testing.T) {
 		ConversationID: 1001,
 		ProjectID:      22,
 		OrganizationID: 33,
-		AuthType:       types.AuthTypeService.String(),
+		AuthType:       "service",
 		Provider:       "twilio",
 		Direction:      "outbound",
 		CallerNumber:   "+15550001111",
@@ -545,12 +556,13 @@ func TestStoreGetByChannelUUID(t *testing.T) {
 
 func TestStoreAuthenticationSnapshotRoundTripDoesNotWriteLegacyToken(t *testing.T) {
 	store, ctx := newTestStore(t)
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: math.MaxInt64},
-		UserValue:         &types.UserContext{UserID: math.MaxInt64},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
-		ProjectValue:      &types.ProjectContext{OrganizationID: 33, ProjectID: 22},
+	auth, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: math.MaxInt64},
+		authentication.Tenant{OrganizationID: 33, ProjectID: 22},
+		authentication.Proof{Method: authentication.AuthenticationUserSession, Reference: authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: "session-max"}}, nil,
+	)
+	if err != nil {
+		t.Fatalf("NewDirectPrincipal() error = %v", err)
 	}
 	callContext := &CallContext{AssistantID: 77, ConversationID: 1001, Provider: "sip", Direction: "outbound"}
 	if err := callContext.SetAuthentication(auth); err != nil {
@@ -568,13 +580,11 @@ func TestStoreAuthenticationSnapshotRoundTripDoesNotWriteLegacyToken(t *testing.
 	if err != nil {
 		t.Fatalf("ToAuthentication() error = %v", err)
 	}
-	userContext, err := reconstructed.UserContext()
-	if err != nil || userContext.UserID != math.MaxInt64 {
-		t.Fatalf("UserContext() = %+v, %v", userContext, err)
+	if reconstructed.Subject().ID != math.MaxInt64 {
+		t.Fatalf("Subject() = %+v", reconstructed.Subject())
 	}
-	actor := reconstructed.Actor()
-	if actor.ID != math.MaxInt64 {
-		t.Fatalf("Actor() = %+v", actor)
+	if _, delegated := reconstructed.Actor(); delegated {
+		t.Fatal("Actor() reports delegation for direct user principal")
 	}
 	var authToken string
 	testStore := store.(*postgresStore)

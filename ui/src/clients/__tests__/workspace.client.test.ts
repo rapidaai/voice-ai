@@ -33,36 +33,36 @@ jest.mock('@/configs', () => ({
 jest.mock('@rapidaai/react', () => {
   class ProjectRoleAssignment {
     private projectId = '';
-    private projectRole = '';
+    private roleDefinitionIds: string[] = [];
 
     setProjectid(projectId: string) {
       this.projectId = projectId;
     }
 
-    setProjectrole(projectRole: string) {
-      this.projectRole = projectRole;
+    setRoledefinitionidsList(roleDefinitionIds: string[]) {
+      this.roleDefinitionIds = roleDefinitionIds;
     }
 
     getProjectid() {
       return this.projectId;
     }
 
-    getProjectrole() {
-      return this.projectRole;
+    getRoledefinitionidsList() {
+      return this.roleDefinitionIds;
     }
   }
 
   class InviteUserToOrganizationRequest {
     private email = '';
-    private organizationRole = '';
+    private organizationRoleDefinitionIds: string[] = [];
     private projectRoles: ProjectRoleAssignment[] = [];
 
     setEmail(email: string) {
       this.email = email;
     }
 
-    setOrganizationrole(organizationRole: string) {
-      this.organizationRole = organizationRole;
+    setOrganizationroledefinitionidsList(roleDefinitionIds: string[]) {
+      this.organizationRoleDefinitionIds = roleDefinitionIds;
     }
 
     setProjectrolesList(projectRoles: ProjectRoleAssignment[]) {
@@ -73,8 +73,8 @@ jest.mock('@rapidaai/react', () => {
       return this.email;
     }
 
-    getOrganizationrole() {
-      return this.organizationRole;
+    getOrganizationroledefinitionidsList() {
+      return this.organizationRoleDefinitionIds;
     }
 
     getProjectrolesList() {
@@ -105,22 +105,22 @@ jest.mock('@rapidaai/react', () => {
 
   class UpdateUserOrganizationRoleRequest {
     private userId = '';
-    private organizationRole = '';
+    private roleDefinitionIds: string[] = [];
 
     setUserid(userId: string) {
       this.userId = userId;
     }
 
-    setOrganizationrole(organizationRole: string) {
-      this.organizationRole = organizationRole;
+    setRoledefinitionidsList(roleDefinitionIds: string[]) {
+      this.roleDefinitionIds = roleDefinitionIds;
     }
 
     getUserid() {
       return this.userId;
     }
 
-    getOrganizationrole() {
-      return this.organizationRole;
+    getRoledefinitionidsList() {
+      return this.roleDefinitionIds;
     }
   }
 
@@ -157,6 +157,7 @@ jest.mock('@rapidaai/react', () => {
 });
 
 const auth = {
+  organizationId: 'org-1',
   token: 'token-1',
   userId: 'auth-1',
 };
@@ -164,6 +165,7 @@ const auth = {
 const metadata = {
   authorization: 'token-1',
   'x-auth-id': 'auth-1',
+  'x-organization-id': 'org-1',
 };
 
 describe('workspace client', () => {
@@ -263,18 +265,22 @@ describe('workspace client', () => {
       name: 'Rapida',
       size: '50',
       industry: 'Support',
-      auth,
+      auth: { token: auth.token, userId: auth.userId },
       callback: jest.fn(),
     });
     inviteOrganizationUser({
       email: 'p_iyer@outlook.com',
-      organizationRole: 'admin',
-      projectRoles: [{ projectId: 'project-1', projectRole: 'editor' }],
+      organizationRoleDefinitionIds: ['role-org-admin'],
+      projectRoles: [
+        { projectId: 'project-1', roleDefinitionIds: ['role-editor'] },
+      ],
       auth,
     });
     addUserToProjectsByRole({
       userId: 'user-1',
-      projectRoles: [{ projectId: 'project-2', projectRole: 'reader' }],
+      projectRoles: [
+        { projectId: 'project-2', roleDefinitionIds: ['role-reader'] },
+      ],
       auth,
     });
 
@@ -283,36 +289,41 @@ describe('workspace client', () => {
       'Rapida',
       '50',
       'Support',
-      metadata,
+      {
+        authorization: 'token-1',
+        'x-auth-id': 'auth-1',
+      },
       expect.any(Function),
     );
 
     const inviteRequest = (InviteUserToOrganization as jest.Mock).mock
       .calls[0][1];
     expect(inviteRequest.getEmail()).toBe('p_iyer@outlook.com');
-    expect(inviteRequest.getOrganizationrole()).toBe('admin');
+    expect(inviteRequest.getOrganizationroledefinitionidsList()).toEqual([
+      'role-org-admin',
+    ]);
     expect(inviteRequest.getProjectrolesList()[0].getProjectid()).toBe(
       'project-1',
     );
-    expect(inviteRequest.getProjectrolesList()[0].getProjectrole()).toBe(
-      'editor',
-    );
+    expect(
+      inviteRequest.getProjectrolesList()[0].getRoledefinitionidsList(),
+    ).toEqual(['role-editor']);
 
     const projectRequest = (AddUserToProjects as jest.Mock).mock.calls[0][1];
     expect(projectRequest.getUserid()).toBe('user-1');
     expect(projectRequest.getProjectrolesList()[0].getProjectid()).toBe(
       'project-2',
     );
-    expect(projectRequest.getProjectrolesList()[0].getProjectrole()).toBe(
-      'reader',
-    );
+    expect(
+      projectRequest.getProjectrolesList()[0].getRoledefinitionidsList(),
+    ).toEqual(['role-reader']);
   });
 
   it('creates organization user delete and role update requests', () => {
     deleteOrganizationUser({ userId: 'user-1', auth });
     updateOrganizationUserRole({
       userId: 'user-2',
-      organizationRole: 'member',
+      roleDefinitionIds: ['role-member', 'role-auditor'],
       auth,
     });
 
@@ -328,7 +339,10 @@ describe('workspace client', () => {
     const updateRequest = (UpdateUserOrganizationRole as jest.Mock).mock
       .calls[0][1];
     expect(updateRequest.getUserid()).toBe('user-2');
-    expect(updateRequest.getOrganizationrole()).toBe('member');
+    expect(updateRequest.getRoledefinitionidsList()).toEqual([
+      'role-member',
+      'role-auditor',
+    ]);
     expect(UpdateUserOrganizationRole).toHaveBeenCalledWith(
       { endpoint: 'test-endpoint' },
       updateRequest,

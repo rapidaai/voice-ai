@@ -13,10 +13,8 @@ import (
 
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
-	"github.com/rapidaai/pkg/clients"
+	"github.com/rapidaai/pkg/authentication"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
-	"github.com/rapidaai/pkg/types"
-	"google.golang.org/grpc/metadata"
 )
 
 func TestWithRapidaClient(t *testing.T) {
@@ -29,41 +27,29 @@ func TestWithRapidaClient(t *testing.T) {
 	}
 }
 
-func TestServiceAuthenticationMintsDelegatedServiceActor(t *testing.T) {
+func TestServiceAuthenticationCreatesTenantBoundServicePrincipal(t *testing.T) {
 	m, _, _ := newTestManager(t)
-	auth := m.serviceAuthentication(7, 11)
-	if auth.Type() != types.AuthTypeService {
-		t.Fatalf("Type() = %q, want %q", auth.Type(), types.AuthTypeService)
+	auth := m.serviceAuthentication(context.Background(), 7, 11)
+	if auth.Subject() != (authentication.Identity{Type: authentication.IdentityService, ID: 1, Issuer: "internal"}) {
+		t.Fatalf("Subject() = %+v", auth.Subject())
 	}
-	actor := auth.Actor()
-	if actor != (types.ActorIdentity{Type: types.ActorTypeService, ID: 9007}) {
-		t.Fatalf("Actor() = %+v", actor)
+	if _, delegated := auth.Actor(); delegated {
+		t.Fatal("Actor() reports delegation for a direct service principal")
 	}
+	if auth.Tenant() != (authentication.Tenant{OrganizationID: 7, ProjectID: 11}) {
+		t.Fatalf("Tenant() = %+v", auth.Tenant())
+	}
+	if auth.Proof().Reference.Value == "" {
+		t.Fatalf("Proof() = %+v", auth.Proof())
+	}
+}
 
-	internalClient := clients.NewInternalClient(&m.assistantConfig.AppConfig, nil, nil)
-	outgoingContext, err := internalClient.WithAuth(context.Background(), auth)
-	if err != nil {
-		t.Fatalf("WithAuth() error = %v", err)
-	}
-	outgoingMetadata, ok := metadata.FromOutgoingContext(outgoingContext)
-	if !ok || len(outgoingMetadata.Get(types.SERVICE_SCOPE_KEY)) != 1 {
-		t.Fatalf("service scope metadata = %v", outgoingMetadata)
-	}
-	scope, err := types.ExtractServiceScope(outgoingMetadata.Get(types.SERVICE_SCOPE_KEY)[0], m.assistantConfig.Secret)
-	if err != nil {
-		t.Fatalf("ExtractServiceScope() error = %v", err)
-	}
-	forwardedAuth, err := scope.Authentication()
-	if err != nil {
-		t.Fatalf("Authentication() error = %v", err)
-	}
-	forwardedActor := forwardedAuth.Actor()
-	if forwardedActor != actor {
-		t.Fatalf("Actor() = %+v; want %+v", forwardedActor, actor)
-	}
-	projectContext, err := forwardedAuth.ProjectContext()
-	if err != nil || projectContext.OrganizationID != 7 || projectContext.ProjectID != 11 {
-		t.Fatalf("ProjectContext() = %+v, %v", projectContext, err)
+func TestServiceAuthenticationRejectsMissingLocalVerifier(t *testing.T) {
+	m, _, _ := newTestManager(t)
+	m.servicePrincipalResolver = nil
+
+	if auth := m.serviceAuthentication(context.Background(), 7, 11); auth.Subject().ID != 0 {
+		t.Fatalf("serviceAuthentication() = %+v", auth)
 	}
 }
 
@@ -151,7 +137,7 @@ func TestRegistrationRenewalFailedWritesDurableMetadata(t *testing.T) {
 		Scan(&insertedAudit).Error; err != nil {
 		t.Fatalf("failed loading created actor: %v", err)
 	}
-	if insertedAudit.CreatedActorType != types.ActorTypeService.String() || insertedAudit.CreatedActorID != 9007 {
+	if insertedAudit.CreatedActorType != string(authentication.IdentityService) || insertedAudit.CreatedActorID != 9007 {
 		t.Fatalf("created actor = %q/%d", insertedAudit.CreatedActorType, insertedAudit.CreatedActorID)
 	}
 	var updatedAudit struct {
@@ -166,10 +152,10 @@ func TestRegistrationRenewalFailedWritesDurableMetadata(t *testing.T) {
 		Scan(&updatedAudit).Error; err != nil {
 		t.Fatalf("failed loading updated actor: %v", err)
 	}
-	if updatedAudit.CreatedActorType != types.ActorTypeUser.String() || updatedAudit.CreatedActorID != 1 {
+	if updatedAudit.CreatedActorType != string(authentication.IdentityUser) || updatedAudit.CreatedActorID != 1 {
 		t.Fatalf("created actor changed to %q/%d", updatedAudit.CreatedActorType, updatedAudit.CreatedActorID)
 	}
-	if updatedAudit.UpdatedActorType != types.ActorTypeService.String() || updatedAudit.UpdatedActorID != 9007 {
+	if updatedAudit.UpdatedActorType != string(authentication.IdentityService) || updatedAudit.UpdatedActorID != 9007 {
 		t.Fatalf("updated actor = %q/%d", updatedAudit.UpdatedActorType, updatedAudit.UpdatedActorID)
 	}
 }

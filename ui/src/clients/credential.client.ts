@@ -5,11 +5,16 @@ import {
   CreateProviderCredentialRequest,
   CreateProviderKey,
   DeleteProviderKey,
+  Criteria,
+  GetAllProjectCredentialRequest,
   GetAllProjectCredentialResponse,
   GetAllOrganizationCredential,
   GetAllOrganizationCredentialResponse,
-  GetAllProjectCredential,
   GetCredentialResponse,
+  ListProjectCredentials as ListProjectCredentialsApi,
+  Paginate,
+  RevokeProjectCredential,
+  RevokeProjectCredentialResponse,
   ServiceError,
 } from '@rapidaai/react';
 import { Struct } from 'google-protobuf/google/protobuf/struct_pb';
@@ -26,6 +31,9 @@ type CredentialClientCallback<TResponse> = (
   error: ServiceError | null,
   response: TResponse | null,
 ) => void;
+
+type ProjectCredentialAuth = Pick<ApiAuth, 'token' | 'userId'> &
+  Required<Pick<ApiAuth, 'organizationId'>>;
 
 export type ListOrganizationCredentialsParams = {
   page: number;
@@ -51,31 +59,46 @@ export type DeleteProviderCredentialParams = {
 export type CreateProjectPublishableCredentialParams = {
   projectId: string;
   name: string;
-  auth: Pick<ApiAuth, 'token' | 'userId'>;
+  roleDefinitionId: string;
+  auth: ProjectCredentialAuth;
   callback: CredentialClientCallback<CreateProjectCredentialResponse>;
 };
 
 export type ListProjectCredentialsParams = {
   projectId: string;
-  auth: Pick<ApiAuth, 'token' | 'userId'>;
+  page: number;
+  pageSize: number;
+  criteria: CredentialCriteria[];
+  auth: ProjectCredentialAuth;
   callback: CredentialClientCallback<GetAllProjectCredentialResponse>;
 };
 
+export type RevokeProjectCredentialParams = {
+  projectId: string;
+  credentialId: string;
+  auth: ProjectCredentialAuth;
+  callback: CredentialClientCallback<RevokeProjectCredentialResponse>;
+};
+
 const createCredentialHeaders = ({
+  organizationId,
   token,
   userId,
-}: Pick<ApiAuth, 'token' | 'userId'>) => ({
+}: ProjectCredentialAuth) => ({
   authorization: token,
   'x-auth-id': userId,
+  'x-organization-id': organizationId,
 });
 
 const createCredentialDebuggerMetadata = ({
+  organizationId,
   projectId,
   token,
   userId,
 }: ApiAuth) =>
   ConnectionConfig.WithDebugger({
     authorization: token,
+    organizationId,
     userId,
     projectId,
   });
@@ -85,8 +108,13 @@ export const deleteProviderKey = withConnection(DeleteProviderKey);
 export const getAllOrganizationCredential = withConnection(
   GetAllOrganizationCredential,
 );
-export const getAllProjectCredential = withConnection(GetAllProjectCredential);
+export const getProjectCredentialsPage = withConnection(
+  ListProjectCredentialsApi,
+);
 export const createProjectCredential = withConnection(CreateProjectCredential);
+export const revokeProjectCredentialApi = withConnection(
+  RevokeProjectCredential,
+);
 
 export const listOrganizationCredentials = ({
   page,
@@ -132,19 +160,53 @@ export const deleteProviderCredential = ({
 export const createProjectPublishableCredential = ({
   projectId,
   name,
+  roleDefinitionId,
   auth,
   callback,
 }: CreateProjectPublishableCredentialParams) =>
   createProjectCredential(
     projectId,
     name,
+    roleDefinitionId,
     callback,
     createCredentialHeaders(auth),
   );
 
 export const listProjectCredentials = ({
   projectId,
+  page,
+  pageSize,
+  criteria,
   auth,
   callback,
-}: ListProjectCredentialsParams) =>
-  getAllProjectCredential(projectId, callback, createCredentialHeaders(auth));
+}: ListProjectCredentialsParams) => {
+  const request = new GetAllProjectCredentialRequest();
+  const paginate = new Paginate();
+  request.setProjectid(projectId);
+  paginate.setPage(page);
+  paginate.setPagesize(pageSize);
+  request.setPaginate(paginate);
+  criteria.forEach(({ key, value, logic }) => {
+    const filter = new Criteria();
+    filter.setKey(key);
+    filter.setValue(value);
+    filter.setLogic(logic);
+    request.addCriterias(filter);
+  });
+  return getProjectCredentialsPage(
+    request,
+    callback,
+    createCredentialHeaders(auth),
+  );
+};
+
+export const revokeProjectCredential = ({
+  projectId,
+  credentialId,
+  auth,
+  callback,
+}: RevokeProjectCredentialParams) =>
+  revokeProjectCredentialApi(projectId, credentialId, callback, {
+    ...createCredentialHeaders(auth),
+    'x-project-id': projectId,
+  });

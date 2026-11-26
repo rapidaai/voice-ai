@@ -7,7 +7,12 @@ const {
   test,
 } = require('../../fixtures');
 const { fulfillGrpcWeb } = require('../../mocks/grpc-web');
-const { GetAllUserResponse, Paginated, User } = require('@rapidaai/react');
+const {
+  AssignedRole,
+  GetAllUserResponse,
+  Paginated,
+  User,
+} = require('@rapidaai/react');
 
 const USER_LIST_PATH = '**/web_api.AuthenticationService/GetAllUser';
 const usersPath = '/organization/users';
@@ -26,7 +31,11 @@ function buildUserListResponse(itemCount = 1) {
     user.setId(String(101 + index));
     user.setName(index === 0 ? 'Ada Lovelace' : `User ${index + 1}`);
     user.setEmail(`user-${index + 1}@example.test`);
-    user.setRole('member');
+    const assignedRole = new AssignedRole();
+    assignedRole.setRoledefinitionid('103');
+    assignedRole.setKey('organization_member');
+    assignedRole.setName('Organization Member');
+    user.setOrganizationrolesList([assignedRole]);
     user.setStatus('ACTIVE');
     user.setCreateddate(timestamp('2026-10-17T08:28:00Z'));
     return user;
@@ -82,6 +91,46 @@ test('organization users keep table controls sticky through long results', async
     .toBeLessThanOrEqual(1);
 });
 
+test('organization users show assigned roles and multi-role management', async ({
+  page,
+}) => {
+  await authenticatePage(page);
+  await page.route(USER_LIST_PATH, route =>
+    fulfillGrpcWeb(route, buildUserListResponse()),
+  );
+
+  await page.goto(usersPath);
+
+  await expect(
+    page.getByText('Organization Member', { exact: true }),
+  ).toBeVisible();
+  await page.locator('.cds--table-column-radio label').click();
+  const batchActions = page.locator('.cds--batch-actions');
+  await expect(
+    batchActions.getByRole('button', { name: 'Manage roles' }),
+  ).toBeVisible();
+  await expect(
+    batchActions.getByRole('button', { name: 'Make admin' }),
+  ).toHaveCount(0);
+});
+
+test('organization users do not send project context when no project is selected', async ({
+  page,
+}) => {
+  await authenticatePage(page, { project: false });
+  let requestHeaders;
+  await page.route(USER_LIST_PATH, async route => {
+    requestHeaders = await route.request().allHeaders();
+    return fulfillGrpcWeb(route, buildUserListResponse());
+  });
+
+  await page.goto(usersPath);
+
+  await expect(page.getByText('Ada Lovelace', { exact: true })).toBeVisible();
+  expect(requestHeaders['x-organization-id']).toBe('202');
+  expect(requestHeaders).not.toHaveProperty('x-project-id');
+});
+
 for (const colorMode of ['light', 'dark']) {
   test(`organization users loading in ${colorMode} mode`, async ({ page }) => {
     await page.setViewportSize(viewport);
@@ -117,7 +166,9 @@ for (const colorMode of ['light', 'dark']) {
     await page.goto(usersPath);
 
     await expect(page.getByText('Ada Lovelace', { exact: true })).toBeVisible();
-    await expect(page.getByPlaceholder('Search users...')).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Search for name, email, role, status'),
+    ).toBeVisible();
     const pagination = page.locator('.cds--pagination');
     await expect(pagination).toHaveClass(/sticky/);
     await expect(pagination).toHaveClass(/bottom-0/);
@@ -140,7 +191,7 @@ for (const colorMode of ['light', 'dark']) {
       batchActions.getByRole('button', { name: 'Invite to project' }),
     ).toBeVisible();
     await expect(
-      batchActions.getByRole('button', { name: 'Make admin' }),
+      batchActions.getByRole('button', { name: 'Manage roles' }),
     ).toBeVisible();
     await expect(
       batchActions.getByRole('button', { name: 'Delete' }),

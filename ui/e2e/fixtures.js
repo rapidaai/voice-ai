@@ -34,6 +34,12 @@ const {
   installWorkspaceClientMock,
   mockWorkspaceCreation,
 } = require('./mocks/clients/workspace');
+const {
+  ACCESS_MANAGEMENT_PATHS,
+  installAccessManagementClientMock,
+  mockRoleListFailureAfterInitialLoad,
+  mockRoleNotFound,
+} = require('./mocks/clients/access-management');
 
 const COLOR_MODES = ['light', 'dark'];
 const SCREENSHOT_VIEWPORTS = [
@@ -44,42 +50,85 @@ const SCREENSHOT_VIEWPORTS = [
 ];
 
 function createAuthState({ organization = true, project = true } = {}) {
+  const hasProject = organization && project;
+  const organizationRole = {
+    id: '102',
+    key: 'organization_admin',
+    name: 'Organization Admin',
+    scope: 'organization',
+    permissionsList: [
+      'organization.members.read',
+      'organization.members.invite',
+      'organization.members.remove',
+      'organization.access.manage',
+      'organization.roles.read',
+      'organization.project_access_tokens.revoke',
+    ].map((key, index) => ({
+      id: String(1000 + index),
+      key,
+      scope: 'organization',
+    })),
+  };
+  const projectRole = {
+    id: '110',
+    key: 'project_admin',
+    name: 'Project Admin',
+    scope: 'project',
+    permissionsList: ['project.read', 'project.access_tokens.revoke'].map(
+      (key, index) => ({
+        id: String(2000 + index),
+        key,
+        scope: 'project',
+      }),
+    ),
+  };
+
   return {
     state: {
-      currentUser: {
-        id: '101',
-        name: 'E2E User',
-        email: 'e2e@example.test',
+      authentication: {
+        principal: {
+          subject: { type: 'user', id: '101' },
+          selectedtenant: {
+            organizationid: organization ? '202' : '0',
+            projectid: hasProject ? '302' : '0',
+          },
+          proof: {
+            method: 'user_session',
+            reference: { type: 'token', value: '1' },
+          },
+        },
+        user: {
+          id: '101',
+          name: 'E2E User',
+          email: 'e2e@example.test',
+          status: 'active',
+        },
+        organizationsList: organization
+          ? [
+              {
+                id: '202',
+                name: 'E2E Organization',
+                rolesList: [organizationRole],
+                projectsList: hasProject
+                  ? [
+                      {
+                        id: '302',
+                        name: 'E2E Project',
+                        rolesList: [projectRole],
+                      },
+                    ]
+                  : [],
+              },
+            ]
+          : [],
       },
       token: {
         token: 'token-e2e',
       },
-      organizationRole: organization
-        ? {
-            id: '201',
-            organizationid: '202',
-            role: 'admin',
-          }
-        : {},
-      projectRoles: project
-        ? [
-            {
-              id: '301',
-              projectid: '302',
-              role: 'admin',
-            },
-          ]
-        : [],
-      currentProjectRole: project
-        ? {
-            id: '301',
-            projectid: '302',
-            role: 'admin',
-          }
-        : {},
-      featurePermissions: [],
+      selectedOrganizationID: organization ? '202' : '',
+      selectedProjectID: hasProject ? '302' : '',
     },
-    version: 1,
+    version: 3,
   };
 }
 
@@ -96,18 +145,43 @@ async function installBrowserFixtures(page) {
   await installActivityClientMock(page);
   await installCredentialClientMock(page);
   await installWorkspaceClientMock(page);
+  await installAccessManagementClientMock(page);
   await installGrpcWebPreflightMock(page);
 }
 
-async function authenticatePage(page, options) {
-  await page.addInitScript(state => {
-    window.localStorage.setItem('rpd::__user', JSON.stringify(state));
-    window.localStorage.setItem('rapida-sidebar-open', 'true');
-  }, createAuthState(options));
+async function authenticatePage(page, options = {}) {
+  const { showInterfaceTour = false, ...authOptions } = options;
+  await page.addInitScript(
+    ({ state, showInterfaceTour }) => {
+      window.localStorage.setItem('rpd::__user', JSON.stringify(state));
+      window.localStorage.setItem(
+        'rpd::__ui_sidenav',
+        JSON.stringify({ main: true, assistant: true, endpoint: true }),
+      );
+      const userId = state.state.authentication.user?.id;
+      if (!userId) return;
+      const tourToShow =
+        showInterfaceTour === true ? 'dashboard' : showInterfaceTour;
+      const completedTours = {
+        dashboard: 'completed',
+        assistant: 'completed',
+        createAssistant: 'completed',
+      };
+      if (tourToShow) delete completedTours[tourToShow];
+      window.localStorage.setItem(
+        'rpd::__ui_tour',
+        JSON.stringify(completedTours),
+      );
+    },
+    {
+      state: createAuthState(authOptions),
+      showInterfaceTour,
+    },
+  );
 }
 
-async function gotoJourney(page, journey) {
-  if (journey.auth) await authenticatePage(page);
+async function gotoJourney(page, journey, options) {
+  if (journey.auth) await authenticatePage(page, options);
 
   const viewport = page.viewportSize();
   if (viewport) {
@@ -135,15 +209,13 @@ async function gotoJourney(page, journey) {
     await expect(page.locator('body')).toContainText(journey.readyText);
   }
   if (!journey.allowNotFound) {
-    await expect(page.locator('body')).not.toContainText(
-      "Sorry we couldn't find this page.",
-    );
+    await expect(page.locator('body')).not.toContainText('Page not found');
   }
 }
 
 async function setColorMode(page, colorMode) {
   await page.addInitScript(mode => {
-    window.localStorage.setItem('ui-theme-mode', mode);
+    window.localStorage.setItem('rpd::__ui_theme', mode);
   }, colorMode);
 }
 
@@ -223,6 +295,7 @@ module.exports = {
   expect,
   COLOR_MODES,
   SCREENSHOT_VIEWPORTS,
+  ACCESS_MANAGEMENT_PATHS,
   ASSISTANT_LIST_PATH,
   ASSISTANT_DETAIL_PATH,
   ACTIVITY_LIST_PATHS,
@@ -238,6 +311,8 @@ module.exports = {
   expandDashboardForScreenshot,
   gotoJourney,
   mockAuthenticationOperation,
+  mockRoleListFailureAfterInitialLoad,
+  mockRoleNotFound,
   mockWorkspaceCreation,
   setColorMode,
   screenshotBaselinePath,

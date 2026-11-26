@@ -4,15 +4,9 @@ import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 import { ErrorContainer } from '../error-container';
-import { typographyClassNames } from '@/app/components/ui/primitives/text';
 
-jest.mock('@/app/components/ui/primitives/button', () => ({
-  PrimaryButton: ({ children, renderIcon: Icon, ...props }: any) => (
-    <button {...props}>
-      {children}
-      {Icon ? <Icon /> : null}
-    </button>
-  ),
+jest.mock('@/theme/theme-provider', () => ({
+  useTheme: () => ({ resolvedMode: 'dark' }),
 }));
 
 jest.mock('@carbon/icons-react', () => ({
@@ -20,7 +14,7 @@ jest.mock('@carbon/icons-react', () => ({
 }));
 
 describe('ErrorContainer', () => {
-  it('renders the page error content', () => {
+  it('renders a Carbon not-found state for internal 404 errors', () => {
     render(
       <ErrorContainer
         code="404"
@@ -31,9 +25,16 @@ describe('ErrorContainer', () => {
       />,
     );
 
-    expect(screen.getByText('404')).toBeInTheDocument();
-    expect(screen.getByText('Page not found')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Page not found' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('The page does not exist.')).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('heading', { name: 'Page not found' })
+        .closest('.c4p--empty-state-type--notFound'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('404')).not.toBeInTheDocument();
     expect(screen.getByTestId('action-icon')).toBeInTheDocument();
   });
 
@@ -56,7 +57,7 @@ describe('ErrorContainer', () => {
     expect(onAction).toHaveBeenCalledTimes(1);
   });
 
-  it('centers the page state and uses shared Carbon typography', () => {
+  it('renders a Carbon unauthorized state for internal 403 errors', () => {
     render(
       <ErrorContainer
         code="403"
@@ -68,22 +69,15 @@ describe('ErrorContainer', () => {
     );
 
     const container = screen.getByLabelText('Assistant not available');
-    const code = screen.getByText('403');
     const title = screen.getByRole('heading', {
       name: 'Assistant not available',
     });
-    const description = screen.getByText(
-      'This assistant may be archived or unavailable.',
-    );
 
     expect(container).toHaveClass('w-full', 'flex-1', 'items-center');
-    expect(code).toHaveClass(...typographyClassNames['heading-06'].split(' '));
-    expect(title).toHaveClass(...typographyClassNames['heading-04'].split(' '));
-    expect(description).toHaveClass(
-      ...typographyClassNames['body-01'].split(' '),
-    );
+    expect(title.closest('.c4p--empty-state-type--unauthorized')).toBeVisible();
+    expect(screen.queryByText('403')).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Go to listing' }).parentElement,
-    ).toHaveClass('mt-8');
+      screen.getByText('This assistant may be archived or unavailable.'),
+    ).toHaveClass('c4p--empty-state__subtitle');
   });
 });

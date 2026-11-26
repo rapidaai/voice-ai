@@ -124,6 +124,18 @@ jest.mock('@/app/components/dialogs/provider', () => ({
     ) : null,
 }));
 
+jest.mock(
+  '@/app/components/domain/project-credentials/create-project-token',
+  () => ({
+    CreateProjectToken: ({ open, onCreated }: any) =>
+      open ? (
+        <button type="button" onClick={onCreated}>
+          Create selected-role credential
+        </button>
+      ) : null,
+  }),
+);
+
 jest.mock('@/hooks/use-global-navigator', () => ({
   useGlobalNavigation: () => ({ goTo: mockGoTo }),
 }));
@@ -137,6 +149,7 @@ jest.mock('@/hooks/use-model', () => ({
 jest.mock('@/hooks/use-credential', () => ({
   useCurrentCredential: () => ({
     authId: 'user-1',
+    organizationId: 'organization-1',
     token: 'token-1',
     projectId: 'project-1',
   }),
@@ -160,10 +173,58 @@ jest.mock('react-hot-toast/headless', () => ({
 }));
 
 jest.mock('@rapidaai/react', () => ({
+  Criteria: class {
+    logic = '';
+    key = '';
+    value = '';
+
+    setKey(key: string) {
+      this.key = key;
+    }
+
+    setValue(value: string) {
+      this.value = value;
+    }
+
+    setLogic(logic: string) {
+      this.logic = logic;
+    }
+  },
   CreateProjectCredential: (...args: any[]) =>
     mockCreateProjectCredential(...args),
-  GetAllProjectCredential: (...args: any[]) =>
+  GetAllProjectCredentialRequest: class {
+    criterias: unknown[] = [];
+    page = 0;
+    pageSize = 0;
+    projectId = '';
+
+    setProjectid(projectId: string) {
+      this.projectId = projectId;
+    }
+
+    setPaginate(paginate: { page: number; pageSize: number }) {
+      this.page = paginate.page;
+      this.pageSize = paginate.pageSize;
+    }
+
+    addCriterias(criteria: unknown) {
+      this.criterias.push(criteria);
+    }
+  },
+  ListProjectCredentials: (...args: any[]) =>
     mockGetAllProjectCredential(...args),
+  Paginate: class {
+    page = 0;
+    pageSize = 0;
+
+    setPage(page: number) {
+      this.page = page;
+    }
+
+    setPagesize(pageSize: number) {
+      this.pageSize = pageSize;
+    }
+  },
 }));
 
 jest.mock('@/llm-tools', () => ({
@@ -217,10 +278,17 @@ const makeTool = (executionMethod = 'mcp') =>
     getName: () => 'Customer lookup',
   }) as any;
 
-const makeProjectCredential = () =>
+const makeProjectCredential = (
+  id = 'credential-1',
+  name = 'Web widget',
+  key = 'pk_test_123',
+) =>
   ({
     getCreateddate: () => null,
-    getKey: () => 'pk_test_123',
+    getId: () => id,
+    getKey: () => key,
+    getName: () => name,
+    getRolename: () => 'Runtime',
   }) as any;
 
 describe('domain cards', () => {
@@ -235,14 +303,13 @@ describe('domain cards', () => {
         writeText: jest.fn(),
       },
     });
-    mockGetAllProjectCredential.mockImplementation(
-      (_config, _projectId, cb) => {
-        cb(null, {
-          getDataList: () => [makeProjectCredential()],
-          getSuccess: () => true,
-        });
-      },
-    );
+    mockGetAllProjectCredential.mockImplementation((_config, _options, cb) => {
+      cb(null, {
+        getDataList: () => [makeProjectCredential()],
+        getPaginated: () => ({ getTotalitem: () => 1 }),
+        getSuccess: () => true,
+      });
+    });
   });
 
   afterAll(() => {
@@ -381,39 +448,81 @@ describe('domain cards', () => {
     expect(writeText).toHaveBeenCalledWith('pk_test_123');
   });
 
-  it('creates a credential from the empty credential state', async () => {
-    const user = userEvent.setup({ writeToClipboard: false });
-    mockGetAllProjectCredential.mockImplementation(
-      (_config, _projectId, cb) => {
-        cb(null, {
-          getDataList: () => [],
-          getSuccess: () => true,
-        });
-      },
-    );
-    mockCreateProjectCredential.mockImplementation(
-      (_config, _projectId, _name, cb) => {
-        cb(null, { getSuccess: () => true });
-      },
-    );
+  it('loads every explicit project API key page', async () => {
+    mockGetAllProjectCredential.mockImplementation((_config, options, cb) => {
+      const item =
+        options.page === 1
+          ? makeProjectCredential()
+          : makeProjectCredential(
+              'credential-2',
+              'Phone application',
+              'pk_test_456',
+            );
+      cb(null, {
+        getDataList: () => [item],
+        getPaginated: () => ({ getTotalitem: () => 2 }),
+        getSuccess: () => true,
+      });
+    });
 
     render(<RapidaCredentialCard />);
 
-    await waitFor(() => {
-      expect(screen.getByText('No credentials')).toBeInTheDocument();
-    });
-
-    await user.click(
-      screen.getByRole('button', { name: 'Create new credential' }),
+    expect(await screen.findByText('Phone application')).toBeInTheDocument();
+    expect(mockGetAllProjectCredential).toHaveBeenCalledTimes(2);
+    expect(mockGetAllProjectCredential.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ page: 1, pageSize: 100 }),
     );
-
-    expect(mockCreateProjectCredential).toHaveBeenCalled();
+    expect(mockGetAllProjectCredential.mock.calls[1][1]).toEqual(
+      expect.objectContaining({ page: 2, pageSize: 100 }),
+    );
   });
 
-  it('shows SDK credential errors from create and list requests', async () => {
+  it('stops when a paginated API key response ends before its reported total', async () => {
+    mockGetAllProjectCredential.mockImplementation((_config, options, cb) => {
+      cb(null, {
+        getDataList: () =>
+          options.page === 1 ? [makeProjectCredential()] : [],
+        getPaginated: () => ({ getTotalitem: () => 3 }),
+        getSuccess: () => true,
+      });
+    });
+
+    render(<RapidaCredentialCard />);
+
+    expect(
+      await screen.findByText('Project API keys could not be loaded.'),
+    ).toBeInTheDocument();
+    expect(mockGetAllProjectCredential).toHaveBeenCalledTimes(2);
+    expect(mockHideLoader).toHaveBeenCalled();
+  });
+
+  it('opens the shared role selector from the empty credential state', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
+    mockGetAllProjectCredential.mockImplementation((_config, _options, cb) => {
+      cb(null, {
+        getDataList: () => [],
+        getPaginated: () => ({ getTotalitem: () => 0 }),
+        getSuccess: () => true,
+      });
+    });
+    render(<RapidaCredentialCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('No project API keys')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Create API key' }));
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Create selected-role credential',
+      }),
+    );
+    expect(mockGetAllProjectCredential).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows SDK credential errors from list requests', async () => {
     mockGetAllProjectCredential.mockImplementationOnce(
-      (_config, _projectId, cb) => {
+      (_config, _options, cb) => {
         cb(null, {
           getError: () => ({ getHumanmessage: () => 'Unable to list keys.' }),
           getSuccess: () => false,
@@ -421,46 +530,16 @@ describe('domain cards', () => {
       },
     );
 
-    const { unmount } = render(<RapidaCredentialCard />);
+    render(<RapidaCredentialCard />);
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('Unable to list keys.');
     });
-    unmount();
-
-    mockGetAllProjectCredential.mockImplementation(
-      (_config, _projectId, cb) => {
-        cb(null, {
-          getDataList: () => [],
-          getSuccess: () => true,
-        });
-      },
-    );
-    mockCreateProjectCredential.mockImplementation(
-      (_config, _projectId, _name, cb) => {
-        cb(null, {
-          getError: () => ({ getHumanmessage: () => 'Unable to create key.' }),
-          getSuccess: () => false,
-        });
-      },
-    );
-
-    render(<RapidaCredentialCard />);
-
-    await waitFor(() => {
-      expect(screen.getByText('No credentials')).toBeInTheDocument();
-    });
-    await user.click(
-      screen.getByRole('button', { name: 'Create new credential' }),
-    );
-
-    expect(mockToastError).toHaveBeenCalledWith('Unable to create key.');
   });
 
-  it('uses fallback SDK credential errors when responses omit details', async () => {
-    const user = userEvent.setup({ writeToClipboard: false });
+  it('uses fallback SDK credential errors when list responses omit details', async () => {
     mockGetAllProjectCredential.mockImplementationOnce(
-      (_config, _projectId, cb) => {
+      (_config, _options, cb) => {
         cb(null, {
           getError: () => null,
           getSuccess: () => false,
@@ -468,44 +547,12 @@ describe('domain cards', () => {
       },
     );
 
-    const { unmount } = render(<RapidaCredentialCard />);
+    render(<RapidaCredentialCard />);
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith(
-        'Unable to process your request. please try again later.',
+        'Project API keys could not be loaded.',
       );
     });
-    unmount();
-
-    mockToastError.mockClear();
-    mockGetAllProjectCredential.mockImplementation(
-      (_config, _projectId, cb) => {
-        cb(null, {
-          getDataList: () => [],
-          getSuccess: () => true,
-        });
-      },
-    );
-    mockCreateProjectCredential.mockImplementation(
-      (_config, _projectId, _name, cb) => {
-        cb(null, {
-          getError: () => null,
-          getSuccess: () => false,
-        });
-      },
-    );
-
-    render(<RapidaCredentialCard />);
-
-    await waitFor(() => {
-      expect(screen.getByText('No credentials')).toBeInTheDocument();
-    });
-    await user.click(
-      screen.getByRole('button', { name: 'Create new credential' }),
-    );
-
-    expect(mockToastError).toHaveBeenCalledWith(
-      'Unable to process your request. please try again later.',
-    );
   });
 });

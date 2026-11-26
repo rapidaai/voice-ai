@@ -38,7 +38,8 @@ import {
 } from '@carbon/react';
 import { Pagination } from '@/app/components/ui/primitives';
 import { IconOnlyButton } from '@/app/components/ui/primitives';
-import { EmptyState, ErrorContainer } from '@/app/components/ui/feedback';
+import { EmptyState } from '@/app/components/ui/feedback';
+import { ErrorContainer } from '@/app/components/ui/feedback/error-container';
 import {
   Renew,
   Download,

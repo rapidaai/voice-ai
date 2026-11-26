@@ -16,7 +16,7 @@ export function Project({ isLoading }: { isLoading?: boolean }) {
         loading={isLoading}
       >
         <SidebarIconWrapper>
-          <Catalog size={20} />
+          <Catalog size={16} />
         </SidebarIconWrapper>
         <SidebarLabel isLoading={isLoading}>Projects</SidebarLabel>
       </SidebarSimpleListItem>

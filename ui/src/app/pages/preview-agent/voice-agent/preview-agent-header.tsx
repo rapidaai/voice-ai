@@ -12,6 +12,6 @@ export const PreviewAgentHeader: FC = () => (
         textClassName="text-base"
       />
     </div>
-    <CustomerOptions showProjectSelector={false} />
+    <CustomerOptions showContextSwitcher={false} />
   </CompactPageHeader>
 );

@@ -8,13 +8,13 @@ import {
 } from '.';
 
 const authContextValue = {
-  currentUser: { id: 'user-1' },
+  authentication: { user: { id: 'user-1' } },
   token: { token: 'storybook-token' },
-  currentProjectRole: { projectid: 'project-1' },
-  organizationRole: { organizationid: 'org-1' },
-  projectRoles: [
-    { projectid: 'project-1', projectname: 'Support operations' },
-    { projectid: 'project-2', projectname: 'Sales enablement' },
+  getCurrentProject: () => ({ id: 'project-1' }),
+  getCurrentOrganization: () => ({ id: 'org-1' }),
+  getProjects: () => [
+    { id: 'project-1', name: 'Support operations' },
+    { id: 'project-2', name: 'Sales enablement' },
   ],
   authorize: (onSuccess: () => void) => onSuccess(),
 };

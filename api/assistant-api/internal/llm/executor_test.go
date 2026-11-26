@@ -8,12 +8,12 @@ import (
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/entity/knowledges"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	endpoint_client "github.com/rapidaai/pkg/clients/endpoint"
 	integration_client "github.com/rapidaai/pkg/clients/integration"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/stretchr/testify/require"
@@ -39,8 +39,8 @@ func (communication *factoryTestCommunication) DeploymentCaller() endpoint_clien
 	return nil
 }
 
-func (communication *factoryTestCommunication) Auth() *types.Authentication {
-	return &types.Authentication{}
+func (communication *factoryTestCommunication) Auth() authentication.Principal {
+	return authentication.Principal{}
 }
 
 func (communication *factoryTestCommunication) GetSource() utils.RapidaSource {

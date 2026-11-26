@@ -66,3 +66,24 @@ not rewrite the decision. Create and approve a new RFC for a material change, se
 | [0004](0004-consolidate-authentication-middleware.md) | Separate Authentication Middleware by Credential Class | Accepted |
 | [0005](0005-refine-authentication-middleware-contracts.md) | Refine Authentication Middleware Contracts | Accepted |
 | [0006](0006-remove-audit-backfill-id-validation.md) | Simplify Audit Actor Migrations | Accepted |
+| [0022](0022-role-permission-persistence-migration.md) | Role Catalog Persistence | Accepted |
+| [0026](0026-access-policy-v1.md) | Access Policy Version 1 | Superseded |
+| [0027](0027-recovery-approver-separation.md) | Recovery Approver Separation | Superseded |
+| [0028](0028-token-strict-subset-reduction.md) | Token Reduction and Recovery Separation | Superseded |
+| [0029](0029-access-management-role-api.md) | Access Management Role API | Superseded |
+| [0030](0030-access-management-response-envelope.md) | Access Management Response Envelope | Superseded |
+| [0031](0031-remove-role-reduction-evidence.md) | Remove Role Reduction Evidence | Superseded |
+| [0032](0032-remove-token-permission-eligibility.md) | Remove Token Permission Eligibility | Superseded |
+| [0033](0033-remove-role-permission-subject-copy.md) | Remove Role-Permission Subject Copy | Superseded |
+| [0034](0034-paginate-permission-catalog.md) | Paginate Permission Catalog | Superseded |
+| [0035](0035-react-sdk-access-management.md) | React SDK Access Management | Superseded |
+| [0036](0036-use-react-sdk-generator.md) | Use the React SDK Generator | Accepted |
+| [0037](0037-role-management-ui.md) | Role Management UI | Accepted |
+| [0041](0041-project-api-key-inventory.md) | Project API Key Inventory and Revocation | Accepted |
+| [0046](0046-access-management-controller-errors.md) | Access Management Controller Validation and Errors | Accepted |
+| [0047](0047-user-role-assignment-migration.md) | User Role Assignment Migration | Accepted |
+| [0048](0048-remove-user-role-migration-tests.md) | Remove User Role Migration Tests | Accepted |
+| [0049](0049-user-invitation-role-assignments.md) | User Invitation Role Assignments | Accepted |
+| [0054](0054-unified-authentication-principal.md) | Unified Authentication Principal | Accepted |
+| [0074](0074-unified-authentication-aggregate.md) | Unified Authentication Aggregate | Accepted |
+| [0075](0075-billing-backed-authentication.md) | Billing-Backed Authentication | Accepted |

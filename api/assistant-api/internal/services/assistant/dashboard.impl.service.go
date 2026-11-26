@@ -8,12 +8,13 @@ package internal_assistant_service
 import (
 	"context"
 	"fmt"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"math"
 	"strings"
 	"time"
 
 	observability "github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/protos"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -29,7 +30,7 @@ type assistantDashboardSQLFilters struct {
 
 func (assistantService *assistantService) GetAssistantDashboard(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	fromDate *timestamppb.Timestamp,
 	toDate *timestamppb.Timestamp,
@@ -478,14 +479,14 @@ ORDER BY bucket_index ASC
 }
 
 func (assistantService *assistantService) buildAssistantDashboardSQLFilters(
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	fromDate *timestamppb.Timestamp,
 	toDate *timestamppb.Timestamp,
 ) (*assistantDashboardSQLFilters, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	rangeEnd := time.Now()

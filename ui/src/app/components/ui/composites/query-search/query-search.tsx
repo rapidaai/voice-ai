@@ -42,12 +42,10 @@ import {
   type QueryFilterChip,
   type QuerySearchDateTimeMode,
   type QuerySearchField,
-  type QuerySearchFilter,
   type QuerySearchLabels,
   type QuerySearchLogicOption,
   type QuerySearchOption,
   type QuerySearchProps,
-  type QuerySearchTab,
 } from './query-search-model';
 
 export { parseQuerySearchFilters };
@@ -992,7 +990,7 @@ export const QuerySearch = ({
     >
       <div
         className={[
-          'flex h-12 min-w-0 items-center gap-2 border-0 bg-transparent px-3 text-sm text-foreground transition-colors hover:bg-field',
+          'flex h-12 min-w-0 items-center gap-2 border-0 border-b border-border-subtle bg-transparent px-3 text-sm text-foreground transition-colors hover:bg-field',
           isOpen
             ? 'bg-field outline outline-2 -outline-offset-2 outline-primary'
             : '',

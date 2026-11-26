@@ -3,14 +3,16 @@ package internal_notification_service
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/protos"
 )
 
@@ -58,11 +60,13 @@ func TestUpdateNotificationSettingAuditsCreateAndConflictUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 	service := NewNotificationService(logger, &notificationTestPostgres{db: database})
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: 11},
-		UserValue:         &types.UserContext{UserID: 11},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 22},
+	auth, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: 11},
+		authentication.Tenant{OrganizationID: 22},
+		authentication.Proof{Method: authentication.AuthenticationUserSession, Reference: authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: "notification-test"}}, nil,
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	setting := &protos.NotificationSetting{EventType: "call.completed", Channel: "email", Enabled: true}
@@ -93,5 +97,22 @@ func TestUpdateNotificationSettingAuditsCreateAndConflictUpdate(t *testing.T) {
 	}
 	if !updatedType.Valid || updatedType.String != "user" || !updatedID.Valid || updatedID.Int64 != 11 {
 		t.Fatalf("updated audit = %v/%v", updatedType, updatedID)
+	}
+
+	if _, err := service.UpdateNotificationSetting(context.Background(), auth, 12, []*protos.NotificationSetting{setting}); err == nil {
+		t.Fatal("UpdateNotificationSetting() cross-subject error = nil")
+	} else {
+		var denied pkg_errors.RouteAuthorizationDeniedError
+		if !errors.As(err, &denied) {
+			t.Fatalf("UpdateNotificationSetting() cross-subject error = %v", err)
+		}
+	}
+	if _, err := service.GetAllNotificationSetting(context.Background(), auth, 12); err == nil {
+		t.Fatal("GetAllNotificationSetting() cross-subject error = nil")
+	} else {
+		var denied pkg_errors.RouteAuthorizationDeniedError
+		if !errors.As(err, &denied) {
+			t.Fatalf("GetAllNotificationSetting() cross-subject error = %v", err)
+		}
 	}
 }

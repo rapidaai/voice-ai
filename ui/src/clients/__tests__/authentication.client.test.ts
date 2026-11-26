@@ -42,7 +42,6 @@ jest.mock('@rapidaai/react', () => {
     Google: jest.fn(),
     Linkedin: jest.fn(),
     RegisterUser: jest.fn(),
-    VerifyToken: jest.fn(),
   };
 });
 

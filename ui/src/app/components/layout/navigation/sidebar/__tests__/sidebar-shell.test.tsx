@@ -23,13 +23,18 @@ jest.mock('@/context/sidebar-context', () => ({
   }),
 }));
 
-jest.mock('@carbon/react', () => ({
-  Button: ({ children, kind, ...props }: any) => (
-    <button data-design-system-button-kind={kind} {...props}>
-      {children}
-    </button>
-  ),
-}));
+jest.mock('@carbon/react', () => {
+  const mockReact = jest.requireActual('react');
+  return {
+    Button: mockReact.forwardRef(
+      ({ children, kind, ...props }: any, ref: any) => (
+        <button ref={ref} data-design-system-button-kind={kind} {...props}>
+          {children}
+        </button>
+      ),
+    ),
+  };
+});
 
 jest.mock('@/theme/theme-provider', () => ({
   useTheme: () => {
@@ -83,6 +88,24 @@ jest.mock('@/app/components/layout/navigation/sidebar/team', () => ({
 }));
 jest.mock('@/app/components/layout/navigation/sidebar/project', () => ({
   Project: () => null,
+}));
+jest.mock('@/app/components/layout/navigation/sidebar/roles', () => ({
+  Roles: () => <li>Roles & Permissions</li>,
+}));
+
+jest.mock('@/app/components/ui/composites/coachmark', () => ({
+  Coachmark: ({ actionLabel, children, onAction, open, title }: any) =>
+    open ? (
+      <section aria-label={`${title} coachmark`}>
+        {children}
+        <h2>{title}</h2>
+        <button type="button" onClick={onAction}>
+          {actionLabel}
+        </button>
+      </section>
+    ) : (
+      children
+    ),
 }));
 
 describe('sidebar shell', () => {
@@ -162,5 +185,50 @@ describe('sidebar shell', () => {
 
     await user.click(toggle);
     expect(mockSetLocked).toHaveBeenCalledWith(false);
+  });
+
+  it('shows role management without a console permission projection', () => {
+    render(<SidebarNavigation />);
+    expect(screen.getByText('Roles & Permissions')).toBeInTheDocument();
+  });
+
+  it('anchors separate tour steps to the navigation menu and sidebar control', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    const next = jest.fn();
+    const view = render(
+      <SidebarNavigation
+        interfaceTour={{ step: 'navigation', next, dismiss: jest.fn() }}
+      />,
+    );
+
+    expect(view.container.firstChild).toHaveStyle({ overflow: 'visible' });
+    expect(
+      screen.getByRole('region', {
+        name: 'Explore the side navigation coachmark',
+      }),
+    ).toContainElement(
+      view.container.querySelector('[data-coachmark-target="navigation"]'),
+    );
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(next).toHaveBeenCalledTimes(1);
+
+    view.rerender(
+      <SidebarNavigation
+        interfaceTour={{ step: 'sidebar-toggle', next, dismiss: jest.fn() }}
+      />,
+    );
+
+    expect(
+      screen.getByRole('region', {
+        name: 'Collapse or expand the side navigation coachmark',
+      }),
+    ).toContainElement(
+      view.container.querySelector('[data-coachmark-target="sidebar-toggle"]'),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Expand sidebar' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(next).toHaveBeenCalledTimes(2);
   });
 });

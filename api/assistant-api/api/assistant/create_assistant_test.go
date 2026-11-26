@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +20,8 @@ func TestCreateAssistant_CreateAssistantErrorUsesStandardError(t *testing.T) {
 			},
 		},
 	}
-	ctx := context.WithValue(context.Background(), types.CTX_, createAssistantRestAuth())
+	ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), createAssistantRestAuth())
+	require.NoError(t, err)
 
 	response, err := assistantApi.CreateAssistant(ctx, &protos.CreateAssistantRequest{
 		Name: "Support Assistant",
@@ -51,7 +52,8 @@ func TestCreateAssistant_MissingNameValidation(t *testing.T) {
 			assistantService: assistantService,
 		},
 	}
-	ctx := context.WithValue(context.Background(), types.CTX_, createAssistantRestAuth())
+	ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), createAssistantRestAuth())
+	require.NoError(t, err)
 
 	response, err := assistantApi.CreateAssistant(ctx, &protos.CreateAssistantRequest{
 		AssistantProvider: &protos.CreateAssistantProviderRequest{
@@ -78,7 +80,8 @@ func TestCreateAssistant_MissingProviderValidation(t *testing.T) {
 			assistantService: assistantService,
 		},
 	}
-	ctx := context.WithValue(context.Background(), types.CTX_, createAssistantRestAuth())
+	ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), createAssistantRestAuth())
+	require.NoError(t, err)
 
 	response, err := assistantApi.CreateAssistant(ctx, &protos.CreateAssistantRequest{
 		Name: "Support Assistant",
@@ -99,7 +102,8 @@ func TestCreateAssistant_MissingModelProviderNameValidation(t *testing.T) {
 			assistantService: assistantService,
 		},
 	}
-	ctx := context.WithValue(context.Background(), types.CTX_, createAssistantRestAuth())
+	ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), createAssistantRestAuth())
+	require.NoError(t, err)
 
 	response, err := assistantApi.CreateAssistant(ctx, &protos.CreateAssistantRequest{
 		Name: "Support Assistant",

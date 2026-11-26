@@ -81,6 +81,11 @@ const journeySubjourneys = [
     'journeys/dashboard/responsive.spec.js',
   ),
   covered(
+    'dashboard.interfaceTour',
+    'dashboard.home',
+    'journeys/dashboard/responsive.spec.js',
+  ),
+  covered(
     'deployment.assistant.empty',
     'deployment.assistant',
     'journeys/deployment/assistant-state-screenshots.spec.js',
@@ -104,6 +109,16 @@ const journeySubjourneys = [
     'deployment.assistant.createChooser',
     'deployment.createAssistant',
     'journey-viewport-screenshots.spec.js',
+  ),
+  covered(
+    'deployment.assistant.interfaceTour',
+    'deployment.assistant',
+    'journeys/deployment/assistant-listing.spec.js',
+  ),
+  covered(
+    'deployment.createAssistant.interfaceTour',
+    'deployment.createAssistant',
+    'journeys/deployment/assistant-create-tour.spec.js',
   ),
   covered(
     'deployment.endpoint.overview',
@@ -159,6 +174,16 @@ const journeySubjourneys = [
     'organization.projects.empty',
     'organization.projects',
     'journeys/organization/listings.spec.js',
+  ),
+  covered(
+    'organization.roles.update',
+    'organization.roles',
+    'journeys/organization/roles.spec.js',
+  ),
+  covered(
+    'organization.roles.delete',
+    'organization.roles',
+    'journeys/organization/roles.spec.js',
   ),
 
   covered(
@@ -350,10 +375,10 @@ const journeySubjourneys = [
     'organization.projects',
     'journeys/organization/listings.spec.js',
   ),
-  deferred(
+  covered(
     'integration.credentials.create',
     'integration.projectCredential',
-    'The dialog needs deterministic credential mutation fixtures.',
+    'journeys/integration/project-credential.spec.js',
   ),
   covered(
     'account.notifications',

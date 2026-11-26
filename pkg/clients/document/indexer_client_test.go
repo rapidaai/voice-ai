@@ -2,13 +2,13 @@ package document_client
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/protos"
 )
 
@@ -18,12 +18,12 @@ func TestIndexerServiceClientStopsBeforeHTTPOnAuthError(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := &indexerServiceClient{
-		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, logger, nil),
+		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, "test-api", logger, nil),
 		cfg:            &config.AppConfig{},
 		logger:         logger,
 	}
-	_, err = client.IndexKnowledgeDocument(context.Background(), &types.Authentication{}, &protos.IndexKnowledgeDocumentRequest{})
-	if !errors.Is(err, types.ErrUnauthenticated) {
+	_, err = client.IndexKnowledgeDocument(context.Background(), authentication.Principal{}, &protos.IndexKnowledgeDocumentRequest{})
+	if _, ok := err.(pkg_errors.AuthenticationPrincipalInvalidError); !ok {
 		t.Fatalf("IndexKnowledgeDocument() error = %v", err)
 	}
 }

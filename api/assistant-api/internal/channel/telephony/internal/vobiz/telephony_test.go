@@ -16,6 +16,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_vobiz "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/vobiz/internal"
 	configs "github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,7 +69,7 @@ func TestStatusCallback_ParsesFormBody(t *testing.T) {
 	require.NoError(t, err)
 
 	tel := &vobizTelephony{logger: logger}
-	statusInfo, err := tel.StatusCallback(c, nil, 0, 0)
+	statusInfo, err := tel.StatusCallback(c, authentication.Principal{}, 0, 0)
 
 	require.NoError(t, err)
 	require.NotNil(t, statusInfo)

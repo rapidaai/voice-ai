@@ -3,6 +3,7 @@ package web_proxy_api
 import (
 	"context"
 	"errors"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -15,7 +16,7 @@ import (
 	config "github.com/rapidaai/api/web-api/config"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 )
 
 type webAssistantApi struct {
@@ -31,7 +32,7 @@ type webAssistantGRPCApi struct {
 	webAssistantApi
 }
 
-func NewAssistantGRPC(config *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) protos.AssistantServiceServer {
+func NewAssistantGRPC(config *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector, assistantClient assistant_client.AssistantServiceClient) protos.AssistantServiceServer {
 	return &webAssistantGRPCApi{
 		webAssistantApi{
 			WebApi:          web_api.NewWebApi(config, logger, postgres, redis),
@@ -39,22 +40,18 @@ func NewAssistantGRPC(config *config.WebAppConfig, logger commons.Logger, postgr
 			logger:          logger,
 			postgres:        postgres,
 			redis:           redis,
-			assistantClient: assistant_client.NewAssistantServiceClientGRPC(&config.AppConfig, logger, redis),
+			assistantClient: assistantClient,
 		},
 	}
 }
 
 func (assistant *webAssistantGRPCApi) GetAllAssistantConversation(c context.Context, iRequest *protos.GetAllAssistantConversationRequest) (*protos.GetAllAssistantConversationResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	_page, _assistant, err := assistant.assistantClient.GetAllAssistantConversation(c, iAuth, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate(), nil)
+	_page, _assistant, err := assistant.assistantClient.GetAllAssistantConversation(c, principal, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate(), nil)
 	if err != nil {
 		return exceptions.InternalServerError[protos.GetAllAssistantConversationResponse](err, "Unable to get all the assistant sessions")
 	}
@@ -65,16 +62,12 @@ func (assistant *webAssistantGRPCApi) GetAllAssistantConversation(c context.Cont
 }
 
 func (assistant *webAssistantGRPCApi) GetAllConversationMessage(c context.Context, iRequest *protos.GetAllConversationMessageRequest) (*protos.GetAllConversationMessageResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	_page, _assistant, err := assistant.assistantClient.GetAllConversationMessage(c, iAuth, iRequest.GetAssistantId(), iRequest.GetAssistantConversationId(), iRequest.GetCriterias(), iRequest.GetPaginate(), nil)
+	_page, _assistant, err := assistant.assistantClient.GetAllConversationMessage(c, principal, iRequest.GetAssistantId(), iRequest.GetAssistantConversationId(), iRequest.GetCriterias(), iRequest.GetPaginate(), nil)
 	if err != nil {
 		return exceptions.InternalServerError[protos.GetAllConversationMessageResponse](err, "Unable to get all the assistant sessions")
 	}
@@ -86,16 +79,12 @@ func (assistant *webAssistantGRPCApi) GetAllConversationMessage(c context.Contex
 
 // GetAllAssistantMessage implements protos.AssistantServiceServer.
 func (assistant *webAssistantGRPCApi) GetAllAssistantMessage(c context.Context, iRequest *protos.GetAllAssistantMessageRequest) (*protos.GetAllAssistantMessageResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	_page, _assistant, err := assistant.assistantClient.GetAllAssistantMessage(c, iAuth, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate(), iRequest.GetOrder(), iRequest.GetSelectors())
+	_page, _assistant, err := assistant.assistantClient.GetAllAssistantMessage(c, principal, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate(), iRequest.GetOrder(), iRequest.GetSelectors())
 	if err != nil {
 		return exceptions.InternalServerError[protos.GetAllAssistantMessageResponse](err, "Unable to get all the assistant messages")
 	}
@@ -106,16 +95,12 @@ func (assistant *webAssistantGRPCApi) GetAllAssistantMessage(c context.Context, 
 }
 
 func (assistant *webAssistantGRPCApi) GetAllMessage(c context.Context, iRequest *protos.GetAllMessageRequest) (*protos.GetAllMessageResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	_page, _assistant, err := assistant.assistantClient.GetAllMessage(c, iAuth, iRequest.GetCriterias(), iRequest.GetPaginate(), iRequest.GetOrder(), iRequest.GetSelectors())
+	_page, _assistant, err := assistant.assistantClient.GetAllMessage(c, principal, iRequest.GetCriterias(), iRequest.GetPaginate(), iRequest.GetOrder(), iRequest.GetSelectors())
 	if err != nil {
 		return exceptions.InternalServerError[protos.GetAllMessageResponse](err, "Unable to get all the assistant messages")
 	}
@@ -126,16 +111,12 @@ func (assistant *webAssistantGRPCApi) GetAllMessage(c context.Context, iRequest 
 }
 
 func (assistant *webAssistantGRPCApi) GetAssistantDashboard(c context.Context, iRequest *protos.GetAssistantDashboardRequest) (*protos.GetAssistantDashboardResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	assistantDashboardResponse, err := assistant.assistantClient.GetAssistantDashboard(c, iAuth, iRequest)
+	assistantDashboardResponse, err := assistant.assistantClient.GetAssistantDashboard(c, principal, iRequest)
 	if err != nil {
 		return exceptions.InternalServerError[protos.GetAssistantDashboardResponse](err, "Unable to get the assistant dashboard")
 	}
@@ -143,15 +124,11 @@ func (assistant *webAssistantGRPCApi) GetAssistantDashboard(c context.Context, i
 }
 
 func (assistant *webAssistantGRPCApi) GetAssistant(c context.Context, iRequest *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	_assistant, err := assistant.assistantClient.GetAssistant(c, iAuth, iRequest)
+	_assistant, err := assistant.assistantClient.GetAssistant(c, principal, iRequest)
 	if err != nil {
 		return utils.Error[protos.GetAssistantResponse](
 			err,
@@ -167,16 +144,12 @@ func (assistant *webAssistantGRPCApi) GetAssistant(c context.Context, iRequest *
 /*
  */
 func (assistant *webAssistantGRPCApi) GetAllAssistant(c context.Context, iRequest *protos.GetAllAssistantRequest) (*protos.GetAllAssistantResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	_page, _assistant, err := assistant.assistantClient.GetAllAssistant(c, iAuth, iRequest.GetCriterias(), iRequest.GetPaginate())
+	_page, _assistant, err := assistant.assistantClient.GetAllAssistant(c, principal, iRequest.GetCriterias(), iRequest.GetPaginate())
 	if err != nil {
 		return utils.Error[protos.GetAllAssistantResponse](
 			err,
@@ -189,28 +162,20 @@ func (assistant *webAssistantGRPCApi) GetAllAssistant(c context.Context, iReques
 }
 
 func (assistant *webAssistantGRPCApi) CreateAssistant(c context.Context, iRequest *protos.CreateAssistantRequest) (*protos.GetAssistantResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistant.assistantClient.CreateAssistant(c, iAuth, iRequest)
+	return assistant.assistantClient.CreateAssistant(c, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantProvider(ctx context.Context, iRequest *protos.GetAllAssistantProviderRequest) (*protos.GetAllAssistantProviderResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	_page, _assistantProviders, err := assistantGRPCApi.assistantClient.GetAllAssistantProvider(ctx, iAuth, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate())
+	_page, _assistantProviders, err := assistantGRPCApi.assistantClient.GetAllAssistantProvider(ctx, principal, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate())
 	if err != nil {
 		return utils.Error[protos.GetAllAssistantProviderResponse](
 			err,
@@ -226,69 +191,49 @@ func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantProvider(ctx context
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) UpdateAssistantVersion(ctx context.Context, iRequest *protos.UpdateAssistantVersionRequest) (*protos.GetAssistantResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 	return assistantGRPCApi.assistantClient.UpdateAssistantVersion(
 		ctx,
-		iAuth,
+		principal,
 		iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) CreateAssistantProvider(ctx context.Context, iRequest *protos.CreateAssistantProviderRequest) (*protos.GetAssistantProviderResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.CreateAssistantProvider(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.CreateAssistantProvider(ctx, principal, iRequest)
 }
 
 // CreateAssistantTag implements protos.AssistantServiceServer.
 func (assistantGRPCApi *webAssistantGRPCApi) CreateAssistantTag(ctx context.Context, iRequest *protos.CreateAssistantTagRequest) (*protos.GetAssistantResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.CreateAssistantTag(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.CreateAssistantTag(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) UpdateAssistantDetail(ctx context.Context, iRequest *protos.UpdateAssistantDetailRequest) (*protos.GetAssistantResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.UpdateAssistantDetail(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.UpdateAssistantDetail(ctx, principal, iRequest)
 }
 
 // GetAllAssistantHTTPLog implements protos.AssistantServiceServer.
 func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantHTTPLog(ctx context.Context, iRequest *protos.GetAllAssistantHTTPLogRequest) (*protos.GetAllAssistantHTTPLogResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	page, tls, err := assistantGRPCApi.assistantClient.GetAllAssistantHTTPLog(ctx, iAuth,
+	page, tls, err := assistantGRPCApi.assistantClient.GetAllAssistantHTTPLog(ctx, principal,
 		iRequest.GetProjectId(),
 		iRequest.GetCriterias(), iRequest.GetPaginate(), iRequest.GetOrder())
 	if err != nil {
@@ -313,104 +258,72 @@ func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantHTTPLog(ctx context.
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) GetAssistantHTTPLog(ctx context.Context, iRequest *protos.GetAssistantHTTPLogRequest) (*protos.GetAssistantHTTPLogResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	return assistantGRPCApi.assistantClient.GetAssistantHTTPLog(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.GetAssistantHTTPLog(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) RetryAssistantHTTPLog(ctx context.Context, iRequest *protos.RetryAssistantHTTPLogRequest) (*protos.GetAssistantHTTPLogResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	return assistantGRPCApi.assistantClient.RetryAssistantHTTPLog(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.RetryAssistantHTTPLog(ctx, principal, iRequest)
 }
 
 // GetAssistantConversation implements protos.AssistantServiceServer.
 func (assistantGRPCApi *webAssistantGRPCApi) GetAssistantConversation(ctx context.Context, iRequest *protos.GetAssistantConversationRequest) (*protos.GetAssistantConversationResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.GetAssistantConversation(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.GetAssistantConversation(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) DeleteAssistant(ctx context.Context, iRequest *protos.DeleteAssistantRequest) (*protos.GetAssistantResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.DeleteAssistant(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.DeleteAssistant(ctx, principal, iRequest)
 }
 
 // CreateAssistantKnowledge implements protos.AssistantServiceServer.
 func (assistantGRPCApi *webAssistantGRPCApi) CreateAssistantKnowledge(ctx context.Context, iRequest *protos.CreateAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.CreateAssistantKnowledge(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.CreateAssistantKnowledge(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) UpdateAssistantKnowledge(ctx context.Context, iRequest *protos.UpdateAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.UpdateAssistantKnowledge(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.UpdateAssistantKnowledge(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) DeleteAssistantKnowledge(ctx context.Context, iRequest *protos.DeleteAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.DeleteAssistantKnowledge(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.DeleteAssistantKnowledge(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantKnowledge(ctx context.Context, iRequest *protos.GetAllAssistantKnowledgeRequest) (*protos.GetAllAssistantKnowledgeResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	page, tls, err := assistantGRPCApi.assistantClient.GetAllAssistantKnowledge(ctx, iAuth, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate())
+	page, tls, err := assistantGRPCApi.assistantClient.GetAllAssistantKnowledge(ctx, principal, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate())
 	if err != nil {
 		return utils.Error[protos.GetAllAssistantKnowledgeResponse](
 			err,
@@ -424,65 +337,45 @@ func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantKnowledge(ctx contex
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) GetAssistantKnowledge(ctx context.Context, iRequest *protos.GetAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	return assistantGRPCApi.assistantClient.GetAssistantKnowledge(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.GetAssistantKnowledge(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) CreateAssistantTool(ctx context.Context, iRequest *protos.CreateAssistantToolRequest) (*protos.GetAssistantToolResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.CreateAssistantTool(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.CreateAssistantTool(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) UpdateAssistantTool(ctx context.Context, iRequest *protos.UpdateAssistantToolRequest) (*protos.GetAssistantToolResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.UpdateAssistantTool(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.UpdateAssistantTool(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) DeleteAssistantTool(ctx context.Context, iRequest *protos.DeleteAssistantToolRequest) (*protos.GetAssistantToolResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.DeleteAssistantTool(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.DeleteAssistantTool(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantTool(ctx context.Context, iRequest *protos.GetAllAssistantToolRequest) (*protos.GetAllAssistantToolResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	page, tls, err := assistantGRPCApi.assistantClient.GetAllAssistantTool(ctx, iAuth, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate())
+	page, tls, err := assistantGRPCApi.assistantClient.GetAllAssistantTool(ctx, principal, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate())
 	if err != nil {
 		return utils.Error[protos.GetAllAssistantToolResponse](
 			err,
@@ -496,98 +389,66 @@ func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantTool(ctx context.Con
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) GetAssistantTool(ctx context.Context, iRequest *protos.GetAssistantToolRequest) (*protos.GetAssistantToolResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	return assistantGRPCApi.assistantClient.GetAssistantTool(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.GetAssistantTool(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) GetAssistantToolLog(ctx context.Context, iRequest *protos.GetAssistantToolLogRequest) (*protos.GetAssistantToolLogResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.GetAssistantToolLog(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.GetAssistantToolLog(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantToolLog(ctx context.Context, iRequest *protos.GetAllAssistantToolLogRequest) (*protos.GetAllAssistantToolLogResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.GetAllAssistantToolLog(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.GetAllAssistantToolLog(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) CreateAssistantConfiguration(ctx context.Context, iRequest *protos.CreateAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.CreateAssistantConfiguration(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.CreateAssistantConfiguration(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) UpdateAssistantConfiguration(ctx context.Context, iRequest *protos.UpdateAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.UpdateAssistantConfiguration(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.UpdateAssistantConfiguration(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) DeleteAssistantConfiguration(ctx context.Context, iRequest *protos.DeleteAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.DeleteAssistantConfiguration(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.DeleteAssistantConfiguration(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantConfiguration(ctx context.Context, iRequest *protos.GetAllAssistantConfigurationRequest) (*protos.GetAllAssistantConfigurationResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.GetAllAssistantConfiguration(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.GetAllAssistantConfiguration(ctx, principal, iRequest)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) GetAssistantConfiguration(ctx context.Context, iRequest *protos.GetAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	return assistantGRPCApi.assistantClient.GetAssistantConfiguration(ctx, iAuth, iRequest)
+	return assistantGRPCApi.assistantClient.GetAssistantConfiguration(ctx, principal, iRequest)
 }

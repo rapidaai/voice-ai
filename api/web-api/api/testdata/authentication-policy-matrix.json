@@ -2189,6 +2189,7 @@
       "api": "web-api",
       "file": "api/web-api/api/auth.go",
       "handler": "Authorize",
+      "route": "/web_api.AuthenticationService/Authorize",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2207,6 +2208,7 @@
       "api": "web-api",
       "file": "api/web-api/api/auth.go",
       "handler": "ChangePassword",
+      "route": "/web_api.AuthenticationService/ChangePassword",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2225,6 +2227,7 @@
       "api": "web-api",
       "file": "api/web-api/api/auth.go",
       "handler": "GetAllUser",
+      "route": "/web_api.AuthenticationService/GetAllUser",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2243,6 +2246,7 @@
       "api": "web-api",
       "file": "api/web-api/api/auth.go",
       "handler": "GetUser",
+      "route": "/web_api.AuthenticationService/GetUser",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2261,6 +2265,7 @@
       "api": "web-api",
       "file": "api/web-api/api/auth.go",
       "handler": "UpdateUser",
+      "route": "/web_api.AuthenticationService/UpdateUser",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2273,32 +2278,13 @@
       "required_contexts": [
         "user",
         "organization"
-      ]
-    },
-    {
-      "api": "web-api",
-      "file": "api/web-api/api/connect.go",
-      "handler": "GeneralConnect",
-      "transport": "grpc",
-      "existing_accessor": "GetAuthPrincipleGPRC",
-      "existing_checks": [
-        "user",
-        "organization",
-        "project"
-      ],
-      "allowed_auth_types": [
-        "user"
-      ],
-      "required_contexts": [
-        "user",
-        "organization",
-        "project"
       ]
     },
     {
       "api": "web-api",
       "file": "api/web-api/api/connect.go",
       "handler": "GetConnectorFiles",
+      "route": "/connect_api.ConnectService/GetConnectorFiles",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2317,6 +2303,7 @@
       "api": "web-api",
       "file": "api/web-api/api/notification.go",
       "handler": "GetNotificationSettting",
+      "route": "/notification_api.NotificationService/GetNotificationSettting",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2335,6 +2322,7 @@
       "api": "web-api",
       "file": "api/web-api/api/notification.go",
       "handler": "UpdateNotificationSetting",
+      "route": "/notification_api.NotificationService/UpdateNotificationSetting",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2353,25 +2341,8 @@
       "api": "web-api",
       "file": "api/web-api/api/organization.go",
       "handler": "CreateOrganization",
+      "route": "/web_api.OrganizationService/CreateOrganization",
       "transport": "grpc",
-      "existing_accessor": "GetAuthPrincipleGPRC",
-      "existing_checks": [
-        "user",
-        "organization"
-      ],
-      "allowed_auth_types": [
-        "user"
-      ],
-      "required_contexts": [
-        "user",
-        "organization"
-      ]
-    },
-    {
-      "api": "web-api",
-      "file": "api/web-api/api/organization.go",
-      "handler": "CreateOrganization",
-      "transport": "http",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
         "user",
@@ -2389,6 +2360,7 @@
       "api": "web-api",
       "file": "api/web-api/api/organization.go",
       "handler": "GetOrganization",
+      "route": "/web_api.OrganizationService/GetOrganization",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2407,6 +2379,7 @@
       "api": "web-api",
       "file": "api/web-api/api/organization.go",
       "handler": "UpdateOrganization",
+      "route": "/web_api.OrganizationService/UpdateOrganization",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2425,6 +2398,7 @@
       "api": "web-api",
       "file": "api/web-api/api/organization_membership.go",
       "handler": "DeleteUserFromOrganization",
+      "route": "/web_api.OrganizationService/DeleteUserFromOrganization",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2443,6 +2417,7 @@
       "api": "web-api",
       "file": "api/web-api/api/organization_membership.go",
       "handler": "InviteUserToOrganization",
+      "route": "/web_api.OrganizationService/InviteUserToOrganization",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2461,6 +2436,7 @@
       "api": "web-api",
       "file": "api/web-api/api/organization_membership.go",
       "handler": "UpdateUserOrganizationRole",
+      "route": "/web_api.OrganizationService/UpdateUserOrganizationRole",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2479,6 +2455,7 @@
       "api": "web-api",
       "file": "api/web-api/api/project.go",
       "handler": "AddUserToProjects",
+      "route": "/web_api.ProjectService/AddUserToProjects",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2497,6 +2474,7 @@
       "api": "web-api",
       "file": "api/web-api/api/project.go",
       "handler": "ArchiveProject",
+      "route": "/web_api.ProjectService/ArchiveProject",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2515,6 +2493,7 @@
       "api": "web-api",
       "file": "api/web-api/api/project.go",
       "handler": "CreateProject",
+      "route": "/web_api.ProjectService/CreateProject",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2533,24 +2512,24 @@
       "api": "web-api",
       "file": "api/web-api/api/project.go",
       "handler": "CreateProjectCredential",
+      "route": "/web_api.ProjectService/CreateProjectCredential",
       "transport": "grpc",
-      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_accessor": "Principal",
       "existing_checks": [
-        "user",
-        "organization"
+        "project"
       ],
       "allowed_auth_types": [
         "user"
       ],
       "required_contexts": [
-        "user",
-        "organization"
+        "project"
       ]
     },
     {
       "api": "web-api",
       "file": "api/web-api/api/project.go",
       "handler": "DeleteUserFromProject",
+      "route": "/web_api.ProjectService/DeleteUserFromProject",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2569,6 +2548,7 @@
       "api": "web-api",
       "file": "api/web-api/api/project.go",
       "handler": "GetAllProject",
+      "route": "/web_api.ProjectService/GetAllProject",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2587,8 +2567,27 @@
       "api": "web-api",
       "file": "api/web-api/api/project.go",
       "handler": "GetAllProjectCredential",
+      "route": "/web_api.ProjectService/GetAllProjectCredential",
       "transport": "grpc",
-      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_accessor": "Principal",
+      "existing_checks": [
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/project.go",
+      "handler": "RevokeProjectCredential",
+      "route": "/web_api.ProjectService/RevokeProjectCredential",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
       "existing_checks": [
         "user",
         "organization"
@@ -2605,6 +2604,7 @@
       "api": "web-api",
       "file": "api/web-api/api/project.go",
       "handler": "GetProject",
+      "route": "/web_api.ProjectService/GetProject",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -2619,6 +2619,7 @@
       "api": "web-api",
       "file": "api/web-api/api/project.go",
       "handler": "UpdateProject",
+      "route": "/web_api.ProjectService/UpdateProject",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2637,6 +2638,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/activity.go",
       "handler": "GetAllAuditLog",
+      "route": "/integration_api.AuditLoggingService/GetAllAuditLog",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -2651,6 +2653,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/activity.go",
       "handler": "GetAuditLog",
+      "route": "/integration_api.AuditLoggingService/GetAuditLog",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -2665,6 +2668,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "CreateAssistant",
+      "route": "/assistant_api.AssistantService/CreateAssistant",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2684,6 +2688,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "CreateAssistantConfiguration",
+      "route": "/assistant_api.AssistantService/CreateAssistantConfiguration",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2702,6 +2707,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "CreateAssistantKnowledge",
+      "route": "/assistant_api.AssistantService/CreateAssistantKnowledge",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2720,6 +2726,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "CreateAssistantProvider",
+      "route": "/assistant_api.AssistantService/CreateAssistantProvider",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2739,6 +2746,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "CreateAssistantTag",
+      "route": "/assistant_api.AssistantService/CreateAssistantTag",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2757,6 +2765,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "CreateAssistantTool",
+      "route": "/assistant_api.AssistantService/CreateAssistantTool",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2775,6 +2784,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "DeleteAssistant",
+      "route": "/assistant_api.AssistantService/DeleteAssistant",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2793,6 +2803,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "DeleteAssistantConfiguration",
+      "route": "/assistant_api.AssistantService/DeleteAssistantConfiguration",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2811,6 +2822,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "DeleteAssistantKnowledge",
+      "route": "/assistant_api.AssistantService/DeleteAssistantKnowledge",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2829,6 +2841,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "DeleteAssistantTool",
+      "route": "/assistant_api.AssistantService/DeleteAssistantTool",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2847,6 +2860,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAllAssistant",
+      "route": "/assistant_api.AssistantService/GetAllAssistant",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -2861,6 +2875,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAllAssistantConfiguration",
+      "route": "/assistant_api.AssistantService/GetAllAssistantConfiguration",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2879,6 +2894,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAllAssistantConversation",
+      "route": "/assistant_api.AssistantService/GetAllAssistantConversation",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -2893,6 +2909,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAllAssistantHTTPLog",
+      "route": "/assistant_api.AssistantService/GetAllAssistantHTTPLog",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2911,6 +2928,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAllAssistantKnowledge",
+      "route": "/assistant_api.AssistantService/GetAllAssistantKnowledge",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2929,6 +2947,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAllAssistantMessage",
+      "route": "/assistant_api.AssistantService/GetAllAssistantMessage",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -2943,6 +2962,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAllAssistantProvider",
+      "route": "/assistant_api.AssistantService/GetAllAssistantProvider",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2961,6 +2981,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAllAssistantTool",
+      "route": "/assistant_api.AssistantService/GetAllAssistantTool",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2979,6 +3000,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAllAssistantToolLog",
+      "route": "/assistant_api.AssistantService/GetAllAssistantToolLog",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -2997,6 +3019,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAllConversationMessage",
+      "route": "/assistant_api.AssistantService/GetAllConversationMessage",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3011,6 +3034,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAllMessage",
+      "route": "/assistant_api.AssistantService/GetAllMessage",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3025,6 +3049,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAssistant",
+      "route": "/assistant_api.AssistantService/GetAssistant",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3039,6 +3064,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAssistantConfiguration",
+      "route": "/assistant_api.AssistantService/GetAssistantConfiguration",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3057,6 +3083,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAssistantConversation",
+      "route": "/assistant_api.AssistantService/GetAssistantConversation",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3075,6 +3102,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAssistantDashboard",
+      "route": "/assistant_api.AssistantService/GetAssistantDashboard",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3089,6 +3117,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAssistantHTTPLog",
+      "route": "/assistant_api.AssistantService/GetAssistantHTTPLog",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3107,6 +3136,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAssistantKnowledge",
+      "route": "/assistant_api.AssistantService/GetAssistantKnowledge",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3125,6 +3155,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAssistantTool",
+      "route": "/assistant_api.AssistantService/GetAssistantTool",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3143,6 +3174,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "GetAssistantToolLog",
+      "route": "/assistant_api.AssistantService/GetAssistantToolLog",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3161,6 +3193,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "RetryAssistantHTTPLog",
+      "route": "/assistant_api.AssistantService/RetryAssistantHTTPLog",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3179,6 +3212,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "UpdateAssistantConfiguration",
+      "route": "/assistant_api.AssistantService/UpdateAssistantConfiguration",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3197,6 +3231,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "UpdateAssistantDetail",
+      "route": "/assistant_api.AssistantService/UpdateAssistantDetail",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3215,6 +3250,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "UpdateAssistantKnowledge",
+      "route": "/assistant_api.AssistantService/UpdateAssistantKnowledge",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3233,6 +3269,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "UpdateAssistantTool",
+      "route": "/assistant_api.AssistantService/UpdateAssistantTool",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3251,6 +3288,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant.go",
       "handler": "UpdateAssistantVersion",
+      "route": "/assistant_api.AssistantService/UpdateAssistantVersion",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3269,6 +3307,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "CreateAssistantApiDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/CreateAssistantApiDeployment",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3287,6 +3326,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "CreateAssistantDebuggerDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/CreateAssistantDebuggerDeployment",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3305,6 +3345,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "CreateAssistantPhoneDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/CreateAssistantPhoneDeployment",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3324,6 +3365,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "CreateAssistantWebpluginDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/CreateAssistantWebpluginDeployment",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3342,6 +3384,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "CreateAssistantWhatsappDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/CreateAssistantWhatsappDeployment",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3360,6 +3403,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "DisableAssistantApiDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/DisableAssistantApiDeployment",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3378,6 +3422,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "DisableAssistantDebuggerDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/DisableAssistantDebuggerDeployment",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3396,6 +3441,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "DisableAssistantPhoneDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/DisableAssistantPhoneDeployment",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3414,6 +3460,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "DisableAssistantWebpluginDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/DisableAssistantWebpluginDeployment",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3432,6 +3479,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "DisableAssistantWhatsappDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/DisableAssistantWhatsappDeployment",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3450,6 +3498,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "GetAllAssistantApiDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/GetAllAssistantApiDeployment",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3464,6 +3513,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "GetAllAssistantDebuggerDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/GetAllAssistantDebuggerDeployment",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3478,6 +3528,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "GetAllAssistantPhoneDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/GetAllAssistantPhoneDeployment",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3492,6 +3543,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "GetAllAssistantWebpluginDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/GetAllAssistantWebpluginDeployment",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3506,6 +3558,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "GetAllAssistantWhatsappDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/GetAllAssistantWhatsappDeployment",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3520,6 +3573,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "GetAssistantApiDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/GetAssistantApiDeployment",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3534,6 +3588,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "GetAssistantDebuggerDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/GetAssistantDebuggerDeployment",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3548,6 +3603,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "GetAssistantPhoneDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/GetAssistantPhoneDeployment",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3562,6 +3618,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "GetAssistantWebpluginDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/GetAssistantWebpluginDeployment",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3576,6 +3633,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/assistant_deployment.go",
       "handler": "GetAssistantWhatsappDeployment",
+      "route": "/assistant_api.AssistantDeploymentService/GetAssistantWhatsappDeployment",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3590,6 +3648,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/document.go",
       "handler": "IndexKnowledgeDocument",
+      "route": "/document_api.DocumentService/IndexKnowledgeDocument",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [
@@ -3608,6 +3667,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/endpoint.go",
       "handler": "CreateEndpoint",
+      "route": "/endpoint_api.EndpointService/CreateEndpoint",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3626,6 +3686,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/endpoint.go",
       "handler": "CreateEndpointCacheConfiguration",
+      "route": "/endpoint_api.EndpointService/CreateEndpointCacheConfiguration",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3644,6 +3705,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/endpoint.go",
       "handler": "CreateEndpointProviderModel",
+      "route": "/endpoint_api.EndpointService/CreateEndpointProviderModel",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3662,6 +3724,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/endpoint.go",
       "handler": "CreateEndpointRetryConfiguration",
+      "route": "/endpoint_api.EndpointService/CreateEndpointRetryConfiguration",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3680,6 +3743,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/endpoint.go",
       "handler": "CreateEndpointTag",
+      "route": "/endpoint_api.EndpointService/CreateEndpointTag",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3698,6 +3762,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/endpoint.go",
       "handler": "ForkEndpoint",
+      "route": "/endpoint_api.EndpointService/ForkEndpoint",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3716,6 +3781,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/endpoint.go",
       "handler": "GetAllEndpoint",
+      "route": "/endpoint_api.EndpointService/GetAllEndpoint",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3730,6 +3796,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/endpoint.go",
       "handler": "GetAllEndpointLog",
+      "route": "/endpoint_api.EndpointService/GetAllEndpointLog",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3744,6 +3811,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/endpoint.go",
       "handler": "GetAllEndpointProviderModel",
+      "route": "/endpoint_api.EndpointService/GetAllEndpointProviderModel",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3758,6 +3826,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/endpoint.go",
       "handler": "GetEndpoint",
+      "route": "/endpoint_api.EndpointService/GetEndpoint",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3772,6 +3841,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/endpoint.go",
       "handler": "GetEndpointLog",
+      "route": "/endpoint_api.EndpointService/GetEndpointLog",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3786,6 +3856,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/endpoint.go",
       "handler": "UpdateEndpointDetail",
+      "route": "/endpoint_api.EndpointService/UpdateEndpointDetail",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3804,6 +3875,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/endpoint.go",
       "handler": "UpdateEndpointVersion",
+      "route": "/endpoint_api.EndpointService/UpdateEndpointVersion",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3822,6 +3894,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/invoke.go",
       "handler": "Invoke",
+      "route": "/endpoint_api.Deployment/Invoke",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3836,6 +3909,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/knowledge.go",
       "handler": "CreateKnowledge",
+      "route": "/knowledge_api.KnowledgeService/CreateKnowledge",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3854,6 +3928,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/knowledge.go",
       "handler": "CreateKnowledgeDocument",
+      "route": "/knowledge_api.KnowledgeService/CreateKnowledgeDocument",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3872,6 +3947,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/knowledge.go",
       "handler": "CreateKnowledgeTag",
+      "route": "/knowledge_api.KnowledgeService/CreateKnowledgeTag",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3890,6 +3966,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/knowledge.go",
       "handler": "DeleteKnowledgeDocumentSegment",
+      "route": "/knowledge_api.KnowledgeService/DeleteKnowledgeDocumentSegment",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3908,6 +3985,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/knowledge.go",
       "handler": "GetAllKnowledge",
+      "route": "/knowledge_api.KnowledgeService/GetAllKnowledge",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3922,6 +4000,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/knowledge.go",
       "handler": "GetAllKnowledgeDocument",
+      "route": "/knowledge_api.KnowledgeService/GetAllKnowledgeDocument",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3936,6 +4015,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/knowledge.go",
       "handler": "GetAllKnowledgeDocumentSegment",
+      "route": "/knowledge_api.KnowledgeService/GetAllKnowledgeDocumentSegment",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3950,6 +4030,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/knowledge.go",
       "handler": "GetAllKnowledgeLog",
+      "route": "/knowledge_api.KnowledgeService/GetAllKnowledgeLog",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -3968,6 +4049,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/knowledge.go",
       "handler": "GetKnowledge",
+      "route": "/knowledge_api.KnowledgeService/GetKnowledge",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -3982,6 +4064,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/knowledge.go",
       "handler": "GetKnowledgeLog",
+      "route": "/knowledge_api.KnowledgeService/GetKnowledgeLog",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -4000,6 +4083,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/knowledge.go",
       "handler": "UpdateKnowledgeDetail",
+      "route": "/knowledge_api.KnowledgeService/UpdateKnowledgeDetail",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -4018,6 +4102,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/knowledge.go",
       "handler": "UpdateKnowledgeDocumentSegment",
+      "route": "/knowledge_api.KnowledgeService/UpdateKnowledgeDocumentSegment",
       "transport": "grpc",
       "existing_accessor": "GetAuthPrincipleGPRC",
       "existing_checks": [
@@ -4036,6 +4121,7 @@
       "api": "web-api",
       "file": "api/web-api/api/proxy/observability.go",
       "handler": "GetAllTelemetry",
+      "route": "/observability_api.ObservabilityService/GetAllTelemetry",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [],
@@ -4049,47 +4135,8 @@
     {
       "api": "web-api",
       "file": "api/web-api/api/vault.go",
-      "handler": "CreateProviderCredential",
-      "transport": "grpc",
-      "existing_accessor": "GetAuthPrincipleGPRC",
-      "existing_checks": [
-        "user",
-        "organization",
-        "project"
-      ],
-      "allowed_auth_types": [
-        "user"
-      ],
-      "required_contexts": [
-        "user",
-        "organization",
-        "project"
-      ]
-    },
-    {
-      "api": "web-api",
-      "file": "api/web-api/api/vault.go",
-      "handler": "DeleteCredential",
-      "transport": "grpc",
-      "existing_accessor": "GetAuthPrincipleGPRC",
-      "existing_checks": [
-        "user",
-        "organization",
-        "project"
-      ],
-      "allowed_auth_types": [
-        "user"
-      ],
-      "required_contexts": [
-        "user",
-        "organization",
-        "project"
-      ]
-    },
-    {
-      "api": "web-api",
-      "file": "api/web-api/api/vault.go",
       "handler": "GetAllOrganizationCredential",
+      "route": "/vault_api.VaultService/GetAllOrganizationCredential",
       "transport": "grpc",
       "existing_accessor": "GetSimplePrincipleGRPC",
       "existing_checks": [
@@ -4106,39 +4153,146 @@
     },
     {
       "api": "web-api",
-      "file": "api/web-api/api/vault.go",
-      "handler": "GetCredential",
+      "file": "api/web-api/api/access_management.go",
+      "handler": "ListPermissions",
+      "route": "/web_api.AccessManagementService/ListPermissions",
       "transport": "grpc",
-      "existing_accessor": "GetSimplePrincipleGRPC",
-      "existing_checks": [
-        "project"
-      ],
-      "allowed_auth_types": [
-        "user",
-        "project",
-        "service"
-      ],
-      "required_contexts": [
-        "project"
-      ]
+      "existing_accessor": "Principal",
+      "existing_checks": [],
+      "allowed_auth_types": ["user", "project"],
+      "required_contexts": ["organization", "project"]
     },
     {
       "api": "web-api",
-      "file": "api/web-api/api/vault.go",
-      "handler": "GetOauth2Credential",
+      "file": "api/web-api/api/access_management.go",
+      "handler": "ListRoles",
+      "route": "/web_api.AccessManagementService/ListRoles",
       "transport": "grpc",
-      "existing_accessor": "GetSimplePrincipleGRPC",
-      "existing_checks": [
-        "project"
-      ],
-      "allowed_auth_types": [
-        "user",
-        "project",
-        "service"
-      ],
-      "required_contexts": [
-        "project"
-      ]
+      "existing_accessor": "Principal",
+      "existing_checks": [],
+      "allowed_auth_types": ["user", "project"],
+      "required_contexts": ["organization", "project"]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/access_management.go",
+      "handler": "GetRole",
+      "route": "/web_api.AccessManagementService/GetRole",
+      "transport": "grpc",
+      "existing_accessor": "Principal",
+      "existing_checks": [],
+      "allowed_auth_types": ["user", "project"],
+      "required_contexts": ["organization", "project"]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/access_management.go",
+      "handler": "CreateCustomRole",
+      "route": "/web_api.AccessManagementService/CreateCustomRole",
+      "transport": "grpc",
+      "existing_accessor": "Principal",
+      "existing_checks": [],
+      "allowed_auth_types": ["user"],
+      "required_contexts": ["organization"]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/access_management.go",
+      "handler": "UpdateCustomRole",
+      "route": "/web_api.AccessManagementService/UpdateCustomRole",
+      "transport": "grpc",
+      "existing_accessor": "Principal",
+      "existing_checks": [],
+      "allowed_auth_types": ["user"],
+      "required_contexts": ["organization"]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/access_management.go",
+      "handler": "ReduceCustomRolePermissions",
+      "route": "/web_api.AccessManagementService/ReduceCustomRolePermissions",
+      "transport": "grpc",
+      "existing_accessor": "Principal",
+      "existing_checks": [],
+      "allowed_auth_types": ["user"],
+      "required_contexts": ["organization"]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/access_management.go",
+      "handler": "ArchiveCustomRole",
+      "route": "/web_api.AccessManagementService/ArchiveCustomRole",
+      "transport": "grpc",
+      "existing_accessor": "Principal",
+      "existing_checks": [],
+      "allowed_auth_types": ["user"],
+      "required_contexts": ["organization"]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/dashboard.go",
+      "handler": "GetProjectDashboard",
+      "route": "/dashboard_api.DashboardService/GetProjectDashboard",
+      "transport": "grpc",
+      "existing_accessor": "Principal",
+      "existing_checks": [],
+      "allowed_auth_types": ["user", "project"],
+      "required_contexts": ["project"]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/product_usage.go",
+      "handler": "CreateProductUsage",
+      "route": "/billing_api.ProductUsageService/CreateProductUsage",
+      "transport": "grpc",
+      "existing_accessor": "Principal",
+      "existing_checks": [],
+      "allowed_auth_types": ["user", "project", "service"],
+      "required_contexts": ["project"]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/product_usage.go",
+      "handler": "GetProductUsages",
+      "route": "/billing_api.ProductUsageService/GetProductUsages",
+      "transport": "grpc",
+      "existing_accessor": "Principal",
+      "existing_checks": [],
+      "allowed_auth_types": ["user", "project"],
+      "required_contexts": ["project"]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/product_usage.go",
+      "handler": "GetOrganizationUsages",
+      "route": "/billing_api.ProductUsageService/GetOrganizationUsages",
+      "transport": "grpc",
+      "existing_accessor": "Principal",
+      "existing_checks": [],
+      "allowed_auth_types": ["user"],
+      "required_contexts": ["organization"]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/auth.go",
+      "handler": "VerifyToken",
+      "route": "/web_api.AuthenticationService/VerifyToken",
+      "transport": "grpc",
+      "existing_accessor": "Principal",
+      "existing_checks": [],
+      "allowed_auth_types": ["service"],
+      "required_contexts": ["service"]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/organization.go",
+      "handler": "UpdateBillingInformation",
+      "route": "/web_api.OrganizationService/UpdateBillingInformation",
+      "transport": "grpc",
+      "existing_accessor": "Principal",
+      "existing_checks": [],
+      "allowed_auth_types": ["user"],
+      "required_contexts": ["organization"]
     }
   ]
 }

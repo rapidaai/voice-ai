@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/validator"
@@ -35,7 +36,7 @@ const (
 
 type recorder struct {
 	logger           commons.Logger
-	auth             *types.Authentication
+	auth             authentication.Principal
 	globalScope      GlobalScope
 	context          Context
 	clock            func() time.Time
@@ -99,13 +100,10 @@ func New(options ...Option) Recorder {
 	}
 
 	globalScope := resolvedOptions.globalScope
-	if validator.NonNil(resolvedOptions.auth) {
-		if projectContext, err := resolvedOptions.auth.ProjectContext(); err == nil {
-			globalScope.ProjectID = projectContext.ProjectID
-			globalScope.OrganizationID = projectContext.OrganizationID
-		} else if organizationContext, err := resolvedOptions.auth.OrganizationContext(); err == nil {
-			globalScope.OrganizationID = organizationContext.OrganizationID
-		}
+	if resolvedOptions.auth.Subject().ID != 0 {
+		tenant := resolvedOptions.auth.Tenant()
+		globalScope.ProjectID = tenant.ProjectID
+		globalScope.OrganizationID = tenant.OrganizationID
 	}
 	clock := resolvedOptions.clock
 	if clock == nil {

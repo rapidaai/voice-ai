@@ -302,6 +302,7 @@ export function CreateEndpointPage() {
       />
 
       <CreateFullPageWithGlobalHeader
+        alignHeaderWithStepRail
         title="Create endpoint"
         description="Configure the model and instruction, then define how the endpoint appears in your workspace."
         errorMessage={errorMessage}

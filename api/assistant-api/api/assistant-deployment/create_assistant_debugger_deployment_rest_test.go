@@ -13,10 +13,11 @@ import (
 	"github.com/gin-gonic/gin"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	pkg_errors "github.com/rapidaai/pkg/errors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -49,7 +50,7 @@ type createDebuggerDeploymentRestServiceStub struct {
 
 func (s *createDebuggerDeploymentRestServiceStub) CreateWhatsappDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
@@ -102,7 +103,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWhatsappDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) CreatePhoneDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
@@ -160,7 +161,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreatePhoneDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) CreateApiDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
@@ -207,7 +208,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateApiDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) CreateDebuggerDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 	greeting, _ *string,
 	unclearInputTimeout *float64,
@@ -249,7 +250,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateDebuggerDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) CreateWebPluginDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
@@ -299,7 +300,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWebPluginDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAssistantApiDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantApiDeployment, error) {
 	s.getCalled = true
@@ -337,7 +338,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAssistantApiDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAssistantDebuggerDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
 	s.getCalled = true
@@ -364,7 +365,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAssistantDebuggerDeployment
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAssistantPhoneDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
 	s.getCalled = true
@@ -398,7 +399,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAssistantPhoneDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAssistantWebpluginDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
 	s.getCalled = true
@@ -426,7 +427,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAssistantWebpluginDeploymen
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAssistantWhatsappDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
 	s.getCalled = true
@@ -460,7 +461,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAssistantWhatsappDeployment
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantApiDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
@@ -473,7 +474,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantApiDeployment(
 	if s.getAllErr != nil {
 		return 0, nil, s.getAllErr
 	}
-	deployment, err := s.GetAssistantApiDeployment(context.Background(), nil, assistantId)
+	deployment, err := s.GetAssistantApiDeployment(context.Background(), authentication.Principal{}, assistantId)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -482,7 +483,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantApiDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantDebuggerDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
@@ -495,7 +496,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantDebuggerDeploym
 	if s.getAllErr != nil {
 		return 0, nil, s.getAllErr
 	}
-	deployment, err := s.GetAssistantDebuggerDeployment(context.Background(), nil, assistantId)
+	deployment, err := s.GetAssistantDebuggerDeployment(context.Background(), authentication.Principal{}, assistantId)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -504,7 +505,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantDebuggerDeploym
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantPhoneDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
@@ -517,7 +518,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantPhoneDeployment
 	if s.getAllErr != nil {
 		return 0, nil, s.getAllErr
 	}
-	deployment, err := s.GetAssistantPhoneDeployment(context.Background(), nil, assistantId)
+	deployment, err := s.GetAssistantPhoneDeployment(context.Background(), authentication.Principal{}, assistantId)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -526,7 +527,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantPhoneDeployment
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantWebpluginDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
@@ -539,7 +540,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantWebpluginDeploy
 	if s.getAllErr != nil {
 		return 0, nil, s.getAllErr
 	}
-	deployment, err := s.GetAssistantWebpluginDeployment(context.Background(), nil, assistantId)
+	deployment, err := s.GetAssistantWebpluginDeployment(context.Background(), authentication.Principal{}, assistantId)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -548,7 +549,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantWebpluginDeploy
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantWhatsappDeployment(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
@@ -561,30 +562,30 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantWhatsappDeploym
 	if s.getAllErr != nil {
 		return 0, nil, s.getAllErr
 	}
-	deployment, err := s.GetAssistantWhatsappDeployment(context.Background(), nil, assistantId)
+	deployment, err := s.GetAssistantWhatsappDeployment(context.Background(), authentication.Principal{}, assistantId)
 	if err != nil {
 		return 0, nil, err
 	}
 	return 1, []*internal_assistant_entity.AssistantWhatsappDeployment{deployment}, nil
 }
 
-func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantApiDeployment(context.Context, *types.Authentication, uint64) (*internal_assistant_entity.AssistantApiDeployment, error) {
+func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantApiDeployment(context.Context, authentication.Principal, uint64) (*internal_assistant_entity.AssistantApiDeployment, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantDebuggerDeployment(context.Context, *types.Authentication, uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
+func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantDebuggerDeployment(context.Context, authentication.Principal, uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantPhoneDeployment(context.Context, *types.Authentication, uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
+func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantPhoneDeployment(context.Context, authentication.Principal, uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantWebpluginDeployment(context.Context, *types.Authentication, uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
+func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantWebpluginDeployment(context.Context, authentication.Principal, uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantWhatsappDeployment(context.Context, *types.Authentication, uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
+func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantWhatsappDeployment(context.Context, authentication.Principal, uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -1055,12 +1056,16 @@ func newCreateDebuggerDeploymentGRPCApi(
 	}
 }
 
-func createDebuggerDeploymentRestAuth() *types.Authentication {
+func createDebuggerDeploymentRestAuth() authentication.Principal {
 	return testUserAuthentication(11, 22, 33)
 }
 
 func createDebuggerDeploymentGRPCContext() context.Context {
-	return context.WithValue(context.Background(), types.CTX_, createDebuggerDeploymentRestAuth())
+	ctx, err := middleware_authentication.ContextWithPrincipal(context.Background(), createDebuggerDeploymentRestAuth())
+	if err != nil {
+		panic(err)
+	}
+	return ctx
 }
 
 func createDebuggerDeploymentGRPCRequest() *protos.CreateAssistantDeploymentRequest {

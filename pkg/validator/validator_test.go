@@ -6,10 +6,23 @@
 package validator
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/rapidaai/protos"
 )
+
+func TestAuthenticationSecret(t *testing.T) {
+	valid := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	if !AuthenticationSecret(valid) {
+		t.Fatal("canonical 32-byte secret rejected")
+	}
+	for _, value := range []string{"", "secret", base64.RawStdEncoding.EncodeToString(make([]byte, 32)), base64.StdEncoding.EncodeToString(make([]byte, 31)), base64.StdEncoding.EncodeToString(make([]byte, 33)), "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh9="} {
+		if AuthenticationSecret(value) {
+			t.Fatalf("AuthenticationSecret(%q) = true", value)
+		}
+	}
+}
 
 func TestOneOf(t *testing.T) {
 	if !OneOf("admin", "owner", "admin") {

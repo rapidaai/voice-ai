@@ -70,8 +70,8 @@ describe('DeploymentEditTabs', () => {
     ).toBe(screen.getByRole('tabpanel'));
   });
 
-  it('uses the shared Carbon typography for deployment edit headers', () => {
-    render(
+  it('uses the shared create-page header for deployment edits', () => {
+    const { container } = render(
       <DeploymentEditHeader
         eyebrow="Debugger deployment"
         title="Edit debugger deployment"
@@ -87,6 +87,9 @@ describe('DeploymentEditTabs', () => {
     ).toHaveClass(...typographyClassNames['heading-03'].split(' '));
     expect(
       screen.getByText('Update experience and voice settings.'),
-    ).toHaveClass(...typographyClassNames['body-01'].split(' '));
+    ).toHaveClass(...typographyClassNames['body-compact-01'].split(' '));
+    expect(
+      container.querySelector('[data-create-page-header-content]'),
+    ).toBeInTheDocument();
   });
 });

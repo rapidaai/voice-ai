@@ -30,13 +30,18 @@ import {
 import { withConnection } from './connection';
 
 type WorkspaceAuth = {
+  organizationId: string;
   token: string;
   userId: string;
 };
 
+type WorkspaceOnboardingAuth = Omit<WorkspaceAuth, 'organizationId'> & {
+  organizationId?: undefined;
+};
+
 type WorkspaceProjectRole = {
   projectId: string;
-  projectRole: string;
+  roleDefinitionIds: string[];
 };
 
 type WorkspaceClientCallback<TResponse> = (
@@ -48,7 +53,7 @@ export type CreateWorkspaceOrganizationParams = {
   name: string;
   size: string;
   industry: string;
-  auth: WorkspaceAuth;
+  auth: WorkspaceOnboardingAuth;
   callback: WorkspaceClientCallback<CreateOrganizationResponse>;
 };
 
@@ -69,7 +74,7 @@ export type UpdateWorkspaceProjectParams = {
 
 export type InviteOrganizationUserParams = {
   email: string;
-  organizationRole: string;
+  organizationRoleDefinitionIds: string[];
   projectRoles: WorkspaceProjectRole[];
   auth: WorkspaceAuth;
 };
@@ -115,20 +120,25 @@ export type DeleteOrganizationUserParams = {
 
 export type UpdateOrganizationUserRoleParams = {
   userId: string;
-  organizationRole: string;
+  roleDefinitionIds: string[];
   auth: WorkspaceAuth;
 };
 
-const createWorkspaceMetadata = ({ token, userId }: WorkspaceAuth) => ({
+const createWorkspaceMetadata = ({
+  organizationId,
+  token,
+  userId,
+}: WorkspaceAuth | WorkspaceOnboardingAuth) => ({
   authorization: token,
   'x-auth-id': userId,
+  ...(organizationId ? { 'x-organization-id': organizationId } : {}),
 });
 
 const createProjectRoleAssignments = (projectRoles: WorkspaceProjectRole[]) =>
   projectRoles.map(row => {
     const assignment = new ProjectRoleAssignment();
     assignment.setProjectid(row.projectId);
-    assignment.setProjectrole(row.projectRole);
+    assignment.setRoledefinitionidsList(row.roleDefinitionIds);
     return assignment;
   });
 
@@ -239,13 +249,13 @@ export const deleteWorkspaceProject = ({
 
 export const inviteOrganizationUser = ({
   email,
-  organizationRole,
+  organizationRoleDefinitionIds,
   projectRoles,
   auth,
 }: InviteOrganizationUserParams) => {
   const request = new InviteUserToOrganizationRequest();
   request.setEmail(email);
-  request.setOrganizationrole(organizationRole);
+  request.setOrganizationroledefinitionidsList(organizationRoleDefinitionIds);
   request.setProjectrolesList(createProjectRoleAssignments(projectRoles));
 
   return inviteUserToOrganization(request, createWorkspaceMetadata(auth));
@@ -275,12 +285,12 @@ export const deleteOrganizationUser = ({
 
 export const updateOrganizationUserRole = ({
   userId,
-  organizationRole,
+  roleDefinitionIds,
   auth,
 }: UpdateOrganizationUserRoleParams) => {
   const request = new UpdateUserOrganizationRoleRequest();
   request.setUserid(userId);
-  request.setOrganizationrole(organizationRole);
+  request.setRoledefinitionidsList(roleDefinitionIds);
 
   return updateUserOrganizationRole(request, createWorkspaceMetadata(auth));
 };

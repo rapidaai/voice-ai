@@ -3,10 +3,12 @@ package internal_productusage_service
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
 	"github.com/rapidaai/pkg/types"
@@ -72,22 +74,27 @@ func newProductUsageServiceTest(t *testing.T) (Service, *gorm.DB) {
 	return NewProductUsageService(&productUsageTestPostgres{db: database}, nil), database
 }
 
-func productUsageAuth(authType types.AuthType, organizationID, projectID, actorID uint64) *types.Authentication {
-	auth := &types.Authentication{
-		AuthType: authType,
-		ActorValue: &types.ActorIdentity{
-			Type: types.ActorType(authType),
-			ID:   actorID,
-		},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+func productUsageAuth(authType authentication.IdentityType, organizationID, projectID, actorID uint64) authentication.Principal {
+	tenant := authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID}
+	subject := authentication.Identity{ID: actorID}
+	proof := authentication.Proof{}
+	switch authType {
+	case authentication.IdentityUser:
+		subject.Type = authentication.IdentityUser
+		proof = authentication.Proof{Method: authentication.AuthenticationUserSession, Reference: authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: "product-usage-test"}}
+	case authentication.IdentityProjectCredential:
+		subject.Type = authentication.IdentityProjectCredential
+		proof = authentication.Proof{Method: authentication.AuthenticationProjectCredential, Audience: authentication.AudienceManagement, Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: strconv.FormatUint(actorID, 10)}}
+	case authentication.IdentityOrganizationCredential:
+		subject.Type = authentication.IdentityOrganizationCredential
+		proof = authentication.Proof{Method: authentication.AuthenticationOrganizationCredential, Reference: authentication.ProofReference{Type: authentication.ProofReferenceCredential, Value: strconv.FormatUint(actorID, 10)}}
+	case authentication.IdentityService:
+		subject.Type = authentication.IdentityService
+		subject.Issuer = "product-usage-test"
+		proof = authentication.Proof{Method: authentication.AuthenticationServiceAssertion, Audience: authentication.AudienceRapidaInternal, Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "product-usage-key"}}
 	}
-	if projectID > 0 {
-		auth.ProjectValue = &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID}
-	}
-	if authType == types.AuthTypeUser {
-		auth.UserValue = &types.UserContext{UserID: actorID}
-	}
-	return auth
+	principal, _ := authentication.NewDirectPrincipal(subject, tenant, proof, nil)
+	return principal
 }
 
 func productUsageInput(quantity int64, occurredAt time.Time) *protos.CreateProductUsageRequest {
@@ -104,7 +111,7 @@ func insertProductUsage(t *testing.T, database *gorm.DB, organizationID, project
 	usage := internal_entity.ProductUsage{
 		Mutable: gorm_model.Mutable{
 			Status:           type_enums.RECORD_ACTIVE,
-			CreatedActorType: types.AuthTypeUser.String(),
+			CreatedActorType: string(authentication.IdentityUser),
 			CreatedActorID:   1,
 		},
 		Organizational: gorm_model.Organizational{
@@ -130,7 +137,7 @@ func TestGetDashboardUsageScopesRangeAndTenant(t *testing.T) {
 	insertProductUsage(t, database, 20, 200, string(types.ProductUsageSTTDuration), int64(9*time.Second), fromDate)
 	insertProductUsage(t, database, 10, 100, string(types.ProductUsageSTTDuration), int64(9*time.Second), toDate)
 
-	section, err := service.GetDashboardUsage(context.Background(), productUsageAuth(types.AuthTypeProject, 10, 100, 100), fromDate, toDate)
+	section, err := service.GetDashboardUsage(context.Background(), productUsageAuth(authentication.IdentityProjectCredential, 10, 100, 100), fromDate, toDate)
 	require.NoError(t, err)
 	require.Equal(t, protos.DashboardSectionState_DASHBOARD_SECTION_STATE_READY, section.GetState())
 	require.Len(t, section.GetComponents(), 6)
@@ -140,7 +147,7 @@ func TestGetDashboardUsageScopesRangeAndTenant(t *testing.T) {
 func TestGetDashboardUsageReturnsEmptyAndRejectsInvalidRange(t *testing.T) {
 	service, database := newProductUsageServiceTest(t)
 	fromDate := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
-	auth := productUsageAuth(types.AuthTypeProject, 10, 100, 100)
+	auth := productUsageAuth(authentication.IdentityProjectCredential, 10, 100, 100)
 	insertProductUsage(t, database, 10, 100, "unsupported_duration", int64(time.Second), fromDate)
 
 	section, err := service.GetDashboardUsage(context.Background(), auth, fromDate, fromDate.Add(time.Hour))
@@ -153,7 +160,7 @@ func TestGetDashboardUsageReturnsEmptyAndRejectsInvalidRange(t *testing.T) {
 
 func TestCreateProductUsageGeneratesIDAndAllowsRepeatedEvents(t *testing.T) {
 	service, database := newProductUsageServiceTest(t)
-	auth := productUsageAuth(types.AuthTypeUser, 10, 100, 1)
+	auth := productUsageAuth(authentication.IdentityUser, 10, 100, 1)
 	request := productUsageInput(25, time.Date(2026, time.August, 29, 10, 30, 0, 123456789, time.FixedZone("test", 5*60*60+30*60)))
 
 	first, err := service.CreateProductUsage(context.Background(), auth, request)
@@ -167,7 +174,7 @@ func TestCreateProductUsageGeneratesIDAndAllowsRepeatedEvents(t *testing.T) {
 	require.Equal(t, uint64(10), first.OrganizationId)
 	require.Equal(t, uint64(100), first.ProjectId)
 	require.Equal(t, int64(25), first.Usages)
-	require.Equal(t, types.AuthTypeUser.String(), first.CreatedActorType)
+	require.Equal(t, string(authentication.IdentityUser), first.CreatedActorType)
 	require.Equal(t, uint64(1), first.CreatedActorID)
 	require.Equal(t, request.GetOccurredAt().AsTime().UTC().Truncate(time.Microsecond), first.OccurredAt)
 
@@ -178,7 +185,7 @@ func TestCreateProductUsageGeneratesIDAndAllowsRepeatedEvents(t *testing.T) {
 
 func TestCreateProductUsageValidatesInputAndProjectOwnership(t *testing.T) {
 	service, _ := newProductUsageServiceTest(t)
-	auth := productUsageAuth(types.AuthTypeService, 10, 100, 601)
+	auth := productUsageAuth(authentication.IdentityService, 10, 100, 601)
 	occurredAt := time.Date(2026, time.August, 29, 5, 0, 0, 0, time.UTC)
 
 	_, err := service.CreateProductUsage(context.Background(), auth, productUsageInput(0, occurredAt))
@@ -189,7 +196,7 @@ func TestCreateProductUsageValidatesInputAndProjectOwnership(t *testing.T) {
 	_, err = service.CreateProductUsage(context.Background(), auth, invalidUnit)
 	require.ErrorIs(t, err, ErrInvalidRequest)
 
-	_, err = service.CreateProductUsage(context.Background(), productUsageAuth(types.AuthTypeUser, 20, 100, 1), productUsageInput(1, occurredAt))
+	_, err = service.CreateProductUsage(context.Background(), productUsageAuth(authentication.IdentityUser, 20, 100, 1), productUsageInput(1, occurredAt))
 	require.ErrorIs(t, err, ErrProjectMismatch)
 
 	_, err = service.CreateProductUsage(context.Background(), auth, nil)
@@ -207,7 +214,7 @@ func TestGetProductUsagesScopesTypeTenantCriteriaAndPagination(t *testing.T) {
 
 	count, usages, err := service.GetProductUsages(
 		context.Background(),
-		productUsageAuth(types.AuthTypeUser, 10, 100, 1),
+		productUsageAuth(authentication.IdentityUser, 10, 100, 1),
 		string(types.ProductUsageSTTDuration),
 		[]*protos.Criteria{{Key: "usages", Logic: ">=", Value: "10"}},
 		&protos.Paginate{Page: 2, PageSize: 1},
@@ -221,7 +228,7 @@ func TestGetProductUsagesScopesTypeTenantCriteriaAndPagination(t *testing.T) {
 
 func TestGetProductUsagesRequiresSupportedUsageType(t *testing.T) {
 	service, _ := newProductUsageServiceTest(t)
-	auth := productUsageAuth(types.AuthTypeProject, 10, 100, 501)
+	auth := productUsageAuth(authentication.IdentityProjectCredential, 10, 100, 501)
 
 	_, _, err := service.GetProductUsages(context.Background(), auth, "", nil, nil)
 	require.ErrorIs(t, err, ErrInvalidRequest)
@@ -238,7 +245,7 @@ func TestGetOrganizationUsagesSpansProjectsWithoutCrossingTenant(t *testing.T) {
 
 	count, usages, err := service.GetOrganizationUsages(
 		context.Background(),
-		productUsageAuth(types.AuthTypeOrg, 10, 0, 700),
+		productUsageAuth(authentication.IdentityOrganizationCredential, 10, 0, 700),
 		[]*protos.Criteria{{Key: "usageType", Value: string(types.ProductUsageLLMDuration)}},
 		&protos.Paginate{Page: 1, PageSize: 10},
 	)
@@ -253,7 +260,7 @@ func TestGetOrganizationUsagesRejectsUnsafeCriteria(t *testing.T) {
 	service, _ := newProductUsageServiceTest(t)
 	_, _, err := service.GetOrganizationUsages(
 		context.Background(),
-		productUsageAuth(types.AuthTypeUser, 10, 0, 1),
+		productUsageAuth(authentication.IdentityUser, 10, 0, 1),
 		[]*protos.Criteria{{Key: "organization_id OR 1=1", Value: "10"}},
 		nil,
 	)

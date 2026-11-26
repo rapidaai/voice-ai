@@ -5,4 +5,4 @@ script_directory=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$script_directory/../report.sh"
 
-run_flow_clients "$script_directory" 'Create vault' nodejs react
+run_flow_clients "$script_directory" 'Reject vault creation without recent MFA' nodejs react

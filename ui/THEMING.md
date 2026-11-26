@@ -91,7 +91,7 @@ placeholder at container startup. It does not change branding or theme values.
 - `defaultMode` accepts `light`, `dark`, or `system`.
 - `allowModeSelection: false` ignores stored and cross-tab user overrides.
 - A locked `system` mode continues to follow operating-system mode changes.
-- User preference is stored under `ui-theme-mode`.
+- User preference is stored under `rpd::__ui_theme`.
 - The resolved mode is exposed through `data-color-mode` on `<html>`.
 - The selected Carbon preset is exposed through `data-carbon-theme` and the
   matching `cds--<preset>` class on `<html>`.

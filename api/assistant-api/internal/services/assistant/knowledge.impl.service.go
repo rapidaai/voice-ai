@@ -13,12 +13,12 @@ import (
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
 	"github.com/rapidaai/pkg/storages"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	"gorm.io/gorm"
@@ -32,7 +32,7 @@ type assistantKnowledgeService struct {
 }
 
 // CreateAssistantKnowledge implements internal_services.AssistantKnowledgeService.
-func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *types.Authentication, assistantId uint64, knowledgeId uint64,
+func (eService *assistantKnowledgeService) Create(ctx context.Context, auth authentication.Principal, assistantId uint64, knowledgeId uint64,
 	retrievalMethod gorm_types.RetrievalMethod,
 	rerankEnabled bool, scoreThreshold float32, topK uint32, rerankerProviderModelId *uint64,
 	rerankerProviderModelName *string,
@@ -60,8 +60,8 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *typ
 		TopK:            topK,
 		Mutable: gorm_models.Mutable{
 			Status:           type_enums.RECORD_ACTIVE,
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(auth.Caller().Type),
+			CreatedActorID:   auth.Caller().ID,
 		},
 	}
 
@@ -87,8 +87,8 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *typ
 			AssistantKnowledgeId: assistantKnowledgeConfig.Id,
 			Mutable: gorm_models.Mutable{
 				Status:           type_enums.RECORD_ACTIVE,
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -100,8 +100,8 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *typ
 		Columns: []clause.Column{{Name: "assistant_provider_model_id"}, {Name: "key"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
 			"value":              gorm.Expr("excluded.value"),
-			"updated_actor_type": auth.Actor().Type.String(),
-			"updated_actor_id":   auth.Actor().ID,
+			"updated_actor_type": string(auth.Caller().Type),
+			"updated_actor_id":   auth.Caller().ID,
 		}),
 	}).Create(modelOptions)
 	if tx.Error != nil {
@@ -114,15 +114,15 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *typ
 }
 
 // DeleteAssistantKnowledge implements internal_services.AssistantKnowledgeService.
-func (eService *assistantKnowledgeService) Delete(ctx context.Context, auth *types.Authentication, akId uint64, assistantId uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
+func (eService *assistantKnowledgeService) Delete(ctx context.Context, auth authentication.Principal, akId uint64, assistantId uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	aK := &internal_assistant_entity.AssistantKnowledge{
 		Mutable: gorm_models.Mutable{
 			Status:           type_enums.RECORD_ARCHIEVE,
-			UpdatedActorType: auth.Actor().Type.String(),
-			UpdatedActorID:   auth.Actor().ID,
+			UpdatedActorType: string(auth.Caller().Type),
+			UpdatedActorID:   auth.Caller().ID,
 		},
 	}
 	tx := db.Where("id = ? AND assistant_id = ? ",
@@ -138,7 +138,7 @@ func (eService *assistantKnowledgeService) Delete(ctx context.Context, auth *typ
 }
 
 // GetAllAssistantKnowledge implements internal_services.AssistantKnowledgeService.
-func (eService *assistantKnowledgeService) GetAll(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantKnowledge, error) {
+func (eService *assistantKnowledgeService) GetAll(ctx context.Context, auth authentication.Principal, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantKnowledge, error) {
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var (
@@ -175,7 +175,7 @@ func (eService *assistantKnowledgeService) GetAll(ctx context.Context, auth *typ
 }
 
 // GetAssistantKnowledge implements internal_services.AssistantKnowledgeService.
-func (eService *assistantKnowledgeService) Get(ctx context.Context, auth *types.Authentication, akId, assistantId uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
+func (eService *assistantKnowledgeService) Get(ctx context.Context, auth authentication.Principal, akId, assistantId uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var aK *internal_assistant_entity.AssistantKnowledge
@@ -194,7 +194,7 @@ func (eService *assistantKnowledgeService) Get(ctx context.Context, auth *types.
 }
 
 // UpdateAssistantKnowledge implements internal_services.AssistantKnowledgeService.
-func (eService *assistantKnowledgeService) Update(ctx context.Context, auth *types.Authentication, akId uint64, assistantId uint64, knowledgeId uint64, retrievalMethod gorm_types.RetrievalMethod, rerankEnabled bool, scoreThreshold float32, topK uint32, rerankerProviderModelId *uint64, rerankerProviderModelName *string, rerankerProviderModelOptions []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
+func (eService *assistantKnowledgeService) Update(ctx context.Context, auth authentication.Principal, akId uint64, assistantId uint64, knowledgeId uint64, retrievalMethod gorm_types.RetrievalMethod, rerankEnabled bool, scoreThreshold float32, topK uint32, rerankerProviderModelId *uint64, rerankerProviderModelName *string, rerankerProviderModelOptions []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
@@ -216,8 +216,8 @@ func (eService *assistantKnowledgeService) Update(ctx context.Context, auth *typ
 		RerankerEnable:  rerankEnabled,
 		TopK:            topK,
 		Mutable: gorm_models.Mutable{
-			UpdatedActorType: auth.Actor().Type.String(),
-			UpdatedActorID:   auth.Actor().ID,
+			UpdatedActorType: string(auth.Caller().Type),
+			UpdatedActorID:   auth.Caller().ID,
 		},
 	}
 	if rerankEnabled {

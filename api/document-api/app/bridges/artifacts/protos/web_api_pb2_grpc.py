@@ -50,11 +50,6 @@ class AuthenticationServiceStub(object):
                 request_serializer=web__api__pb2.AuthorizeRequest.SerializeToString,
                 response_deserializer=web__api__pb2.AuthenticateResponse.FromString,
                 _registered_method=True)
-        self.ScopeAuthorize = channel.unary_unary(
-                '/web_api.AuthenticationService/ScopeAuthorize',
-                request_serializer=web__api__pb2.ScopeAuthorizeRequest.SerializeToString,
-                response_deserializer=web__api__pb2.ScopedAuthenticationResponse.FromString,
-                _registered_method=True)
         self.VerifyToken = channel.unary_unary(
                 '/web_api.AuthenticationService/VerifyToken',
                 request_serializer=web__api__pb2.VerifyTokenRequest.SerializeToString,
@@ -123,12 +118,6 @@ class AuthenticationServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def Authorize(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def ScopeAuthorize(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -213,11 +202,6 @@ def add_AuthenticationServiceServicer_to_server(servicer, server):
                     servicer.Authorize,
                     request_deserializer=web__api__pb2.AuthorizeRequest.FromString,
                     response_serializer=web__api__pb2.AuthenticateResponse.SerializeToString,
-            ),
-            'ScopeAuthorize': grpc.unary_unary_rpc_method_handler(
-                    servicer.ScopeAuthorize,
-                    request_deserializer=web__api__pb2.ScopeAuthorizeRequest.FromString,
-                    response_serializer=web__api__pb2.ScopedAuthenticationResponse.SerializeToString,
             ),
             'VerifyToken': grpc.unary_unary_rpc_method_handler(
                     servicer.VerifyToken,
@@ -351,33 +335,6 @@ class AuthenticationService(object):
             '/web_api.AuthenticationService/Authorize',
             web__api__pb2.AuthorizeRequest.SerializeToString,
             web__api__pb2.AuthenticateResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def ScopeAuthorize(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/web_api.AuthenticationService/ScopeAuthorize',
-            web__api__pb2.ScopeAuthorizeRequest.SerializeToString,
-            web__api__pb2.ScopedAuthenticationResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1043,6 +1000,11 @@ class ProjectServiceStub(object):
                 request_serializer=web__api__pb2.GetAllProjectCredentialRequest.SerializeToString,
                 response_deserializer=web__api__pb2.GetAllProjectCredentialResponse.FromString,
                 _registered_method=True)
+        self.RevokeProjectCredential = channel.unary_unary(
+                '/web_api.ProjectService/RevokeProjectCredential',
+                request_serializer=web__api__pb2.RevokeProjectCredentialRequest.SerializeToString,
+                response_deserializer=web__api__pb2.RevokeProjectCredentialResponse.FromString,
+                _registered_method=True)
 
 
 class ProjectServiceServicer(object):
@@ -1102,6 +1064,12 @@ class ProjectServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RevokeProjectCredential(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ProjectServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1149,6 +1117,11 @@ def add_ProjectServiceServicer_to_server(servicer, server):
                     servicer.GetAllProjectCredential,
                     request_deserializer=web__api__pb2.GetAllProjectCredentialRequest.FromString,
                     response_serializer=web__api__pb2.GetAllProjectCredentialResponse.SerializeToString,
+            ),
+            'RevokeProjectCredential': grpc.unary_unary_rpc_method_handler(
+                    servicer.RevokeProjectCredential,
+                    request_deserializer=web__api__pb2.RevokeProjectCredentialRequest.FromString,
+                    response_serializer=web__api__pb2.RevokeProjectCredentialResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1394,6 +1367,33 @@ class ProjectService(object):
             '/web_api.ProjectService/GetAllProjectCredential',
             web__api__pb2.GetAllProjectCredentialRequest.SerializeToString,
             web__api__pb2.GetAllProjectCredentialResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RevokeProjectCredential(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/web_api.ProjectService/RevokeProjectCredential',
+            web__api__pb2.RevokeProjectCredentialRequest.SerializeToString,
+            web__api__pb2.RevokeProjectCredentialResponse.FromString,
             options,
             channel_credentials,
             insecure,

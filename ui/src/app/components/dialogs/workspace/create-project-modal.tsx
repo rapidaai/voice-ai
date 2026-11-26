@@ -41,7 +41,7 @@ export const CreateProjectDialog = ({
   const { register, handleSubmit } = useForm<ProjectFormValues>();
   const { loading, showLoader, hideLoader } = useRapidaStore();
   const { authorize } = useContext(AuthContext);
-  const { authId, token } = useCurrentCredential();
+  const { authId, organizationId, token } = useCurrentCredential();
   const [error, setError] = useState<string>();
 
   const closeDialog = useCallback(() => {
@@ -98,7 +98,7 @@ export const CreateProjectDialog = ({
     createWorkspaceProject({
       name: data.projectName,
       description: data.projectDescription,
-      auth: { token, userId: authId },
+      auth: { organizationId, token, userId: authId },
       callback: handleCreateProject,
     });
   };

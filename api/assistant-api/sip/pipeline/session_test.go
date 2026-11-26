@@ -17,8 +17,8 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/authentication"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
-	"github.com/rapidaai/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,16 +64,19 @@ func TestSIPTalkerReceivesRapidaClient(t *testing.T) {
 	require.True(t, found, "SIP talker does not receive RapidaClient")
 }
 
-func newIdentityTestAuthentication() *types.Authentication {
+func newIdentityTestAuthentication() authentication.Principal {
 	organizationID := uint64(7)
 	projectID := uint64(8)
 	serviceID := uint64(9)
-	return &types.Authentication{
-		AuthType:          types.AuthTypeService,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeService, ID: serviceID},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityService, ID: serviceID, Issuer: "assistant-api"},
+		authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID},
+		authentication.Proof{Method: authentication.AuthenticationServiceAssertion, Audience: authentication.AudienceRapidaInternal, Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "assistant-test-1"}}, nil,
+	)
+	if err != nil {
+		panic(err)
 	}
+	return principal
 }
 
 func TestEnsureCallContextOutboundFallbackMapsPhoneValues(t *testing.T) {
@@ -110,10 +113,9 @@ func TestEnsureCallContextOutboundFallbackMapsPhoneValues(t *testing.T) {
 	assert.Equal(t, "+15557654321", call.FromNumber)
 	assert.Equal(t, uint64(7), call.OrganizationID)
 	assert.Equal(t, uint64(8), call.ProjectID)
-	require.NotNil(t, call.AuthActorType)
-	assert.Equal(t, string(types.ActorTypeService), *call.AuthActorType)
-	require.NotNil(t, call.AuthActorID)
-	assert.Equal(t, uint64(9), *call.AuthActorID)
+	assert.Equal(t, string(authentication.IdentityService), call.AuthSubjectType)
+	assert.Equal(t, uint64(9), call.AuthSubjectID)
+	assert.Nil(t, call.AuthServiceActorID)
 }
 
 func TestEnsureCallContextOutboundFallbackKeepsAliasPhonesEmpty(t *testing.T) {
@@ -232,7 +234,7 @@ func TestEnsureCallContextOutboundLoadedContextClearsAliasPhones(t *testing.T) {
 	assert.Equal(t, 1, store.getCalls)
 }
 
-func newOutboundContextTestSession(t *testing.T, auth *types.Authentication, contextID string) *sip_runtime.Session {
+func newOutboundContextTestSession(t *testing.T, auth authentication.Principal, contextID string) *sip_runtime.Session {
 	t.Helper()
 	session, err := sip_runtime.NewSession(context.Background(),
 		sip_runtime.WithSessionConfig(&sip_config.Config{

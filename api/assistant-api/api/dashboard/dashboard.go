@@ -8,7 +8,7 @@ import (
 	internal_dashboard_service "github.com/rapidaai/api/assistant-api/internal/services/dashboard"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/protos"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -30,17 +30,13 @@ func (dashboardAPI *projectDashboardAnalyticsGRPCApi) GetProjectDashboardAnalyti
 	if request == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
-	auth, err := types.Authorize(ctx)
-	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, err.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	auth, err = auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if err != nil {
-		return nil, status.Error(codes.PermissionDenied, err.Error())
-	}
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, status.Error(codes.PermissionDenied, err.Error())
+	projectContext := principal.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, status.Error(codes.PermissionDenied, "project authentication is required")
 	}
 
 	analytics, err := dashboardAPI.projectDashboardAnalytics.GetProjectDashboardAnalytics(ctx, projectContext, request)

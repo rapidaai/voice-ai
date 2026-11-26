@@ -15,17 +15,15 @@ export const useAuth = () => {
  * @returns
  */
 export const useCredential = () => {
-  const { currentUser, token, currentProjectRole, organizationRole } =
+  const { authentication, token, getCurrentProject, getCurrentOrganization } =
     useAuth();
+  const currentProject = getCurrentProject?.();
+  const currentOrganization = getCurrentOrganization?.();
   return [
-    currentUser && currentUser.id ? currentUser.id : '',
+    authentication?.user?.id || '',
     token && token.token ? token.token : '',
-    currentProjectRole && currentProjectRole.projectid
-      ? currentProjectRole.projectid
-      : '',
-    organizationRole && organizationRole.organizationid
-      ? organizationRole.organizationid
-      : '',
+    currentProject?.id || '',
+    currentOrganization?.id || '',
   ];
 };
 
@@ -34,20 +32,16 @@ export const useCredential = () => {
  * @returns
  */
 export const useCurrentCredential = () => {
-  const { currentUser, token, currentProjectRole, organizationRole } =
+  const { authentication, token, getCurrentProject, getCurrentOrganization } =
     useAuth();
+  const currentProject = getCurrentProject?.();
+  const currentOrganization = getCurrentOrganization?.();
   return {
-    user: currentUser,
-    authId: currentUser && currentUser.id ? currentUser.id : '',
+    user: authentication?.user,
+    authId: authentication?.user?.id || '',
     token: token && token.token ? token.token : '',
-    projectId:
-      currentProjectRole && currentProjectRole.projectid
-        ? currentProjectRole.projectid
-        : '',
-    organizationId:
-      organizationRole && organizationRole.organizationid
-        ? organizationRole.organizationid
-        : '',
+    projectId: currentProject?.id || '',
+    organizationId: currentOrganization?.id || '',
   };
 };
 
@@ -63,11 +57,11 @@ export const useResourceRole = (resource: {
   /**
    *
    */
-  const { currentUser, projectRoles, organizationRole } = useAuth();
+  const { authentication, getProjects, getCurrentOrganization } = useAuth();
 
-  const userId = currentUser && currentUser.id;
-  const orgId = organizationRole && organizationRole.organizationid;
-  const projectIds = projectRoles?.map(x => x.projectid);
+  const userId = authentication?.user?.id;
+  const orgId = getCurrentOrganization?.()?.id;
+  const projectIds = getProjects?.().map(project => project.id);
   if (!userId || !projectIds || !orgId) return ResourceRole.anyone;
   if (userId === resource.getCreatedby()) {
     return ResourceRole.owner;

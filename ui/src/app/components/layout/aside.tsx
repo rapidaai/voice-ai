@@ -9,6 +9,7 @@ export function Aside({
   children,
   onMouseEnter,
   onMouseLeave,
+  style,
   ...attributes
 }: AsideProps) {
   const { open, setOpen } = useSidebar();
@@ -33,13 +34,14 @@ export function Aside({
         'no-scrollbar overflow-y-auto overflow-x-hidden',
         'group',
         open
-          ? 'absolute inset-y-0 left-0 w-64 shadow-lg md:relative md:inset-auto md:shadow-none'
-          : 'relative w-12',
+          ? 'absolute inset-y-0 left-0 shadow-lg md:relative md:inset-auto md:shadow-none'
+          : 'relative',
         'h-full transition-[width] duration-200 ease-in-out',
         className,
       )}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      style={{ ...style, width: open ? '13.5rem' : '3rem' }}
     >
       {children}
     </aside>

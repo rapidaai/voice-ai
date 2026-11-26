@@ -26,16 +26,18 @@ import (
 
 	"github.com/rapidaai/api/integration-api/config"
 	integration_routers "github.com/rapidaai/api/integration-api/router"
-	web_client "github.com/rapidaai/pkg/clients/web"
+	authentication_resolver "github.com/rapidaai/pkg/authentication/resolver"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	middlewares "github.com/rapidaai/pkg/middlewares"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 
 	"github.com/soheilhy/cmux"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 
-	"github.com/rapidaai/pkg/authenticators"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
+	"github.com/rapidaai/pkg/utils"
 )
 
 // wrapper for gin engine
@@ -46,6 +48,7 @@ type AppRunner struct {
 	Logger    commons.Logger
 	Postgres  connectors.PostgresConnector
 	Redis     connectors.RedisConnector
+	Clients   *rapida_client.RapidaClient
 	Closeable []func(context.Context) error
 }
 
@@ -72,37 +75,32 @@ func main() {
 		panic(err)
 	}
 
+	if err := appRunner.Init(ctx); err != nil {
+		appRunner.Close(ctx)
+		panic(err)
+	}
+	defer appRunner.Close(ctx)
+
 	// interservice communication is authenticated now
-	authClient := web_client.NewAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)
-	userAuthenticator := authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
-	projectAuthenticator := authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
-	organizationAuthenticator := authenticators.NewOrganizationAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
-	serviceAuthenticator := authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger)
 	appRunner.S = grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
 
-			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(projectAuthenticator, appRunner.Logger),
-			middlewares.NewOrganizationAuthenticatorUnaryServerMiddleware(organizationAuthenticator, appRunner.Logger),
-			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(serviceAuthenticator, appRunner.Logger),
-			middlewares.NewAuthenticationUnaryServerMiddleware(userAuthenticator, appRunner.Logger),
+			middleware_authentication.NewProjectUnaryMiddleware(authentication_resolver.NewProjectPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
+			middleware_authentication.NewOrganizationUnaryMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
+			middleware_authentication.NewServiceUnaryMiddleware(authentication_resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, appRunner.Cfg.ServiceAuthenticationKey()), appRunner.Logger),
+			middleware_authentication.NewUserUnaryMiddleware(authentication_resolver.NewUserPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 		),
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
-
-			middlewares.NewProjectAuthenticatorStreamServerMiddleware(projectAuthenticator, appRunner.Logger),
-			middlewares.NewOrganizationAuthenticatorStreamServerMiddleware(organizationAuthenticator, appRunner.Logger),
-			middlewares.NewServiceAuthenticatorStreamServerMiddleware(serviceAuthenticator, appRunner.Logger),
-			middlewares.NewAuthenticationStreamServerMiddleware(userAuthenticator, appRunner.Logger),
+			middleware_authentication.NewProjectStreamMiddleware(authentication_resolver.NewProjectPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
+			middleware_authentication.NewOrganizationStreamMiddleware(authentication_resolver.NewOrganizationPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
+			middleware_authentication.NewServiceStreamMiddleware(authentication_resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, appRunner.Cfg.ServiceAuthenticationKey()), appRunner.Logger),
+			middleware_authentication.NewUserStreamMiddleware(authentication_resolver.NewUserPrincipalResolver(appRunner.Clients.Authentication), appRunner.Logger),
 		),
 	)
-	// init
-	if err := appRunner.Init(ctx); err != nil {
-		panic(err)
-	}
-
 	// all routers add all handlers which required to resolve the service request
 	appRunner.AllRouters()
 
@@ -115,7 +113,6 @@ func main() {
 		panic(err)
 	}
 
-	defer appRunner.Close(ctx)
 	cmuxListener := cmux.New(listener)
 	http2GRPCFilteredListener := cmuxListener.Match(cmux.HTTP2())
 	grpcFilteredListener := cmuxListener.Match(
@@ -139,7 +136,8 @@ func main() {
 		}
 
 		httpServer := http.Server{
-			Handler: http.HandlerFunc(handler),
+			Handler:           http.HandlerFunc(handler),
+			ReadHeaderTimeout: 10 * time.Second,
 		}
 		//
 		err = httpServer.Serve(grpcFilteredListener)
@@ -214,19 +212,31 @@ func (app *AppRunner) ResolveConfig() error {
 
 // init for app close
 func (app *AppRunner) Init(ctx context.Context) error {
-	err := app.Postgres.Connect(ctx)
-	if err != nil {
-		app.Logger.Error("error while connecting to postgres.", err)
-		return err
+	if app.Postgres != nil {
+		err := app.Postgres.Connect(ctx)
+		if err != nil {
+			app.Logger.Error("error while connecting to postgres.", err)
+			return err
+		}
+		app.Closeable = append(app.Closeable, app.Postgres.Disconnect)
 	}
-	err = app.Redis.Connect(ctx)
-	if err != nil {
-		app.Logger.Error("error while connecting to redis.", err)
-		return err
+	if app.Redis != nil {
+		err := app.Redis.Connect(ctx)
+		if err != nil {
+			app.Logger.Error("error while connecting to redis.", err)
+			return err
+		}
+		app.Closeable = append(app.Closeable, app.Redis.Disconnect)
 	}
 
-	app.Closeable = append(app.Closeable, app.Redis.Disconnect)
-	app.Closeable = append(app.Closeable, app.Postgres.Disconnect)
+	clients, err := rapida_client.New(&app.Cfg.AppConfig, app.Logger, app.Redis)
+	if err != nil {
+		return fmt.Errorf("initialize internal clients: %w", err)
+	}
+	app.Clients = clients
+	if app.Clients != nil {
+		app.Closeable = append(app.Closeable, app.Clients.Close)
+	}
 
 	return nil
 }
@@ -324,7 +334,14 @@ func (app *AppRunner) Migrate() error {
 	}
 	if dirty {
 		app.Logger.Warnf("Database is in a dirty state at version: %d. Forcing clean...", version)
-		if err := m.Force(int(version - 1)); err != nil {
+		if version == 0 {
+			return fmt.Errorf("cannot force migration below version zero")
+		}
+		previousVersion, conversionErr := utils.Uint64ToInt(uint64(version - 1))
+		if conversionErr != nil {
+			return fmt.Errorf("invalid migration version: %w", conversionErr)
+		}
+		if err := m.Force(previousVersion); err != nil {
 			return fmt.Errorf("failed to force migration version: %w", err)
 		}
 		app.Logger.Infof("Migration state forced to clean at version: %d. Proceeding with migration.", version-1)

@@ -12,15 +12,15 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	clients "github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	endpoint_api "github.com/rapidaai/protos"
 )
 
 type DeploymentServiceClient interface {
-	Invoke(ctx context.Context, auth *types.Authentication, iRequest *endpoint_api.InvokeRequest) (*endpoint_api.InvokeResponse, error)
+	Invoke(ctx context.Context, auth authentication.Principal, iRequest *endpoint_api.InvokeRequest) (*endpoint_api.InvokeResponse, error)
 }
 
 type deploymentServiceClient struct {
@@ -48,14 +48,14 @@ func NewDeploymentServiceClientGRPC(config *config.AppConfig, logger commons.Log
 // NewDeploymentServiceClientWithClient creates a deployment client using the provided gRPC client.
 func NewDeploymentServiceClientWithClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, deploymentClient endpoint_api.DeploymentClient) DeploymentServiceClient {
 	return &deploymentServiceClient{
-		InternalClient:   clients.NewInternalClient(config, logger, redis),
+		InternalClient:   clients.NewInternalClient(config, "endpoint-api", logger, redis),
 		cfg:              config,
 		logger:           logger,
 		deploymentClient: deploymentClient,
 	}
 }
 
-func (dsc *deploymentServiceClient) Invoke(ctx context.Context, auth *types.Authentication, iRequest *endpoint_api.InvokeRequest) (*endpoint_api.InvokeResponse, error) {
+func (dsc *deploymentServiceClient) Invoke(ctx context.Context, auth authentication.Principal, iRequest *endpoint_api.InvokeRequest) (*endpoint_api.InvokeResponse, error) {
 	authContext, err := dsc.WithAuth(ctx, auth)
 	if err != nil {
 		return nil, err

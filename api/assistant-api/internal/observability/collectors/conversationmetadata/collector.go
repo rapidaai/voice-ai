@@ -57,7 +57,7 @@ func (c *Collector) Collect(ctx context.Context, scope observability.Scope, obse
 	if !validator.NonNil(c) || !validator.NonNil(c.conversationService) {
 		return ErrMetadataServiceRequired
 	}
-	if !validator.NonNil(observationContext.Auth) {
+	if !validator.NonZero(observationContext.Auth.Subject().ID) {
 		return ErrMetadataAuthRequired
 	}
 

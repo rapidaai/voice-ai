@@ -16,8 +16,8 @@ import (
 	"github.com/emiago/sipgo/sip"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
@@ -125,7 +125,7 @@ type SIPRequestContext struct {
 	CallAddress CallAddress
 	SDPInfo     *SDPMediaInfo
 
-	Auth            *types.Authentication
+	Auth            authentication.Principal
 	Assistant       *internal_assistant_entity.Assistant
 	VaultCredential *protos.VaultCredential
 	Config          *sip_config.Config

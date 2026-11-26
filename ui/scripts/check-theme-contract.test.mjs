@@ -161,6 +161,25 @@ test('accepts a valid enterprise theme repository', context => {
   assert.deepEqual(checkThemeContract(repoRoot), []);
 });
 
+test('assigns shared side navigation tokens to the shared pattern owner', () => {
+  assert.deepEqual(
+    SHELL_CONTRACTS[
+      'ui/src/app/components/layout/navigation/side-navigation-patterns.tsx'
+    ],
+    [
+      'bg-shell',
+      'border-border-subtle',
+      'text-muted',
+      'text-foreground',
+      'bg-layer-hover',
+    ],
+  );
+  assert.equal(
+    SHELL_CONTRACTS['ui/src/app/components/layout/navigation/sidebar.tsx'],
+    undefined,
+  );
+});
+
 test('rejects the legacy context and legacy provider or hook references', context => {
   const repoRoot = createFixtureRepo(context);
   writeFixtureFile(
@@ -229,8 +248,7 @@ test('rejects typography palettes and dark inversion', () => {
 });
 
 test('rejects literal and dark placeholder colors', () => {
-  const source =
-    'className="placeholder-gray-400 dark:placeholder-gray-600"';
+  const source = 'className="placeholder-gray-400 dark:placeholder-gray-600"';
 
   assert.deepEqual(
     findThemeStyleViolations(source).map(({ rule }) => rule),

@@ -77,22 +77,28 @@ func (uat *UserAuthToken) IsExpired() bool {
 type UserOrganizationRole struct {
 	gorm_model.Audited
 	gorm_model.Mutable
-	UserAuthId     uint64       `json:"user_auth_id" gorm:"type:bigint;size:20;not null;index:ur_idx_auth_id"`
-	OrganizationId uint64       `json:"organization_id" gorm:"type:bigint;size:20;not null"`
-	Role           string       `json:"role" gorm:"type:string;size:200;not null;"`
-	Organization   Organization `gorm:"foreignKey:OrganizationId"`
-	Member         UserAuth     `gorm:"foreignKey:UserAuthId"`
+	UserAuthId       uint64         `json:"user_auth_id" gorm:"type:bigint;size:20;not null;index:ur_idx_auth_id"`
+	OrganizationId   uint64         `json:"organization_id" gorm:"type:bigint;size:20;not null"`
+	RoleDefinitionID uint64         `json:"roleDefinitionId" gorm:"column:role_definition_id;type:bigint;not null"`
+	RoleScopeType    string         `json:"roleScopeType" gorm:"column:role_scope_type;type:varchar(32);not null"`
+	RoleSubjectType  string         `json:"roleSubjectType" gorm:"column:role_subject_type;type:varchar(32);not null"`
+	RoleDefinition   RoleDefinition `gorm:"foreignKey:RoleDefinitionID;references:Id"`
+	Organization     Organization   `gorm:"foreignKey:OrganizationId"`
+	Member           UserAuth       `gorm:"foreignKey:UserAuthId"`
 }
 
 type UserProjectRole struct {
 	gorm_model.Audited
 	gorm_model.Mutable
 
-	UserAuthId uint64   `json:"user_auth_id" gorm:"type:bigint;size:20;not null;index:ur_idx_auth_id"`
-	ProjectId  uint64   `json:"project_id" gorm:"type:bigint;size:20;not null"`
-	Role       string   `json:"role" gorm:"type:string;size:200;not null;"`
-	Project    Project  `gorm:"foreignKey:ProjectId"`
-	Member     UserAuth `gorm:"foreignKey:UserAuthId"`
+	UserAuthId       uint64         `json:"user_auth_id" gorm:"type:bigint;size:20;not null;index:ur_idx_auth_id"`
+	ProjectId        uint64         `json:"project_id" gorm:"type:bigint;size:20;not null"`
+	RoleDefinitionID uint64         `json:"roleDefinitionId" gorm:"column:role_definition_id;type:bigint;not null"`
+	RoleScopeType    string         `json:"roleScopeType" gorm:"column:role_scope_type;type:varchar(32);not null"`
+	RoleSubjectType  string         `json:"roleSubjectType" gorm:"column:role_subject_type;type:varchar(32);not null"`
+	RoleDefinition   RoleDefinition `gorm:"foreignKey:RoleDefinitionID;references:Id"`
+	Project          Project        `gorm:"foreignKey:ProjectId"`
+	Member           UserAuth       `gorm:"foreignKey:UserAuthId"`
 }
 
 func (uor *UserOrganizationRole) GetId() uint64 {
@@ -103,8 +109,8 @@ func (uor *UserOrganizationRole) GetOrganizationId() uint64 {
 	return uor.OrganizationId
 }
 
-func (uor *UserOrganizationRole) GetRoleName() string {
-	return uor.Role
+func (uor *UserOrganizationRole) GetRoleDefinitionID() uint64 {
+	return uor.RoleDefinitionID
 }
 
 func (uor *UserProjectRole) GetId() uint64 {
@@ -115,6 +121,6 @@ func (uor *UserProjectRole) GetProjectId() uint64 {
 	return uor.ProjectId
 }
 
-func (uor *UserProjectRole) GetRoleName() string {
-	return uor.Role
+func (uor *UserProjectRole) GetRoleDefinitionID() uint64 {
+	return uor.RoleDefinitionID
 }

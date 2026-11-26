@@ -64,6 +64,10 @@ import {
 import { EmptyState } from '@/app/components/ui/feedback';
 import { PageHeader } from '@/app/components/layout/page-header';
 import {
+  pageCardSurfaceClassName,
+  pageContentBoundaryClassName,
+} from '@/app/components/layout/page-content';
+import {
   PrimaryButton,
   SecondaryButton,
   Text,
@@ -73,8 +77,12 @@ import { listAssistants } from '@/clients/assistant.client';
 import { getProjectDashboardRange } from '@/clients/dashboard.client';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import { useTheme } from '@/theme/theme-provider';
+import { cn } from '@/utils';
 
 type DashboardRange = '30d' | '7d' | '24h';
+
+const healthSummaryItemClassName =
+  'grid min-h-[106px] grid-cols-[24px_minmax(0,1fr)_minmax(4rem,auto)] items-center gap-x-4 py-5';
 
 type DashboardMetric = {
   label: string;
@@ -250,10 +258,14 @@ function PanelHeader({
   return (
     <header className="flex min-h-[76px] flex-col items-start gap-4 border-b border-border-subtle px-6 py-4 sm:flex-row sm:justify-between ">
       <div>
-        <Text as="h2" variant="heading-02" className="text-foreground">
+        <Text
+          as="h2"
+          variant="heading-02"
+          className="font-semibold! text-foreground"
+        >
           {title}
         </Text>
-        <Text as="p" variant="body-compact-01" className="mt-1 text-muted">
+        <Text as="p" variant="helper-text-02" className="mt-1 text-helper">
           {subtitle}
         </Text>
       </div>
@@ -267,20 +279,42 @@ function DashboardCard({
   subtitle,
   action,
   children,
+  fillHeight = true,
 }: {
   title: string;
   subtitle: string;
   action?: ReactNode;
   children: ReactNode;
+  fillHeight?: boolean;
 }) {
   return (
     <section
       data-dashboard-card
-      className="h-full min-w-0 border border-border-subtle bg-surface"
+      className={cn(
+        pageCardSurfaceClassName,
+        'min-w-0',
+        fillHeight && 'h-full',
+      )}
     >
       <PanelHeader title={title} subtitle={subtitle} action={action} />
       {children}
     </section>
+  );
+}
+
+function DashboardTableHeaderText({ children }: { children: ReactNode }) {
+  return (
+    <Text variant="label-01" className="text-muted">
+      {children}
+    </Text>
+  );
+}
+
+function DashboardTableCellText({ children }: { children: ReactNode }) {
+  return (
+    <Text variant="body-compact-01" className="text-muted">
+      {children}
+    </Text>
   );
 }
 
@@ -297,9 +331,14 @@ function DashboardNoActivity({
     <section
       data-dashboard-empty
       aria-labelledby="dashboard-getting-started-title"
-      className="flex min-h-[420px] items-center bg-layer"
+      className="flex min-h-[420px] items-center bg-surface"
     >
-      <div className="mx-auto w-full max-w-[640px] border border-border-subtle bg-surface px-6 py-10 md:px-10 md:py-12">
+      <div
+        className={cn(
+          pageCardSurfaceClassName,
+          'mx-auto w-full max-w-[640px] px-6 py-10 md:px-10 md:py-12',
+        )}
+      >
         <Text as="p" variant="label-01" className="text-primary">
           {isFirstTimeWorkspace ? 'Getting started' : 'Selected time range'}
         </Text>
@@ -307,7 +346,7 @@ function DashboardNoActivity({
           as="h2"
           id="dashboard-getting-started-title"
           variant="heading-05"
-          className="mt-2 text-foreground"
+          className="mt-2 font-semibold! text-foreground"
         >
           {isFirstTimeWorkspace
             ? 'Build your first dashboard insights'
@@ -398,7 +437,7 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
   return (
     <article
       data-dashboard-kpi
-      className="flex min-h-[156px] flex-col border border-border-subtle bg-surface"
+      className={cn(pageCardSurfaceClassName, 'flex min-h-[156px] flex-col')}
     >
       <header
         data-dashboard-kpi-header
@@ -407,7 +446,7 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
         <Text
           as="h2"
           variant="heading-compact-01"
-          className="truncate text-foreground"
+          className="truncate font-semibold! text-foreground"
         >
           {metric.label}
         </Text>
@@ -465,15 +504,31 @@ function ActivityPanel({
   const summary = analytics.getSummary();
   const sessions = summary?.getSessions()?.getValue() || 0;
   const failures = summary?.getFailedsessions()?.getValue() || 0;
-  const activity: ChartTabularData = analytics
-    .getActivityList()
-    .flatMap(bucket => {
-      const key = dashboardActivityLabel(bucket.getFromdate(), range);
+  const activityBuckets = analytics.getActivityList();
+  const activityLabels = activityBuckets.map(bucket =>
+    dashboardActivityLabel(bucket.getFromdate(), range),
+  );
+  const activity: ChartTabularData = activityBuckets.flatMap(
+    (bucket, index) => {
+      const key = activityLabels[index];
       return [
         { group: 'Sessions', key, value: bucket.getSessions() },
         { group: 'Failed', key, value: bucket.getFailedsessions() },
       ];
-    });
+    },
+  );
+  const visibleTickCount = Math.min(activityLabels.length, 7);
+  const visibleActivityLabels = Array.from(
+    { length: visibleTickCount },
+    (_, index) =>
+      activityLabels[
+        visibleTickCount === 1
+          ? 0
+          : Math.round(
+              (index * (activityLabels.length - 1)) / (visibleTickCount - 1),
+            )
+      ],
+  );
   const chartLabel = `Conversation Activity showing ${numberFormatter.format(
     sessions,
   )} sessions and ${numberFormatter.format(
@@ -483,7 +538,11 @@ function ActivityPanel({
     accessibility: { svgAriaLabel: chartLabel },
     animations: false,
     axes: {
-      bottom: { mapsTo: 'key', scaleType: ScaleTypes.LABELS },
+      bottom: {
+        mapsTo: 'key',
+        scaleType: ScaleTypes.LABELS,
+        ticks: { values: visibleActivityLabels },
+      },
       left: {
         includeZero: true,
         mapsTo: 'value',
@@ -498,7 +557,7 @@ function ActivityPanel({
       position: LegendPositions.TOP,
     },
     points: { enabled: false },
-    theme: resolvedMode === 'dark' ? ChartTheme.G100 : ChartTheme.WHITE,
+    theme: resolvedMode === 'dark' ? ChartTheme.G90 : ChartTheme.G10,
     toolbar: { enabled: false },
   };
 
@@ -508,7 +567,7 @@ function ActivityPanel({
       subtitle="Sessions and failures over time"
     >
       {activity.length ? (
-        <div className="min-w-0 px-6 pb-6">
+        <div className="app-dashboard-chart min-w-0 px-6 pb-6">
           <LineChart data={activity} options={chartOptions} />
         </div>
       ) : (
@@ -535,58 +594,70 @@ function HealthPanel({ analytics }: { analytics: ProjectDashboardAnalytics }) {
       subtitle="Reliability signals requiring attention"
     >
       <ul className="divide-y divide-border-subtle px-6 ">
-        <li className="flex min-h-[106px] items-start gap-4 py-5">
+        <li data-dashboard-health-item className={healthSummaryItemClassName}>
           <WarningAltFilled
             size={24}
             aria-hidden="true"
-            className="mt-0.5 shrink-0 text-support-error"
+            className="shrink-0 text-support-error"
           />
-          <div className="min-w-0 flex-1">
-            <Text as="p" variant="heading-compact-01">
+          <div className="min-w-0">
+            <Text
+              as="p"
+              variant="heading-compact-01"
+              className="font-semibold!"
+            >
               Failed sessions
             </Text>
-            <Text as="p" variant="label-01" className="mt-2 text-muted">
+            <Text as="p" variant="helper-text-01" className="mt-1 text-helper">
               {numberFormatter.format(recentFailures)} recent{' '}
               {recentFailures === 1 ? 'failure' : 'failures'}
             </Text>
           </div>
-          <Text variant="heading-04" className="tabular-nums">
+          <Text variant="heading-04" className="text-right tabular-nums">
             {numberFormatter.format(health?.getFailedsessions() || 0)}
           </Text>
         </li>
-        <li className="flex min-h-[106px] items-start gap-4 py-5">
+        <li data-dashboard-health-item className={healthSummaryItemClassName}>
           <WarningAltFilled
             size={24}
             aria-hidden="true"
-            className="mt-0.5 shrink-0 text-support-warning"
+            className="shrink-0 text-support-warning"
           />
-          <div className="min-w-0 flex-1">
-            <Text as="p" variant="heading-compact-01">
+          <div className="min-w-0">
+            <Text
+              as="p"
+              variant="heading-compact-01"
+              className="font-semibold!"
+            >
               Slow sessions
             </Text>
-            <Text as="p" variant="label-01" className="mt-2 text-muted">
+            <Text as="p" variant="helper-text-01" className="mt-1 text-helper">
               Response latency above {numberFormatter.format(threshold)} ms
             </Text>
           </div>
-          <Text variant="heading-04" className="tabular-nums">
+          <Text variant="heading-04" className="text-right tabular-nums">
             {numberFormatter.format(health?.getSlowsessions() || 0)}
           </Text>
         </li>
-        <li className="flex min-h-[106px] items-start gap-4 py-5">
+        <li data-dashboard-health-item className={healthSummaryItemClassName}>
           <CheckmarkFilled
             size={24}
             aria-hidden="true"
-            className="mt-0.5 shrink-0 text-support-success"
+            className="shrink-0 text-support-success"
           />
-          <div className="min-w-0 flex-1">
-            <Text as="p" variant="heading-compact-01">
+          <div className="min-w-0">
+            <Text
+              as="p"
+              variant="heading-compact-01"
+              className="font-semibold!"
+            >
               Healthy assistants
             </Text>
-            <Text as="p" variant="label-01" className="mt-2 text-muted">
+            <Text as="p" variant="helper-text-01" className="mt-1 text-helper">
               Based on success rate and latency
             </Text>
           </div>
-          <Text variant="heading-04" className="tabular-nums">
+          <Text variant="heading-04" className="text-right tabular-nums">
             {healthyAssistants} of {assistantCount}
           </Text>
         </li>
@@ -611,7 +682,11 @@ function EmptyContent({
         aria-hidden="true"
         className="text-disabled"
       />
-      <Text as="h3" variant="heading-02" className="mt-4 text-foreground">
+      <Text
+        as="h3"
+        variant="heading-02"
+        className="mt-4 font-semibold! text-foreground"
+      >
         {title}
       </Text>
       <Text
@@ -724,11 +799,12 @@ function RecentFailuresTable({
     <DashboardCard
       title="Recent Failures"
       subtitle="Latest sessions requiring investigation"
+      fillHeight={false}
     >
       {rows.length ? (
         <DataTable rows={rows} headers={failureTableHeaders}>
           {({ rows, headers, getHeaderProps, getRowProps, getTableProps }) => (
-            <TableContainer>
+            <TableContainer className="p-0!">
               <div className="overflow-x-auto">
                 <Table
                   {...getTableProps()}
@@ -749,7 +825,9 @@ function RecentFailuresTable({
                           {...getHeaderProps({ header })}
                           key={header.key}
                         >
-                          {header.header}
+                          <DashboardTableHeaderText>
+                            {header.header}
+                          </DashboardTableHeaderText>
                         </TableHeader>
                       ))}
                     </TableRow>
@@ -765,7 +843,10 @@ function RecentFailuresTable({
                                 href={failureRoutes.get(row.id)}
                                 className="text-link hover:underline focus:underline"
                               >
-                                <Text variant="heading-compact-01">
+                                <Text
+                                  variant="heading-compact-01"
+                                  className="font-semibold!"
+                                >
                                   {cell.value}
                                 </Text>
                               </a>
@@ -774,7 +855,9 @@ function RecentFailuresTable({
                                 <Text variant="label-01">{cell.value}</Text>
                               </Tag>
                             ) : (
-                              cell.value
+                              <DashboardTableCellText>
+                                {cell.value}
+                              </DashboardTableCellText>
                             )}
                           </TableCell>
                         ))}
@@ -841,7 +924,7 @@ function AssistantsTable({
       {rows.length ? (
         <DataTable rows={rows} headers={assistantTableHeaders}>
           {({ rows, headers, getHeaderProps, getRowProps, getTableProps }) => (
-            <TableContainer>
+            <TableContainer className="p-0!">
               <div className="overflow-x-auto">
                 <Table
                   {...getTableProps()}
@@ -863,7 +946,9 @@ function AssistantsTable({
                           {...getHeaderProps({ header })}
                           key={header.key}
                         >
-                          {header.header}
+                          <DashboardTableHeaderText>
+                            {header.header}
+                          </DashboardTableHeaderText>
                         </TableHeader>
                       ))}
                     </TableRow>
@@ -892,12 +977,17 @@ function AssistantsTable({
                                 )}`}
                                 className="text-link hover:underline focus:underline"
                               >
-                                <Text variant="heading-compact-01">
+                                <Text
+                                  variant="heading-compact-01"
+                                  className="font-semibold!"
+                                >
                                   {cell.value}
                                 </Text>
                               </a>
                             ) : (
-                              cell.value
+                              <DashboardTableCellText>
+                                {cell.value}
+                              </DashboardTableCellText>
                             )}
                           </TableCell>
                         ))}
@@ -934,7 +1024,10 @@ function DashboardLoading() {
           <div
             data-dashboard-loading-card
             data-dashboard-loading-kpi
-            className="flex min-h-[156px] flex-col border border-border-subtle bg-surface"
+            className={cn(
+              pageCardSurfaceClassName,
+              'flex min-h-[156px] flex-col',
+            )}
             key={item}
             aria-hidden="true"
           >
@@ -957,7 +1050,10 @@ function DashboardLoading() {
       <div className="mt-4 grid gap-4 xl:grid-cols-16">
         <div
           data-dashboard-loading-card
-          className="h-[396px] border border-border-subtle bg-surface p-6 xl:col-span-11"
+          className={cn(
+            pageCardSurfaceClassName,
+            'h-[396px] p-6 xl:col-span-11',
+          )}
         >
           <SkeletonText width="30%" heading />
           <SkeletonText width="45%" />
@@ -965,7 +1061,10 @@ function DashboardLoading() {
         </div>
         <div
           data-dashboard-loading-card
-          className="h-[396px] border border-border-subtle bg-surface p-6 xl:col-span-5"
+          className={cn(
+            pageCardSurfaceClassName,
+            'h-[396px] p-6 xl:col-span-5',
+          )}
         >
           <SkeletonText width="55%" heading />
           <SkeletonText width="75%" />
@@ -978,7 +1077,7 @@ function DashboardLoading() {
         {[0, 1].map(item => (
           <div
             data-dashboard-loading-card
-            className="h-[260px] border border-border-subtle bg-surface p-6 "
+            className={cn(pageCardSurfaceClassName, 'h-[260px] p-6')}
             key={item}
             aria-hidden="true"
           >
@@ -1220,10 +1319,13 @@ export const HomePage = () => {
   return (
     <main
       data-dashboard-page
-      className="min-h-0 flex-1 overflow-auto bg-layer text-foreground "
+      className="min-h-0 flex-1 overflow-auto bg-surface text-foreground"
     >
       <div data-dashboard-content className="flex min-h-full flex-col">
         <PageHeader
+          className="bg-surface"
+          contentClassName={pageContentBoundaryClassName}
+          showDivider={false}
           eyebrow={
             <Text variant="label-01" className="text-primary">
               Dashboard
@@ -1260,7 +1362,7 @@ export const HomePage = () => {
 
         <div
           data-dashboard-grid
-          className="mx-auto grid w-full max-w-[1584px] flex-1 grid-cols-4 gap-4 p-4 md:grid-cols-8 md:px-8 lg:grid-cols-16"
+          className={`${pageContentBoundaryClassName} grid flex-1 grid-cols-4 gap-4 p-4 md:grid-cols-8 md:px-8 md:py-8 lg:grid-cols-16`}
         >
           {loadError && !dashboard ? (
             <div className="col-span-full flex min-h-[420px]">

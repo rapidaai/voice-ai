@@ -9,7 +9,7 @@ import (
 	"context"
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 )
@@ -18,7 +18,7 @@ import (
 type AssistantHTTPLogService interface {
 	CreateLog(
 		ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		source string,
 		sourceRefId uint64,
 		sourceEvent string,
@@ -38,14 +38,14 @@ type AssistantHTTPLogService interface {
 
 	GetLog(
 		ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		projectId uint64,
 		httpLogId uint64,
 	) (*internal_assistant_entity.AssistantHTTPLog, error)
 
 	GetAllLog(
 		ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		projectId uint64,
 		criterias []*protos.Criteria,
 		paginate *protos.Paginate,
@@ -54,13 +54,13 @@ type AssistantHTTPLogService interface {
 
 	GetLogObject(
 		ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		httpLogId uint64,
 	) (requestData []byte, responseData []byte, err error)
 
 	RetryLog(
 		ctx context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		projectId uint64,
 		httpLogId uint64,
 	) (*internal_assistant_entity.AssistantHTTPLog, error)

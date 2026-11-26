@@ -13,8 +13,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from mock.mock import MagicMock
 
-from app.connectors.redis_connector import RedisConnector
-from app.main import app
+from app.connectors.redis_connector import RedisConnector  # noqa: E402
+from app.main import app  # noqa: E402
 
 
 @pytest.fixture

@@ -24,13 +24,12 @@ import {
   TableBatchAction,
   TableBatchActions,
   TableToolbarContent,
-  TableToolbarSearch,
   Button,
+  Tag,
   TableSelectRow,
 } from '@carbon/react';
 import { ProjectUserGroupAvatar } from '@/app/components/domain/avatar/project-user-group-avatar';
 import { toHumanReadableDate } from '@/utils/date';
-import { RoleIndicator } from '@/app/components/domain/indicators/role';
 import {
   PageHeader,
   PageHeaderStickyToolbar,
@@ -42,6 +41,10 @@ import { UpdateProjectDialog } from '@/app/components/dialogs/workspace';
 import { CarbonIconIndicator } from '@/app/components/ui/feedback';
 import { deleteWorkspaceProject, listWorkspaceProjects } from '@/clients';
 import { EmptyState } from '@/app/components/ui/feedback';
+import {
+  ProjectQuerySearch,
+  type OrganizationProjectSearchFilter,
+} from './project-query-search';
 
 const headers = [
   { key: 'name', header: 'Name' },
@@ -55,18 +58,23 @@ const skeletonHeaders = [{ key: 'select', header: '' }, ...headers];
 
 export function ProjectPage() {
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
-  const [userId, token] = useCredential();
+  const [userId, token, , organizationId] = useCredential();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isFetching, setIsFetching] = useState(true);
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [criteria] = useState<{ key: string; value: string }[]>([]);
+  const [querySearchValue, setQuerySearchValue] = useState('');
+  const [searchFilters, setSearchFilters] = useState<
+    OrganizationProjectSearchFilter[]
+  >([]);
   const [projectPendingDelete, setProjectPendingDelete] =
     useState<Project | null>(null);
   const [projectPendingUpdate, setProjectPendingUpdate] =
     useState<Project | null>(null);
-  const { projectRoles } = useContext(AuthContext);
+  const { getProjects } = useContext(AuthContext);
+  const authenticatedProjects = getProjects?.();
 
   const afterGettingProject = useCallback(
     (err: ServiceError | null, alpr: GetAllProjectResponse | null) => {
@@ -102,7 +110,7 @@ export function ProjectPage() {
         page,
         pageSize,
         criteria,
-        auth: { token, userId },
+        auth: { organizationId, token, userId },
         callback: afterGettingProject,
       });
     },
@@ -116,7 +124,7 @@ export function ProjectPage() {
   const onDeleteProject = (projectId: string) => {
     deleteWorkspaceProject({
       projectId,
-      auth: { token, userId },
+      auth: { organizationId, token, userId },
       callback: (
         err: ServiceError | null,
         apr: ArchiveProjectResponse | null,
@@ -141,14 +149,27 @@ export function ProjectPage() {
       ? toHumanReadableDate(project.getCreateddate()!)
       : '',
     role:
-      projectRoles?.find(role => role.projectid === project.getId())?.role ||
-      '',
+      authenticatedProjects
+        ?.find(
+          authenticatedProject => authenticatedProject.id === project.getId(),
+        )
+        ?.rolesList.map(role => role.name)
+        .join(', ') || '',
     collaborators: project
       .getMembersList()
       .map(member => member.getName())
       .join(', '),
     status: project.getStatus?.() || '',
   }));
+  const visibleTableRows = tableRows.filter(row =>
+    searchFilters.every(filter => {
+      const currentValue = String(row[filter.key] || '').toLowerCase();
+      const expectedValue = filter.value.toLowerCase();
+      return filter.logic === 'contains'
+        ? currentValue.includes(expectedValue)
+        : currentValue === expectedValue;
+    }),
+  );
 
   return (
     <div
@@ -166,7 +187,7 @@ export function ProjectPage() {
         description="Organize assistants, endpoints, credentials, and collaborators across your workspace."
         contextualActions={
           <Text variant="label-01" className="text-muted tabular-nums">
-            {projects.length} of {totalCount}
+            {visibleTableRows.length} of {totalCount}
           </Text>
         }
         pageActions={
@@ -194,7 +215,7 @@ export function ProjectPage() {
         </TableSection>
       ) : (
         <TableSection className="min-h-0 bg-surface">
-          <DataTable rows={tableRows} headers={headers} radio>
+          <DataTable rows={visibleTableRows} headers={headers} radio>
             {({
               rows,
               headers: tableHeaders,
@@ -205,7 +226,6 @@ export function ProjectPage() {
               getSelectionProps,
               getTableProps,
               getToolbarProps,
-              onInputChange,
             }) => {
               const batchActionProps = getBatchActionProps();
               const selectedProject = selectedRows[0]
@@ -246,9 +266,13 @@ export function ProjectPage() {
                         </TableBatchActions>
                       )}
                       <TableToolbarContent>
-                        <TableToolbarSearch
-                          placeholder="Search projects..."
-                          onChange={onInputChange}
+                        <ProjectQuerySearch
+                          value={querySearchValue}
+                          onChange={setQuerySearchValue}
+                          onApply={filters => {
+                            setPage(1);
+                            setSearchFilters(filters);
+                          }}
                         />
                         <Button
                           hasIconOnly
@@ -264,7 +288,7 @@ export function ProjectPage() {
                     </TableToolbar>
                   </PageHeaderStickyToolbar>
 
-                  {projects.length > 0 ? (
+                  {visibleTableRows.length > 0 ? (
                     <>
                       <div className="shrink-0 overflow-x-auto">
                         <Table {...getTableProps()} className="min-w-max">
@@ -287,6 +311,11 @@ export function ProjectPage() {
                                 candidate => candidate.getId() === tableRow.id,
                               );
                               if (!project) return null;
+                              const assignedRoles =
+                                authenticatedProjects?.find(
+                                  authenticatedProject =>
+                                    authenticatedProject.id === project.getId(),
+                                )?.rolesList || [];
 
                               return (
                                 <TableRow
@@ -304,14 +333,19 @@ export function ProjectPage() {
                                       )}
                                   </TableCell>
                                   <TableCell>
-                                    <RoleIndicator
-                                      role={
-                                        projectRoles?.find(
-                                          role =>
-                                            role.projectid === project.getId(),
-                                        )?.role
-                                      }
-                                    />
+                                    <div className="flex flex-wrap gap-1">
+                                      {assignedRoles.length > 0
+                                        ? assignedRoles.map(role => (
+                                            <Tag
+                                              key={role.id}
+                                              type="gray"
+                                              size="sm"
+                                            >
+                                              {role.name}
+                                            </Tag>
+                                          ))
+                                        : '-'}
+                                    </div>
                                   </TableCell>
                                   <TableCell>
                                     <ProjectUserGroupAvatar
@@ -350,8 +384,16 @@ export function ProjectPage() {
                     <div className="flex flex-1 items-center justify-center">
                       <EmptyState
                         icon={Folders}
-                        title="No projects"
-                        subtitle="Create a project to organize assistants, endpoints, credentials, and collaborators."
+                        title={
+                          searchFilters.length > 0
+                            ? 'No projects found'
+                            : 'No projects'
+                        }
+                        subtitle={
+                          searchFilters.length > 0
+                            ? 'No projects match your current filters.'
+                            : 'Create a project to organize assistants, endpoints, credentials, and collaborators.'
+                        }
                         action="Create new project"
                         actionIcon={Add}
                         onAction={() => setCreateProjectModalOpen(true)}

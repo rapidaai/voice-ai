@@ -81,6 +81,16 @@ describe('Carbon theme adapters', () => {
     );
   });
 
+  it('uses one complete border reset for batch action controls', () => {
+    const styles = readStyles('carbon.scss');
+    const batchActionReset = styles.match(
+      /\.cds--batch-actions \.cds--action-list \.cds--btn,[\s\S]*?\{([\s\S]*?)\n\}/,
+    )?.[1];
+
+    expect(batchActionReset).toContain('border: 0;');
+    expect(batchActionReset).not.toContain('border-left: none;');
+  });
+
   it('uses the configured brand contrast for onboarding checklists', () => {
     const styles = readStyles('carbon.scss');
 
@@ -90,5 +100,19 @@ describe('Carbon theme adapters', () => {
     expect(styles).toMatch(
       /:root\[data-theme-schema='2'\]\s+\.app-onboarding-checklist\s*{[^}]*--app-checklist-foreground: var\(--brand-on-primary\)/,
     );
+  });
+
+  it('keeps dashboard charts visually integrated with their Carbon layer', () => {
+    const styles = readStyles('carbon.scss');
+
+    expect(styles).toContain('.app-dashboard-chart {');
+    expect(styles).toContain(
+      '--app-dashboard-chart-grid-bg: var(--cds-layer-01)',
+    );
+    expect(styles).toContain(
+      '--app-dashboard-chart-grid-line: var(--cds-layer-accent-01)',
+    );
+    expect(styles).toContain('fill: var(--app-dashboard-chart-grid-bg)');
+    expect(styles).toContain('stroke: var(--app-dashboard-chart-grid-line)');
   });
 });

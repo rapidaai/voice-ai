@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 describe('Carbon component styles', () => {
-  it('loads styles for components rendered by the voice debugger', () => {
+  it('loads styles for rendered Carbon components', () => {
     const carbonStyles = readFileSync(
       resolve(process.cwd(), 'src/styles/carbon.scss'),
       'utf8',
@@ -10,6 +10,9 @@ describe('Carbon component styles', () => {
 
     expect(carbonStyles).toContain(
       "@use '@carbon/react/scss/components/inline-loading';",
+    );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/react/scss/components/contained-list';",
     );
     expect(carbonStyles).toContain(
       "@use '@carbon/react/scss/components/accordion';",
@@ -39,6 +42,18 @@ describe('Carbon component styles', () => {
     expect(carbonStyles).toContain('padding-block: 0;');
   });
 
+  it('loads only the next coachmark styles', () => {
+    const coachmarkStyles = readFileSync(
+      resolve(process.cwd(), 'src/styles/carbon.scss'),
+      'utf8',
+    );
+
+    expect(coachmarkStyles).toContain(
+      "@use '@carbon/ibm-products/scss/components/Coachmark/coachmark_next';",
+    );
+    expect(coachmarkStyles).toContain('inline-size: 290px;');
+  });
+
   it('keeps connected provider model controls on one bottom border', () => {
     const carbonStyles = readFileSync(
       resolve(process.cwd(), 'src/styles/carbon.scss'),
@@ -53,6 +68,41 @@ describe('Carbon component styles', () => {
     );
     expect(carbonStyles).toMatch(
       /\.text-provider-combo-row\s*\{\s*\.cds--combo-box \.cds--text-input\s*\{\s*border-block-end: none;/,
+    );
+  });
+
+  it('loads the Carbon tearsheet without role-specific geometry', () => {
+    const carbonStyles = readFileSync(
+      resolve(process.cwd(), 'src/styles/carbon.scss'),
+      'utf8',
+    );
+
+    expect(carbonStyles).toContain(
+      "@use '@carbon/ibm-products/scss/components/Tearsheet';",
+    );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/ibm-products/scss/components/AddSelect';",
+    );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/ibm-products/scss/components/EmptyStates';",
+    );
+    expect(carbonStyles).toContain(
+      "@use '@carbon/ibm-products/scss/components/FullPageError';",
+    );
+    expect(carbonStyles).not.toContain('.role-create-modal');
+  });
+
+  it('inherits shared contextual navigation typography for every item state', () => {
+    const navigationStyles = readFileSync(
+      resolve(process.cwd(), 'src/styles/carbon.scss'),
+      'utf8',
+    );
+
+    expect(navigationStyles).toMatch(
+      /\.app-side-nav :is\(a, button, span\)\s*{\s*font: inherit !important;\s*letter-spacing: inherit !important;/,
+    );
+    expect(navigationStyles).not.toContain(
+      '.cds--side-nav__menu-item .cds--side-nav__link-text',
     );
   });
 });

@@ -1,80 +1,40 @@
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
+
 package web_api
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"strings"
 	"time"
 
-	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
-	"github.com/rapidaai/pkg/ciphers"
+	internal_service "github.com/rapidaai/api/web-api/internal/service"
 	external_clients "github.com/rapidaai/pkg/clients/external"
 	external_emailer_template "github.com/rapidaai/pkg/clients/external/emailer/template"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"gorm.io/gorm"
 )
 
 func (orgG *webOrganizationGRPCApi) InviteUserToOrganization(ctx context.Context, irRequest *protos.InviteUserToOrganizationRequest) (*protos.InviteUserToOrganizationResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	userContext, err := iAuth.UserContext()
-	if err != nil {
-		return nil, err
-	}
-	organizationContext, err := iAuth.OrganizationContext()
-	if err != nil {
-		return nil, err
-	}
-	currentOrgRole, err := orgG.userService.GetActiveOrInvitedOrganizationRoleForOrganization(ctx, userContext.UserID, organizationContext.OrganizationID)
-	if err != nil || currentOrgRole == nil {
-		return &protos.InviteUserToOrganizationResponse{
-			Code:    pkg_errors.InviteUserToOrganizationMissingOrganization.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationMissingOrganization.Code),
-				ErrorMessage: pkg_errors.InviteUserToOrganizationMissingOrganization.Error,
-				HumanMessage: pkg_errors.InviteUserToOrganizationMissingOrganization.ErrorMessage,
-			},
-		}, nil
-	}
-	organization, err := orgG.organizationService.Get(ctx, organizationContext.OrganizationID)
-	if err != nil {
-		return nil, err
-	}
-	inviter, err := orgG.userService.GetUser(ctx, userContext.UserID)
-	if err != nil {
-		return nil, err
-	}
-	if !validator.OneOf(currentOrgRole.Role, type_enums.ORGANIZATION_ROLE_OWNER.String(), type_enums.ORGANIZATION_ROLE_ADMIN.String()) {
-		return &protos.InviteUserToOrganizationResponse{
-			Code:    pkg_errors.InviteUserToOrganizationUnauthorized.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationUnauthorized.Code),
-				ErrorMessage: pkg_errors.InviteUserToOrganizationUnauthorized.Error,
-				HumanMessage: pkg_errors.InviteUserToOrganizationUnauthorized.ErrorMessage,
-			},
-		}, nil
-	}
-
+	tenant := principal.Tenant()
 	if !validator.Email(irRequest.GetEmail()) {
 		return &protos.InviteUserToOrganizationResponse{
-			Code:    pkg_errors.InviteUserToOrganizationInvalidEmail.HTTPStatusCodeInt32(),
-			Success: false,
+			Code: pkg_errors.InviteUserToOrganizationInvalidEmail.HTTPStatusCodeInt32(),
 			Error: &protos.Error{
 				ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationInvalidEmail.Code),
 				ErrorMessage: pkg_errors.InviteUserToOrganizationInvalidEmail.Error,
@@ -82,10 +42,10 @@ func (orgG *webOrganizationGRPCApi) InviteUserToOrganization(ctx context.Context
 			},
 		}, nil
 	}
-	if !validator.OneOf(irRequest.GetOrganizationRole(), type_enums.ORGANIZATION_ROLE_ADMIN.String(), type_enums.ORGANIZATION_ROLE_MEMBER.String()) {
+	organizationRoleDefinitionIDs := append([]uint64(nil), irRequest.GetOrganizationRoleDefinitionIds()...)
+	if !validator.NotEmpty(organizationRoleDefinitionIDs) {
 		return &protos.InviteUserToOrganizationResponse{
-			Code:    pkg_errors.InviteUserToOrganizationInvalidOrganizationRole.HTTPStatusCodeInt32(),
-			Success: false,
+			Code: pkg_errors.InviteUserToOrganizationInvalidOrganizationRole.HTTPStatusCodeInt32(),
 			Error: &protos.Error{
 				ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationInvalidOrganizationRole.Code),
 				ErrorMessage: pkg_errors.InviteUserToOrganizationInvalidOrganizationRole.Error,
@@ -93,14 +53,28 @@ func (orgG *webOrganizationGRPCApi) InviteUserToOrganization(ctx context.Context
 			},
 		}, nil
 	}
-
-	projectIds := make([]uint64, 0, len(irRequest.GetProjectRoles()))
-	projectRoles := map[uint64]string{}
-	for _, projectRole := range irRequest.GetProjectRoles() {
-		if !validator.NonZero(projectRole.GetProjectId()) {
+	organizationRoleDefinitionIDSet := make(map[uint64]struct{}, len(organizationRoleDefinitionIDs))
+	for _, roleDefinitionID := range organizationRoleDefinitionIDs {
+		_, duplicate := organizationRoleDefinitionIDSet[roleDefinitionID]
+		if !validator.NonZero(roleDefinitionID) || duplicate || roleDefinitionID == internal_service.OrganizationOwnerRoleDefinitionID {
 			return &protos.InviteUserToOrganizationResponse{
-				Code:    pkg_errors.InviteUserToOrganizationInvalidProjects.HTTPStatusCodeInt32(),
-				Success: false,
+				Code: pkg_errors.InviteUserToOrganizationInvalidOrganizationRole.HTTPStatusCodeInt32(),
+				Error: &protos.Error{
+					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationInvalidOrganizationRole.Code),
+					ErrorMessage: pkg_errors.InviteUserToOrganizationInvalidOrganizationRole.Error,
+					HumanMessage: pkg_errors.InviteUserToOrganizationInvalidOrganizationRole.ErrorMessage,
+				},
+			}, nil
+		}
+		organizationRoleDefinitionIDSet[roleDefinitionID] = struct{}{}
+	}
+	projectRoleAssignments := irRequest.GetProjectRoles()
+	projectSelections := make([]internal_service.ProjectRoleSelection, 0, len(projectRoleAssignments))
+	projectIDs := make(map[uint64]struct{}, len(projectRoleAssignments))
+	for _, assignment := range projectRoleAssignments {
+		if assignment == nil || !validator.NonZero(assignment.GetProjectId()) {
+			return &protos.InviteUserToOrganizationResponse{
+				Code: pkg_errors.InviteUserToOrganizationInvalidProjects.HTTPStatusCodeInt32(),
 				Error: &protos.Error{
 					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationInvalidProjects.Code),
 					ErrorMessage: pkg_errors.InviteUserToOrganizationInvalidProjects.Error,
@@ -108,10 +82,9 @@ func (orgG *webOrganizationGRPCApi) InviteUserToOrganization(ctx context.Context
 				},
 			}, nil
 		}
-		if _, ok := projectRoles[projectRole.GetProjectId()]; ok {
+		if _, duplicate := projectIDs[assignment.GetProjectId()]; duplicate {
 			return &protos.InviteUserToOrganizationResponse{
-				Code:    pkg_errors.InviteUserToOrganizationDuplicateProject.HTTPStatusCodeInt32(),
-				Success: false,
+				Code: pkg_errors.InviteUserToOrganizationDuplicateProject.HTTPStatusCodeInt32(),
 				Error: &protos.Error{
 					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationDuplicateProject.Code),
 					ErrorMessage: pkg_errors.InviteUserToOrganizationDuplicateProject.Error,
@@ -119,10 +92,12 @@ func (orgG *webOrganizationGRPCApi) InviteUserToOrganization(ctx context.Context
 				},
 			}, nil
 		}
-		if !validator.OneOf(projectRole.GetProjectRole(), type_enums.PROJECT_ROLE_SUPER_ADMIN.String(), type_enums.PROJECT_ROLE_ADMIN.String(), type_enums.PROJECT_ROLE_WRITER.String(), type_enums.PROJECT_ROLE_READER.String()) {
+		projectIDs[assignment.GetProjectId()] = struct{}{}
+
+		roleDefinitionIDs := append([]uint64(nil), assignment.GetRoleDefinitionIds()...)
+		if !validator.NotEmpty(roleDefinitionIDs) {
 			return &protos.InviteUserToOrganizationResponse{
-				Code:    pkg_errors.InviteUserToOrganizationInvalidProjectRole.HTTPStatusCodeInt32(),
-				Success: false,
+				Code: pkg_errors.InviteUserToOrganizationInvalidProjectRole.HTTPStatusCodeInt32(),
 				Error: &protos.Error{
 					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationInvalidProjectRole.Code),
 					ErrorMessage: pkg_errors.InviteUserToOrganizationInvalidProjectRole.Error,
@@ -130,161 +105,125 @@ func (orgG *webOrganizationGRPCApi) InviteUserToOrganization(ctx context.Context
 				},
 			}, nil
 		}
-		projectIds = append(projectIds, projectRole.GetProjectId())
-		projectRoles[projectRole.GetProjectId()] = projectRole.GetProjectRole()
-	}
-
-	var projects []*internal_entity.Project
-	if validator.NotEmpty(projectIds) {
-		var err error
-		projects, err = orgG.projectService.GetAllByOrganization(ctx, iAuth, currentOrgRole.OrganizationId, projectIds)
-		if err != nil {
-			orgG.logger.Errorf("projectService.GetAllByOrganization from grpc with err %v", err)
-			return &protos.InviteUserToOrganizationResponse{
-				Code:    pkg_errors.InviteUserToOrganizationInvalidProjects.HTTPStatusCodeInt32(),
-				Success: false,
-				Error: &protos.Error{
-					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationInvalidProjects.Code),
-					ErrorMessage: pkg_errors.InviteUserToOrganizationInvalidProjects.Error,
-					HumanMessage: pkg_errors.InviteUserToOrganizationInvalidProjects.ErrorMessage,
-				},
-			}, nil
+		roleDefinitionIDSet := make(map[uint64]struct{}, len(roleDefinitionIDs))
+		for _, roleDefinitionID := range roleDefinitionIDs {
+			_, duplicate := roleDefinitionIDSet[roleDefinitionID]
+			if !validator.NonZero(roleDefinitionID) || duplicate {
+				return &protos.InviteUserToOrganizationResponse{
+					Code: pkg_errors.InviteUserToOrganizationInvalidProjectRole.HTTPStatusCodeInt32(),
+					Error: &protos.Error{
+						ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationInvalidProjectRole.Code),
+						ErrorMessage: pkg_errors.InviteUserToOrganizationInvalidProjectRole.Error,
+						HumanMessage: pkg_errors.InviteUserToOrganizationInvalidProjectRole.ErrorMessage,
+					},
+				}, nil
+			}
+			roleDefinitionIDSet[roleDefinitionID] = struct{}{}
 		}
+		projectSelections = append(projectSelections, internal_service.ProjectRoleSelection{
+			ProjectID:         assignment.GetProjectId(),
+			RoleDefinitionIDs: roleDefinitionIDs,
+		})
 	}
-
-	projectNames := make([]string, 0, len(projects))
-	for _, project := range projects {
-		projectNames = append(projectNames, project.Name)
-	}
-
-	eUser, err := orgG.userService.Get(ctx, irRequest.GetEmail())
+	organization, err := orgG.organizationService.Get(ctx, tenant.OrganizationID)
 	if err != nil {
-		source := "invited-by-other"
-		parts := strings.Split(irRequest.GetEmail(), "@")
-		_, err := orgG.userService.Create(ctx, iAuth, parts[0], irRequest.GetEmail(), ciphers.RandomHash("rpd_"), type_enums.RECORD_INVITED, &source)
-		if err != nil {
-			orgG.logger.Errorf("unable to create user for invite err %v", err)
+		return &protos.InviteUserToOrganizationResponse{
+			Code: pkg_errors.InviteUserToOrganizationMissingOrganization.HTTPStatusCodeInt32(),
+			Error: &protos.Error{
+				ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationMissingOrganization.Code),
+				ErrorMessage: pkg_errors.InviteUserToOrganizationMissingOrganization.Error,
+				HumanMessage: pkg_errors.InviteUserToOrganizationMissingOrganization.ErrorMessage,
+			},
+		}, nil
+	}
+	inviter, err := orgG.userService.GetUser(ctx, principal.Subject().ID)
+	if err != nil {
+		return &protos.InviteUserToOrganizationResponse{
+			Code: pkg_errors.InviteUserToOrganizationCreateUser.HTTPStatusCodeInt32(),
+			Error: &protos.Error{
+				ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationCreateUser.Code),
+				ErrorMessage: pkg_errors.InviteUserToOrganizationCreateUser.Error,
+				HumanMessage: pkg_errors.InviteUserToOrganizationCreateUser.ErrorMessage,
+			},
+		}, nil
+	}
+	invitedUser, projects, err := orgG.userService.InviteUserToOrganization(ctx, principal, irRequest.GetEmail(), tenant.OrganizationID, organizationRoleDefinitionIDs, projectSelections)
+	if err != nil {
+		var organizationConflict pkg_errors.OrganizationMembershipConflictError
+		var selectionError pkg_errors.RoleAssignmentSelectionUnavailableError
+		var organizationPersistenceError pkg_errors.OrganizationRolePersistenceError
+		var projectPersistenceError pkg_errors.ProjectRolePersistenceError
+		switch {
+		case errors.As(err, &organizationConflict) && organizationConflict.SameOrganization:
 			return &protos.InviteUserToOrganizationResponse{
-				Code:    pkg_errors.InviteUserToOrganizationCreateUser.HTTPStatusCodeInt32(),
-				Success: false,
+				Code: pkg_errors.InviteUserToOrganizationUserAlreadyInOrganization.HTTPStatusCodeInt32(),
 				Error: &protos.Error{
-					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationCreateUser.Code),
-					ErrorMessage: pkg_errors.InviteUserToOrganizationCreateUser.Error,
-					HumanMessage: pkg_errors.InviteUserToOrganizationCreateUser.ErrorMessage,
+					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationUserAlreadyInOrganization.Code),
+					ErrorMessage: pkg_errors.InviteUserToOrganizationUserAlreadyInOrganization.Error,
+					HumanMessage: pkg_errors.InviteUserToOrganizationUserAlreadyInOrganization.ErrorMessage,
 				},
 			}, nil
-		}
-		eUser, err = orgG.userService.Get(ctx, irRequest.GetEmail())
-		if err != nil {
-			orgG.logger.Errorf("unable to resolve invited user identity err %v", err)
+		case errors.As(err, &organizationConflict):
 			return &protos.InviteUserToOrganizationResponse{
-				Code:    pkg_errors.InviteUserToOrganizationCreateUser.HTTPStatusCodeInt32(),
-				Success: false,
+				Code: pkg_errors.InviteUserToOrganizationUserInAnotherOrganization.HTTPStatusCodeInt32(),
 				Error: &protos.Error{
-					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationCreateUser.Code),
-					ErrorMessage: pkg_errors.InviteUserToOrganizationCreateUser.Error,
-					HumanMessage: pkg_errors.InviteUserToOrganizationCreateUser.ErrorMessage,
+					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationUserInAnotherOrganization.Code),
+					ErrorMessage: pkg_errors.InviteUserToOrganizationUserInAnotherOrganization.Error,
+					HumanMessage: pkg_errors.InviteUserToOrganizationUserInAnotherOrganization.ErrorMessage,
 				},
 			}, nil
-		}
-		invitedUserID := eUser.Id
-
-		_, err = orgG.userService.CreateOrganizationRole(ctx, iAuth, irRequest.GetOrganizationRole(), invitedUserID, currentOrgRole.OrganizationId, type_enums.RECORD_INVITED)
-		if err != nil {
-			orgG.logger.Errorf("unable to create organization role err %v", err)
+		case errors.As(err, &selectionError):
+			switch selectionError.Selection {
+			case pkg_errors.RoleAssignmentProject:
+				return &protos.InviteUserToOrganizationResponse{
+					Code: pkg_errors.InviteUserToOrganizationInvalidProjects.HTTPStatusCodeInt32(),
+					Error: &protos.Error{
+						ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationInvalidProjects.Code),
+						ErrorMessage: pkg_errors.InviteUserToOrganizationInvalidProjects.Error,
+						HumanMessage: pkg_errors.InviteUserToOrganizationInvalidProjects.ErrorMessage,
+					},
+				}, nil
+			case pkg_errors.RoleAssignmentProjectRole:
+				return &protos.InviteUserToOrganizationResponse{
+					Code: pkg_errors.InviteUserToOrganizationInvalidProjectRole.HTTPStatusCodeInt32(),
+					Error: &protos.Error{
+						ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationInvalidProjectRole.Code),
+						ErrorMessage: pkg_errors.InviteUserToOrganizationInvalidProjectRole.Error,
+						HumanMessage: pkg_errors.InviteUserToOrganizationInvalidProjectRole.ErrorMessage,
+					},
+				}, nil
+			default:
+				return &protos.InviteUserToOrganizationResponse{
+					Code: pkg_errors.InviteUserToOrganizationInvalidOrganizationRole.HTTPStatusCodeInt32(),
+					Error: &protos.Error{
+						ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationInvalidOrganizationRole.Code),
+						ErrorMessage: pkg_errors.InviteUserToOrganizationInvalidOrganizationRole.Error,
+						HumanMessage: pkg_errors.InviteUserToOrganizationInvalidOrganizationRole.ErrorMessage,
+					},
+				}, nil
+			}
+		case errors.As(err, &organizationPersistenceError):
 			return &protos.InviteUserToOrganizationResponse{
-				Code:    pkg_errors.InviteUserToOrganizationCreateOrganizationRole.HTTPStatusCodeInt32(),
-				Success: false,
+				Code: pkg_errors.InviteUserToOrganizationCreateOrganizationRole.HTTPStatusCodeInt32(),
 				Error: &protos.Error{
 					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationCreateOrganizationRole.Code),
 					ErrorMessage: pkg_errors.InviteUserToOrganizationCreateOrganizationRole.Error,
 					HumanMessage: pkg_errors.InviteUserToOrganizationCreateOrganizationRole.ErrorMessage,
 				},
 			}, nil
-		}
-		for _, projectRole := range irRequest.GetProjectRoles() {
-			_, err = orgG.userService.CreateProjectRole(ctx, iAuth, invitedUserID, projectRole.GetProjectRole(), projectRole.GetProjectId(), type_enums.RECORD_INVITED)
-			if err != nil {
-				orgG.logger.Errorf("unable to create project role for invite err %v", err)
-				return &protos.InviteUserToOrganizationResponse{
-					Code:    pkg_errors.InviteUserToOrganizationCreateProjectRoles.HTTPStatusCodeInt32(),
-					Success: false,
-					Error: &protos.Error{
-						ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationCreateProjectRoles.Code),
-						ErrorMessage: pkg_errors.InviteUserToOrganizationCreateProjectRoles.Error,
-						HumanMessage: pkg_errors.InviteUserToOrganizationCreateProjectRoles.ErrorMessage,
-					},
-				}, nil
-			}
-		}
-		if err = orgG.emailerClient.EmailRichText(
-			ctx,
-			external_clients.Contact{Email: irRequest.GetEmail()},
-			fmt.Sprintf("[RapidaAI] %s has invited you to join the %s organization", inviter.Name, organization.Name),
-			external_emailer_template.INVITE_MEMBER_TEMPLATE,
-			map[string]string{
-				"inviter_name": inviter.Name,
-				"project_name": strings.Join(projectNames, ","),
-				"invite_url":   fmt.Sprintf("%s/auth/signup?utm_source=invite&utm_param=%d", orgG.cfg.BaseUrl(), currentOrgRole.OrganizationId),
-			},
-		); err != nil {
-			orgG.logger.Errorf("error while sending invite email %v", err)
-		}
-		return &protos.InviteUserToOrganizationResponse{
-			Code:    200,
-			Success: true,
-			Data: &protos.User{
-				Id:     invitedUserID,
-				Name:   eUser.Name,
-				Email:  irRequest.GetEmail(),
-				Role:   irRequest.GetOrganizationRole(),
-				Status: type_enums.RECORD_INVITED.String(),
-			},
-		}, nil
-	}
-
-	org, err := orgG.userService.GetActiveOrInvitedOrganizationRole(ctx, eUser.GetId())
-	if err == nil && org.GetOrganizationId() != currentOrgRole.OrganizationId {
-		return &protos.InviteUserToOrganizationResponse{
-			Code:    pkg_errors.InviteUserToOrganizationUserInAnotherOrganization.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationUserInAnotherOrganization.Code),
-				ErrorMessage: pkg_errors.InviteUserToOrganizationUserInAnotherOrganization.Error,
-				HumanMessage: pkg_errors.InviteUserToOrganizationUserInAnotherOrganization.ErrorMessage,
-			},
-		}, nil
-	} else if err == nil {
-		return &protos.InviteUserToOrganizationResponse{
-			Code:    pkg_errors.InviteUserToOrganizationUserAlreadyInOrganization.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationUserAlreadyInOrganization.Code),
-				ErrorMessage: pkg_errors.InviteUserToOrganizationUserAlreadyInOrganization.Error,
-				HumanMessage: pkg_errors.InviteUserToOrganizationUserAlreadyInOrganization.ErrorMessage,
-			},
-		}, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		orgG.logger.Errorf("unable to get organization role for invite err %v", err)
-		return &protos.InviteUserToOrganizationResponse{
-			Code:    pkg_errors.InviteUserToOrganizationCreateOrganizationRole.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationCreateOrganizationRole.Code),
-				ErrorMessage: pkg_errors.InviteUserToOrganizationCreateOrganizationRole.Error,
-				HumanMessage: pkg_errors.InviteUserToOrganizationCreateOrganizationRole.ErrorMessage,
-			},
-		}, nil
-	}
-
-	roleStatus := eUser.Status
-	if eUser.Status == type_enums.RECORD_ARCHIEVE {
-		roleStatus = type_enums.RECORD_ACTIVE
-		if err = orgG.userService.UpdateUserStatus(ctx, iAuth, eUser.GetId(), roleStatus); err != nil {
-			orgG.logger.Errorf("unable to restore archived user for invite err %v", err)
+		case errors.As(err, &projectPersistenceError):
 			return &protos.InviteUserToOrganizationResponse{
-				Code:    pkg_errors.InviteUserToOrganizationCreateUser.HTTPStatusCodeInt32(),
-				Success: false,
+				Code: pkg_errors.InviteUserToOrganizationCreateProjectRoles.HTTPStatusCodeInt32(),
+				Error: &protos.Error{
+					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationCreateProjectRoles.Code),
+					ErrorMessage: pkg_errors.InviteUserToOrganizationCreateProjectRoles.Error,
+					HumanMessage: pkg_errors.InviteUserToOrganizationCreateProjectRoles.ErrorMessage,
+				},
+			}, nil
+		default:
+			orgG.logger.Errorf("unable to persist organization invitation: %v", err)
+			return &protos.InviteUserToOrganizationResponse{
+				Code: pkg_errors.InviteUserToOrganizationCreateUser.HTTPStatusCodeInt32(),
 				Error: &protos.Error{
 					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationCreateUser.Code),
 					ErrorMessage: pkg_errors.InviteUserToOrganizationCreateUser.Error,
@@ -293,13 +232,10 @@ func (orgG *webOrganizationGRPCApi) InviteUserToOrganization(ctx context.Context
 			}, nil
 		}
 	}
-
-	_, err = orgG.userService.CreateOrganizationRole(ctx, iAuth, irRequest.GetOrganizationRole(), eUser.GetId(), currentOrgRole.OrganizationId, roleStatus)
+	assignments, err := orgG.userService.GetActiveOrInvitedOrganizationRolesForOrganization(ctx, invitedUser.Id, tenant.OrganizationID)
 	if err != nil {
-		orgG.logger.Errorf("unable to create organization role err %v", err)
 		return &protos.InviteUserToOrganizationResponse{
-			Code:    pkg_errors.InviteUserToOrganizationCreateOrganizationRole.HTTPStatusCodeInt32(),
-			Success: false,
+			Code: pkg_errors.InviteUserToOrganizationCreateOrganizationRole.HTTPStatusCodeInt32(),
 			Error: &protos.Error{
 				ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationCreateOrganizationRole.Code),
 				ErrorMessage: pkg_errors.InviteUserToOrganizationCreateOrganizationRole.Error,
@@ -307,25 +243,17 @@ func (orgG *webOrganizationGRPCApi) InviteUserToOrganization(ctx context.Context
 			},
 		}, nil
 	}
-
-	for _, projectRole := range irRequest.GetProjectRoles() {
-		_, err = orgG.userService.CreateProjectRole(ctx, iAuth, eUser.Id, projectRole.GetProjectRole(), projectRole.GetProjectId(), roleStatus)
-		if err != nil {
-			orgG.logger.Errorf("unable to create project role for invite err %v", err)
-			return &protos.InviteUserToOrganizationResponse{
-				Code:    pkg_errors.InviteUserToOrganizationCreateProjectRoles.HTTPStatusCodeInt32(),
-				Success: false,
-				Error: &protos.Error{
-					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationCreateProjectRoles.Code),
-					ErrorMessage: pkg_errors.InviteUserToOrganizationCreateProjectRoles.Error,
-					HumanMessage: pkg_errors.InviteUserToOrganizationCreateProjectRoles.ErrorMessage,
-				},
-			}, nil
-		}
+	assignedRoles := make([]*protos.AssignedRole, 0, len(assignments))
+	for _, assignment := range assignments {
+		assignedRoles = append(assignedRoles, &protos.AssignedRole{RoleDefinitionId: assignment.RoleDefinitionID, Key: assignment.RoleDefinition.Key, Name: assignment.RoleDefinition.Name})
 	}
-	inviteURL := fmt.Sprintf("%s/auth/signup?utm_source=invite&utm_param=%d", orgG.cfg.BaseUrl(), currentOrgRole.OrganizationId)
-	if roleStatus == type_enums.RECORD_ACTIVE {
-		inviteURL = fmt.Sprintf("%s/auth/signin?utm_source=invite&utm_param=%d", orgG.cfg.BaseUrl(), currentOrgRole.OrganizationId)
+	projectNames := make([]string, 0, len(projects))
+	for _, project := range projects {
+		projectNames = append(projectNames, project.Name)
+	}
+	inviteURL := fmt.Sprintf("%s/auth/signup?utm_source=invite&utm_param=%d", orgG.cfg.BaseUrl(), tenant.OrganizationID)
+	if invitedUser.Status == type_enums.RECORD_ACTIVE {
+		inviteURL = fmt.Sprintf("%s/auth/signin?utm_source=invite&utm_param=%d", orgG.cfg.BaseUrl(), tenant.OrganizationID)
 	}
 	if err = orgG.emailerClient.EmailRichText(
 		ctx,
@@ -344,62 +272,26 @@ func (orgG *webOrganizationGRPCApi) InviteUserToOrganization(ctx context.Context
 		Code:    200,
 		Success: true,
 		Data: &protos.User{
-			Id:          eUser.Id,
-			Name:        eUser.Name,
-			Email:       eUser.Email,
-			Role:        irRequest.GetOrganizationRole(),
-			Status:      roleStatus.String(),
-			CreatedDate: timestamppb.New(time.Time(eUser.CreatedDate)),
+			Id:                invitedUser.Id,
+			Name:              invitedUser.Name,
+			Email:             invitedUser.Email,
+			OrganizationRoles: assignedRoles,
+			Status:            invitedUser.Status.String(),
+			CreatedDate:       timestamppb.New(time.Time(invitedUser.CreatedDate)),
 		},
 	}, nil
 }
 
 func (orgG *webOrganizationGRPCApi) UpdateUserOrganizationRole(ctx context.Context, irRequest *protos.UpdateUserOrganizationRoleRequest) (*protos.UpdateUserOrganizationRoleResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
-	userContext, err := iAuth.UserContext()
-	if err != nil {
-		return nil, err
-	}
-	organizationContext, err := iAuth.OrganizationContext()
-	if err != nil {
-		return nil, err
-	}
-	currentOrgRole, err := orgG.userService.GetActiveOrInvitedOrganizationRoleForOrganization(ctx, userContext.UserID, organizationContext.OrganizationID)
-	if err != nil || currentOrgRole == nil {
-		return &protos.UpdateUserOrganizationRoleResponse{
-			Code:    pkg_errors.UpdateUserOrganizationRoleMissingOrganization.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleMissingOrganization.Code),
-				ErrorMessage: pkg_errors.UpdateUserOrganizationRoleMissingOrganization.Error,
-				HumanMessage: pkg_errors.UpdateUserOrganizationRoleMissingOrganization.ErrorMessage,
-			},
-		}, nil
-	}
-	if !validator.OneOf(currentOrgRole.Role, type_enums.ORGANIZATION_ROLE_OWNER.String(), type_enums.ORGANIZATION_ROLE_ADMIN.String()) {
-		return &protos.UpdateUserOrganizationRoleResponse{
-			Code:    pkg_errors.UpdateUserOrganizationRoleUnauthorized.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleUnauthorized.Code),
-				ErrorMessage: pkg_errors.UpdateUserOrganizationRoleUnauthorized.Error,
-				HumanMessage: pkg_errors.UpdateUserOrganizationRoleUnauthorized.ErrorMessage,
-			},
-		}, nil
-	}
-
+	tenant := principal.Tenant()
 	if !validator.NonZero(irRequest.GetUserId()) {
 		return &protos.UpdateUserOrganizationRoleResponse{
-			Code:    pkg_errors.UpdateUserOrganizationRoleInvalidUser.HTTPStatusCodeInt32(),
-			Success: false,
+			Code: pkg_errors.UpdateUserOrganizationRoleInvalidUser.HTTPStatusCodeInt32(),
 			Error: &protos.Error{
 				ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleInvalidUser.Code),
 				ErrorMessage: pkg_errors.UpdateUserOrganizationRoleInvalidUser.Error,
@@ -407,10 +299,10 @@ func (orgG *webOrganizationGRPCApi) UpdateUserOrganizationRole(ctx context.Conte
 			},
 		}, nil
 	}
-	if !validator.OneOf(irRequest.GetOrganizationRole(), type_enums.ORGANIZATION_ROLE_ADMIN.String(), type_enums.ORGANIZATION_ROLE_MEMBER.String()) {
+	roleDefinitionIDs := append([]uint64(nil), irRequest.GetRoleDefinitionIds()...)
+	if !validator.NotEmpty(roleDefinitionIDs) {
 		return &protos.UpdateUserOrganizationRoleResponse{
-			Code:    pkg_errors.UpdateUserOrganizationRoleInvalidRole.HTTPStatusCodeInt32(),
-			Success: false,
+			Code: pkg_errors.UpdateUserOrganizationRoleInvalidRole.HTTPStatusCodeInt32(),
 			Error: &protos.Error{
 				ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleInvalidRole.Code),
 				ErrorMessage: pkg_errors.UpdateUserOrganizationRoleInvalidRole.Error,
@@ -418,67 +310,63 @@ func (orgG *webOrganizationGRPCApi) UpdateUserOrganizationRole(ctx context.Conte
 			},
 		}, nil
 	}
-
-	eUser, err := orgG.userService.GetUser(ctx, irRequest.GetUserId())
-	if err != nil {
-		orgG.logger.Errorf("unable to get user for organization role update err %v", err)
-		return &protos.UpdateUserOrganizationRoleResponse{
-			Code:    pkg_errors.UpdateUserOrganizationRoleInvalidUser.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleInvalidUser.Code),
-				ErrorMessage: pkg_errors.UpdateUserOrganizationRoleInvalidUser.Error,
-				HumanMessage: pkg_errors.UpdateUserOrganizationRoleInvalidUser.ErrorMessage,
-			},
-		}, nil
+	roleDefinitionIDSet := make(map[uint64]struct{}, len(roleDefinitionIDs))
+	for _, roleDefinitionID := range roleDefinitionIDs {
+		_, duplicate := roleDefinitionIDSet[roleDefinitionID]
+		if !validator.NonZero(roleDefinitionID) || duplicate || roleDefinitionID == internal_service.OrganizationOwnerRoleDefinitionID {
+			return &protos.UpdateUserOrganizationRoleResponse{
+				Code: pkg_errors.UpdateUserOrganizationRoleInvalidRole.HTTPStatusCodeInt32(),
+				Error: &protos.Error{
+					ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleInvalidRole.Code),
+					ErrorMessage: pkg_errors.UpdateUserOrganizationRoleInvalidRole.Error,
+					HumanMessage: pkg_errors.UpdateUserOrganizationRoleInvalidRole.ErrorMessage,
+				},
+			}, nil
+		}
+		roleDefinitionIDSet[roleDefinitionID] = struct{}{}
 	}
-
-	org, err := orgG.userService.GetActiveOrInvitedOrganizationRoleForOrganization(ctx, eUser.GetId(), currentOrgRole.OrganizationId)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return &protos.UpdateUserOrganizationRoleResponse{
-			Code:    pkg_errors.UpdateUserOrganizationRoleUserNotInOrg.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleUserNotInOrg.Code),
-				ErrorMessage: pkg_errors.UpdateUserOrganizationRoleUserNotInOrg.Error,
-				HumanMessage: pkg_errors.UpdateUserOrganizationRoleUserNotInOrg.ErrorMessage,
-			},
-		}, nil
-	} else if err != nil {
-		orgG.logger.Errorf("unable to get organization role for organization role update err %v", err)
-		return &protos.UpdateUserOrganizationRoleResponse{
-			Code:    pkg_errors.UpdateUserOrganizationRoleUpdateRole.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleUpdateRole.Code),
-				ErrorMessage: pkg_errors.UpdateUserOrganizationRoleUpdateRole.Error,
-				HumanMessage: pkg_errors.UpdateUserOrganizationRoleUpdateRole.ErrorMessage,
-			},
-		}, nil
-	}
-	if strings.EqualFold(org.Role, type_enums.ORGANIZATION_ROLE_OWNER.String()) {
-		return &protos.UpdateUserOrganizationRoleResponse{
-			Code:    pkg_errors.UpdateUserOrganizationRoleOwner.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleOwner.Code),
-				ErrorMessage: pkg_errors.UpdateUserOrganizationRoleOwner.Error,
-				HumanMessage: pkg_errors.UpdateUserOrganizationRoleOwner.ErrorMessage,
-			},
-		}, nil
-	}
-
-	if err = orgG.userService.UpdateOrganizationRole(ctx, iAuth, eUser.GetId(), currentOrgRole.OrganizationId, irRequest.GetOrganizationRole()); err != nil {
+	if err := orgG.userService.ReplaceOrganizationRoles(ctx, principal, irRequest.GetUserId(), tenant.OrganizationID, roleDefinitionIDs); err != nil {
 		orgG.logger.Errorf("unable to update organization role err %v", err)
-		return &protos.UpdateUserOrganizationRoleResponse{
-			Code:    pkg_errors.UpdateUserOrganizationRoleUpdateRole.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleUpdateRole.Code),
-				ErrorMessage: pkg_errors.UpdateUserOrganizationRoleUpdateRole.Error,
-				HumanMessage: pkg_errors.UpdateUserOrganizationRoleUpdateRole.ErrorMessage,
-			},
-		}, nil
+		var ownerError pkg_errors.OrganizationOwnerMutationError
+		var selectionError pkg_errors.RoleAssignmentSelectionUnavailableError
+		switch {
+		case errors.As(err, &ownerError):
+			return &protos.UpdateUserOrganizationRoleResponse{
+				Code: pkg_errors.UpdateUserOrganizationRoleOwner.HTTPStatusCodeInt32(),
+				Error: &protos.Error{
+					ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleOwner.Code),
+					ErrorMessage: pkg_errors.UpdateUserOrganizationRoleOwner.Error,
+					HumanMessage: pkg_errors.UpdateUserOrganizationRoleOwner.ErrorMessage,
+				},
+			}, nil
+		case errors.As(err, &selectionError) && selectionError.Selection == pkg_errors.RoleAssignmentMembership:
+			return &protos.UpdateUserOrganizationRoleResponse{
+				Code: pkg_errors.UpdateUserOrganizationRoleUserNotInOrg.HTTPStatusCodeInt32(),
+				Error: &protos.Error{
+					ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleUserNotInOrg.Code),
+					ErrorMessage: pkg_errors.UpdateUserOrganizationRoleUserNotInOrg.Error,
+					HumanMessage: pkg_errors.UpdateUserOrganizationRoleUserNotInOrg.ErrorMessage,
+				},
+			}, nil
+		case errors.As(err, &selectionError):
+			return &protos.UpdateUserOrganizationRoleResponse{
+				Code: pkg_errors.UpdateUserOrganizationRoleInvalidRole.HTTPStatusCodeInt32(),
+				Error: &protos.Error{
+					ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleInvalidRole.Code),
+					ErrorMessage: pkg_errors.UpdateUserOrganizationRoleInvalidRole.Error,
+					HumanMessage: pkg_errors.UpdateUserOrganizationRoleInvalidRole.ErrorMessage,
+				},
+			}, nil
+		default:
+			return &protos.UpdateUserOrganizationRoleResponse{
+				Code: pkg_errors.UpdateUserOrganizationRoleUpdateRole.HTTPStatusCodeInt32(),
+				Error: &protos.Error{
+					ErrorCode:    uint64(pkg_errors.UpdateUserOrganizationRoleUpdateRole.Code),
+					ErrorMessage: pkg_errors.UpdateUserOrganizationRoleUpdateRole.Error,
+					HumanMessage: pkg_errors.UpdateUserOrganizationRoleUpdateRole.ErrorMessage,
+				},
+			}, nil
+		}
 	}
 
 	return &protos.UpdateUserOrganizationRoleResponse{
@@ -488,45 +376,11 @@ func (orgG *webOrganizationGRPCApi) UpdateUserOrganizationRole(ctx context.Conte
 }
 
 func (orgG *webOrganizationGRPCApi) DeleteUserFromOrganization(ctx context.Context, irRequest *protos.DeleteUserFromOrganizationRequest) (*protos.DeleteUserFromOrganizationResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	userContext, err := iAuth.UserContext()
-	if err != nil {
-		return nil, err
-	}
-	organizationContext, err := iAuth.OrganizationContext()
-	if err != nil {
-		return nil, err
-	}
-	currentOrgRole, err := orgG.userService.GetActiveOrInvitedOrganizationRoleForOrganization(ctx, userContext.UserID, organizationContext.OrganizationID)
-	if err != nil || currentOrgRole == nil {
-		return &protos.DeleteUserFromOrganizationResponse{
-			Code:    pkg_errors.DeleteUserFromOrganizationMissingOrganization.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.DeleteUserFromOrganizationMissingOrganization.Code),
-				ErrorMessage: pkg_errors.DeleteUserFromOrganizationMissingOrganization.Error,
-				HumanMessage: pkg_errors.DeleteUserFromOrganizationMissingOrganization.ErrorMessage,
-			},
-		}, nil
-	}
-	if !validator.OneOf(currentOrgRole.Role, type_enums.ORGANIZATION_ROLE_OWNER.String(), type_enums.ORGANIZATION_ROLE_ADMIN.String()) {
-		return &protos.DeleteUserFromOrganizationResponse{
-			Code:    pkg_errors.DeleteUserFromOrganizationUnauthorized.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.DeleteUserFromOrganizationUnauthorized.Code),
-				ErrorMessage: pkg_errors.DeleteUserFromOrganizationUnauthorized.Error,
-				HumanMessage: pkg_errors.DeleteUserFromOrganizationUnauthorized.ErrorMessage,
-			},
-		}, nil
-	}
+	tenant := principal.Tenant()
 	if !validator.NonZero(irRequest.GetUserId()) {
 		return &protos.DeleteUserFromOrganizationResponse{
 			Code:    pkg_errors.DeleteUserFromOrganizationInvalidUser.HTTPStatusCodeInt32(),
@@ -552,8 +406,8 @@ func (orgG *webOrganizationGRPCApi) DeleteUserFromOrganization(ctx context.Conte
 			},
 		}, nil
 	}
-	org, err := orgG.userService.GetAnyOrganizationRole(ctx, eUser.GetId())
-	if err != nil || org.GetOrganizationId() != currentOrgRole.OrganizationId || !validator.OneOf(org.Status.String(), type_enums.RECORD_ACTIVE.String(), type_enums.RECORD_INVITED.String()) {
+	organizationRoles, err := orgG.userService.GetActiveOrInvitedOrganizationRolesForOrganization(ctx, eUser.GetId(), tenant.OrganizationID)
+	if err != nil || len(organizationRoles) == 0 {
 		if err != nil {
 			orgG.logger.Errorf("unable to get organization role for organization delete err %v", err)
 		}
@@ -567,7 +421,10 @@ func (orgG *webOrganizationGRPCApi) DeleteUserFromOrganization(ctx context.Conte
 			},
 		}, nil
 	}
-	if strings.EqualFold(org.Role, type_enums.ORGANIZATION_ROLE_OWNER.String()) {
+	for _, organizationRole := range organizationRoles {
+		if organizationRole.RoleDefinitionID != internal_service.OrganizationOwnerRoleDefinitionID {
+			continue
+		}
 		return &protos.DeleteUserFromOrganizationResponse{
 			Code:    pkg_errors.DeleteUserFromOrganizationOwner.HTTPStatusCodeInt32(),
 			Success: false,
@@ -579,7 +436,7 @@ func (orgG *webOrganizationGRPCApi) DeleteUserFromOrganization(ctx context.Conte
 		}, nil
 	}
 
-	if err = orgG.userService.ArchiveUserFromOrganization(ctx, iAuth, eUser.GetId(), currentOrgRole.OrganizationId); err != nil {
+	if err = orgG.userService.ArchiveUserFromOrganization(ctx, principal, eUser.GetId(), tenant.OrganizationID); err != nil {
 		orgG.logger.Errorf("unable to archive user from organization err %v", err)
 		return &protos.DeleteUserFromOrganizationResponse{
 			Code:    pkg_errors.DeleteUserFromOrganizationArchiveUser.HTTPStatusCodeInt32(),

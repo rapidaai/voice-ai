@@ -52,17 +52,15 @@ export const listUsers = ({
   auth,
   callback,
 }: ListUsersParams): void => {
-  getAllUser(
-    page,
-    pageSize,
-    criteria,
-    callback,
-    ConnectionConfig.WithDebugger({
-      authorization: auth.token,
-      userId: auth.userId,
-      projectId: auth.projectId,
-    }),
-  );
+  const metadata = ConnectionConfig.WithDebugger({
+    authorization: auth.token,
+    userId: auth.userId,
+    organizationId: auth.organizationId,
+    projectId: auth.projectId,
+  });
+  if (!auth.projectId) delete metadata['x-project-id'];
+
+  getAllUser(page, pageSize, criteria, callback, metadata);
 };
 
 export const updateUserNotificationSettings = ({
@@ -97,6 +95,7 @@ export const updateUserNotificationSettings = ({
     ConnectionConfig.WithDebugger({
       authorization: auth.token,
       userId: auth.userId,
+      organizationId: auth.organizationId,
       projectId: auth.projectId,
     }),
   );

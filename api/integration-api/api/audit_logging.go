@@ -12,10 +12,13 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	config "github.com/rapidaai/api/integration-api/config"
+	"github.com/rapidaai/pkg/authentication"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	pkg_errors "github.com/rapidaai/pkg/errors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/pkg/validator"
 	integration_api "github.com/rapidaai/protos"
 )
 
@@ -36,17 +39,16 @@ func NewAuditLoggingGRPC(config *config.IntegrationConfig, logger commons.Logger
 }
 
 func (als *auditLoggingGRPCApi) GetAuditLog(c context.Context, ir *integration_api.GetAuditLogRequest) (*integration_api.GetAuditLogResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	iAuth, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, (pkg_errors.AuthenticationFailureError{}).Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	if !validator.OneOf(iAuth.Subject().Type, authentication.IdentityUser, authentication.IdentityProjectCredential, authentication.IdentityService) {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
-	projectContext, projectErr := iAuth.ProjectContext()
-	if projectErr != nil {
-		return nil, status.Error(codes.PermissionDenied, projectErr.Error())
+	projectContext := iAuth.Tenant()
+	if projectContext.OrganizationID == 0 || projectContext.ProjectID == 0 {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
 
 	lg, err := als.auditService.Get(c, projectContext.OrganizationID, projectContext.ProjectID, ir.GetId())
@@ -87,17 +89,16 @@ func (als *auditLoggingGRPCApi) GetAuditLog(c context.Context, ir *integration_a
 }
 
 func (als *auditLoggingGRPCApi) GetAllAuditLog(c context.Context, ir *integration_api.GetAllAuditLogRequest) (*integration_api.GetAllAuditLogResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	iAuth, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, (pkg_errors.AuthenticationFailureError{}).Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	if !validator.OneOf(iAuth.Subject().Type, authentication.IdentityUser, authentication.IdentityProjectCredential, authentication.IdentityService) {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
-	projectContext, projectErr := iAuth.ProjectContext()
-	if projectErr != nil {
-		return nil, status.Error(codes.PermissionDenied, projectErr.Error())
+	projectContext := iAuth.Tenant()
+	if projectContext.OrganizationID == 0 || projectContext.ProjectID == 0 {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
 
 	cnt, lgs, err := als.auditService.GetAll(c,
@@ -116,25 +117,28 @@ func (als *auditLoggingGRPCApi) GetAllAuditLog(c context.Context, ir *integratio
 		als.logger.Errorf("unable to cast the information to generic struct %v", err)
 	}
 
+	totalItem, err := utils.Int64ToUint32(cnt)
+	if err != nil {
+		return nil, err
+	}
 	return utils.PaginatedSuccess[integration_api.GetAllAuditLogResponse](
-		uint32(cnt),
+		totalItem,
 		ir.GetPaginate().GetPage(),
 		out)
 }
 
 // CreateMetadata implements protos.AuditLoggingServiceServer.
 func (als *auditLoggingGRPCApi) CreateMetadata(c context.Context, cmr *integration_api.CreateMetadataRequest) (*integration_api.CreateMetadataResponse, error) {
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	iAuth, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, (pkg_errors.AuthenticationFailureError{}).Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	if !validator.OneOf(iAuth.Subject().Type, authentication.IdentityUser, authentication.IdentityProjectCredential, authentication.IdentityService) {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
-	projectContext, projectErr := iAuth.ProjectContext()
-	if projectErr != nil {
-		return nil, status.Error(codes.PermissionDenied, projectErr.Error())
+	projectContext := iAuth.Tenant()
+	if projectContext.OrganizationID == 0 || projectContext.ProjectID == 0 {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
 	_adt, err := als.auditService.Get(c, projectContext.OrganizationID, projectContext.ProjectID, cmr.GetId())
 	if err != nil {

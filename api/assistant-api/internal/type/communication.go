@@ -12,10 +12,10 @@ import (
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/entity/knowledges"
 
+	"github.com/rapidaai/pkg/authentication"
 	endpoint_client "github.com/rapidaai/pkg/clients/endpoint"
 	integration_client "github.com/rapidaai/pkg/clients/integration"
 	web_client "github.com/rapidaai/pkg/clients/web"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 )
@@ -41,7 +41,7 @@ type Communication interface {
 	InternalCaller
 
 	// authentication
-	Auth() *types.Authentication
+	Auth() authentication.Principal
 
 	// phone, debugger, sdk etc
 	GetSource() utils.RapidaSource

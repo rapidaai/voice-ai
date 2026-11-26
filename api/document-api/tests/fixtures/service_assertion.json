@@ -1,0 +1,9 @@
+{
+  "secret": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+  "service_key": "veUxBjUOPPj8M4ZdOuRNqMuIzamLmE4S2upg4QeQL40=",
+  "destination": "document-api",
+  "issued_at": 1794528000,
+  "expires_at": 1794528055,
+  "fingerprint": "kT0c-JnsGE4x4pLFAL7pVVX4h2L42piDVcwmK2zPWbg",
+  "assertion": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkb2N1bWVudC1hcGkiLCJleHAiOjE3OTQ1MjgwNTUsImF1dGhlbnRpY2F0aW9uIjp7InRlbmFudCI6eyJvcmdhbml6YXRpb25faWQiOjcsInByb2plY3RfaWQiOjExfSwicGVybWlzc2lvbnMiOlsib3JnYW5pemF0aW9uLm1lbWJlcnMucmVhZCIsInByb2plY3Qua25vd2xlZGdlLnJlYWQiXSwic3ViamVjdCI6eyJ0eXBlIjoidXNlciIsImlkIjo0Mn19fQ.WoHmCKOSMEraI__2IDKR2kzvc_MB3Wi0zv9RP15BppM"
+}

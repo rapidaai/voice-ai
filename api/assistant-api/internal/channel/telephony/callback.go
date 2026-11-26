@@ -11,11 +11,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 )
 
 // HandleStatusCallback resolves the telephony provider and parses a status callback webhook.
-func (d *InboundDispatcher) HandleStatusCallback(c *gin.Context, provider string, auth *types.Authentication, assistantId, conversationId uint64) (*internal_type.StatusInfo, error) {
+func (d *InboundDispatcher) HandleStatusCallback(c *gin.Context, provider string, auth authentication.Principal, assistantId, conversationId uint64) (*internal_type.StatusInfo, error) {
 	tel, err := GetTelephony(Telephony(provider), d.cfg, d.logger, d.telephonyOpt)
 	if err != nil {
 		return nil, fmt.Errorf("invalid telephony provider %s: %w", provider, err)

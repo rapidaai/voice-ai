@@ -8,16 +8,19 @@ import (
 	"strings"
 	"time"
 
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
 	internal_services "github.com/rapidaai/api/web-api/internal/service"
+	internal_accessmanagement "github.com/rapidaai/api/web-api/internal/service/accessmanagement"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/ciphers"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
 	gorm_generators "github.com/rapidaai/pkg/models/gorm/generators"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	web_api "github.com/rapidaai/protos"
@@ -35,44 +38,20 @@ func NewProjectService(logger commons.Logger, postgres connectors.PostgresConnec
 	}
 }
 
-func NewProjectAuthenticator(logger commons.Logger, postgres connectors.PostgresConnector) types.ClaimAuthenticator[*types.ProjectScope] {
-	return &projectService{
-		logger:   logger,
-		postgres: postgres,
+func (pS *projectService) Create(ctx context.Context, auth authentication.Principal, organizationId uint64, name string, description string) (*internal_entity.Project, error) {
+	tenant := auth.Tenant()
+	if tenant.OrganizationID == 0 || organizationId != tenant.OrganizationID {
+		return nil, pkg_errors.RouteAuthorizationDeniedError{}
 	}
-}
-
-// Claim implements types.ClaimAuthenticator.
-func (p *projectService) Claim(ctx context.Context, claimToken string) (*types.PlainClaimPrinciple[*types.ProjectScope], error) {
-	start := time.Now()
-	db := p.postgres.DB(ctx)
-	var prjScope types.ProjectScope
-	tx := db.Table("project_credentials").
-		Select("id AS credential_id, project_id, organization_id, status").
-		Order("created_date DESC").
-		Where("key = ?", claimToken).
-		Take(&prjScope)
-	if tx.Error != nil {
-		p.logger.Errorf("Authentication error, illegal key request %v", tx.Error)
-		return nil, tx.Error
-	}
-	p.logger.Debugf("Benchmarking: projectAuthenticator.Claim time taken %v and value %+v", time.Since(start), prjScope)
-	prjScope.CurrentToken = claimToken
-	return &types.PlainClaimPrinciple[*types.ProjectScope]{
-		Info: &prjScope,
-	}, nil
-}
-
-func (pS *projectService) Create(ctx context.Context, auth *types.Authentication, organizationId uint64, name string, description string) (*internal_entity.Project, error) {
-
+	caller := auth.Caller()
 	db := pS.postgres.DB(ctx)
 	project := &internal_entity.Project{
 		Name:           name,
 		OrganizationId: organizationId,
 		Description:    description,
 		Mutable: gorm_models.Mutable{
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(caller.Type),
+			CreatedActorID:   caller.ID,
 		},
 	}
 	tx := db.Save(project)
@@ -81,8 +60,12 @@ func (pS *projectService) Create(ctx context.Context, auth *types.Authentication
 	}
 	return project, nil
 }
-func (pS *projectService) Update(ctx context.Context, auth *types.Authentication, projectId uint64, name *string, description *string) (*internal_entity.Project, error) {
-
+func (pS *projectService) Update(ctx context.Context, auth authentication.Principal, projectId uint64, name *string, description *string) (*internal_entity.Project, error) {
+	tenant := auth.Tenant()
+	if tenant.OrganizationID == 0 || tenant.ProjectID == 0 || projectId != tenant.ProjectID {
+		return nil, pkg_errors.RouteAuthorizationDeniedError{}
+	}
+	caller := auth.Caller()
 	db := pS.postgres.DB(ctx)
 	project := &internal_entity.Project{
 		Audited: gorm_models.Audited{
@@ -90,8 +73,8 @@ func (pS *projectService) Update(ctx context.Context, auth *types.Authentication
 		},
 	}
 	updates := map[string]interface{}{
-		"updated_actor_type": auth.Actor().Type.String(),
-		"updated_actor_id":   auth.Actor().ID,
+		"updated_actor_type": string(caller.Type),
+		"updated_actor_id":   caller.ID,
 		"updated_date":       time.Now(),
 	}
 
@@ -101,14 +84,21 @@ func (pS *projectService) Update(ctx context.Context, auth *types.Authentication
 	if description != nil {
 		updates["description"] = *description
 	}
-	tx := db.Model(&project).Updates(updates)
+	tx := db.Model(&project).Where("organization_id = ? AND status = ?", tenant.OrganizationID, type_enums.RECORD_ACTIVE).Updates(updates)
 	if err := tx.Error; err != nil {
 		return nil, err
+	}
+	if tx.RowsAffected != 1 {
+		return nil, gorm.ErrRecordNotFound
 	}
 	return project, nil
 }
 
-func (pS *projectService) GetAll(ctx context.Context, auth *types.Authentication, organizationId uint64, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.Project, error) {
+func (pS *projectService) GetAll(ctx context.Context, auth authentication.Principal, organizationId uint64, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.Project, error) {
+	tenant := auth.Tenant()
+	if tenant.OrganizationID == 0 || organizationId != tenant.OrganizationID {
+		return 0, nil, pkg_errors.RouteAuthorizationDeniedError{}
+	}
 	db := pS.postgres.DB(ctx)
 	var projects []*internal_entity.Project
 	var cnt int64
@@ -138,10 +128,14 @@ func (pS *projectService) GetAll(ctx context.Context, auth *types.Authentication
 	return cnt, projects, nil
 }
 
-func (pS *projectService) Get(ctx context.Context, auth *types.Authentication, projectId uint64) (*internal_entity.Project, error) {
+func (pS *projectService) Get(ctx context.Context, auth authentication.Principal, projectId uint64) (*internal_entity.Project, error) {
+	tenant := auth.Tenant()
+	if tenant.OrganizationID == 0 || tenant.ProjectID == 0 || projectId != tenant.ProjectID {
+		return nil, pkg_errors.RouteAuthorizationDeniedError{}
+	}
 	db := pS.postgres.DB(ctx)
 	var project internal_entity.Project
-	tx := db.Where("id = ? AND status = ? ", projectId, type_enums.RECORD_ACTIVE).First(&project)
+	tx := db.Where("id = ? AND organization_id = ? AND status = ? ", projectId, tenant.OrganizationID, type_enums.RECORD_ACTIVE).First(&project)
 	if tx.Error != nil {
 		pS.logger.Debugf("unable to find any project %v", projectId)
 		return nil, tx.Error
@@ -149,7 +143,11 @@ func (pS *projectService) Get(ctx context.Context, auth *types.Authentication, p
 	return &project, nil
 }
 
-func (pS *projectService) GetAllByOrganization(ctx context.Context, auth *types.Authentication, organizationId uint64, projectIds []uint64) ([]*internal_entity.Project, error) {
+func (pS *projectService) GetAllByOrganization(ctx context.Context, auth authentication.Principal, organizationId uint64, projectIds []uint64) ([]*internal_entity.Project, error) {
+	tenant := auth.Tenant()
+	if tenant.OrganizationID == 0 || organizationId != tenant.OrganizationID {
+		return nil, pkg_errors.RouteAuthorizationDeniedError{}
+	}
 	db := pS.postgres.DB(ctx)
 	uniqueProjectIds := utils.Unique(projectIds)
 
@@ -168,110 +166,184 @@ func (pS *projectService) GetAllByOrganization(ctx context.Context, auth *types.
 	return projects, nil
 }
 
-func (pS *projectService) Archive(ctx context.Context, auth *types.Authentication, projectId uint64) (*internal_entity.Project, error) {
-
+func (pS *projectService) Archive(ctx context.Context, auth authentication.Principal, projectId uint64) (*internal_entity.Project, error) {
+	tenant := auth.Tenant()
+	if tenant.OrganizationID == 0 || tenant.ProjectID == 0 || projectId != tenant.ProjectID {
+		return nil, pkg_errors.RouteAuthorizationDeniedError{}
+	}
+	caller := auth.Caller()
 	db := pS.postgres.DB(ctx)
 	ct := &internal_entity.Project{}
-	tx := db.Model(ct).Where("id = ?", projectId).Updates(map[string]interface{}{
+	tx := db.Model(ct).Where("id = ? AND organization_id = ? AND status = ?", projectId, tenant.OrganizationID, type_enums.RECORD_ACTIVE).Updates(map[string]interface{}{
 		"status":             type_enums.RECORD_ARCHIEVE,
-		"updated_actor_type": auth.Actor().Type.String(),
-		"updated_actor_id":   auth.Actor().ID,
+		"updated_actor_type": string(caller.Type),
+		"updated_actor_id":   caller.ID,
 		"updated_date":       time.Now(),
 	})
 	if tx.Error != nil {
 		pS.logger.Debugf("unable to update the project %v", projectId)
 		return nil, tx.Error
 	}
+	if tx.RowsAffected != 1 {
+		return nil, gorm.ErrRecordNotFound
+	}
 	return ct, nil
 }
 
-func (pS *projectService) CreateCredential(ctx context.Context, auth *types.Authentication, name string, projectId, organizationId uint64) (*internal_entity.ProjectCredential, error) {
-	if projectId == 0 || projectId > math.MaxInt64 || organizationId == 0 || organizationId > math.MaxInt64 || strings.TrimSpace(name) == "" {
-		return nil, errors.New("project credential requires a valid project, organization, and name")
+func (pS *projectService) CreateCredential(ctx context.Context, auth authentication.Principal, name string, projectId, organizationId, roleDefinitionId uint64) (*internal_entity.ProjectCredential, error) {
+	tenant := auth.Tenant()
+	if tenant.ProjectID == 0 || projectId != tenant.ProjectID || organizationId != tenant.OrganizationID {
+		return nil, pkg_errors.RouteAuthorizationDeniedError{}
+	}
+	caller := auth.Caller()
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	credentialID := gorm_generators.ID()
 	if credentialID == 0 || credentialID > math.MaxInt64 {
 		return nil, errors.New("project credential generated an invalid id")
 	}
 
-	db := pS.postgres.DB(ctx)
-	key := ciphers.Token("rpx_")
-	prc := &internal_entity.ProjectCredential{
+	credential := &internal_entity.ProjectCredential{
 		Audited: gorm_models.Audited{Id: credentialID},
 		Organizational: gorm_models.Organizational{
 			ProjectId:      projectId,
 			OrganizationId: organizationId,
 		},
-		Name: strings.TrimSpace(name),
-		Key:  key,
+		Name:             name,
+		Key:              ciphers.Token("rpx_"),
+		RoleDefinitionID: roleDefinitionId,
+		RoleSubjectType:  internal_accessmanagement.SubjectProjectToken,
 		Mutable: gorm_models.Mutable{
 			Status:           type_enums.RECORD_ACTIVE,
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(caller.Type),
+			CreatedActorID:   caller.ID,
 		},
 	}
-	tx := db.Create(prc)
-	if err := tx.Error; err != nil {
+	role := internal_entity.RoleDefinition{}
+	err := pS.postgres.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		var project struct{ Id uint64 }
+		projectErr := tx.Table("projects").Select("id").Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND organization_id = ? AND status = ?", projectId, organizationId, type_enums.RECORD_ACTIVE).
+			Take(&project).Error
+		if errors.Is(projectErr, gorm.ErrRecordNotFound) {
+			return pkg_errors.CredentialSelectionNotFoundError{}
+		}
+		if projectErr != nil {
+			return projectErr
+		}
+
+		roleErr := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND status = ? AND scope_type = ? AND subject_type = ?", roleDefinitionId, type_enums.RECORD_ACTIVE, internal_accessmanagement.ScopeProject, internal_accessmanagement.SubjectProjectToken).
+			Where("(definition_type = ? AND organization_id IS NULL) OR (definition_type = ? AND organization_id = ?)", internal_accessmanagement.DefinitionBuiltIn, internal_accessmanagement.DefinitionCustom, organizationId).
+			Take(&role).Error
+		if errors.Is(roleErr, gorm.ErrRecordNotFound) {
+			return pkg_errors.CredentialSelectionNotFoundError{}
+		}
+		if roleErr != nil {
+			return roleErr
+		}
+		return tx.Create(credential).Error
+	})
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
 		return nil, err
 	}
-	return prc, nil
+	credential.RoleDefinition = &role
+	return credential, nil
 }
 
-func (pS *projectService) ArchiveCredential(ctx context.Context, auth *types.Authentication, credentialId, projectId, organizationId uint64) (*internal_entity.ProjectCredential, error) {
-	if credentialId == 0 || credentialId > math.MaxInt64 || projectId == 0 || projectId > math.MaxInt64 || organizationId == 0 || organizationId > math.MaxInt64 {
-		return nil, errors.New("project credential identity is invalid")
+func (pS *projectService) RevokeCredential(ctx context.Context, auth authentication.Principal, credentialId, projectId, organizationId uint64) (uint64, error) {
+	tenant := auth.Tenant()
+	if tenant.ProjectID == 0 || projectId != tenant.ProjectID || organizationId != tenant.OrganizationID {
+		return 0, pkg_errors.RouteAuthorizationDeniedError{}
 	}
-
-	db := pS.postgres.DB(ctx)
-	ct := &internal_entity.ProjectCredential{}
-	tx := db.Model(ct).
-		Where("id = ? AND project_id = ? AND organization_id = ? AND status = ?", credentialId, projectId, organizationId, type_enums.RECORD_ACTIVE).
-		Updates(map[string]interface{}{
-			"status":             type_enums.RECORD_ARCHIEVE,
-			"updated_actor_type": auth.Actor().Type.String(),
-			"updated_actor_id":   auth.Actor().ID,
-			"updated_date":       time.Now(),
-		})
-	if tx.Error != nil {
-		pS.logger.Debugf("unable to update project credentials %v", credentialId)
-		return nil, tx.Error
+	caller := auth.Caller()
+	err := pS.postgres.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		credential := &internal_entity.ProjectCredential{}
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND project_id = ? AND organization_id = ? AND status IN ?", credentialId, projectId, organizationId, []type_enums.RecordState{type_enums.RECORD_ACTIVE, type_enums.RECORD_ARCHIEVE}).
+			Take(credential).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return pkg_errors.ProjectAPIKeyNotFoundError{}
+		}
+		if err != nil {
+			return err
+		}
+		if credential.Status == type_enums.RECORD_ARCHIEVE {
+			return nil
+		}
+		result := tx.Model(&internal_entity.ProjectCredential{}).
+			Where("id = ? AND status = ?", credentialId, type_enums.RECORD_ACTIVE).
+			Updates(map[string]interface{}{
+				"status":             type_enums.RECORD_ARCHIEVE,
+				"updated_actor_type": string(caller.Type),
+				"updated_actor_id":   caller.ID,
+				"updated_date":       time.Now(),
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return pkg_errors.ProjectAPIKeyNotFoundError{}
+		}
+		return nil
+	})
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return 0, ctxErr
+		}
+		return 0, err
 	}
-	if tx.RowsAffected != 1 {
-		return nil, errors.New("active project credential not found")
-	}
-	if err := db.Where("id = ?", credentialId).Take(ct).Error; err != nil {
-		return nil, err
-	}
-	return ct, nil
+	return credentialId, nil
 }
 
-func (pS *projectService) GetAllCredential(ctx context.Context, auth *types.Authentication, projectId, organizationId uint64, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.ProjectCredential, error) {
+func (pS *projectService) GetAllCredential(ctx context.Context, auth authentication.Principal, projectId, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.ProjectCredential, error) {
+	tenant := auth.Tenant()
+	if tenant.ProjectID == 0 || projectId != tenant.ProjectID || organizationId != tenant.OrganizationID {
+		return 0, nil, pkg_errors.RouteAuthorizationDeniedError{}
+	}
 	db := pS.postgres.DB(ctx)
-	var pcs []*internal_entity.ProjectCredential
+	var credentials []*internal_entity.ProjectCredential
 	var cnt int64
 	qry := db.
-		Model(internal_entity.ProjectCredential{}).
-		Where("project_id = ? AND organization_id = ? AND status = ? ", projectId, organizationId, type_enums.RECORD_ACTIVE)
-	for _, ct := range criteria {
-		qry.Where(fmt.Sprintf("%s = ?", ct.GetKey()), ct.GetValue())
+		Table("project_credentials").
+		Joins("JOIN role_definitions ON role_definitions.id = project_credentials.role_definition_id").
+		Where("project_credentials.project_id = ? AND project_credentials.organization_id = ? AND project_credentials.status = ?", projectId, organizationId, type_enums.RECORD_ACTIVE)
+	for _, criteria := range criterias {
+		pattern := strings.ReplaceAll(criteria.GetValue(), `\`, `\\`)
+		pattern = strings.ReplaceAll(pattern, `%`, `\%`)
+		pattern = strings.ReplaceAll(pattern, `_`, `\_`)
+		pattern = "%" + pattern + "%"
+		switch criteria.GetKey() {
+		case "name":
+			qry = qry.Where(`LOWER(project_credentials.name) LIKE LOWER(?) ESCAPE '\'`, pattern)
+		case "role":
+			qry = qry.Where(`LOWER(role_definitions.name) LIKE LOWER(?) ESCAPE '\'`, pattern)
+		}
+	}
+	page, pageSize := uint32(0), uint32(0)
+	if paginate != nil {
+		page, pageSize = paginate.GetPage(), paginate.GetPageSize()
 	}
 	tx := qry.
 		Scopes(gorm_models.
 			Paginate(gorm_models.
 				NewPaginated(
-					paginate.GetPage(),
-					paginate.GetPageSize(),
+					page,
+					pageSize,
 					&cnt,
 					qry))).
-		Order(clause.OrderByColumn{
-			Column: clause.Column{Name: "created_date"},
-			Desc:   true,
-		}).
-		Find(&pcs)
+		Select("project_credentials.*").
+		Preload("RoleDefinition").
+		Order("project_credentials.created_date DESC, project_credentials.id DESC").
+		Find(&credentials)
 	if tx.Error != nil {
-		pS.logger.Debugf("unable to find any project %v", organizationId)
+		pS.logger.Debugf("unable to list project credentials for project %v", projectId)
 		return cnt, nil, tx.Error
 	}
 
-	return cnt, pcs, nil
+	return cnt, credentials, nil
 }

@@ -13,93 +13,93 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	clients "github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	protos "github.com/rapidaai/protos"
 )
 
 type AssistantServiceClient interface {
-	GetAllAssistant(c context.Context, auth *types.Authentication, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error)
+	GetAllAssistant(c context.Context, auth authentication.Principal, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error)
 
-	DeleteAssistant(c context.Context, auth *types.Authentication, assistantRequest *protos.DeleteAssistantRequest) (*protos.GetAssistantResponse, error)
-	GetAssistant(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error)
-	CreateAssistant(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantRequest) (*protos.GetAssistantResponse, error)
+	DeleteAssistant(c context.Context, auth authentication.Principal, assistantRequest *protos.DeleteAssistantRequest) (*protos.GetAssistantResponse, error)
+	GetAssistant(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error)
+	CreateAssistant(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantRequest) (*protos.GetAssistantResponse, error)
 
-	GetAllAssistantProvider(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.GetAllAssistantProviderResponse_AssistantProvider, error)
-	UpdateAssistantVersion(c context.Context, auth *types.Authentication, iRequest *protos.UpdateAssistantVersionRequest) (*protos.GetAssistantResponse, error)
-	CreateAssistantProvider(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantProviderRequest) (*protos.GetAssistantProviderResponse, error)
+	GetAllAssistantProvider(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.GetAllAssistantProviderResponse_AssistantProvider, error)
+	UpdateAssistantVersion(c context.Context, auth authentication.Principal, iRequest *protos.UpdateAssistantVersionRequest) (*protos.GetAssistantResponse, error)
+	CreateAssistantProvider(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantProviderRequest) (*protos.GetAssistantProviderResponse, error)
 
 	//
-	GetAllMessage(c context.Context, auth *types.Authentication,
+	GetAllMessage(c context.Context, auth authentication.Principal,
 		criteria []*protos.Criteria, paginate *protos.Paginate,
 		order *protos.Ordering, selectors []*protos.FieldSelector) (*protos.Paginated, []*protos.AssistantConversationMessage, error)
-	GetAllAssistantMessage(c context.Context, auth *types.Authentication, assistantId uint64,
+	GetAllAssistantMessage(c context.Context, auth authentication.Principal, assistantId uint64,
 		criteria []*protos.Criteria, paginate *protos.Paginate,
 		order *protos.Ordering, selectors []*protos.FieldSelector) (*protos.Paginated, []*protos.AssistantConversationMessage, error)
-	GetAllAssistantConversation(ctx context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate, order *protos.Ordering) (*protos.Paginated, []*protos.AssistantConversation, error)
-	GetAllConversationMessage(ctx context.Context, auth *types.Authentication, assistantId, assistantConversationId uint64, criteria []*protos.Criteria, paginate *protos.Paginate, order *protos.Ordering) (*protos.Paginated, []*protos.AssistantConversationMessage, error)
-	GetAssistantDashboard(ctx context.Context, auth *types.Authentication, dashboardRequest *protos.GetAssistantDashboardRequest) (*protos.GetAssistantDashboardResponse, error)
+	GetAllAssistantConversation(ctx context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate, order *protos.Ordering) (*protos.Paginated, []*protos.AssistantConversation, error)
+	GetAllConversationMessage(ctx context.Context, auth authentication.Principal, assistantId, assistantConversationId uint64, criteria []*protos.Criteria, paginate *protos.Paginate, order *protos.Ordering) (*protos.Paginated, []*protos.AssistantConversationMessage, error)
+	GetAssistantDashboard(ctx context.Context, auth authentication.Principal, dashboardRequest *protos.GetAssistantDashboardRequest) (*protos.GetAssistantDashboardResponse, error)
 	GetAssistantConversation(
 		c context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		assistantRequest *protos.GetAssistantConversationRequest) (*protos.GetAssistantConversationResponse, error)
 
-	CreateAssistantTag(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantTagRequest) (*protos.GetAssistantResponse, error)
-	UpdateAssistantDetail(c context.Context, auth *types.Authentication, assistantRequest *protos.UpdateAssistantDetailRequest) (*protos.GetAssistantResponse, error)
+	CreateAssistantTag(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantTagRequest) (*protos.GetAssistantResponse, error)
+	UpdateAssistantDetail(c context.Context, auth authentication.Principal, assistantRequest *protos.UpdateAssistantDetailRequest) (*protos.GetAssistantResponse, error)
 
 	// deployment
-	CreateAssistantApiDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantApiDeploymentResponse, error)
-	CreateAssistantPhoneDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error)
-	CreateAssistantWhatsappDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantWhatsappDeploymentResponse, error)
-	CreateAssistantWebpluginDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantWebpluginDeploymentResponse, error)
-	CreateAssistantDebuggerDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantDebuggerDeploymentResponse, error)
+	CreateAssistantApiDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantApiDeploymentResponse, error)
+	CreateAssistantPhoneDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error)
+	CreateAssistantWhatsappDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantWhatsappDeploymentResponse, error)
+	CreateAssistantWebpluginDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantWebpluginDeploymentResponse, error)
+	CreateAssistantDebuggerDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantDebuggerDeploymentResponse, error)
 
-	GetAssistantApiDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantApiDeploymentResponse, error)
-	GetAssistantPhoneDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error)
-	GetAssistantWhatsappDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWhatsappDeploymentResponse, error)
-	GetAssistantWebpluginDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWebpluginDeploymentResponse, error)
-	GetAssistantDebuggerDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantDebuggerDeploymentResponse, error)
-	GetAllAssistantApiDeployment(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantApiDeployment, error)
-	GetAllAssistantPhoneDeployment(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantPhoneDeployment, error)
-	GetAllAssistantWhatsappDeployment(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantWhatsappDeployment, error)
-	GetAllAssistantWebpluginDeployment(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantWebpluginDeployment, error)
-	GetAllAssistantDebuggerDeployment(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantDebuggerDeployment, error)
-	DisableAssistantApiDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantApiDeploymentResponse, error)
-	DisableAssistantPhoneDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error)
-	DisableAssistantWhatsappDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWhatsappDeploymentResponse, error)
-	DisableAssistantWebpluginDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWebpluginDeploymentResponse, error)
-	DisableAssistantDebuggerDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantDebuggerDeploymentResponse, error)
-
-	//
-	GetAssistantHTTPLog(ctx context.Context, auth *types.Authentication, req *protos.GetAssistantHTTPLogRequest) (*protos.GetAssistantHTTPLogResponse, error)
-	GetAllAssistantHTTPLog(ctx context.Context, auth *types.Authentication, projectId uint64, criteria []*protos.Criteria, paginate *protos.Paginate, ordering *protos.Ordering) (*protos.Paginated, []*protos.AssistantHTTPLog, error)
-	RetryAssistantHTTPLog(ctx context.Context, auth *types.Authentication, req *protos.RetryAssistantHTTPLogRequest) (*protos.GetAssistantHTTPLogResponse, error)
+	GetAssistantApiDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantApiDeploymentResponse, error)
+	GetAssistantPhoneDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error)
+	GetAssistantWhatsappDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWhatsappDeploymentResponse, error)
+	GetAssistantWebpluginDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWebpluginDeploymentResponse, error)
+	GetAssistantDebuggerDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantDebuggerDeploymentResponse, error)
+	GetAllAssistantApiDeployment(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantApiDeployment, error)
+	GetAllAssistantPhoneDeployment(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantPhoneDeployment, error)
+	GetAllAssistantWhatsappDeployment(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantWhatsappDeployment, error)
+	GetAllAssistantWebpluginDeployment(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantWebpluginDeployment, error)
+	GetAllAssistantDebuggerDeployment(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantDebuggerDeployment, error)
+	DisableAssistantApiDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantApiDeploymentResponse, error)
+	DisableAssistantPhoneDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error)
+	DisableAssistantWhatsappDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWhatsappDeploymentResponse, error)
+	DisableAssistantWebpluginDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWebpluginDeploymentResponse, error)
+	DisableAssistantDebuggerDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantDebuggerDeploymentResponse, error)
 
 	//
-	GetAllAssistantTool(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantTool, error)
-	GetAssistantTool(c context.Context, auth *types.Authentication, iRequest *protos.GetAssistantToolRequest) (*protos.GetAssistantToolResponse, error)
-	CreateAssistantTool(c context.Context, auth *types.Authentication, iRequest *protos.CreateAssistantToolRequest) (*protos.GetAssistantToolResponse, error)
-	UpdateAssistantTool(c context.Context, auth *types.Authentication, iRequest *protos.UpdateAssistantToolRequest) (*protos.GetAssistantToolResponse, error)
-	DeleteAssistantTool(c context.Context, auth *types.Authentication, iRequest *protos.DeleteAssistantToolRequest) (*protos.GetAssistantToolResponse, error)
+	GetAssistantHTTPLog(ctx context.Context, auth authentication.Principal, req *protos.GetAssistantHTTPLogRequest) (*protos.GetAssistantHTTPLogResponse, error)
+	GetAllAssistantHTTPLog(ctx context.Context, auth authentication.Principal, projectId uint64, criteria []*protos.Criteria, paginate *protos.Paginate, ordering *protos.Ordering) (*protos.Paginated, []*protos.AssistantHTTPLog, error)
+	RetryAssistantHTTPLog(ctx context.Context, auth authentication.Principal, req *protos.RetryAssistantHTTPLogRequest) (*protos.GetAssistantHTTPLogResponse, error)
 
 	//
-	GetAllAssistantKnowledge(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantKnowledge, error)
-	GetAssistantKnowledge(c context.Context, auth *types.Authentication, iRequest *protos.GetAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error)
-	CreateAssistantKnowledge(c context.Context, auth *types.Authentication, iRequest *protos.CreateAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error)
-	UpdateAssistantKnowledge(c context.Context, auth *types.Authentication, iRequest *protos.UpdateAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error)
-	DeleteAssistantKnowledge(c context.Context, auth *types.Authentication, iRequest *protos.DeleteAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error)
+	GetAllAssistantTool(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantTool, error)
+	GetAssistantTool(c context.Context, auth authentication.Principal, iRequest *protos.GetAssistantToolRequest) (*protos.GetAssistantToolResponse, error)
+	CreateAssistantTool(c context.Context, auth authentication.Principal, iRequest *protos.CreateAssistantToolRequest) (*protos.GetAssistantToolResponse, error)
+	UpdateAssistantTool(c context.Context, auth authentication.Principal, iRequest *protos.UpdateAssistantToolRequest) (*protos.GetAssistantToolResponse, error)
+	DeleteAssistantTool(c context.Context, auth authentication.Principal, iRequest *protos.DeleteAssistantToolRequest) (*protos.GetAssistantToolResponse, error)
 
-	GetAssistantToolLog(ctx context.Context, auth *types.Authentication, in *protos.GetAssistantToolLogRequest) (*protos.GetAssistantToolLogResponse, error)
-	GetAllAssistantToolLog(ctx context.Context, auth *types.Authentication, in *protos.GetAllAssistantToolLogRequest) (*protos.GetAllAssistantToolLogResponse, error)
+	//
+	GetAllAssistantKnowledge(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantKnowledge, error)
+	GetAssistantKnowledge(c context.Context, auth authentication.Principal, iRequest *protos.GetAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error)
+	CreateAssistantKnowledge(c context.Context, auth authentication.Principal, iRequest *protos.CreateAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error)
+	UpdateAssistantKnowledge(c context.Context, auth authentication.Principal, iRequest *protos.UpdateAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error)
+	DeleteAssistantKnowledge(c context.Context, auth authentication.Principal, iRequest *protos.DeleteAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error)
+
+	GetAssistantToolLog(ctx context.Context, auth authentication.Principal, in *protos.GetAssistantToolLogRequest) (*protos.GetAssistantToolLogResponse, error)
+	GetAllAssistantToolLog(ctx context.Context, auth authentication.Principal, in *protos.GetAllAssistantToolLogRequest) (*protos.GetAllAssistantToolLogResponse, error)
 
 	// assistant configurations
-	GetAssistantConfiguration(ctx context.Context, auth *types.Authentication, in *protos.GetAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error)
-	GetAllAssistantConfiguration(ctx context.Context, auth *types.Authentication, in *protos.GetAllAssistantConfigurationRequest) (*protos.GetAllAssistantConfigurationResponse, error)
-	CreateAssistantConfiguration(ctx context.Context, auth *types.Authentication, in *protos.CreateAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error)
-	UpdateAssistantConfiguration(ctx context.Context, auth *types.Authentication, in *protos.UpdateAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error)
-	DeleteAssistantConfiguration(ctx context.Context, auth *types.Authentication, in *protos.DeleteAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error)
+	GetAssistantConfiguration(ctx context.Context, auth authentication.Principal, in *protos.GetAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error)
+	GetAllAssistantConfiguration(ctx context.Context, auth authentication.Principal, in *protos.GetAllAssistantConfigurationRequest) (*protos.GetAllAssistantConfigurationResponse, error)
+	CreateAssistantConfiguration(ctx context.Context, auth authentication.Principal, in *protos.CreateAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error)
+	UpdateAssistantConfiguration(ctx context.Context, auth authentication.Principal, in *protos.UpdateAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error)
+	DeleteAssistantConfiguration(ctx context.Context, auth authentication.Principal, in *protos.DeleteAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error)
 }
 
 type assistantServiceClient struct {
@@ -125,16 +125,33 @@ func NewAssistantServiceClientGRPC(config *config.AppConfig, logger commons.Logg
 	if err != nil {
 		logger.Errorf("Unable to create connection %v", err)
 	}
+	return NewAssistantServiceClientWithClients(
+		config,
+		logger,
+		redis,
+		protos.NewAssistantServiceClient(conn),
+		protos.NewAssistantDeploymentServiceClient(conn),
+	)
+}
+
+// NewAssistantServiceClientWithClients constructs an assistant client around the provided gRPC clients.
+func NewAssistantServiceClientWithClients(
+	config *config.AppConfig,
+	logger commons.Logger,
+	redis connectors.RedisConnector,
+	assistantClient protos.AssistantServiceClient,
+	assistantDeploymentClient protos.AssistantDeploymentServiceClient,
+) AssistantServiceClient {
 	return &assistantServiceClient{
 		cfg:                       config,
 		logger:                    logger,
-		InternalClient:            clients.NewInternalClient(config, logger, redis),
-		assistantClient:           protos.NewAssistantServiceClient(conn),
-		assistantDeploymentClient: protos.NewAssistantDeploymentServiceClient(conn),
+		InternalClient:            clients.NewInternalClient(config, "workflow-api", logger, redis),
+		assistantClient:           assistantClient,
+		assistantDeploymentClient: assistantDeploymentClient,
 	}
 }
 
-func (client *assistantServiceClient) GetAllAssistant(c context.Context, auth *types.Authentication, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error) {
+func (client *assistantServiceClient) GetAllAssistant(c context.Context, auth authentication.Principal, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, nil, err
@@ -154,7 +171,7 @@ func (client *assistantServiceClient) GetAllAssistant(c context.Context, auth *t
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *assistantServiceClient) DeleteAssistant(c context.Context, auth *types.Authentication, assistantRequest *protos.DeleteAssistantRequest) (*protos.GetAssistantResponse, error) {
+func (client *assistantServiceClient) DeleteAssistant(c context.Context, auth authentication.Principal, assistantRequest *protos.DeleteAssistantRequest) (*protos.GetAssistantResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -171,7 +188,7 @@ func (client *assistantServiceClient) DeleteAssistant(c context.Context, auth *t
 	return res, nil
 }
 
-func (client *assistantServiceClient) GetAssistant(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error) {
+func (client *assistantServiceClient) GetAssistant(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -188,7 +205,7 @@ func (client *assistantServiceClient) GetAssistant(c context.Context, auth *type
 	return res, nil
 }
 
-func (client *assistantServiceClient) CreateAssistant(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantRequest) (*protos.GetAssistantResponse, error) {
+func (client *assistantServiceClient) CreateAssistant(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantRequest) (*protos.GetAssistantResponse, error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, err
@@ -201,7 +218,7 @@ func (client *assistantServiceClient) CreateAssistant(c context.Context, auth *t
 	return res, nil
 }
 
-func (client *assistantServiceClient) GetAllAssistantProvider(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.GetAllAssistantProviderResponse_AssistantProvider, error) {
+func (client *assistantServiceClient) GetAllAssistantProvider(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.GetAllAssistantProviderResponse_AssistantProvider, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -224,7 +241,7 @@ func (client *assistantServiceClient) GetAllAssistantProvider(c context.Context,
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *assistantServiceClient) UpdateAssistantVersion(c context.Context, auth *types.Authentication, request *protos.UpdateAssistantVersionRequest) (*protos.GetAssistantResponse, error) {
+func (client *assistantServiceClient) UpdateAssistantVersion(c context.Context, auth authentication.Principal, request *protos.UpdateAssistantVersionRequest) (*protos.GetAssistantResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -239,7 +256,7 @@ func (client *assistantServiceClient) UpdateAssistantVersion(c context.Context, 
 	return res, nil
 }
 
-func (client *assistantServiceClient) CreateAssistantProvider(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantProviderRequest) (*protos.GetAssistantProviderResponse, error) {
+func (client *assistantServiceClient) CreateAssistantProvider(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantProviderRequest) (*protos.GetAssistantProviderResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -254,7 +271,7 @@ func (client *assistantServiceClient) CreateAssistantProvider(c context.Context,
 	return res, nil
 }
 
-func (client *assistantServiceClient) CreateAssistantTag(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantTagRequest) (*protos.GetAssistantResponse, error) {
+func (client *assistantServiceClient) CreateAssistantTag(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantTagRequest) (*protos.GetAssistantResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -269,7 +286,7 @@ func (client *assistantServiceClient) CreateAssistantTag(c context.Context, auth
 	return res, nil
 }
 
-func (client *assistantServiceClient) UpdateAssistantDetail(c context.Context, auth *types.Authentication, assistantRequest *protos.UpdateAssistantDetailRequest) (*protos.GetAssistantResponse, error) {
+func (client *assistantServiceClient) UpdateAssistantDetail(c context.Context, auth authentication.Principal, assistantRequest *protos.UpdateAssistantDetailRequest) (*protos.GetAssistantResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -285,7 +302,7 @@ func (client *assistantServiceClient) UpdateAssistantDetail(c context.Context, a
 }
 
 func (client *assistantServiceClient) GetAllMessage(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	criteria []*protos.Criteria,
 	paginate *protos.Paginate,
 	order *protos.Ordering,
@@ -317,7 +334,7 @@ func (client *assistantServiceClient) GetAllMessage(ctx context.Context,
 }
 
 func (client *assistantServiceClient) GetAllAssistantMessage(ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64, criteria []*protos.Criteria,
 	paginate *protos.Paginate,
 	order *protos.Ordering,
@@ -347,7 +364,7 @@ func (client *assistantServiceClient) GetAllAssistantMessage(ctx context.Context
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *assistantServiceClient) GetAllAssistantConversation(ctx context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate, order *protos.Ordering) (*protos.Paginated, []*protos.AssistantConversation, error) {
+func (client *assistantServiceClient) GetAllAssistantConversation(ctx context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate, order *protos.Ordering) (*protos.Paginated, []*protos.AssistantConversation, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(ctx, auth)
 	if err != nil {
@@ -370,7 +387,7 @@ func (client *assistantServiceClient) GetAllAssistantConversation(ctx context.Co
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *assistantServiceClient) GetAllConversationMessage(ctx context.Context, auth *types.Authentication, assistantId, assistantConversationId uint64, criteria []*protos.Criteria, paginate *protos.Paginate, order *protos.Ordering) (*protos.Paginated, []*protos.AssistantConversationMessage, error) {
+func (client *assistantServiceClient) GetAllConversationMessage(ctx context.Context, auth authentication.Principal, assistantId, assistantConversationId uint64, criteria []*protos.Criteria, paginate *protos.Paginate, order *protos.Ordering) (*protos.Paginated, []*protos.AssistantConversationMessage, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(ctx, auth)
 	if err != nil {
@@ -394,7 +411,7 @@ func (client *assistantServiceClient) GetAllConversationMessage(ctx context.Cont
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *assistantServiceClient) GetAssistantDashboard(ctx context.Context, auth *types.Authentication, dashboardRequest *protos.GetAssistantDashboardRequest) (*protos.GetAssistantDashboardResponse, error) {
+func (client *assistantServiceClient) GetAssistantDashboard(ctx context.Context, auth authentication.Principal, dashboardRequest *protos.GetAssistantDashboardRequest) (*protos.GetAssistantDashboardResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(ctx, auth)
 	if err != nil {
@@ -413,7 +430,7 @@ func (client *assistantServiceClient) GetAssistantDashboard(ctx context.Context,
 	return response, nil
 }
 
-func (client *assistantServiceClient) CreateAssistantApiDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantApiDeploymentResponse, error) {
+func (client *assistantServiceClient) CreateAssistantApiDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantApiDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -428,7 +445,7 @@ func (client *assistantServiceClient) CreateAssistantApiDeployment(c context.Con
 	client.logger.Benchmark("Benchmarking: assistantDeploymentClient.CreateAssistantApiDeployment", time.Since(start))
 	return res, nil
 }
-func (client *assistantServiceClient) CreateAssistantPhoneDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error) {
+func (client *assistantServiceClient) CreateAssistantPhoneDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -443,7 +460,7 @@ func (client *assistantServiceClient) CreateAssistantPhoneDeployment(c context.C
 	client.logger.Benchmark("Benchmarking: assistantServiceClient.CreateAssistantPhoneDeployment", time.Since(start))
 	return res, nil
 }
-func (client *assistantServiceClient) CreateAssistantWhatsappDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantWhatsappDeploymentResponse, error) {
+func (client *assistantServiceClient) CreateAssistantWhatsappDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantWhatsappDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -458,7 +475,7 @@ func (client *assistantServiceClient) CreateAssistantWhatsappDeployment(c contex
 	client.logger.Benchmark("Benchmarking: assistantDeploymentClient.CreateAssistantWhatsappDeployment", time.Since(start))
 	return res, nil
 }
-func (client *assistantServiceClient) CreateAssistantWebpluginDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantWebpluginDeploymentResponse, error) {
+func (client *assistantServiceClient) CreateAssistantWebpluginDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantWebpluginDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -473,7 +490,7 @@ func (client *assistantServiceClient) CreateAssistantWebpluginDeployment(c conte
 	client.logger.Benchmark("Benchmarking: assistantDeploymentClient.CreateAssistantWebpluginDeployment", time.Since(start))
 	return res, nil
 }
-func (client *assistantServiceClient) CreateAssistantDebuggerDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantDebuggerDeploymentResponse, error) {
+func (client *assistantServiceClient) CreateAssistantDebuggerDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.CreateAssistantDeploymentRequest) (*protos.GetAssistantDebuggerDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -489,7 +506,7 @@ func (client *assistantServiceClient) CreateAssistantDebuggerDeployment(c contex
 	return res, nil
 }
 
-func (client *assistantServiceClient) GetAssistantApiDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantApiDeploymentResponse, error) {
+func (client *assistantServiceClient) GetAssistantApiDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantApiDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -504,7 +521,7 @@ func (client *assistantServiceClient) GetAssistantApiDeployment(c context.Contex
 	client.logger.Benchmark("Benchmarking: assistantDeploymentClient.CreateAssistantDebuggerDeployment", time.Since(start))
 	return res, nil
 }
-func (client *assistantServiceClient) GetAssistantPhoneDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error) {
+func (client *assistantServiceClient) GetAssistantPhoneDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -519,7 +536,7 @@ func (client *assistantServiceClient) GetAssistantPhoneDeployment(c context.Cont
 	client.logger.Benchmark("Benchmarking: assistantDeploymentClient.GetAssistantPhoneDeployment", time.Since(start))
 	return res, nil
 }
-func (client *assistantServiceClient) GetAssistantWhatsappDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWhatsappDeploymentResponse, error) {
+func (client *assistantServiceClient) GetAssistantWhatsappDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWhatsappDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -534,7 +551,7 @@ func (client *assistantServiceClient) GetAssistantWhatsappDeployment(c context.C
 	client.logger.Benchmark("Benchmarking: assistantDeploymentClient.GetAssistantWhatsappDeployment", time.Since(start))
 	return res, nil
 }
-func (client *assistantServiceClient) GetAssistantWebpluginDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWebpluginDeploymentResponse, error) {
+func (client *assistantServiceClient) GetAssistantWebpluginDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWebpluginDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -550,7 +567,7 @@ func (client *assistantServiceClient) GetAssistantWebpluginDeployment(c context.
 	client.logger.Debugf("report %+v", res.Data)
 	return res, nil
 }
-func (client *assistantServiceClient) GetAssistantDebuggerDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantDebuggerDeploymentResponse, error) {
+func (client *assistantServiceClient) GetAssistantDebuggerDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantDebuggerDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -566,7 +583,7 @@ func (client *assistantServiceClient) GetAssistantDebuggerDeployment(c context.C
 	return res, nil
 }
 
-func (client *assistantServiceClient) GetAllAssistantApiDeployment(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantApiDeployment, error) {
+func (client *assistantServiceClient) GetAllAssistantApiDeployment(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantApiDeployment, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -586,7 +603,7 @@ func (client *assistantServiceClient) GetAllAssistantApiDeployment(c context.Con
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *assistantServiceClient) GetAllAssistantPhoneDeployment(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantPhoneDeployment, error) {
+func (client *assistantServiceClient) GetAllAssistantPhoneDeployment(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantPhoneDeployment, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -606,7 +623,7 @@ func (client *assistantServiceClient) GetAllAssistantPhoneDeployment(c context.C
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *assistantServiceClient) GetAllAssistantWhatsappDeployment(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantWhatsappDeployment, error) {
+func (client *assistantServiceClient) GetAllAssistantWhatsappDeployment(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantWhatsappDeployment, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -626,7 +643,7 @@ func (client *assistantServiceClient) GetAllAssistantWhatsappDeployment(c contex
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *assistantServiceClient) GetAllAssistantWebpluginDeployment(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantWebpluginDeployment, error) {
+func (client *assistantServiceClient) GetAllAssistantWebpluginDeployment(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantWebpluginDeployment, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -646,7 +663,7 @@ func (client *assistantServiceClient) GetAllAssistantWebpluginDeployment(c conte
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *assistantServiceClient) GetAllAssistantDebuggerDeployment(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantDebuggerDeployment, error) {
+func (client *assistantServiceClient) GetAllAssistantDebuggerDeployment(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantDebuggerDeployment, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -666,7 +683,7 @@ func (client *assistantServiceClient) GetAllAssistantDebuggerDeployment(c contex
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *assistantServiceClient) DisableAssistantApiDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantApiDeploymentResponse, error) {
+func (client *assistantServiceClient) DisableAssistantApiDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantApiDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -682,7 +699,7 @@ func (client *assistantServiceClient) DisableAssistantApiDeployment(c context.Co
 	return res, nil
 }
 
-func (client *assistantServiceClient) DisableAssistantPhoneDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error) {
+func (client *assistantServiceClient) DisableAssistantPhoneDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantPhoneDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -698,7 +715,7 @@ func (client *assistantServiceClient) DisableAssistantPhoneDeployment(c context.
 	return res, nil
 }
 
-func (client *assistantServiceClient) DisableAssistantWhatsappDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWhatsappDeploymentResponse, error) {
+func (client *assistantServiceClient) DisableAssistantWhatsappDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWhatsappDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -714,7 +731,7 @@ func (client *assistantServiceClient) DisableAssistantWhatsappDeployment(c conte
 	return res, nil
 }
 
-func (client *assistantServiceClient) DisableAssistantWebpluginDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWebpluginDeploymentResponse, error) {
+func (client *assistantServiceClient) DisableAssistantWebpluginDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWebpluginDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -730,7 +747,7 @@ func (client *assistantServiceClient) DisableAssistantWebpluginDeployment(c cont
 	return res, nil
 }
 
-func (client *assistantServiceClient) DisableAssistantDebuggerDeployment(c context.Context, auth *types.Authentication, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantDebuggerDeploymentResponse, error) {
+func (client *assistantServiceClient) DisableAssistantDebuggerDeployment(c context.Context, auth authentication.Principal, assistantRequest *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantDebuggerDeploymentResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -746,7 +763,7 @@ func (client *assistantServiceClient) DisableAssistantDebuggerDeployment(c conte
 	return res, nil
 }
 
-func (client *assistantServiceClient) GetAllAssistantHTTPLog(ctx context.Context, auth *types.Authentication,
+func (client *assistantServiceClient) GetAllAssistantHTTPLog(ctx context.Context, auth authentication.Principal,
 	projectId uint64,
 	criteria []*protos.Criteria, paginate *protos.Paginate, ordering *protos.Ordering) (*protos.Paginated, []*protos.AssistantHTTPLog, error) {
 	start := time.Now()
@@ -773,7 +790,7 @@ func (client *assistantServiceClient) GetAllAssistantHTTPLog(ctx context.Context
 	return res.GetPaginated(), res.GetData(), nil
 }
 func (client *assistantServiceClient) GetAssistantHTTPLog(c context.Context,
-	auth *types.Authentication, iRequest *protos.GetAssistantHTTPLogRequest) (*protos.GetAssistantHTTPLogResponse, error) {
+	auth authentication.Principal, iRequest *protos.GetAssistantHTTPLogRequest) (*protos.GetAssistantHTTPLogResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -793,7 +810,7 @@ func (client *assistantServiceClient) GetAssistantHTTPLog(c context.Context,
 }
 
 func (client *assistantServiceClient) RetryAssistantHTTPLog(c context.Context,
-	auth *types.Authentication, iRequest *protos.RetryAssistantHTTPLogRequest) (*protos.GetAssistantHTTPLogResponse, error) {
+	auth authentication.Principal, iRequest *protos.RetryAssistantHTTPLogRequest) (*protos.GetAssistantHTTPLogResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -814,7 +831,7 @@ func (client *assistantServiceClient) RetryAssistantHTTPLog(c context.Context,
 
 func (client *assistantServiceClient) GetAssistantConversation(
 	c context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantRequest *protos.GetAssistantConversationRequest) (*protos.GetAssistantConversationResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
@@ -834,7 +851,7 @@ func (client *assistantServiceClient) GetAssistantConversation(
 	return res, nil
 }
 
-func (client *assistantServiceClient) GetAllAssistantTool(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantTool, error) {
+func (client *assistantServiceClient) GetAllAssistantTool(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantTool, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -859,7 +876,7 @@ func (client *assistantServiceClient) GetAllAssistantTool(c context.Context, aut
 }
 
 func (client *assistantServiceClient) GetAssistantTool(c context.Context,
-	auth *types.Authentication, iRequest *protos.GetAssistantToolRequest) (*protos.GetAssistantToolResponse, error) {
+	auth authentication.Principal, iRequest *protos.GetAssistantToolRequest) (*protos.GetAssistantToolResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -878,7 +895,7 @@ func (client *assistantServiceClient) GetAssistantTool(c context.Context,
 	return res, nil
 }
 
-func (client *assistantServiceClient) CreateAssistantTool(c context.Context, auth *types.Authentication, iRequest *protos.CreateAssistantToolRequest) (*protos.GetAssistantToolResponse, error) {
+func (client *assistantServiceClient) CreateAssistantTool(c context.Context, auth authentication.Principal, iRequest *protos.CreateAssistantToolRequest) (*protos.GetAssistantToolResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -897,7 +914,7 @@ func (client *assistantServiceClient) CreateAssistantTool(c context.Context, aut
 	return res, nil
 }
 
-func (client *assistantServiceClient) DeleteAssistantTool(c context.Context, auth *types.Authentication, iRequest *protos.DeleteAssistantToolRequest) (*protos.GetAssistantToolResponse, error) {
+func (client *assistantServiceClient) DeleteAssistantTool(c context.Context, auth authentication.Principal, iRequest *protos.DeleteAssistantToolRequest) (*protos.GetAssistantToolResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -916,7 +933,7 @@ func (client *assistantServiceClient) DeleteAssistantTool(c context.Context, aut
 	return res, nil
 }
 
-func (client *assistantServiceClient) UpdateAssistantTool(c context.Context, auth *types.Authentication, iRequest *protos.UpdateAssistantToolRequest) (*protos.GetAssistantToolResponse, error) {
+func (client *assistantServiceClient) UpdateAssistantTool(c context.Context, auth authentication.Principal, iRequest *protos.UpdateAssistantToolRequest) (*protos.GetAssistantToolResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -937,7 +954,7 @@ func (client *assistantServiceClient) UpdateAssistantTool(c context.Context, aut
 
 //
 
-func (client *assistantServiceClient) GetAllAssistantKnowledge(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantKnowledge, error) {
+func (client *assistantServiceClient) GetAllAssistantKnowledge(c context.Context, auth authentication.Principal, assistantId uint64, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.AssistantKnowledge, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -962,7 +979,7 @@ func (client *assistantServiceClient) GetAllAssistantKnowledge(c context.Context
 }
 
 func (client *assistantServiceClient) GetAssistantKnowledge(c context.Context,
-	auth *types.Authentication, iRequest *protos.GetAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error) {
+	auth authentication.Principal, iRequest *protos.GetAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -981,7 +998,7 @@ func (client *assistantServiceClient) GetAssistantKnowledge(c context.Context,
 	return res, nil
 }
 
-func (client *assistantServiceClient) CreateAssistantKnowledge(c context.Context, auth *types.Authentication, iRequest *protos.CreateAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error) {
+func (client *assistantServiceClient) CreateAssistantKnowledge(c context.Context, auth authentication.Principal, iRequest *protos.CreateAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -1000,7 +1017,7 @@ func (client *assistantServiceClient) CreateAssistantKnowledge(c context.Context
 	return res, nil
 }
 
-func (client *assistantServiceClient) DeleteAssistantKnowledge(c context.Context, auth *types.Authentication, iRequest *protos.DeleteAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error) {
+func (client *assistantServiceClient) DeleteAssistantKnowledge(c context.Context, auth authentication.Principal, iRequest *protos.DeleteAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -1019,7 +1036,7 @@ func (client *assistantServiceClient) DeleteAssistantKnowledge(c context.Context
 	return res, nil
 }
 
-func (client *assistantServiceClient) UpdateAssistantKnowledge(c context.Context, auth *types.Authentication, iRequest *protos.UpdateAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error) {
+func (client *assistantServiceClient) UpdateAssistantKnowledge(c context.Context, auth authentication.Principal, iRequest *protos.UpdateAssistantKnowledgeRequest) (*protos.GetAssistantKnowledgeResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -1038,7 +1055,7 @@ func (client *assistantServiceClient) UpdateAssistantKnowledge(c context.Context
 	return res, nil
 }
 
-func (client *assistantServiceClient) GetAssistantToolLog(c context.Context, auth *types.Authentication, in *protos.GetAssistantToolLogRequest) (*protos.GetAssistantToolLogResponse, error) {
+func (client *assistantServiceClient) GetAssistantToolLog(c context.Context, auth authentication.Principal, in *protos.GetAssistantToolLogRequest) (*protos.GetAssistantToolLogResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -1057,7 +1074,7 @@ func (client *assistantServiceClient) GetAssistantToolLog(c context.Context, aut
 	return res, nil
 }
 
-func (client *assistantServiceClient) GetAllAssistantToolLog(ctx context.Context, auth *types.Authentication, in *protos.GetAllAssistantToolLogRequest) (*protos.GetAllAssistantToolLogResponse, error) {
+func (client *assistantServiceClient) GetAllAssistantToolLog(ctx context.Context, auth authentication.Principal, in *protos.GetAllAssistantToolLogRequest) (*protos.GetAllAssistantToolLogResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(ctx, auth)
 	if err != nil {
@@ -1076,7 +1093,7 @@ func (client *assistantServiceClient) GetAllAssistantToolLog(ctx context.Context
 	return res, nil
 }
 
-func (client *assistantServiceClient) GetAssistantConfiguration(ctx context.Context, auth *types.Authentication, in *protos.GetAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error) {
+func (client *assistantServiceClient) GetAssistantConfiguration(ctx context.Context, auth authentication.Principal, in *protos.GetAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(ctx, auth)
 	if err != nil {
@@ -1092,7 +1109,7 @@ func (client *assistantServiceClient) GetAssistantConfiguration(ctx context.Cont
 	return res, nil
 }
 
-func (client *assistantServiceClient) GetAllAssistantConfiguration(ctx context.Context, auth *types.Authentication, in *protos.GetAllAssistantConfigurationRequest) (*protos.GetAllAssistantConfigurationResponse, error) {
+func (client *assistantServiceClient) GetAllAssistantConfiguration(ctx context.Context, auth authentication.Principal, in *protos.GetAllAssistantConfigurationRequest) (*protos.GetAllAssistantConfigurationResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(ctx, auth)
 	if err != nil {
@@ -1108,7 +1125,7 @@ func (client *assistantServiceClient) GetAllAssistantConfiguration(ctx context.C
 	return res, nil
 }
 
-func (client *assistantServiceClient) CreateAssistantConfiguration(ctx context.Context, auth *types.Authentication, in *protos.CreateAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error) {
+func (client *assistantServiceClient) CreateAssistantConfiguration(ctx context.Context, auth authentication.Principal, in *protos.CreateAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(ctx, auth)
 	if err != nil {
@@ -1124,7 +1141,7 @@ func (client *assistantServiceClient) CreateAssistantConfiguration(ctx context.C
 	return res, nil
 }
 
-func (client *assistantServiceClient) UpdateAssistantConfiguration(ctx context.Context, auth *types.Authentication, in *protos.UpdateAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error) {
+func (client *assistantServiceClient) UpdateAssistantConfiguration(ctx context.Context, auth authentication.Principal, in *protos.UpdateAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(ctx, auth)
 	if err != nil {
@@ -1140,7 +1157,7 @@ func (client *assistantServiceClient) UpdateAssistantConfiguration(ctx context.C
 	return res, nil
 }
 
-func (client *assistantServiceClient) DeleteAssistantConfiguration(ctx context.Context, auth *types.Authentication, in *protos.DeleteAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error) {
+func (client *assistantServiceClient) DeleteAssistantConfiguration(ctx context.Context, auth authentication.Principal, in *protos.DeleteAssistantConfigurationRequest) (*protos.GetAssistantConfigurationResponse, error) {
 	start := time.Now()
 	authContext, err := client.WithAuth(ctx, auth)
 	if err != nil {

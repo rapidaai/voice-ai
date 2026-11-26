@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { InviteOrganizationUserDialog } from '@/app/components/dialogs/workspace';
 import { InviteProjectUserDialog } from '@/app/components/dialogs/workspace';
+import { ManageOrganizationUserRolesDialog } from '@/app/components/dialogs/workspace';
 import { User } from '@rapidaai/react';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import toast from 'react-hot-toast/headless';
@@ -9,13 +10,7 @@ import { useRapidaStore } from '@/stores/app';
 import { useUserPageStore } from '@/stores/user';
 import { SingleUser } from '@/app/pages/workspace/user/single-user';
 import { Pagination, Text } from '@/app/components/ui/primitives';
-import {
-  Add,
-  Renew,
-  TrashCan,
-  UserAdmin,
-  UserMultiple,
-} from '@carbon/icons-react';
+import { Add, Edit, Renew, TrashCan, UserMultiple } from '@carbon/icons-react';
 import {
   Table,
   TableHead,
@@ -26,7 +21,6 @@ import {
   TableBatchAction,
   TableBatchActions,
   TableToolbarContent,
-  TableToolbarSearch,
   Button,
   DataTable,
   DataTableSkeleton,
@@ -38,14 +32,18 @@ import {
 } from '@/app/components/layout/page-header';
 import { TableSection } from '@/app/components/layout/sections/table-section';
 import { ConfirmDeleteDialog } from '@/app/components/dialogs/shared';
-import { deleteOrganizationUser, updateOrganizationUserRole } from '@/clients';
+import { deleteOrganizationUser } from '@/clients';
 import { EmptyState } from '@/app/components/ui/feedback';
+import {
+  UserQuerySearch,
+  type OrganizationUserSearchFilter,
+} from './user-query-search';
 
 const headers = [
   { key: 'id', header: 'ID' },
   { key: 'name', header: 'Name' },
   { key: 'email', header: 'Email' },
-  { key: 'role', header: 'Org Role' },
+  { key: 'role', header: 'Organization Roles' },
   { key: 'createdDate', header: 'Date Created' },
   { key: 'status', header: 'Status' },
 ];
@@ -61,9 +59,15 @@ export function UserPage() {
     useState(false);
   const [userPendingProjectInvite, setUserPendingProjectInvite] =
     useState<User | null>(null);
+  const [userPendingRoleUpdate, setUserPendingRoleUpdate] =
+    useState<User | null>(null);
   const [userPendingDelete, setUserPendingDelete] = useState<User | null>(null);
   const [isFetching, setIsFetching] = useState(true);
-  const { projectId, authId, token } = useCurrentCredential();
+  const [querySearchValue, setQuerySearchValue] = useState('');
+  const [searchFilters, setSearchFilters] = useState<
+    OrganizationUserSearchFilter[]
+  >([]);
+  const { organizationId, projectId, authId, token } = useCurrentCredential();
   const userActions = useUserPageStore();
 
   const onError = useCallback((err: string) => {
@@ -77,8 +81,23 @@ export function UserPage() {
 
   const getUsers = useCallback(() => {
     setIsFetching(true);
-    userActions.getAllUser(token, authId, projectId, onError, onSuccess);
-  }, [authId, onError, onSuccess, projectId, token, userActions.getAllUser]);
+    userActions.getAllUser(
+      token,
+      authId,
+      organizationId,
+      projectId,
+      onError,
+      onSuccess,
+    );
+  }, [
+    authId,
+    onError,
+    onSuccess,
+    organizationId,
+    projectId,
+    token,
+    userActions.getAllUser,
+  ]);
 
   useEffect(() => {
     getUsers();
@@ -90,7 +109,7 @@ export function UserPage() {
     try {
       const response = await deleteOrganizationUser({
         userId: user.getId(),
-        auth: { token, userId: authId },
+        auth: { organizationId, token, userId: authId },
       });
       hideLoader();
 
@@ -111,48 +130,26 @@ export function UserPage() {
     }
   };
 
-  const onUpdateOrganizationRole = async (
-    user: User,
-    organizationRole: string,
-  ) => {
-    showLoader('overlay');
-
-    try {
-      const response = await updateOrganizationUserRole({
-        userId: user.getId(),
-        organizationRole,
-        auth: { token, userId: authId },
-      });
-      hideLoader();
-
-      const responseError = response.getError();
-      const message = responseError?.getHumanmessage() || fallbackErrorMessage;
-
-      if (response.getSuccess()) {
-        toast.success(
-          organizationRole === 'admin'
-            ? 'The user was promoted to admin.'
-            : 'The user was changed to member.',
-        );
-        getUsers();
-        return;
-      }
-
-      toast.error(message);
-    } catch (err: any) {
-      hideLoader();
-      toast.error(err?.message || fallbackErrorMessage);
-    }
-  };
-
   const tableRows = userActions.users.map(user => ({
     id: user.getId(),
     name: user.getName(),
     email: user.getEmail(),
-    role: user.getRole(),
+    role: user
+      .getOrganizationrolesList()
+      .map(role => role.getName())
+      .join(', '),
     createdDate: user.getCreateddate()?.toString() || '',
     status: user.getStatus?.() || '',
   }));
+  const visibleTableRows = tableRows.filter(row =>
+    searchFilters.every(filter => {
+      const currentValue = String(row[filter.key] || '').toLowerCase();
+      const expectedValue = filter.value.toLowerCase();
+      return filter.logic === 'contains'
+        ? currentValue.includes(expectedValue)
+        : currentValue === expectedValue;
+    }),
+  );
 
   return (
     <div
@@ -170,7 +167,7 @@ export function UserPage() {
         description="Manage organization access, roles, and project collaboration for your team."
         contextualActions={
           <Text variant="label-01" className="text-muted tabular-nums">
-            {userActions.users.length} of {userActions.totalCount}
+            {visibleTableRows.length} of {userActions.totalCount}
           </Text>
         }
         pageActions={
@@ -198,7 +195,7 @@ export function UserPage() {
         </TableSection>
       ) : (
         <TableSection className="min-h-0 bg-surface">
-          <DataTable rows={tableRows} headers={headers} radio>
+          <DataTable rows={visibleTableRows} headers={headers} radio>
             {({
               rows,
               headers: tableHeaders,
@@ -209,7 +206,6 @@ export function UserPage() {
               getSelectionProps,
               getTableProps,
               getToolbarProps,
-              onInputChange,
             }) => {
               const batchActionProps = getBatchActionProps();
               const selectedUser = selectedRows[0]
@@ -217,16 +213,9 @@ export function UserPage() {
                     user => user.getId() === selectedRows[0].id,
                   )
                 : undefined;
-              const selectedOrganizationRole = selectedUser
-                ?.getRole()
-                ?.toLowerCase();
-              const nextOrganizationRole =
-                selectedOrganizationRole === 'member'
-                  ? 'admin'
-                  : selectedOrganizationRole === 'admin'
-                    ? 'member'
-                    : null;
-
+              const selectedUserIsOwner = selectedUser
+                ?.getOrganizationrolesList()
+                .some(role => role.getRoledefinitionid() === '101');
               return (
                 <>
                   <PageHeaderStickyToolbar>
@@ -246,43 +235,40 @@ export function UserPage() {
                           >
                             Invite to project
                           </TableBatchAction>
-                          {nextOrganizationRole && (
+                          {!selectedUserIsOwner && (
                             <TableBatchAction
-                              renderIcon={UserAdmin}
-                              iconDescription={
-                                nextOrganizationRole === 'admin'
-                                  ? 'Make admin'
-                                  : 'Make member'
-                              }
+                              renderIcon={Edit}
+                              iconDescription="Manage roles"
                               onClick={() => {
-                                onUpdateOrganizationRole(
-                                  selectedUser,
-                                  nextOrganizationRole,
-                                );
+                                setUserPendingRoleUpdate(selectedUser);
                                 batchActionProps.onCancel();
                               }}
                             >
-                              {nextOrganizationRole === 'admin'
-                                ? 'Make admin'
-                                : 'Make member'}
+                              Manage roles
                             </TableBatchAction>
                           )}
-                          <TableBatchAction
-                            renderIcon={TrashCan}
-                            iconDescription="Delete"
-                            onClick={() => {
-                              setUserPendingDelete(selectedUser);
-                              batchActionProps.onCancel();
-                            }}
-                          >
-                            Delete
-                          </TableBatchAction>
+                          {!selectedUserIsOwner && (
+                            <TableBatchAction
+                              renderIcon={TrashCan}
+                              iconDescription="Delete"
+                              onClick={() => {
+                                setUserPendingDelete(selectedUser);
+                                batchActionProps.onCancel();
+                              }}
+                            >
+                              Delete
+                            </TableBatchAction>
+                          )}
                         </TableBatchActions>
                       )}
                       <TableToolbarContent>
-                        <TableToolbarSearch
-                          placeholder="Search users..."
-                          onChange={onInputChange}
+                        <UserQuerySearch
+                          value={querySearchValue}
+                          onChange={setQuerySearchValue}
+                          onApply={filters => {
+                            userActions.setPage(1);
+                            setSearchFilters(filters);
+                          }}
                         />
                         <Button
                           hasIconOnly
@@ -296,7 +282,7 @@ export function UserPage() {
                     </TableToolbar>
                   </PageHeaderStickyToolbar>
 
-                  {userActions.users.length > 0 ? (
+                  {visibleTableRows.length > 0 ? (
                     <>
                       <div className="shrink-0 overflow-x-auto">
                         <Table {...getTableProps()} className="min-w-max">
@@ -354,8 +340,16 @@ export function UserPage() {
                     <div className="flex flex-1 items-center justify-center">
                       <EmptyState
                         icon={UserMultiple}
-                        title="No organization users"
-                        subtitle="Invite teammates to collaborate on projects and manage organization access."
+                        title={
+                          searchFilters.length > 0
+                            ? 'No users found'
+                            : 'No organization users'
+                        }
+                        subtitle={
+                          searchFilters.length > 0
+                            ? 'No users match your current filters.'
+                            : 'Invite teammates to collaborate on projects and manage organization access.'
+                        }
                         action="Invite user"
                         actionIcon={Add}
                         onAction={() => setInviteOrganizationModalOpen(true)}
@@ -385,6 +379,19 @@ export function UserPage() {
         user={userPendingProjectInvite}
         onSuccess={() => {
           setUserPendingProjectInvite(null);
+          getUsers();
+        }}
+      />
+      <ManageOrganizationUserRolesDialog
+        modalOpen={Boolean(userPendingRoleUpdate)}
+        setModalOpen={open => {
+          if (!open) {
+            setUserPendingRoleUpdate(null);
+          }
+        }}
+        user={userPendingRoleUpdate}
+        onSuccess={() => {
+          setUserPendingRoleUpdate(null);
           getUsers();
         }}
       />

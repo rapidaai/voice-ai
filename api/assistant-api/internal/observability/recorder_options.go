@@ -11,13 +11,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 )
 
 type recorderOptions struct {
 	logger           commons.Logger
-	auth             *types.Authentication
+	auth             authentication.Principal
 	globalScope      GlobalScope
 	context          Context
 	clock            func() time.Time
@@ -41,7 +42,7 @@ func newOption(applyFunc func(*recorderOptions)) Option {
 	return &funcOption{applyFunc: applyFunc}
 }
 
-func WithAuth(auth *types.Authentication) Option {
+func WithAuth(auth authentication.Principal) Option {
 	return newOption(func(recorderOptions *recorderOptions) {
 		recorderOptions.auth = auth
 	})

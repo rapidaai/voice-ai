@@ -17,7 +17,7 @@ import (
 	"github.com/google/uuid"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/protos"
 )
 
@@ -49,7 +49,7 @@ type Session struct {
 	metadata map[string]interface{}
 
 	// Authentication and authorization context - available in all session methods
-	auth            *types.Authentication                // Authentication principal
+	auth            authentication.Principal             // Authentication principal
 	assistant       *internal_assistant_entity.Assistant // Assistant entity
 	conversationID  uint64                               // Conversation ID
 	contextID       string                               // Call context ID (outbound)
@@ -112,7 +112,7 @@ func WithSessionCodec(codec *Codec) SessionOption {
 	}
 }
 
-func WithSessionAuth(auth *types.Authentication) SessionOption {
+func WithSessionAuth(auth authentication.Principal) SessionOption {
 	return func(session *Session) { session.auth = auth }
 }
 
@@ -625,14 +625,14 @@ func (s *Session) Disconnect() {
 }
 
 // GetAuth returns the authentication principal for this session.
-func (s *Session) GetAuth() *types.Authentication {
+func (s *Session) GetAuth() authentication.Principal {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.auth
 }
 
 // SetAuth sets the authentication principal for this session.
-func (s *Session) SetAuth(auth *types.Authentication) {
+func (s *Session) SetAuth(auth authentication.Principal) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.auth = auth

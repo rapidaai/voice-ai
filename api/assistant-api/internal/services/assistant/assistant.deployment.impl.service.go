@@ -13,10 +13,10 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	"gorm.io/gorm"
@@ -41,7 +41,7 @@ func NewAssistantDeploymentService(cfg *config.AssistantConfig,
 
 func (eService assistantDeploymentService) CreateWebPluginDeployment(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	greeting, mistake *string,
 	unclearInputTimeout *float64, unclearInputMessage *string,
@@ -59,8 +59,8 @@ func (eService assistantDeploymentService) CreateWebPluginDeployment(
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
 					Status:           type_enums.RECORD_ACTIVE,
-					CreatedActorType: auth.Actor().Type.String(),
-					CreatedActorID:   auth.Actor().ID,
+					CreatedActorType: string(auth.Caller().Type),
+					CreatedActorID:   auth.Caller().ID,
 				},
 				AssistantId: assistantId,
 			},
@@ -100,7 +100,7 @@ func (eService assistantDeploymentService) CreateWebPluginDeployment(
 
 func (eService assistantDeploymentService) createAssistantDeploymentAudio(
 	ctx context.Context,
-	auth *types.Authentication, deploymentId uint64,
+	auth authentication.Principal, deploymentId uint64,
 	audioType string,
 	audioConfig *protos.DeploymentAudioProvider) (*internal_assistant_entity.AssistantDeploymentAudio, error) {
 
@@ -108,8 +108,8 @@ func (eService assistantDeploymentService) createAssistantDeploymentAudio(
 	deployment := &internal_assistant_entity.AssistantDeploymentAudio{
 		Mutable: gorm_models.Mutable{
 			Status:           type_enums.RecordState(audioConfig.GetStatus()),
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(auth.Caller().Type),
+			CreatedActorID:   auth.Caller().ID,
 		},
 		AudioType:             audioType,
 		AssistantDeploymentId: deploymentId,
@@ -131,8 +131,8 @@ func (eService assistantDeploymentService) createAssistantDeploymentAudio(
 			AssistantDeploymentAudioId: deployment.Id,
 			Mutable: gorm_models.Mutable{
 				Status:           type_enums.RecordState(audioConfig.GetStatus()),
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -145,8 +145,8 @@ func (eService assistantDeploymentService) createAssistantDeploymentAudio(
 		DoUpdates: append(clause.AssignmentColumns([]string{
 			"value",
 		}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Caller().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Caller().ID},
 		),
 	}).Create(audioDeploymentOptions)
 	if tx.Error != nil {
@@ -158,7 +158,7 @@ func (eService assistantDeploymentService) createAssistantDeploymentAudio(
 
 func (eService assistantDeploymentService) CreateDebuggerDeployment(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	greeting, mistake *string,
 	unclearInputTimeout *float64, unclearInputMessage *string,
@@ -175,8 +175,8 @@ func (eService assistantDeploymentService) CreateDebuggerDeployment(
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
 					Status:           type_enums.RECORD_ACTIVE,
-					CreatedActorType: auth.Actor().Type.String(),
-					CreatedActorID:   auth.Actor().ID,
+					CreatedActorType: string(auth.Caller().Type),
+					CreatedActorID:   auth.Caller().ID,
 				},
 				AssistantId: assistantId,
 			},
@@ -213,7 +213,7 @@ func (eService assistantDeploymentService) CreateDebuggerDeployment(
 
 func (eService assistantDeploymentService) CreateApiDeployment(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	greeting, mistake *string,
 	unclearInputTimeout *float64, unclearInputMessage *string,
@@ -230,8 +230,8 @@ func (eService assistantDeploymentService) CreateApiDeployment(
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
 					Status:           type_enums.RECORD_ACTIVE,
-					CreatedActorType: auth.Actor().Type.String(),
-					CreatedActorID:   auth.Actor().ID,
+					CreatedActorType: string(auth.Caller().Type),
+					CreatedActorID:   auth.Caller().ID,
 				},
 				AssistantId: assistantId,
 			},
@@ -268,7 +268,7 @@ func (eService assistantDeploymentService) CreateApiDeployment(
 
 func (eService assistantDeploymentService) CreateWhatsappDeployment(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	greeting, mistake *string,
 	unclearInputTimeout *float64, unclearInputMessage *string,
@@ -286,8 +286,8 @@ func (eService assistantDeploymentService) CreateWhatsappDeployment(
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
 					Status:           type_enums.RECORD_ACTIVE,
-					CreatedActorType: auth.Actor().Type.String(),
-					CreatedActorID:   auth.Actor().ID,
+					CreatedActorType: string(auth.Caller().Type),
+					CreatedActorID:   auth.Caller().ID,
 				},
 				AssistantId: assistantId,
 			},
@@ -327,8 +327,8 @@ func (eService assistantDeploymentService) CreateWhatsappDeployment(
 			AssistantDeploymentWhatsappId: deployment.Id,
 			Mutable: gorm_models.Mutable{
 				Status:           type_enums.RECORD_ACTIVE,
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -341,8 +341,8 @@ func (eService assistantDeploymentService) CreateWhatsappDeployment(
 		DoUpdates: append(clause.AssignmentColumns([]string{
 			"value",
 		}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Caller().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Caller().ID},
 		),
 	}).Create(whatsappOpts)
 	if tx.Error != nil {
@@ -354,7 +354,7 @@ func (eService assistantDeploymentService) CreateWhatsappDeployment(
 
 func (eService assistantDeploymentService) CreatePhoneDeployment(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	greeting, mistake *string,
 	unclearInputTimeout *float64, unclearInputMessage *string,
@@ -373,8 +373,8 @@ func (eService assistantDeploymentService) CreatePhoneDeployment(
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
 					Status:           type_enums.RECORD_ACTIVE,
-					CreatedActorType: auth.Actor().Type.String(),
-					CreatedActorID:   auth.Actor().ID,
+					CreatedActorType: string(auth.Caller().Type),
+					CreatedActorID:   auth.Caller().ID,
 				},
 				AssistantId: assistantId,
 			},
@@ -421,8 +421,8 @@ func (eService assistantDeploymentService) CreatePhoneDeployment(
 			AssistantDeploymentTelephonyId: deployment.Id,
 			Mutable: gorm_models.Mutable{
 				Status:           type_enums.RECORD_ACTIVE,
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -436,8 +436,8 @@ func (eService assistantDeploymentService) CreatePhoneDeployment(
 		DoUpdates: append(clause.AssignmentColumns([]string{
 			"value",
 		}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Caller().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Caller().ID},
 		),
 	}).Create(phoneOpts)
 	if tx.Error != nil {
@@ -448,7 +448,7 @@ func (eService assistantDeploymentService) CreatePhoneDeployment(
 	return deployment, nil
 }
 
-func (eService assistantDeploymentService) GetAssistantApiDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantApiDeployment, error) {
+func (eService assistantDeploymentService) GetAssistantApiDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64) (*internal_assistant_entity.AssistantApiDeployment, error) {
 	db := eService.postgres.DB(ctx)
 	var apiDeployment *internal_assistant_entity.AssistantApiDeployment
 	qry := db.
@@ -470,7 +470,7 @@ func (eService assistantDeploymentService) GetAssistantApiDeployment(ctx context
 	}
 	return apiDeployment, nil
 }
-func (eService assistantDeploymentService) GetAssistantDebuggerDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
+func (eService assistantDeploymentService) GetAssistantDebuggerDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
 	db := eService.postgres.DB(ctx)
 	var debuggerDeployment *internal_assistant_entity.AssistantDebuggerDeployment
 	qry := db.
@@ -493,7 +493,7 @@ func (eService assistantDeploymentService) GetAssistantDebuggerDeployment(ctx co
 	}
 	return debuggerDeployment, nil
 }
-func (eService assistantDeploymentService) GetAssistantPhoneDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
+func (eService assistantDeploymentService) GetAssistantPhoneDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
 	db := eService.postgres.DB(ctx)
 	var phoneDeployment *internal_assistant_entity.AssistantPhoneDeployment
 	qry := db.
@@ -516,7 +516,7 @@ func (eService assistantDeploymentService) GetAssistantPhoneDeployment(ctx conte
 	}
 	return phoneDeployment, nil
 }
-func (eService assistantDeploymentService) GetAssistantWebpluginDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
+func (eService assistantDeploymentService) GetAssistantWebpluginDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
 	db := eService.postgres.DB(ctx)
 	var webPluginDeployment *internal_assistant_entity.AssistantWebPluginDeployment
 	qry := db.
@@ -538,7 +538,7 @@ func (eService assistantDeploymentService) GetAssistantWebpluginDeployment(ctx c
 	}
 	return webPluginDeployment, nil
 }
-func (eService assistantDeploymentService) GetAssistantWhatsappDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
+func (eService assistantDeploymentService) GetAssistantWhatsappDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
 	db := eService.postgres.DB(ctx)
 	var whatsappDeployment *internal_assistant_entity.AssistantWhatsappDeployment
 	qry := db.
@@ -559,7 +559,7 @@ func (eService assistantDeploymentService) GetAssistantWhatsappDeployment(ctx co
 	return whatsappDeployment, nil
 }
 
-func (eService assistantDeploymentService) GetAllAssistantApiDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantApiDeployment, error) {
+func (eService assistantDeploymentService) GetAllAssistantApiDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantApiDeployment, error) {
 	db := eService.postgres.DB(ctx)
 	var (
 		deployments []*internal_assistant_entity.AssistantApiDeployment
@@ -593,7 +593,7 @@ func (eService assistantDeploymentService) GetAllAssistantApiDeployment(ctx cont
 	return cnt, deployments, nil
 }
 
-func (eService assistantDeploymentService) GetAllAssistantDebuggerDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantDebuggerDeployment, error) {
+func (eService assistantDeploymentService) GetAllAssistantDebuggerDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantDebuggerDeployment, error) {
 	db := eService.postgres.DB(ctx)
 	var (
 		deployments []*internal_assistant_entity.AssistantDebuggerDeployment
@@ -627,7 +627,7 @@ func (eService assistantDeploymentService) GetAllAssistantDebuggerDeployment(ctx
 	return cnt, deployments, nil
 }
 
-func (eService assistantDeploymentService) GetAllAssistantPhoneDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantPhoneDeployment, error) {
+func (eService assistantDeploymentService) GetAllAssistantPhoneDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantPhoneDeployment, error) {
 	db := eService.postgres.DB(ctx)
 	var (
 		deployments []*internal_assistant_entity.AssistantPhoneDeployment
@@ -662,7 +662,7 @@ func (eService assistantDeploymentService) GetAllAssistantPhoneDeployment(ctx co
 	return cnt, deployments, nil
 }
 
-func (eService assistantDeploymentService) GetAllAssistantWebpluginDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantWebPluginDeployment, error) {
+func (eService assistantDeploymentService) GetAllAssistantWebpluginDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantWebPluginDeployment, error) {
 	db := eService.postgres.DB(ctx)
 	var (
 		deployments []*internal_assistant_entity.AssistantWebPluginDeployment
@@ -696,7 +696,7 @@ func (eService assistantDeploymentService) GetAllAssistantWebpluginDeployment(ct
 	return cnt, deployments, nil
 }
 
-func (eService assistantDeploymentService) GetAllAssistantWhatsappDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantWhatsappDeployment, error) {
+func (eService assistantDeploymentService) GetAllAssistantWhatsappDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantWhatsappDeployment, error) {
 	db := eService.postgres.DB(ctx)
 	var (
 		deployments []*internal_assistant_entity.AssistantWhatsappDeployment
@@ -727,7 +727,7 @@ func (eService assistantDeploymentService) GetAllAssistantWhatsappDeployment(ctx
 	return cnt, deployments, nil
 }
 
-func (eService assistantDeploymentService) DisableAssistantApiDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantApiDeployment, error) {
+func (eService assistantDeploymentService) DisableAssistantApiDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64) (*internal_assistant_entity.AssistantApiDeployment, error) {
 
 	db := eService.postgres.DB(ctx)
 	var out *internal_assistant_entity.AssistantApiDeployment
@@ -757,8 +757,8 @@ func (eService assistantDeploymentService) DisableAssistantApiDeployment(ctx con
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
 						Status:           type_enums.RECORD_INACTIVE,
-						CreatedActorType: auth.Actor().Type.String(),
-						CreatedActorID:   auth.Actor().ID,
+						CreatedActorType: string(auth.Caller().Type),
+						CreatedActorID:   auth.Caller().ID,
 					},
 					AssistantId: assistantId,
 				},
@@ -788,7 +788,7 @@ func (eService assistantDeploymentService) DisableAssistantApiDeployment(ctx con
 	return out, err
 }
 
-func (eService assistantDeploymentService) DisableAssistantDebuggerDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
+func (eService assistantDeploymentService) DisableAssistantDebuggerDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
 
 	db := eService.postgres.DB(ctx)
 	var out *internal_assistant_entity.AssistantDebuggerDeployment
@@ -818,8 +818,8 @@ func (eService assistantDeploymentService) DisableAssistantDebuggerDeployment(ct
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
 						Status:           type_enums.RECORD_INACTIVE,
-						CreatedActorType: auth.Actor().Type.String(),
-						CreatedActorID:   auth.Actor().ID,
+						CreatedActorType: string(auth.Caller().Type),
+						CreatedActorID:   auth.Caller().ID,
 					},
 					AssistantId: assistantId,
 				},
@@ -849,7 +849,7 @@ func (eService assistantDeploymentService) DisableAssistantDebuggerDeployment(ct
 	return out, err
 }
 
-func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
+func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
 
 	db := eService.postgres.DB(ctx)
 	var out *internal_assistant_entity.AssistantPhoneDeployment
@@ -880,8 +880,8 @@ func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx c
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
 						Status:           type_enums.RECORD_INACTIVE,
-						CreatedActorType: auth.Actor().Type.String(),
-						CreatedActorID:   auth.Actor().ID,
+						CreatedActorType: string(auth.Caller().Type),
+						CreatedActorID:   auth.Caller().ID,
 					},
 					AssistantId: assistantId,
 				},
@@ -917,8 +917,8 @@ func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx c
 					AssistantDeploymentTelephonyId: created.Id,
 					Mutable: gorm_models.Mutable{
 						Status:           type_enums.RECORD_ACTIVE,
-						CreatedActorType: auth.Actor().Type.String(),
-						CreatedActorID:   auth.Actor().ID,
+						CreatedActorType: string(auth.Caller().Type),
+						CreatedActorID:   auth.Caller().ID,
 					},
 					Metadata: gorm_models.Metadata{
 						Key:   v.Key,
@@ -936,7 +936,7 @@ func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx c
 	return out, err
 }
 
-func (eService assistantDeploymentService) DisableAssistantWebpluginDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
+func (eService assistantDeploymentService) DisableAssistantWebpluginDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
 
 	db := eService.postgres.DB(ctx)
 	var out *internal_assistant_entity.AssistantWebPluginDeployment
@@ -966,8 +966,8 @@ func (eService assistantDeploymentService) DisableAssistantWebpluginDeployment(c
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
 						Status:           type_enums.RECORD_INACTIVE,
-						CreatedActorType: auth.Actor().Type.String(),
-						CreatedActorID:   auth.Actor().ID,
+						CreatedActorType: string(auth.Caller().Type),
+						CreatedActorID:   auth.Caller().ID,
 					},
 					AssistantId: assistantId,
 				},
@@ -998,7 +998,7 @@ func (eService assistantDeploymentService) DisableAssistantWebpluginDeployment(c
 	return out, err
 }
 
-func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
+func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ctx context.Context, auth authentication.Principal, assistantId uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
 
 	db := eService.postgres.DB(ctx)
 	var out *internal_assistant_entity.AssistantWhatsappDeployment
@@ -1025,8 +1025,8 @@ func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ct
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
 						Status:           type_enums.RECORD_INACTIVE,
-						CreatedActorType: auth.Actor().Type.String(),
-						CreatedActorID:   auth.Actor().ID,
+						CreatedActorType: string(auth.Caller().Type),
+						CreatedActorID:   auth.Caller().ID,
 					},
 					AssistantId: assistantId,
 				},
@@ -1054,8 +1054,8 @@ func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ct
 					AssistantDeploymentWhatsappId: created.Id,
 					Mutable: gorm_models.Mutable{
 						Status:           type_enums.RECORD_ACTIVE,
-						CreatedActorType: auth.Actor().Type.String(),
-						CreatedActorID:   auth.Actor().ID,
+						CreatedActorType: string(auth.Caller().Type),
+						CreatedActorID:   auth.Caller().ID,
 					},
 					Metadata: gorm_models.Metadata{
 						Key:   v.Key,
@@ -1073,14 +1073,14 @@ func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ct
 	return out, err
 }
 
-func (eService assistantDeploymentService) archiveDeploymentRecords(ctx context.Context, db *gorm.DB, auth *types.Authentication, model interface{}, assistantId uint64) error {
+func (eService assistantDeploymentService) archiveDeploymentRecords(ctx context.Context, db *gorm.DB, auth authentication.Principal, model interface{}, assistantId uint64) error {
 	return db.WithContext(ctx).
 		Model(model).
 		Where("assistant_id = ? AND status IN ?", assistantId, []type_enums.RecordState{type_enums.RECORD_ACTIVE, type_enums.RECORD_INACTIVE}).
 		Updates(map[string]interface{}{
 			"status":             type_enums.RECORD_ARCHIEVE,
-			"updated_actor_type": auth.Actor().Type.String(),
-			"updated_actor_id":   auth.Actor().ID,
+			"updated_actor_type": string(auth.Caller().Type),
+			"updated_actor_id":   auth.Caller().ID,
 		}).Error
 }
 

@@ -47,7 +47,7 @@ var (
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           UpdateUserOrganizationRoleInvalidRoleCode,
 		Error:          "invalid organization role",
-		ErrorMessage:   "Please select admin or member.",
+		ErrorMessage:   "Please select one or more valid organization roles.",
 	}
 	UpdateUserOrganizationRoleUserNotInOrg = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,

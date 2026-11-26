@@ -138,17 +138,26 @@ DELETE FROM user_project_roles WHERE id = 1;
 DELETE FROM user_organization_roles WHERE id = 1;
 DELETE FROM user_auth_tokens WHERE id = 1;
 DELETE FROM project_credentials WHERE id = 1;
+DELETE FROM role_permissions WHERE role_definition_id IN (SELECT id FROM role_definitions WHERE organization_id = 1);
+DELETE FROM role_definitions WHERE organization_id = 1;
 DELETE FROM projects WHERE id = 1;
 DELETE FROM organizations WHERE id = 1;
 DELETE FROM user_auths WHERE id = 1;
 INSERT INTO organizations (id,name,description,size,industry,contact,status,created_actor_type) VALUES (1,'CI','CI','1','CI','ci@example.invalid','ACTIVE','unknown');
 INSERT INTO projects (id,organization_id,name,description,status,created_actor_type) VALUES (1,1,'CI','CI','ACTIVE','unknown');
-INSERT INTO project_credentials (id,organization_id,project_id,name,key,status,created_actor_type) VALUES (1,1,1,'CI project API key','$ci_project_api_key','ACTIVE','unknown');
+INSERT INTO project_credentials (id,organization_id,project_id,name,key,role_definition_id,role_subject_type,status,created_actor_type)
+VALUES (1,1,1,'CI project API key','$ci_project_api_key',(SELECT id FROM role_definitions WHERE key = 'project_token_full_access' AND organization_id IS NULL),'PROJECT_TOKEN','ACTIVE','unknown');
 INSERT INTO user_auths (id,name,email,password,status,source,created_actor_type) VALUES (1,'CI','ci@example.invalid','unused','ACTIVE','direct','unknown');
 INSERT INTO user_auth_tokens (id,user_auth_id,token_type,token,expire_at,status,created_actor_type) VALUES (1,1,'auth-token','$ci_auth_token',now()+interval '1 hour','ACTIVE','unknown');
-INSERT INTO user_organization_roles (id,user_auth_id,organization_id,role,status,created_actor_type) VALUES (1,1,1,'owner','ACTIVE','unknown');
-INSERT INTO user_project_roles (id,project_id,user_auth_id,role,status,created_actor_type) VALUES (1,1,1,'owner','ACTIVE','unknown');
+INSERT INTO user_organization_roles (id,user_auth_id,organization_id,role_definition_id,role_scope_type,role_subject_type,status,created_actor_type)
+VALUES (1,1,1,(SELECT id FROM role_definitions WHERE key = 'organization_owner' AND organization_id IS NULL),'ORGANIZATION','USER','ACTIVE','unknown');
+INSERT INTO user_project_roles (id,project_id,user_auth_id,role_definition_id,role_scope_type,role_subject_type,status,created_actor_type)
+VALUES (1,1,1,(SELECT id FROM role_definitions WHERE key = 'project_admin' AND organization_id IS NULL),'PROJECT','USER','ACTIVE','unknown');
 SQL
+}
+
+check_access_management() {
+  access-management-smoke
 }
 
 check_product_usage() {
@@ -304,6 +313,9 @@ run_smoke_tests() {
 
   echo 'Running product usage smoke tests with both authentication methods'
   check_product_usage
+
+  echo 'Running access management API smoke tests'
+  check_access_management
 
   echo 'Running telephony callback smoke tests with stored project and PAT authentication'
   run_telephony_callback_smoke

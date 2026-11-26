@@ -13,8 +13,9 @@ import (
 	internal_services "github.com/rapidaai/api/integration-api/internal/service"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
+	pkg_errors "github.com/rapidaai/pkg/errors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	integration_api "github.com/rapidaai/protos"
@@ -36,7 +37,10 @@ func NewAuditService(logger commons.Logger, postgres connectors.PostgresConnecto
 func (aS *auditService) Create(ctx context.Context,
 	requestId, organizationId, projectId, credentialId uint64, intName,
 	assetPrefix string, mertics []*protos.Metric, status type_enums.RecordState) (*internal_gorm.ExternalAudit, error) {
-	auth := ctx.Value(types.CTX_).(*types.Authentication)
+	auth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, pkg_errors.AuthenticationFailureError{}
+	}
 	db := aS.postgres.DB(ctx)
 
 	audit := &internal_gorm.ExternalAudit{
@@ -44,8 +48,8 @@ func (aS *auditService) Create(ctx context.Context,
 			Id: requestId,
 		},
 		ActorAudit: gorm_models.ActorAudit{
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(auth.Subject().Type),
+			CreatedActorID:   auth.Subject().ID,
 		},
 		OrganizationId:  organizationId,
 		ProjectId:       projectId,
@@ -61,8 +65,8 @@ func (aS *auditService) Create(ctx context.Context,
 
 	assignments := clause.AssignmentColumns([]string{"metrics", "response_status", "status", "time_taken", "updated_date"})
 	assignments = append(assignments,
-		clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-		clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Subject().Type)},
+		clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Subject().ID},
 	)
 	tx := db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
@@ -77,7 +81,10 @@ func (aS *auditService) Create(ctx context.Context,
 
 func (aS *auditService) CreateMetadata(c context.Context, auditId uint64, metadata map[string]string) ([]*internal_gorm.ExternalAuditMetadata, error) {
 	if len(metadata) > 0 {
-		auth := c.Value(types.CTX_).(*types.Authentication)
+		auth, ok := middleware_authentication.Principal(c)
+		if !ok {
+			return nil, pkg_errors.AuthenticationFailureError{}
+		}
 		db := aS.postgres.DB(c)
 		_metadata := make([]*internal_gorm.ExternalAuditMetadata, 0)
 		for k, v := range metadata {
@@ -86,15 +93,15 @@ func (aS *auditService) CreateMetadata(c context.Context, auditId uint64, metada
 				Key:             k,
 				Value:           v,
 				ActorAudit: gorm_models.ActorAudit{
-					CreatedActorType: auth.Actor().Type.String(),
-					CreatedActorID:   auth.Actor().ID,
+					CreatedActorType: string(auth.Subject().Type),
+					CreatedActorID:   auth.Subject().ID,
 				},
 			})
 		}
 		assignments := clause.AssignmentColumns([]string{"value", "updated_date"})
 		assignments = append(assignments,
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Subject().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Subject().ID},
 		)
 		tx := db.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "external_audit_id"}, {Name: "key"}},
@@ -111,7 +118,10 @@ func (aS *auditService) CreateMetadata(c context.Context, auditId uint64, metada
 
 func (aS *auditService) UpdateMetadata(c context.Context, auditId uint64, metadata map[string]string) ([]*internal_gorm.ExternalAuditMetadata, error) {
 	if len(metadata) > 0 {
-		auth := c.Value(types.CTX_).(*types.Authentication)
+		auth, ok := middleware_authentication.Principal(c)
+		if !ok {
+			return nil, pkg_errors.AuthenticationFailureError{}
+		}
 		db := aS.postgres.DB(c)
 		_metadata := make([]*internal_gorm.ExternalAuditMetadata, 0)
 		for k, v := range metadata {
@@ -120,8 +130,8 @@ func (aS *auditService) UpdateMetadata(c context.Context, auditId uint64, metada
 				Key:             k,
 				Value:           v,
 				ActorAudit: gorm_models.ActorAudit{
-					CreatedActorType: auth.Actor().Type.String(),
-					CreatedActorID:   auth.Actor().ID,
+					CreatedActorType: string(auth.Subject().Type),
+					CreatedActorID:   auth.Subject().ID,
 				},
 			})
 		}
@@ -130,8 +140,8 @@ func (aS *auditService) UpdateMetadata(c context.Context, auditId uint64, metada
 			DoUpdates: clause.Assignments(map[string]interface{}{
 				"value":              clause.Expr{SQL: "excluded.value"},
 				"updated_date":       time.Now(),
-				"updated_actor_type": auth.Actor().Type.String(),
-				"updated_actor_id":   auth.Actor().ID,
+				"updated_actor_type": string(auth.Subject().Type),
+				"updated_actor_id":   auth.Subject().ID,
 			}),
 		}).Create(&_metadata)
 		if tx.Error != nil {

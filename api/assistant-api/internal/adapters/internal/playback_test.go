@@ -15,6 +15,7 @@ import (
 	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/api/assistant-api/internal/watchdog"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -168,7 +169,7 @@ func TestTalk_PlaybackCompletionBypassesFullControlQueue(t *testing.T) {
 			}
 			require.Equal(t, 256, requestor.channels.ControlChannel().Len())
 			startedAt := time.Now()
-			require.NoError(t, requestor.Talk(context.Background(), nil))
+			require.NoError(t, requestor.Talk(context.Background(), authentication.Principal{}))
 			finishedAt := time.Now()
 
 			require.Len(t, recorder.records, 1)

@@ -36,7 +36,7 @@ jest.mock('@/hooks/use-global-navigator', () => ({
   useGlobalNavigation: () => ({ goTo: mockGoTo }),
 }));
 
-jest.mock('@/app/components/ui/feedback', () => ({
+jest.mock('@/app/components/ui/feedback/error-container', () => ({
   ErrorContainer: ({ title, actionLabel, onAction }: any) => (
     <section>
       <h1>{title}</h1>

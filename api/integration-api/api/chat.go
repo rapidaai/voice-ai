@@ -14,9 +14,12 @@ import (
 
 	internal_caller_factory "github.com/rapidaai/api/integration-api/internal/caller"
 	internal_callers "github.com/rapidaai/api/integration-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
+	pkg_errors "github.com/rapidaai/pkg/errors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/pkg/validator"
 	protos "github.com/rapidaai/protos"
 )
 
@@ -26,17 +29,16 @@ func (iApi *integrationApi) Chat(
 	tag string,
 ) (*protos.ChatResponse, error) {
 	tag = strings.ToLower(tag)
-	auth, authErr := types.Authorize(c)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	iAuth, ok := middleware_authentication.Principal(c)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, (pkg_errors.AuthenticationFailureError{}).Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	if !validator.OneOf(iAuth.Subject().Type, authentication.IdentityUser, authentication.IdentityProjectCredential, authentication.IdentityService) {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
-	projectContext, projectErr := iAuth.ProjectContext()
-	if projectErr != nil {
-		return nil, status.Error(codes.PermissionDenied, projectErr.Error())
+	projectContext := iAuth.Tenant()
+	if projectContext.OrganizationID == 0 || projectContext.ProjectID == 0 {
+		return nil, status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
 
 	if irRequest.AdditionalData == nil {
@@ -113,17 +115,16 @@ func (iApi *integrationApi) StreamChatBidirectionalUnified(
 	logger commons.Logger,
 	stream grpc.BidiStreamingServer[protos.StreamChatRequest, protos.StreamChatResponse],
 ) error {
-	auth, authErr := types.Authorize(context)
-	if authErr != nil {
-		return status.Error(codes.Unauthenticated, authErr.Error())
+	iAuth, ok := middleware_authentication.Principal(context)
+	if !ok {
+		return status.Error(codes.Unauthenticated, (pkg_errors.AuthenticationFailureError{}).Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return status.Error(codes.PermissionDenied, scopeErr.Error())
+	if !validator.OneOf(iAuth.Subject().Type, authentication.IdentityUser, authentication.IdentityProjectCredential, authentication.IdentityService) {
+		return status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
-	projectContext, projectErr := iAuth.ProjectContext()
-	if projectErr != nil {
-		return status.Error(codes.PermissionDenied, projectErr.Error())
+	projectContext := iAuth.Tenant()
+	if projectContext.OrganizationID == 0 || projectContext.ProjectID == 0 {
+		return status.Error(codes.PermissionDenied, (pkg_errors.AuthorizationFailureError{}).Error())
 	}
 	var (
 		chatStream                internal_callers.ChatStream

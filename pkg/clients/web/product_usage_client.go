@@ -15,16 +15,16 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
 
 const productUsageRequestTimeout = 5 * time.Second
 
 type ProductUsageClient interface {
-	CreateProductUsage(context.Context, *types.Authentication, *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error)
+	CreateProductUsage(context.Context, authentication.Principal, *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error)
 	Close() error
 }
 
@@ -54,7 +54,7 @@ func NewProductUsageClientWithClient(config *config.AppConfig, logger commons.Lo
 
 func newProductUsageClientWithClient(config *config.AppConfig, logger commons.Logger, productUsageClient protos.ProductUsageServiceClient) *productUsageServiceClient {
 	return &productUsageServiceClient{
-		InternalClient:     clients.NewInternalClient(config, logger, nil),
+		InternalClient:     clients.NewWebInternalClient(config, logger, nil),
 		cfg:                config,
 		logger:             logger,
 		requestTimeout:     productUsageRequestTimeout,
@@ -62,7 +62,7 @@ func newProductUsageClientWithClient(config *config.AppConfig, logger commons.Lo
 	}
 }
 
-func (client *productUsageServiceClient) CreateProductUsage(ctx context.Context, auth *types.Authentication, request *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error) {
+func (client *productUsageServiceClient) CreateProductUsage(ctx context.Context, auth authentication.Principal, request *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error) {
 	requestTimeout := client.requestTimeout
 	if requestTimeout <= 0 {
 		requestTimeout = productUsageRequestTimeout

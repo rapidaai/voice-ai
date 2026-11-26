@@ -9,7 +9,6 @@ import (
 	internal_user_service "github.com/rapidaai/api/web-api/internal/service/user"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	protos "github.com/rapidaai/protos"
 )
@@ -31,7 +30,7 @@ func NewWebApi(cfg *config.WebAppConfig, logger commons.Logger, postgres connect
 	}
 }
 
-func (w *WebApi) GetUser(c context.Context, auth *types.Authentication, userId uint64) *protos.User {
+func (w *WebApi) GetUser(c context.Context, userId uint64) *protos.User {
 	usr, err := w.userService.GetUser(c, userId)
 	if err != nil {
 		w.logger.Errorf("unable to get user form the database %+v", err)
@@ -45,7 +44,7 @@ func (w *WebApi) GetUser(c context.Context, auth *types.Authentication, userId u
 	return ot
 }
 
-func (w *WebApi) GetOrganization(c context.Context, auth *types.Authentication, orgId uint64) *protos.Organization {
+func (w *WebApi) GetOrganization(c context.Context, orgId uint64) *protos.Organization {
 	org, err := w.orgService.Get(c, orgId)
 	if err != nil {
 		w.logger.Errorf("unable to get organization form the database %+v", err)

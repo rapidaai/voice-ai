@@ -51,3 +51,9 @@ func TestGetClientInfoFromGrpcContext(t *testing.T) {
 		t.Errorf("GetClientInfoFromGrpcContext() = %v, want UserAgent 'test'", ci)
 	}
 }
+
+func TestAuthenticationSelectionHeadersAreDistinct(t *testing.T) {
+	if ORGANIZATION_KEY != "x-organization-id" || ORGANIZATION_KEY == ORG_SCOPE_KEY || ORGANIZATION_KEY == PROJECT_KEY {
+		t.Fatalf("authentication selection headers = organization %q, credential %q, project %q", ORGANIZATION_KEY, ORG_SCOPE_KEY, PROJECT_KEY)
+	}
+}

@@ -63,7 +63,7 @@ export function SignUpPage() {
     (err: ServiceError | null, auth: AuthenticateResponse | null) => {
       hideLoader();
       if (auth?.getSuccess()) {
-        setAuthentication?.(auth.getData(), () => {
+        setAuthentication?.(auth.getAuthentication(), auth.getToken(), () => {
           navigate(next || '/dashboard');
         });
         return;

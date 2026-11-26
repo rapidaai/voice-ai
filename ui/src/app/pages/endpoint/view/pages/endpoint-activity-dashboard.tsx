@@ -21,7 +21,11 @@ import { listEndpointLogs } from '@/clients/endpoint.client';
 import { useCredential } from '@/hooks/use-credential';
 import { toDate, toDateString } from '@/utils/date';
 import { getTotalTokenMetric } from '@/utils/metadata';
-import { Dropdown, Tile } from '@/app/components/ui/primitives';
+import { Dropdown } from '@/app/components/ui/primitives';
+import {
+  pageCardSurfaceClassName,
+  pageContentBoundaryClassName,
+} from '@/app/components/layout/page-content';
 
 const RECENT_LOG_LIMIT = 20;
 const SUCCESS_STATES = new Set(['SUCCESS', 'COMPLETE', 'COMPLETED']);
@@ -64,7 +68,7 @@ function MetricTile(props: {
   loading: boolean;
 }) {
   return (
-    <Tile className="h-[156px] !rounded-none !border !border-border-subtle !bg-surface !p-0 ">
+    <article className={`${pageCardSurfaceClassName} h-[156px]`}>
       <div className="flex h-10 items-center border-b border-border-subtle px-4 ">
         <h3 className="truncate text-sm font-semibold text-foreground ">
           {props.title}
@@ -99,7 +103,7 @@ function MetricTile(props: {
           </>
         )}
       </div>
-    </Tile>
+    </article>
   );
 }
 
@@ -175,7 +179,7 @@ function RequestDetailsCard(props: {
   const unavailable = props.error ? '--' : undefined;
 
   return (
-    <Tile className="h-[310px] !rounded-none !border !border-border-subtle !bg-surface !p-0 ">
+    <section className={`${pageCardSurfaceClassName} h-[310px]`}>
       <div className="flex h-12 items-center border-b border-border-subtle px-4 ">
         <h2 className="truncate text-sm font-semibold text-foreground ">
           Request details
@@ -230,7 +234,7 @@ function RequestDetailsCard(props: {
           </>
         )}
       </div>
-    </Tile>
+    </section>
   );
 }
 
@@ -362,7 +366,8 @@ export function EndpointActivityDashboard({
 
   return (
     <section
-      className="min-h-full w-full bg-layer p-4 "
+      data-testid="endpoint-overview-content"
+      className={`${pageContentBoundaryClassName} min-h-full p-4 md:px-8 md:py-8`}
       aria-labelledby="endpoint-activity-title"
     >
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -372,7 +377,7 @@ export function EndpointActivityDashboard({
             id="endpoint-activity-title"
             className="text-2xl font-normal text-foreground "
           >
-            Endpoint activity
+            Endpoint Activity
           </h1>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -426,7 +431,9 @@ export function EndpointActivityDashboard({
           loading={loading}
           error={error}
         />
-        <Tile className="h-[310px] !rounded-none !border !border-border-subtle !bg-surface !p-0 md:col-span-2 ">
+        <section
+          className={`${pageCardSurfaceClassName} h-[310px] md:col-span-2`}
+        >
           <div className="flex h-12 items-center justify-between border-b border-border-subtle px-4 ">
             <h2
               id="recent-requests-title"
@@ -560,7 +567,7 @@ export function EndpointActivityDashboard({
               </ResponsiveContainer>
             </div>
           )}
-        </Tile>
+        </section>
       </div>
     </section>
   );

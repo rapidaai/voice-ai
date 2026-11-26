@@ -60,54 +60,56 @@ func TestGetAllUserReturnsActiveAndInvitedOrganizationMembers(t *testing.T) {
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ACTIVE,
 		},
-		UserAuthId:     80,
-		OrganizationId: 10,
-		Role:           type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+		UserAuthId:       80,
+		OrganizationId:   10,
+		RoleDefinitionID: 108,
 	}).Error)
 	require.NoError(t, db.Create(&internal_entity.UserOrganizationRole{
 		Audited: gorm_models.Audited{Id: 84},
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_INVITED,
 		},
-		UserAuthId:     81,
-		OrganizationId: 10,
-		Role:           type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+		UserAuthId:       81,
+		OrganizationId:   10,
+		RoleDefinitionID: 108,
 	}).Error)
 	require.NoError(t, db.Create(&internal_entity.UserOrganizationRole{
 		Audited: gorm_models.Audited{Id: 85},
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ACTIVE,
 		},
-		UserAuthId:     82,
-		OrganizationId: 20,
-		Role:           type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+		UserAuthId:       82,
+		OrganizationId:   20,
+		RoleDefinitionID: 108,
 	}).Error)
 
-	res, err := api.GetAllUser(ownerContext(type_enums.ORGANIZATION_ROLE_ADMIN.String()), &protos.GetAllUserRequest{
+	res, err := api.GetAllUser(ownerContext(uint64(102)), &protos.GetAllUserRequest{
 		Paginate: &protos.Paginate{Page: 1, PageSize: 10},
 	})
 	require.NoError(t, err)
 	require.True(t, res.GetSuccess())
-	require.EqualValues(t, 2, res.GetPaginated().GetTotalItem())
+	require.EqualValues(t, 4, res.GetPaginated().GetTotalItem())
 
 	members := map[string]string{}
 	for _, member := range res.GetData() {
 		members[member.GetEmail()] = member.GetStatus()
+		if member.GetEmail() == "active@example.com" || member.GetEmail() == "invited@example.com" {
+			require.Len(t, member.GetOrganizationRoles(), 1)
+			require.EqualValues(t, 108, member.GetOrganizationRoles()[0].GetRoleDefinitionId())
+		}
 	}
-	require.Equal(t, map[string]string{
-		"active@example.com":  type_enums.RECORD_ACTIVE.String(),
-		"invited@example.com": type_enums.RECORD_INVITED.String(),
-	}, members)
+	require.Equal(t, type_enums.RECORD_ACTIVE.String(), members["active@example.com"])
+	require.Equal(t, type_enums.RECORD_INVITED.String(), members["invited@example.com"])
 }
 
 func TestInviteUserToOrganizationRejectsAuthAndValidationFailures(t *testing.T) {
 	api, db, _ := newOrganizationAPITest(t)
 
 	res, err := api.InviteUserToOrganization(context.Background(), &protos.InviteUserToOrganizationRequest{
-		Email:            "new@example.com",
-		OrganizationRole: type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+		Email:                         "new@example.com",
+		OrganizationRoleDefinitionIds: []uint64{108},
 		ProjectRoles: []*protos.ProjectRoleAssignment{
-			{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_READER.String()},
+			{ProjectId: 100, RoleDefinitionIds: []uint64{112}},
 		},
 	})
 	require.Error(t, err)
@@ -127,86 +129,137 @@ func TestInviteUserToOrganizationRejectsAuthAndValidationFailures(t *testing.T) 
 	}{
 		{
 			name:          "non admin",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_MEMBER.String()),
+			ctx:           ownerContext(uint64(108)),
 			platformError: pkg_errors.InviteUserToOrganizationUnauthorized,
 			req: &protos.InviteUserToOrganizationRequest{
-				Email:            "new@example.com",
-				OrganizationRole: type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+				Email:                         "new@example.com",
+				OrganizationRoleDefinitionIds: []uint64{108},
 				ProjectRoles: []*protos.ProjectRoleAssignment{
-					{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_READER.String()},
+					{ProjectId: 100, RoleDefinitionIds: []uint64{112}},
 				},
 			},
 		},
 		{
 			name:          "invalid raw email",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()),
+			ctx:           ownerContext(uint64(101)),
 			platformError: pkg_errors.InviteUserToOrganizationInvalidEmail,
 			req: &protos.InviteUserToOrganizationRequest{
-				Email:            " new@example.com",
-				OrganizationRole: type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+				Email:                         " new@example.com",
+				OrganizationRoleDefinitionIds: []uint64{108},
 				ProjectRoles: []*protos.ProjectRoleAssignment{
-					{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_READER.String()},
+					{ProjectId: 100, RoleDefinitionIds: []uint64{112}},
 				},
 			},
 		},
 		{
 			name:          "invalid organization role",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()),
+			ctx:           ownerContext(uint64(101)),
 			platformError: pkg_errors.InviteUserToOrganizationInvalidOrganizationRole,
 			req: &protos.InviteUserToOrganizationRequest{
-				Email:            "new@example.com",
-				OrganizationRole: "Member",
+				Email:                         "new@example.com",
+				OrganizationRoleDefinitionIds: []uint64{0},
 				ProjectRoles: []*protos.ProjectRoleAssignment{
-					{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_READER.String()},
+					{ProjectId: 100, RoleDefinitionIds: []uint64{112}},
 				},
 			},
 		},
 		{
-			name:          "owner invite role",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()),
+			name:          "empty organization roles",
+			ctx:           ownerContext(uint64(101)),
 			platformError: pkg_errors.InviteUserToOrganizationInvalidOrganizationRole,
 			req: &protos.InviteUserToOrganizationRequest{
-				Email:            "new-owner@example.com",
-				OrganizationRole: type_enums.ORGANIZATION_ROLE_OWNER.String(),
+				Email: "new@example.com",
+			},
+		},
+		{
+			name:          "duplicate organization role",
+			ctx:           ownerContext(uint64(101)),
+			platformError: pkg_errors.InviteUserToOrganizationInvalidOrganizationRole,
+			req: &protos.InviteUserToOrganizationRequest{
+				Email:                         "new@example.com",
+				OrganizationRoleDefinitionIds: []uint64{108, 108},
+			},
+		},
+		{
+			name:          "owner invite role",
+			ctx:           ownerContext(uint64(101)),
+			platformError: pkg_errors.InviteUserToOrganizationInvalidOrganizationRole,
+			req: &protos.InviteUserToOrganizationRequest{
+				Email:                         "new-owner@example.com",
+				OrganizationRoleDefinitionIds: []uint64{101},
 				ProjectRoles: []*protos.ProjectRoleAssignment{
-					{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_READER.String()},
+					{ProjectId: 100, RoleDefinitionIds: []uint64{112}},
 				},
 			},
 		},
 		{
 			name:          "invalid project role",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()),
+			ctx:           ownerContext(uint64(101)),
 			platformError: pkg_errors.InviteUserToOrganizationInvalidProjectRole,
 			req: &protos.InviteUserToOrganizationRequest{
-				Email:            "new@example.com",
-				OrganizationRole: type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+				Email:                         "new@example.com",
+				OrganizationRoleDefinitionIds: []uint64{108},
 				ProjectRoles: []*protos.ProjectRoleAssignment{
-					{ProjectId: 100, ProjectRole: "Reader"},
+					{ProjectId: 100, RoleDefinitionIds: []uint64{0}},
 				},
 			},
 		},
 		{
-			name:          "empty project id",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()),
+			name:          "empty project roles",
+			ctx:           ownerContext(uint64(101)),
+			platformError: pkg_errors.InviteUserToOrganizationInvalidProjectRole,
+			req: &protos.InviteUserToOrganizationRequest{
+				Email:                         "new@example.com",
+				OrganizationRoleDefinitionIds: []uint64{108},
+				ProjectRoles: []*protos.ProjectRoleAssignment{
+					{ProjectId: 100},
+				},
+			},
+		},
+		{
+			name:          "duplicate project role",
+			ctx:           ownerContext(uint64(101)),
+			platformError: pkg_errors.InviteUserToOrganizationInvalidProjectRole,
+			req: &protos.InviteUserToOrganizationRequest{
+				Email:                         "new@example.com",
+				OrganizationRoleDefinitionIds: []uint64{108},
+				ProjectRoles: []*protos.ProjectRoleAssignment{
+					{ProjectId: 100, RoleDefinitionIds: []uint64{112, 112}},
+				},
+			},
+		},
+		{
+			name:          "nil project assignment",
+			ctx:           ownerContext(uint64(101)),
 			platformError: pkg_errors.InviteUserToOrganizationInvalidProjects,
 			req: &protos.InviteUserToOrganizationRequest{
-				Email:            "new@example.com",
-				OrganizationRole: type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+				Email:                         "new@example.com",
+				OrganizationRoleDefinitionIds: []uint64{108},
+				ProjectRoles:                  []*protos.ProjectRoleAssignment{nil},
+			},
+		},
+		{
+			name:          "empty project id",
+			ctx:           ownerContext(uint64(101)),
+			platformError: pkg_errors.InviteUserToOrganizationInvalidProjects,
+			req: &protos.InviteUserToOrganizationRequest{
+				Email:                         "new@example.com",
+				OrganizationRoleDefinitionIds: []uint64{108},
 				ProjectRoles: []*protos.ProjectRoleAssignment{
-					{ProjectId: 0, ProjectRole: type_enums.PROJECT_ROLE_READER.String()},
+					{ProjectId: 0, RoleDefinitionIds: []uint64{112}},
 				},
 			},
 		},
 		{
 			name:          "duplicate project",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()),
+			ctx:           ownerContext(uint64(101)),
 			platformError: pkg_errors.InviteUserToOrganizationDuplicateProject,
 			req: &protos.InviteUserToOrganizationRequest{
-				Email:            "new@example.com",
-				OrganizationRole: type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+				Email:                         "new@example.com",
+				OrganizationRoleDefinitionIds: []uint64{108},
 				ProjectRoles: []*protos.ProjectRoleAssignment{
-					{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_READER.String()},
-					{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_WRITER.String()},
+					{ProjectId: 100, RoleDefinitionIds: []uint64{112}},
+					{ProjectId: 100, RoleDefinitionIds: []uint64{110}},
 				},
 			},
 		},
@@ -240,14 +293,14 @@ func TestInviteUserToOrganizationRejectsInvalidProjectsBeforeWrites(t *testing.T
 		projectRoles := []*protos.ProjectRoleAssignment{}
 		for _, id := range ids {
 			projectRoles = append(projectRoles, &protos.ProjectRoleAssignment{
-				ProjectId:   id,
-				ProjectRole: type_enums.PROJECT_ROLE_WRITER.String(),
+				ProjectId:         id,
+				RoleDefinitionIds: []uint64{110},
 			})
 		}
-		res, err := api.InviteUserToOrganization(ownerContext(type_enums.ORGANIZATION_ROLE_ADMIN.String()), &protos.InviteUserToOrganizationRequest{
-			Email:            "new@example.com",
-			OrganizationRole: type_enums.ORGANIZATION_ROLE_MEMBER.String(),
-			ProjectRoles:     projectRoles,
+		res, err := api.InviteUserToOrganization(ownerContext(uint64(102)), &protos.InviteUserToOrganizationRequest{
+			Email:                         "new@example.com",
+			OrganizationRoleDefinitionIds: []uint64{108},
+			ProjectRoles:                  projectRoles,
 		})
 		require.NoError(t, err)
 		require.False(t, res.GetSuccess())
@@ -264,18 +317,18 @@ func TestInviteUserToOrganizationRejectsInvalidProjectsBeforeWrites(t *testing.T
 func TestInviteUserToOrganizationInvitesNewUserWithOrganizationAndProjectRoles(t *testing.T) {
 	api, db, emailer := newOrganizationAPITest(t)
 
-	res, err := api.InviteUserToOrganization(ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()), &protos.InviteUserToOrganizationRequest{
-		Email:            "new@example.com",
-		OrganizationRole: type_enums.ORGANIZATION_ROLE_ADMIN.String(),
+	res, err := api.InviteUserToOrganization(ownerContext(uint64(101)), &protos.InviteUserToOrganizationRequest{
+		Email:                         "new@example.com",
+		OrganizationRoleDefinitionIds: []uint64{102},
 		ProjectRoles: []*protos.ProjectRoleAssignment{
-			{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_WRITER.String()},
-			{ProjectId: 101, ProjectRole: type_enums.PROJECT_ROLE_READER.String()},
+			{ProjectId: 100, RoleDefinitionIds: []uint64{110}},
+			{ProjectId: 101, RoleDefinitionIds: []uint64{112}},
 		},
 	})
 	require.NoError(t, err)
 	require.True(t, res.GetSuccess())
 	require.Equal(t, "new@example.com", res.GetData().GetEmail())
-	require.Equal(t, type_enums.ORGANIZATION_ROLE_ADMIN.String(), res.GetData().GetRole())
+	require.Equal(t, uint64(102), res.GetData().GetOrganizationRoles()[0].GetRoleDefinitionId())
 	require.Equal(t, 1, emailer.calls)
 	require.Equal(t, "new@example.com", emailer.to.Email)
 	require.Equal(t, "Alpha,Beta", emailer.args["project_name"])
@@ -284,19 +337,19 @@ func TestInviteUserToOrganizationInvitesNewUserWithOrganizationAndProjectRoles(t
 	require.NoError(t, db.First(&user, "email = ?", "new@example.com").Error)
 	var orgRole internal_entity.UserOrganizationRole
 	require.NoError(t, db.First(&orgRole, "user_auth_id = ?", user.Id).Error)
-	require.Equal(t, type_enums.ORGANIZATION_ROLE_ADMIN.String(), orgRole.Role)
+	require.Equal(t, uint64(102), orgRole.RoleDefinitionID)
 	require.Equal(t, type_enums.RECORD_INVITED, orgRole.Status)
 	var projectRoles []internal_entity.UserProjectRole
 	require.NoError(t, db.Find(&projectRoles, "user_auth_id = ?", user.Id).Error)
 	require.Len(t, projectRoles, 2)
-	roles := map[uint64]string{}
+	roles := map[uint64]uint64{}
 	for _, projectRole := range projectRoles {
-		roles[projectRole.ProjectId] = projectRole.Role
+		roles[projectRole.ProjectId] = projectRole.RoleDefinitionID
 		require.Equal(t, type_enums.RECORD_INVITED, projectRole.Status)
 	}
-	require.Equal(t, map[uint64]string{
-		100: type_enums.PROJECT_ROLE_WRITER.String(),
-		101: type_enums.PROJECT_ROLE_READER.String(),
+	require.Equal(t, map[uint64]uint64{
+		100: uint64(110),
+		101: uint64(112),
 	}, roles)
 }
 
@@ -317,25 +370,25 @@ func TestInviteUserToOrganizationRejectsExistingSameOrgUser(t *testing.T) {
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ACTIVE,
 		},
-		UserAuthId:     50,
-		OrganizationId: 10,
-		Role:           type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+		UserAuthId:       50,
+		OrganizationId:   10,
+		RoleDefinitionID: 108,
 	}).Error)
 	require.NoError(t, db.Create(&internal_entity.UserProjectRole{
 		Audited: gorm_models.Audited{Id: 52},
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ACTIVE,
 		},
-		UserAuthId: 50,
-		ProjectId:  100,
-		Role:       type_enums.PROJECT_ROLE_READER.String(),
+		UserAuthId:       50,
+		ProjectId:        100,
+		RoleDefinitionID: 112,
 	}).Error)
 
-	res, err := api.InviteUserToOrganization(ownerContext(type_enums.ORGANIZATION_ROLE_ADMIN.String()), &protos.InviteUserToOrganizationRequest{
-		Email:            "existing@example.com",
-		OrganizationRole: type_enums.ORGANIZATION_ROLE_ADMIN.String(),
+	res, err := api.InviteUserToOrganization(ownerContext(uint64(102)), &protos.InviteUserToOrganizationRequest{
+		Email:                         "existing@example.com",
+		OrganizationRoleDefinitionIds: []uint64{102},
 		ProjectRoles: []*protos.ProjectRoleAssignment{
-			{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_ADMIN.String()},
+			{ProjectId: 100, RoleDefinitionIds: []uint64{109}},
 		},
 	})
 	require.NoError(t, err)
@@ -348,12 +401,12 @@ func TestInviteUserToOrganizationRejectsExistingSameOrgUser(t *testing.T) {
 	var orgRoles []internal_entity.UserOrganizationRole
 	require.NoError(t, db.Find(&orgRoles, "user_auth_id = ? AND organization_id = ?", 50, 10).Error)
 	require.Len(t, orgRoles, 1)
-	require.Equal(t, type_enums.ORGANIZATION_ROLE_MEMBER.String(), orgRoles[0].Role)
+	require.Equal(t, uint64(108), orgRoles[0].RoleDefinitionID)
 
 	var projectRoles []internal_entity.UserProjectRole
 	require.NoError(t, db.Find(&projectRoles, "user_auth_id = ? AND project_id = ?", 50, 100).Error)
 	require.Len(t, projectRoles, 1)
-	require.Equal(t, type_enums.PROJECT_ROLE_READER.String(), projectRoles[0].Role)
+	require.Equal(t, uint64(112), projectRoles[0].RoleDefinitionID)
 	require.Equal(t, type_enums.RECORD_ACTIVE, projectRoles[0].Status)
 }
 
@@ -374,16 +427,16 @@ func TestInviteUserToOrganizationRejectsExistingInvitedSameOrgUser(t *testing.T)
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_INVITED,
 		},
-		UserAuthId:     60,
-		OrganizationId: 10,
-		Role:           type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+		UserAuthId:       60,
+		OrganizationId:   10,
+		RoleDefinitionID: 108,
 	}).Error)
 
-	res, err := api.InviteUserToOrganization(ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()), &protos.InviteUserToOrganizationRequest{
-		Email:            "invited@example.com",
-		OrganizationRole: type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+	res, err := api.InviteUserToOrganization(ownerContext(uint64(101)), &protos.InviteUserToOrganizationRequest{
+		Email:                         "invited@example.com",
+		OrganizationRoleDefinitionIds: []uint64{108},
 		ProjectRoles: []*protos.ProjectRoleAssignment{
-			{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_READER.String()},
+			{ProjectId: 100, RoleDefinitionIds: []uint64{112}},
 		},
 	})
 	require.NoError(t, err)
@@ -419,16 +472,16 @@ func TestInviteUserToOrganizationRejectsExistingInvitedUserInAnotherOrganization
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_INVITED,
 		},
-		UserAuthId:     70,
-		OrganizationId: 20,
-		Role:           type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+		UserAuthId:       70,
+		OrganizationId:   20,
+		RoleDefinitionID: 108,
 	}).Error)
 
-	res, err := api.InviteUserToOrganization(ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()), &protos.InviteUserToOrganizationRequest{
-		Email:            "cross-invited@example.com",
-		OrganizationRole: type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+	res, err := api.InviteUserToOrganization(ownerContext(uint64(101)), &protos.InviteUserToOrganizationRequest{
+		Email:                         "cross-invited@example.com",
+		OrganizationRoleDefinitionIds: []uint64{108},
 		ProjectRoles: []*protos.ProjectRoleAssignment{
-			{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_READER.String()},
+			{ProjectId: 100, RoleDefinitionIds: []uint64{112}},
 		},
 	})
 	require.NoError(t, err)
@@ -461,26 +514,26 @@ func TestInviteUserToOrganizationRestoresArchivedUserAsActive(t *testing.T) {
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ARCHIEVE,
 		},
-		UserAuthId:     80,
-		OrganizationId: 10,
-		Role:           type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+		UserAuthId:       80,
+		OrganizationId:   10,
+		RoleDefinitionID: 108,
 	}).Error)
 	require.NoError(t, db.Create(&internal_entity.UserProjectRole{
 		Audited: gorm_models.Audited{Id: 82},
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ARCHIEVE,
 		},
-		UserAuthId: 80,
-		ProjectId:  100,
-		Role:       type_enums.PROJECT_ROLE_READER.String(),
+		UserAuthId:       80,
+		ProjectId:        100,
+		RoleDefinitionID: 112,
 	}).Error)
 
-	res, err := api.InviteUserToOrganization(ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()), &protos.InviteUserToOrganizationRequest{
-		Email:            "archived@example.com",
-		OrganizationRole: type_enums.ORGANIZATION_ROLE_ADMIN.String(),
+	res, err := api.InviteUserToOrganization(ownerContext(uint64(101)), &protos.InviteUserToOrganizationRequest{
+		Email:                         "archived@example.com",
+		OrganizationRoleDefinitionIds: []uint64{102},
 		ProjectRoles: []*protos.ProjectRoleAssignment{
-			{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_WRITER.String()},
-			{ProjectId: 101, ProjectRole: type_enums.PROJECT_ROLE_READER.String()},
+			{ProjectId: 100, RoleDefinitionIds: []uint64{110}},
+			{ProjectId: 101, RoleDefinitionIds: []uint64{112}},
 		},
 	})
 	require.NoError(t, err)
@@ -498,18 +551,18 @@ func TestInviteUserToOrganizationRestoresArchivedUserAsActive(t *testing.T) {
 	require.Len(t, orgRoles, 2)
 	require.Equal(t, type_enums.RECORD_ARCHIEVE, orgRoles[0].Status)
 	require.Equal(t, type_enums.RECORD_ACTIVE, orgRoles[1].Status)
-	require.Equal(t, type_enums.ORGANIZATION_ROLE_ADMIN.String(), orgRoles[1].Role)
+	require.Equal(t, uint64(102), orgRoles[1].RoleDefinitionID)
 
 	var projectRoles []internal_entity.UserProjectRole
 	require.NoError(t, db.Find(&projectRoles, "user_auth_id = ? AND status = ?", 80, type_enums.RECORD_ACTIVE.String()).Error)
 	require.Len(t, projectRoles, 2)
-	activeRoles := map[uint64]string{}
+	activeRoles := map[uint64]uint64{}
 	for _, projectRole := range projectRoles {
-		activeRoles[projectRole.ProjectId] = projectRole.Role
+		activeRoles[projectRole.ProjectId] = projectRole.RoleDefinitionID
 	}
-	require.Equal(t, map[uint64]string{
-		100: type_enums.PROJECT_ROLE_WRITER.String(),
-		101: type_enums.PROJECT_ROLE_READER.String(),
+	require.Equal(t, map[uint64]uint64{
+		100: uint64(110),
+		101: uint64(112),
 	}, activeRoles)
 }
 
@@ -517,11 +570,11 @@ func TestInviteUserToOrganizationProjectRoleFailureReturnsError(t *testing.T) {
 	api, db, _ := newOrganizationAPITest(t)
 	require.NoError(t, db.Exec(`DROP TABLE user_project_roles`).Error)
 
-	res, err := api.InviteUserToOrganization(ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()), &protos.InviteUserToOrganizationRequest{
-		Email:            "new@example.com",
-		OrganizationRole: type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+	res, err := api.InviteUserToOrganization(ownerContext(uint64(101)), &protos.InviteUserToOrganizationRequest{
+		Email:                         "new@example.com",
+		OrganizationRoleDefinitionIds: []uint64{108},
 		ProjectRoles: []*protos.ProjectRoleAssignment{
-			{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_READER.String()},
+			{ProjectId: 100, RoleDefinitionIds: []uint64{112}},
 		},
 	})
 	require.NoError(t, err)
@@ -533,18 +586,18 @@ func TestInviteUserToOrganizationProjectRoleFailureReturnsError(t *testing.T) {
 
 	var count int64
 	require.NoError(t, db.Model(&internal_entity.UserAuth{}).Count(&count).Error)
-	require.EqualValues(t, 1, count)
+	require.EqualValues(t, 2, count)
 }
 
 func TestInviteUserToOrganizationEmailFailureDoesNotRollback(t *testing.T) {
 	api, db, emailer := newOrganizationAPITest(t)
 	emailer.err = errors.New("email failed")
 
-	res, err := api.InviteUserToOrganization(ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()), &protos.InviteUserToOrganizationRequest{
-		Email:            "new@example.com",
-		OrganizationRole: type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+	res, err := api.InviteUserToOrganization(ownerContext(uint64(101)), &protos.InviteUserToOrganizationRequest{
+		Email:                         "new@example.com",
+		OrganizationRoleDefinitionIds: []uint64{108},
 		ProjectRoles: []*protos.ProjectRoleAssignment{
-			{ProjectId: 100, ProjectRole: type_enums.PROJECT_ROLE_READER.String()},
+			{ProjectId: 100, RoleDefinitionIds: []uint64{112}},
 		},
 	})
 	require.NoError(t, err)
@@ -573,22 +626,22 @@ func TestUpdateUserOrganizationRoleUpdatesActiveOrganizationMember(t *testing.T)
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ACTIVE,
 		},
-		UserAuthId:     100,
-		OrganizationId: 10,
-		Role:           type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+		UserAuthId:       100,
+		OrganizationId:   10,
+		RoleDefinitionID: 108,
 	}).Error)
 
-	res, err := api.UpdateUserOrganizationRole(ownerContext(type_enums.ORGANIZATION_ROLE_ADMIN.String()), &protos.UpdateUserOrganizationRoleRequest{
-		UserId:           100,
-		OrganizationRole: type_enums.ORGANIZATION_ROLE_ADMIN.String(),
+	res, err := api.UpdateUserOrganizationRole(ownerContext(uint64(102)), &protos.UpdateUserOrganizationRoleRequest{
+		UserId:            100,
+		RoleDefinitionIds: []uint64{102},
 	})
 	require.NoError(t, err)
 	require.True(t, res.GetSuccess())
 	require.EqualValues(t, 200, res.GetCode())
 
 	var orgRole internal_entity.UserOrganizationRole
-	require.NoError(t, db.First(&orgRole, "user_auth_id = ? AND organization_id = ?", 100, 10).Error)
-	require.Equal(t, type_enums.ORGANIZATION_ROLE_ADMIN.String(), orgRole.Role)
+	require.NoError(t, db.First(&orgRole, "user_auth_id = ? AND organization_id = ? AND status = ?", 100, 10, type_enums.RECORD_ACTIVE).Error)
+	require.Equal(t, uint64(102), orgRole.RoleDefinitionID)
 	require.Equal(t, type_enums.RECORD_ACTIVE, orgRole.Status)
 }
 
@@ -609,9 +662,9 @@ func TestUpdateUserOrganizationRoleRejectsAuthAndValidationFailures(t *testing.T
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ACTIVE,
 		},
-		UserAuthId:     102,
-		OrganizationId: 20,
-		Role:           type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+		UserAuthId:       102,
+		OrganizationId:   20,
+		RoleDefinitionID: 108,
 	}).Error)
 	require.NoError(t, db.Create(&internal_entity.UserAuth{
 		Audited: gorm_models.Audited{Id: 104},
@@ -628,14 +681,14 @@ func TestUpdateUserOrganizationRoleRejectsAuthAndValidationFailures(t *testing.T
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ACTIVE,
 		},
-		UserAuthId:     104,
-		OrganizationId: 10,
-		Role:           type_enums.ORGANIZATION_ROLE_OWNER.String(),
+		UserAuthId:       104,
+		OrganizationId:   10,
+		RoleDefinitionID: 101,
 	}).Error)
 
 	res, err := api.UpdateUserOrganizationRole(context.Background(), &protos.UpdateUserOrganizationRoleRequest{
-		UserId:           102,
-		OrganizationRole: type_enums.ORGANIZATION_ROLE_ADMIN.String(),
+		UserId:            102,
+		RoleDefinitionIds: []uint64{102},
 	})
 	require.Error(t, err)
 	require.False(t, res.GetSuccess())
@@ -650,38 +703,50 @@ func TestUpdateUserOrganizationRoleRejectsAuthAndValidationFailures(t *testing.T
 	}{
 		{
 			name:          "non admin",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_MEMBER.String()),
-			req:           &protos.UpdateUserOrganizationRoleRequest{UserId: 102, OrganizationRole: type_enums.ORGANIZATION_ROLE_ADMIN.String()},
+			ctx:           ownerContext(uint64(108)),
+			req:           &protos.UpdateUserOrganizationRoleRequest{UserId: 102, RoleDefinitionIds: []uint64{102}},
 			platformError: pkg_errors.UpdateUserOrganizationRoleUnauthorized,
 		},
 		{
 			name:          "zero user id",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()),
-			req:           &protos.UpdateUserOrganizationRoleRequest{OrganizationRole: type_enums.ORGANIZATION_ROLE_ADMIN.String()},
+			ctx:           ownerContext(uint64(101)),
+			req:           &protos.UpdateUserOrganizationRoleRequest{RoleDefinitionIds: []uint64{102}},
 			platformError: pkg_errors.UpdateUserOrganizationRoleInvalidUser,
 		},
 		{
 			name:          "invalid organization role",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()),
-			req:           &protos.UpdateUserOrganizationRoleRequest{UserId: 102, OrganizationRole: "Admin"},
+			ctx:           ownerContext(uint64(101)),
+			req:           &protos.UpdateUserOrganizationRoleRequest{UserId: 102, RoleDefinitionIds: []uint64{0}},
+			platformError: pkg_errors.UpdateUserOrganizationRoleInvalidRole,
+		},
+		{
+			name:          "empty organization roles",
+			ctx:           ownerContext(uint64(101)),
+			req:           &protos.UpdateUserOrganizationRoleRequest{UserId: 102},
+			platformError: pkg_errors.UpdateUserOrganizationRoleInvalidRole,
+		},
+		{
+			name:          "duplicate organization role",
+			ctx:           ownerContext(uint64(101)),
+			req:           &protos.UpdateUserOrganizationRoleRequest{UserId: 102, RoleDefinitionIds: []uint64{108, 108}},
 			platformError: pkg_errors.UpdateUserOrganizationRoleInvalidRole,
 		},
 		{
 			name:          "owner role request",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()),
-			req:           &protos.UpdateUserOrganizationRoleRequest{UserId: 102, OrganizationRole: type_enums.ORGANIZATION_ROLE_OWNER.String()},
+			ctx:           ownerContext(uint64(101)),
+			req:           &protos.UpdateUserOrganizationRoleRequest{UserId: 102, RoleDefinitionIds: []uint64{101}},
 			platformError: pkg_errors.UpdateUserOrganizationRoleInvalidRole,
 		},
 		{
 			name:          "user outside organization",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()),
-			req:           &protos.UpdateUserOrganizationRoleRequest{UserId: 102, OrganizationRole: type_enums.ORGANIZATION_ROLE_ADMIN.String()},
+			ctx:           ownerContext(uint64(101)),
+			req:           &protos.UpdateUserOrganizationRoleRequest{UserId: 102, RoleDefinitionIds: []uint64{102}},
 			platformError: pkg_errors.UpdateUserOrganizationRoleUserNotInOrg,
 		},
 		{
 			name:          "organization owner",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_ADMIN.String()),
-			req:           &protos.UpdateUserOrganizationRoleRequest{UserId: 104, OrganizationRole: type_enums.ORGANIZATION_ROLE_MEMBER.String()},
+			ctx:           ownerContext(uint64(102)),
+			req:           &protos.UpdateUserOrganizationRoleRequest{UserId: 104, RoleDefinitionIds: []uint64{108}},
 			platformError: pkg_errors.UpdateUserOrganizationRoleOwner,
 		},
 	}
@@ -720,30 +785,30 @@ func TestDeleteUserFromOrganizationArchivesUserOrganizationAndProjectRoles(t *te
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ACTIVE,
 		},
-		UserAuthId:     110,
-		OrganizationId: 10,
-		Role:           type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+		UserAuthId:       110,
+		OrganizationId:   10,
+		RoleDefinitionID: 108,
 	}).Error)
 	require.NoError(t, db.Create(&internal_entity.UserProjectRole{
 		Audited: gorm_models.Audited{Id: 112},
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ACTIVE,
 		},
-		UserAuthId: 110,
-		ProjectId:  100,
-		Role:       type_enums.PROJECT_ROLE_READER.String(),
+		UserAuthId:       110,
+		ProjectId:        100,
+		RoleDefinitionID: 112,
 	}).Error)
 	require.NoError(t, db.Create(&internal_entity.UserProjectRole{
 		Audited: gorm_models.Audited{Id: 113},
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_INVITED,
 		},
-		UserAuthId: 110,
-		ProjectId:  101,
-		Role:       type_enums.PROJECT_ROLE_WRITER.String(),
+		UserAuthId:       110,
+		ProjectId:        101,
+		RoleDefinitionID: 110,
 	}).Error)
 
-	res, err := api.DeleteUserFromOrganization(ownerContext(type_enums.ORGANIZATION_ROLE_ADMIN.String()), &protos.DeleteUserFromOrganizationRequest{
+	res, err := api.DeleteUserFromOrganization(ownerContext(uint64(102)), &protos.DeleteUserFromOrganizationRequest{
 		UserId: 110,
 	})
 	require.NoError(t, err)
@@ -783,9 +848,9 @@ func TestDeleteUserFromOrganizationRejectsAuthAndValidationFailures(t *testing.T
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ACTIVE,
 		},
-		UserAuthId:     120,
-		OrganizationId: 20,
-		Role:           type_enums.ORGANIZATION_ROLE_MEMBER.String(),
+		UserAuthId:       120,
+		OrganizationId:   20,
+		RoleDefinitionID: 108,
 	}).Error)
 	require.NoError(t, db.Create(&internal_entity.UserAuth{
 		Audited: gorm_models.Audited{Id: 122},
@@ -802,9 +867,9 @@ func TestDeleteUserFromOrganizationRejectsAuthAndValidationFailures(t *testing.T
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ACTIVE,
 		},
-		UserAuthId:     122,
-		OrganizationId: 10,
-		Role:           type_enums.ORGANIZATION_ROLE_OWNER.String(),
+		UserAuthId:       122,
+		OrganizationId:   10,
+		RoleDefinitionID: 101,
 	}).Error)
 
 	res, err := api.DeleteUserFromOrganization(context.Background(), &protos.DeleteUserFromOrganizationRequest{UserId: 120})
@@ -821,25 +886,25 @@ func TestDeleteUserFromOrganizationRejectsAuthAndValidationFailures(t *testing.T
 	}{
 		{
 			name:          "non admin",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_MEMBER.String()),
+			ctx:           ownerContext(uint64(108)),
 			req:           &protos.DeleteUserFromOrganizationRequest{UserId: 120},
 			platformError: pkg_errors.DeleteUserFromOrganizationUnauthorized,
 		},
 		{
 			name:          "zero user id",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()),
+			ctx:           ownerContext(uint64(101)),
 			req:           &protos.DeleteUserFromOrganizationRequest{},
 			platformError: pkg_errors.DeleteUserFromOrganizationInvalidUser,
 		},
 		{
 			name:          "user outside organization",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_OWNER.String()),
+			ctx:           ownerContext(uint64(101)),
 			req:           &protos.DeleteUserFromOrganizationRequest{UserId: 120},
 			platformError: pkg_errors.DeleteUserFromOrganizationUserNotInOrg,
 		},
 		{
 			name:          "organization owner",
-			ctx:           ownerContext(type_enums.ORGANIZATION_ROLE_ADMIN.String()),
+			ctx:           ownerContext(uint64(102)),
 			req:           &protos.DeleteUserFromOrganizationRequest{UserId: 122},
 			platformError: pkg_errors.DeleteUserFromOrganizationOwner,
 		},

@@ -2,13 +2,13 @@ package internal_dashboard_service
 
 import (
 	"context"
+	"github.com/rapidaai/pkg/authentication"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/require"
@@ -62,8 +62,8 @@ func projectDashboardAnalyticsTestService(t *testing.T) (*projectDashboardAnalyt
 	return &projectDashboardAnalyticsService{postgres: &dashboardTestPostgres{db: database}}, database
 }
 
-func dashboardTestProjectContext(organizationID, projectID uint64) types.ProjectContext {
-	return types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID}
+func dashboardTestProjectContext(organizationID, projectID uint64) authentication.Tenant {
+	return authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID}
 }
 
 func dashboardRequest(fromDate, toDate time.Time) *protos.GetProjectDashboardAnalyticsRequest {

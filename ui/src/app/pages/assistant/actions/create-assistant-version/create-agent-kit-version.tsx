@@ -24,7 +24,7 @@ import { CreateAssistantProviderRequest } from '@rapidaai/react';
 import type { GetAssistantProviderResponse } from '@rapidaai/react';
 import { FormLabel } from '@/app/components/ui/primitives';
 import { Textarea } from '@/app/components/ui/primitives';
-import { ErrorContainer } from '@/app/components/ui/feedback';
+import { ErrorContainer } from '@/app/components/ui/feedback/error-container';
 import { DocNoticeBlock } from '@/app/components/layout/container/message/notice-block/doc-notice-block';
 import { Input } from '@/app/components/ui/primitives';
 import { Select } from '@/app/components/ui/primitives';
@@ -70,7 +70,7 @@ export function CreateAgentKitVersion() {
         <ErrorContainer
           onAction={goToAssistantListing}
           code="403"
-          actionLabel="Go to listing"
+          actionLabel="Back to assistants"
           title="Assistant not available"
           description="This assistant may be archived or you don't have access to it. Please check with your administrator or try another assistant."
         />
@@ -383,9 +383,10 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
   return (
     <>
       <ConfirmDialogComponent />
-      <Helmet title="Connect AgentKit"></Helmet>
+      <Helmet title="Create AgentKit Version"></Helmet>
       <CreateFullPageWithHeader
-        title="Create AgentKit version"
+        alignHeaderWithStepRail
+        title="Create AgentKit Version"
         eyebrow="Assistant"
         description="Create a new version of this AgentKit connection."
         activeStep={activeTab}
@@ -395,6 +396,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
           {
             code: 'change-assistant',
             name: 'Connect Configuration',
+            hideHeader: true,
             description: `Provide the connection configuration for your ${theme.brand.name} AgentKit setup.`,
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">

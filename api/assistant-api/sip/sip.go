@@ -20,6 +20,8 @@ import (
 	sip_pipeline "github.com/rapidaai/api/assistant-api/sip/pipeline"
 	sip_registration "github.com/rapidaai/api/assistant-api/sip/registration"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	authentication_jwt "github.com/rapidaai/pkg/authentication/jwt"
+	authentication_resolver "github.com/rapidaai/pkg/authentication/resolver"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -91,6 +93,15 @@ func NewSIPEngine(config *config.AssistantConfig, logger commons.Logger,
 // Connect initializes the SIP server. The middleware chain resolves the
 // assistant from the SIP route user in the To-URI:
 func (m *SIPEngine) Connect(ctx context.Context) error {
+	serviceAuthenticationKey := m.cfg.ServiceAuthenticationKey()
+	serviceAssertionIssuer, err := authentication_jwt.NewIssuer(m.cfg.Name, serviceAuthenticationKey)
+	if err != nil {
+		return fmt.Errorf("failed to configure SIP service assertion issuer: %w", err)
+	}
+	servicePrincipalResolver := authentication_resolver.NewServicePrincipalResolver(
+		m.cfg.Name,
+		serviceAuthenticationKey,
+	)
 	m.ctx, m.cancel = context.WithCancel(ctx)
 	server, err := sip_runtime.NewServer(
 		m.ctx,
@@ -107,7 +118,7 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 			sip_middleware.WithContext(m.ctx),
 			sip_middleware.WithLogger(m.logger),
 			sip_middleware.WithAssistantService(m.assistantService),
-			sip_middleware.WithServiceID(m.cfg.ServiceID),
+			sip_middleware.WithServiceAuthentication(serviceAssertionIssuer, servicePrincipalResolver),
 		),
 		sip_middleware.NewVaultMiddleware(
 			sip_middleware.WithContext(m.ctx),
@@ -129,6 +140,7 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 		sip_registration.WithRedis(m.redis),
 		sip_registration.WithRegistrationClient(m.registrationClient),
 		sip_registration.WithAssistantConfig(m.cfg),
+		sip_registration.WithServiceAuthentication(serviceAssertionIssuer, servicePrincipalResolver),
 		sip_registration.WithRapidaClient(m.rapidaClient),
 	)
 
@@ -218,7 +230,7 @@ func (m *SIPEngine) sessionEstablishedStage(session *sip_runtime.Session, reques
 	}
 
 	auth := session.GetAuth()
-	if auth == nil {
+	if auth.Subject().ID == 0 {
 		return sip_pipeline.SessionEstablishedPipeline{}, fmt.Errorf("missing auth on session %s", callID)
 	}
 

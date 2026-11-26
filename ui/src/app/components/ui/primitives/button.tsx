@@ -9,10 +9,13 @@ import { Text } from '@/app/components/ui/primitives/text';
 import { cn } from '@/utils';
 import type {
   ComponentProps,
+  ButtonHTMLAttributes,
   ElementType,
+  ForwardedRef,
   MouseEventHandler,
   ReactNode,
 } from 'react';
+import { forwardRef } from 'react';
 
 // Types
 
@@ -28,7 +31,11 @@ type ButtonKind =
 type IconButtonKind = 'primary' | 'secondary' | 'ghost' | 'tertiary';
 type IconButtonSize = 'sm' | 'md' | 'lg';
 
-export interface CarbonButtonProps {
+export interface CarbonButtonProps
+  extends Omit<
+    ButtonHTMLAttributes<HTMLButtonElement>,
+    'children' | 'className' | 'disabled' | 'onClick' | 'type'
+  > {
   children?: ReactNode;
   className?: string;
   disabled?: boolean;
@@ -60,19 +67,25 @@ interface ButtonSkeletonProps {
 
 // Internal helper
 
-function CarbonBtn({
-  kind,
-  isLoading,
-  size,
-  type = 'button',
-  disabled,
-  children,
-  className,
-  renderIcon,
-  iconDescription,
-  hasIconOnly,
-  ...rest
-}: CarbonButtonProps & { kind: ButtonKind }) {
+const CarbonBtn = forwardRef<
+  HTMLButtonElement,
+  CarbonButtonProps & { kind: ButtonKind }
+>(function CarbonBtn(
+  {
+    kind,
+    isLoading,
+    size,
+    type = 'button',
+    disabled,
+    children,
+    className,
+    renderIcon,
+    iconDescription,
+    hasIconOnly,
+    ...rest
+  },
+  ref: ForwardedRef<HTMLButtonElement>,
+) {
   if (isLoading) {
     return (
       <CarbonButtonSkeleton
@@ -85,6 +98,7 @@ function CarbonBtn({
 
   return (
     <CarbonButton
+      ref={ref}
       {...rest}
       type={type}
       kind={kind}
@@ -98,28 +112,27 @@ function CarbonBtn({
       {children}
     </CarbonButton>
   );
-}
+});
 
 // Default / Primary
 
 /** Carbon Primary button: the main CTA on a page. */
-export function PrimaryButton({
-  children,
-  className,
-  ...props
-}: CarbonButtonProps) {
-  return (
-    <CarbonBtn
-      kind="primary"
-      className={cn('app-primary-button', className)}
-      {...props}
-    >
-      <Text variant="body-compact-01" className="text-inherit">
-        {children}
-      </Text>
-    </CarbonBtn>
-  );
-}
+export const PrimaryButton = forwardRef<HTMLButtonElement, CarbonButtonProps>(
+  function PrimaryButton({ children, className, ...props }, ref) {
+    return (
+      <CarbonBtn
+        ref={ref}
+        kind="primary"
+        className={cn('app-primary-button', className)}
+        {...props}
+      >
+        <Text variant="body-compact-01" className="text-inherit">
+          {children}
+        </Text>
+      </CarbonBtn>
+    );
+  },
+);
 
 // Secondary
 
@@ -138,9 +151,11 @@ export function TertiaryButton(props: CarbonButtonProps) {
 // Ghost
 
 /** Carbon Ghost button: no border or bg, text only. Low emphasis actions. */
-export function GhostButton(props: CarbonButtonProps) {
-  return <CarbonBtn kind="ghost" {...props} />;
-}
+export const GhostButton = forwardRef<HTMLButtonElement, CarbonButtonProps>(
+  function GhostButton(props, ref) {
+    return <CarbonBtn ref={ref} kind="ghost" {...props} />;
+  },
+);
 
 // Danger
 

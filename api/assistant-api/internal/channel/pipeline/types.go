@@ -12,7 +12,7 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/validator"
 )
 
@@ -24,7 +24,7 @@ type Pipeline interface {
 type CallReceivedPipeline struct {
 	ID          string
 	Provider    string
-	Auth        *types.Authentication
+	Auth        authentication.Principal
 	AssistantID uint64
 	GinContext  *gin.Context
 	Observer    observability.Recorder
@@ -34,7 +34,7 @@ func (p CallReceivedPipeline) CallID() string { return p.ID }
 func (p CallReceivedPipeline) Validate() bool {
 	return validator.NotBlank(p.ID) &&
 		validator.NotBlank(p.Provider) &&
-		validator.NonNil(p.Auth) &&
+		validator.NonZero(p.Auth.Subject().ID) &&
 		validator.AllNonZero(p.AssistantID) &&
 		validator.NonNil(p.GinContext) &&
 		validator.NonNil(p.Observer)
@@ -43,7 +43,7 @@ func (p CallReceivedPipeline) Validate() bool {
 type WebhookParsedPipeline struct {
 	ID          string
 	Provider    string
-	Auth        *types.Authentication
+	Auth        authentication.Principal
 	AssistantID uint64
 	CallInfo    *internal_type.CallInfo
 	GinContext  *gin.Context
@@ -53,7 +53,7 @@ func (p WebhookParsedPipeline) CallID() string { return p.ID }
 func (p WebhookParsedPipeline) Validate() bool {
 	return validator.NotBlank(p.ID) &&
 		validator.NotBlank(p.Provider) &&
-		validator.NonNil(p.Auth) &&
+		validator.NonZero(p.Auth.Subject().ID) &&
 		validator.AllNonZero(p.AssistantID) &&
 		validator.NonNil(p.CallInfo) &&
 		validator.NonNil(p.GinContext)
@@ -62,7 +62,7 @@ func (p WebhookParsedPipeline) Validate() bool {
 type AssistantResolvedPipeline struct {
 	ID          string
 	Provider    string
-	Auth        *types.Authentication
+	Auth        authentication.Principal
 	AssistantID uint64
 	Assistant   *internal_assistant_entity.Assistant
 	CallInfo    *internal_type.CallInfo
@@ -73,7 +73,7 @@ func (p AssistantResolvedPipeline) CallID() string { return p.ID }
 func (p AssistantResolvedPipeline) Validate() bool {
 	return validator.NotBlank(p.ID) &&
 		validator.NotBlank(p.Provider) &&
-		validator.NonNil(p.Auth) &&
+		validator.NonZero(p.Auth.Subject().ID) &&
 		validator.AllNonZero(p.AssistantID) &&
 		validator.NonNil(p.Assistant) &&
 		validator.NonNil(p.CallInfo) &&
@@ -83,7 +83,7 @@ func (p AssistantResolvedPipeline) Validate() bool {
 type ConversationCreatedPipeline struct {
 	ID             string
 	Provider       string
-	Auth           *types.Authentication
+	Auth           authentication.Principal
 	AssistantID    uint64
 	Assistant      *internal_assistant_entity.Assistant
 	ConversationID uint64
@@ -96,7 +96,7 @@ func (p ConversationCreatedPipeline) CallID() string { return p.ID }
 func (p ConversationCreatedPipeline) Validate() bool {
 	return validator.NotBlank(p.ID) &&
 		validator.NotBlank(p.Provider) &&
-		validator.NonNil(p.Auth) &&
+		validator.NonZero(p.Auth.Subject().ID) &&
 		validator.AllNonZero(p.AssistantID, p.ConversationID) &&
 		validator.NotBlank(p.ContextID) &&
 		validator.NonNil(p.Assistant) &&
@@ -107,7 +107,7 @@ func (p ConversationCreatedPipeline) Validate() bool {
 type ProviderAnsweringPipeline struct {
 	ID             string
 	Provider       string
-	Auth           *types.Authentication
+	Auth           authentication.Principal
 	AssistantID    uint64
 	ConversationID uint64
 	ContextID      string
@@ -119,7 +119,7 @@ func (p ProviderAnsweringPipeline) CallID() string { return p.ID }
 func (p ProviderAnsweringPipeline) Validate() bool {
 	return validator.NotBlank(p.ID) &&
 		validator.NotBlank(p.Provider) &&
-		validator.NonNil(p.Auth) &&
+		validator.NonZero(p.Auth.Subject().ID) &&
 		validator.AllNonZero(p.AssistantID, p.ConversationID) &&
 		validator.NotBlank(p.ContextID) &&
 		validator.NotBlank(p.CallerNumber) &&
@@ -156,13 +156,13 @@ func (p SessionConnectedPipeline) Validate() bool {
 
 type SessionInitializedPipeline struct {
 	ID   string
-	Auth *types.Authentication
+	Auth authentication.Principal
 }
 
 func (p SessionInitializedPipeline) CallID() string { return p.ID }
 func (p SessionInitializedPipeline) Validate() bool {
 	return validator.NotBlank(p.ID) &&
-		validator.NonNil(p.Auth)
+		validator.NonZero(p.Auth.Subject().ID)
 }
 
 type CallActivePipeline struct {
@@ -176,7 +176,7 @@ func (p CallActivePipeline) Validate() bool {
 
 type OutboundRequestedPipeline struct {
 	ID          string
-	Auth        *types.Authentication
+	Auth        authentication.Principal
 	AssistantID uint64
 	Version     string
 	ToPhone     string
@@ -190,7 +190,7 @@ type OutboundRequestedPipeline struct {
 func (p OutboundRequestedPipeline) CallID() string { return p.ID }
 func (p OutboundRequestedPipeline) Validate() bool {
 	return validator.NotBlank(p.ID) &&
-		validator.NonNil(p.Auth) &&
+		validator.NonZero(p.Auth.Subject().ID) &&
 		validator.AllNonZero(p.AssistantID) &&
 		validator.NotBlank(p.ToPhone) &&
 		validator.NonNil(p.Observer)

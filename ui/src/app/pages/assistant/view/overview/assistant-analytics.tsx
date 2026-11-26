@@ -44,6 +44,7 @@ import {
 } from '@carbon/react';
 import { Information } from '@carbon/icons-react';
 import { getAssistantDashboardRange } from '@/clients/assistant.client';
+import { pageContentBoundaryClassName } from '@/app/components/layout/page-content';
 
 const CHART_COLORS = [
   'var(--color-primary)',
@@ -322,12 +323,18 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
   );
 
   return (
-    <div className="w-full min-h-full bg-layer p-4 ">
+    <div
+      data-testid="assistant-overview-content"
+      className={cn(
+        pageContentBoundaryClassName,
+        'min-h-full p-4 md:px-8 md:py-8',
+      )}
+    >
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs text-muted">Dashboard</p>
           <h2 className="text-2xl font-normal text-foreground ">
-            Assistant activity
+            Assistant Activity
           </h2>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -857,7 +864,7 @@ const DashboardWidget: FC<{
 }) => (
   <Tile
     className={cn(
-      '!rounded-none !p-0 !bg-surface border border-border-subtle h-[310px]',
+      '!rounded-lg !p-0 !bg-surface border border-border-subtle h-[310px]',
       size === 'large' && 'xl:col-span-2',
       className,
     )}
@@ -889,7 +896,7 @@ const KpiTile: FC<{
   action?: ReactNode;
   isLoading?: boolean;
 }> = ({ title, label, value, unit, caption, action, isLoading = false }) => (
-  <Tile className="!rounded-none !p-0 !bg-surface border border-border-subtle h-[156px]">
+  <Tile className="!rounded-lg !p-0 !bg-surface border border-border-subtle h-[156px]">
     <div className="flex h-10 items-center justify-between border-b border-border-subtle px-4 ">
       <h3 className="truncate text-sm font-semibold text-foreground ">
         {title}

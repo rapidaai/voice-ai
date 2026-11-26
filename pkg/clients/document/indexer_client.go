@@ -14,15 +14,15 @@ import (
 	"time"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
 
 type IndexerServiceClient interface {
-	IndexKnowledgeDocument(ctx context.Context, auth *types.Authentication,
+	IndexKnowledgeDocument(ctx context.Context, auth authentication.Principal,
 		in *protos.IndexKnowledgeDocumentRequest) (*protos.IndexKnowledgeDocumentResponse, error)
 }
 
@@ -36,7 +36,7 @@ type indexerServiceClient struct {
 // NewSendgridServiceClientHTTP creates a new Sendgrid service client for HTTP.
 func NewIndexerServiceClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector) IndexerServiceClient {
 	return &indexerServiceClient{
-		InternalClient: clients.NewInternalClient(config, logger, redis),
+		InternalClient: clients.NewInternalClient(config, "document-api", logger, redis),
 		cfg:            config,
 		logger:         logger,
 		client: &http.Client{
@@ -45,7 +45,7 @@ func NewIndexerServiceClient(config *config.AppConfig, logger commons.Logger, re
 	}
 }
 
-func (client *indexerServiceClient) IndexKnowledgeDocument(ctx context.Context, auth *types.Authentication, in *protos.IndexKnowledgeDocumentRequest) (*protos.IndexKnowledgeDocumentResponse, error) {
+func (client *indexerServiceClient) IndexKnowledgeDocument(ctx context.Context, auth authentication.Principal, in *protos.IndexKnowledgeDocumentRequest) (*protos.IndexKnowledgeDocumentResponse, error) {
 	reqBody, err := json.Marshal(in)
 	if err != nil {
 		client.logger.Errorf("unable to marshal request body: %v", err)

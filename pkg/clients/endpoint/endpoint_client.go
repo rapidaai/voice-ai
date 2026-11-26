@@ -12,28 +12,28 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	clients "github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	endpoint_api "github.com/rapidaai/protos"
 )
 
 type EndpointServiceClient interface {
-	GetAllEndpoint(c context.Context, auth *types.Authentication, criteria []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.Paginated, []*endpoint_api.Endpoint, error)
-	GetEndpoint(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.GetEndpointRequest) (*endpoint_api.Endpoint, error)
-	CreateEndpoint(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.CreateEndpointRequest) (*endpoint_api.CreateEndpointResponse, error)
-	GetAllEndpointProviderModel(c context.Context, auth *types.Authentication, endpointId uint64, criteria []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.Paginated, []*endpoint_api.EndpointProviderModel, error)
-	UpdateEndpointVersion(c context.Context, auth *types.Authentication, endpointId, endpointProviderModelId uint64) (*endpoint_api.UpdateEndpointVersionResponse, error)
-	CreateEndpointProviderModel(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.CreateEndpointProviderModelRequest) (*endpoint_api.CreateEndpointProviderModelResponse, error)
-	CreateEndpointCacheConfiguration(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.CreateEndpointCacheConfigurationRequest) (*endpoint_api.CreateEndpointCacheConfigurationResponse, error)
-	CreateEndpointRetryConfiguration(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.CreateEndpointRetryConfigurationRequest) (*endpoint_api.CreateEndpointRetryConfigurationResponse, error)
-	ForkEndpoint(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.ForkEndpointRequest) (*endpoint_api.BaseResponse, error)
-	CreateEndpointTag(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.CreateEndpointTagRequest) (*endpoint_api.GetEndpointResponse, error)
-	UpdateEndpointDetail(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.UpdateEndpointDetailRequest) (*endpoint_api.GetEndpointResponse, error)
+	GetAllEndpoint(c context.Context, auth authentication.Principal, criteria []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.Paginated, []*endpoint_api.Endpoint, error)
+	GetEndpoint(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.GetEndpointRequest) (*endpoint_api.Endpoint, error)
+	CreateEndpoint(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.CreateEndpointRequest) (*endpoint_api.CreateEndpointResponse, error)
+	GetAllEndpointProviderModel(c context.Context, auth authentication.Principal, endpointId uint64, criteria []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.Paginated, []*endpoint_api.EndpointProviderModel, error)
+	UpdateEndpointVersion(c context.Context, auth authentication.Principal, endpointId, endpointProviderModelId uint64) (*endpoint_api.UpdateEndpointVersionResponse, error)
+	CreateEndpointProviderModel(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.CreateEndpointProviderModelRequest) (*endpoint_api.CreateEndpointProviderModelResponse, error)
+	CreateEndpointCacheConfiguration(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.CreateEndpointCacheConfigurationRequest) (*endpoint_api.CreateEndpointCacheConfigurationResponse, error)
+	CreateEndpointRetryConfiguration(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.CreateEndpointRetryConfigurationRequest) (*endpoint_api.CreateEndpointRetryConfigurationResponse, error)
+	ForkEndpoint(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.ForkEndpointRequest) (*endpoint_api.BaseResponse, error)
+	CreateEndpointTag(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.CreateEndpointTagRequest) (*endpoint_api.GetEndpointResponse, error)
+	UpdateEndpointDetail(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.UpdateEndpointDetailRequest) (*endpoint_api.GetEndpointResponse, error)
 
-	GetAllEndpointLog(c context.Context, auth *types.Authentication, endpointId uint64, criteria []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.Paginated, []*endpoint_api.EndpointLog, error)
-	GetEndpointLog(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.GetEndpointLogRequest) (*endpoint_api.GetEndpointLogResponse, error)
+	GetAllEndpointLog(c context.Context, auth authentication.Principal, endpointId uint64, criteria []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.Paginated, []*endpoint_api.EndpointLog, error)
+	GetEndpointLog(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.GetEndpointLogRequest) (*endpoint_api.GetEndpointLogResponse, error)
 }
 
 type endpointServiceClient struct {
@@ -48,15 +48,20 @@ func NewEndpointServiceClientGRPC(config *config.AppConfig, logger commons.Logge
 	if err != nil {
 		logger.Errorf("Unable to create connection %v", err)
 	}
+	return NewEndpointServiceClientWithClient(config, logger, redis, endpoint_api.NewEndpointServiceClient(conn))
+}
+
+// NewEndpointServiceClientWithClient constructs an endpoint client around the provided gRPC client.
+func NewEndpointServiceClientWithClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, endpointClient endpoint_api.EndpointServiceClient) EndpointServiceClient {
 	return &endpointServiceClient{
-		InternalClient: clients.NewInternalClient(config, logger, redis),
+		InternalClient: clients.NewInternalClient(config, "endpoint-api", logger, redis),
 		cfg:            config,
 		logger:         logger,
-		endpointClient: endpoint_api.NewEndpointServiceClient(conn),
+		endpointClient: endpointClient,
 	}
 }
 
-func (client *endpointServiceClient) GetAllEndpoint(c context.Context, auth *types.Authentication, criteria []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.Paginated, []*endpoint_api.Endpoint, error) {
+func (client *endpointServiceClient) GetAllEndpoint(c context.Context, auth authentication.Principal, criteria []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.Paginated, []*endpoint_api.Endpoint, error) {
 	client.logger.Debugf("get all endpoint request")
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -78,7 +83,7 @@ func (client *endpointServiceClient) GetAllEndpoint(c context.Context, auth *typ
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *endpointServiceClient) GetEndpoint(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.GetEndpointRequest) (*endpoint_api.Endpoint, error) {
+func (client *endpointServiceClient) GetEndpoint(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.GetEndpointRequest) (*endpoint_api.Endpoint, error) {
 	client.logger.Debugf("get endpoint request")
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
@@ -97,7 +102,7 @@ func (client *endpointServiceClient) GetEndpoint(c context.Context, auth *types.
 	return res.GetData(), nil
 }
 
-func (client *endpointServiceClient) CreateEndpoint(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.CreateEndpointRequest) (*endpoint_api.CreateEndpointResponse, error) {
+func (client *endpointServiceClient) CreateEndpoint(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.CreateEndpointRequest) (*endpoint_api.CreateEndpointResponse, error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, err
@@ -110,7 +115,7 @@ func (client *endpointServiceClient) CreateEndpoint(c context.Context, auth *typ
 	return res, nil
 }
 
-func (client *endpointServiceClient) GetAllEndpointProviderModel(c context.Context, auth *types.Authentication, endpointId uint64, criteria []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.Paginated, []*endpoint_api.EndpointProviderModel, error) {
+func (client *endpointServiceClient) GetAllEndpointProviderModel(c context.Context, auth authentication.Principal, endpointId uint64, criteria []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.Paginated, []*endpoint_api.EndpointProviderModel, error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, nil, err
@@ -132,7 +137,7 @@ func (client *endpointServiceClient) GetAllEndpointProviderModel(c context.Conte
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *endpointServiceClient) UpdateEndpointVersion(c context.Context, auth *types.Authentication, endpointId, endpointProviderModelId uint64) (*endpoint_api.UpdateEndpointVersionResponse, error) {
+func (client *endpointServiceClient) UpdateEndpointVersion(c context.Context, auth authentication.Principal, endpointId, endpointProviderModelId uint64) (*endpoint_api.UpdateEndpointVersionResponse, error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, err
@@ -148,7 +153,7 @@ func (client *endpointServiceClient) UpdateEndpointVersion(c context.Context, au
 	return res, nil
 }
 
-func (client *endpointServiceClient) CreateEndpointProviderModel(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.CreateEndpointProviderModelRequest) (*endpoint_api.CreateEndpointProviderModelResponse, error) {
+func (client *endpointServiceClient) CreateEndpointProviderModel(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.CreateEndpointProviderModelRequest) (*endpoint_api.CreateEndpointProviderModelResponse, error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, err
@@ -161,7 +166,7 @@ func (client *endpointServiceClient) CreateEndpointProviderModel(c context.Conte
 	return res, nil
 }
 
-func (client *endpointServiceClient) CreateEndpointCacheConfiguration(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.CreateEndpointCacheConfigurationRequest) (*endpoint_api.CreateEndpointCacheConfigurationResponse, error) {
+func (client *endpointServiceClient) CreateEndpointCacheConfiguration(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.CreateEndpointCacheConfigurationRequest) (*endpoint_api.CreateEndpointCacheConfigurationResponse, error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, err
@@ -173,7 +178,7 @@ func (client *endpointServiceClient) CreateEndpointCacheConfiguration(c context.
 	}
 	return res, nil
 }
-func (client *endpointServiceClient) CreateEndpointRetryConfiguration(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.CreateEndpointRetryConfigurationRequest) (*endpoint_api.CreateEndpointRetryConfigurationResponse, error) {
+func (client *endpointServiceClient) CreateEndpointRetryConfiguration(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.CreateEndpointRetryConfigurationRequest) (*endpoint_api.CreateEndpointRetryConfigurationResponse, error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, err
@@ -185,7 +190,7 @@ func (client *endpointServiceClient) CreateEndpointRetryConfiguration(c context.
 	}
 	return res, nil
 }
-func (client *endpointServiceClient) CreateEndpointTag(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.CreateEndpointTagRequest) (*endpoint_api.GetEndpointResponse, error) {
+func (client *endpointServiceClient) CreateEndpointTag(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.CreateEndpointTagRequest) (*endpoint_api.GetEndpointResponse, error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, err
@@ -197,7 +202,7 @@ func (client *endpointServiceClient) CreateEndpointTag(c context.Context, auth *
 	}
 	return res, nil
 }
-func (client *endpointServiceClient) UpdateEndpointDetail(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.UpdateEndpointDetailRequest) (*endpoint_api.GetEndpointResponse, error) {
+func (client *endpointServiceClient) UpdateEndpointDetail(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.UpdateEndpointDetailRequest) (*endpoint_api.GetEndpointResponse, error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, err
@@ -209,7 +214,7 @@ func (client *endpointServiceClient) UpdateEndpointDetail(c context.Context, aut
 	}
 	return res, nil
 }
-func (client *endpointServiceClient) ForkEndpoint(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.ForkEndpointRequest) (*endpoint_api.BaseResponse, error) {
+func (client *endpointServiceClient) ForkEndpoint(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.ForkEndpointRequest) (*endpoint_api.BaseResponse, error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, err
@@ -222,7 +227,7 @@ func (client *endpointServiceClient) ForkEndpoint(c context.Context, auth *types
 	return res, nil
 }
 
-func (client *endpointServiceClient) GetAllEndpointLog(c context.Context, auth *types.Authentication, endpointId uint64, criteria []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.Paginated, []*endpoint_api.EndpointLog, error) {
+func (client *endpointServiceClient) GetAllEndpointLog(c context.Context, auth authentication.Principal, endpointId uint64, criteria []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.Paginated, []*endpoint_api.EndpointLog, error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, nil, err
@@ -244,7 +249,7 @@ func (client *endpointServiceClient) GetAllEndpointLog(c context.Context, auth *
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *endpointServiceClient) GetEndpointLog(c context.Context, auth *types.Authentication, endpointRequest *endpoint_api.GetEndpointLogRequest) (*endpoint_api.GetEndpointLogResponse, error) {
+func (client *endpointServiceClient) GetEndpointLog(c context.Context, auth authentication.Principal, endpointRequest *endpoint_api.GetEndpointLogRequest) (*endpoint_api.GetEndpointLogResponse, error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, err

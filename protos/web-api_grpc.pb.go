@@ -22,7 +22,6 @@ const (
 	AuthenticationService_Authenticate_FullMethodName   = "/web_api.AuthenticationService/Authenticate"
 	AuthenticationService_RegisterUser_FullMethodName   = "/web_api.AuthenticationService/RegisterUser"
 	AuthenticationService_Authorize_FullMethodName      = "/web_api.AuthenticationService/Authorize"
-	AuthenticationService_ScopeAuthorize_FullMethodName = "/web_api.AuthenticationService/ScopeAuthorize"
 	AuthenticationService_VerifyToken_FullMethodName    = "/web_api.AuthenticationService/VerifyToken"
 	AuthenticationService_ForgotPassword_FullMethodName = "/web_api.AuthenticationService/ForgotPassword"
 	AuthenticationService_CreatePassword_FullMethodName = "/web_api.AuthenticationService/CreatePassword"
@@ -42,7 +41,6 @@ type AuthenticationServiceClient interface {
 	Authenticate(ctx context.Context, in *AuthenticateRequest, opts ...grpc.CallOption) (*AuthenticateResponse, error)
 	RegisterUser(ctx context.Context, in *RegisterUserRequest, opts ...grpc.CallOption) (*AuthenticateResponse, error)
 	Authorize(ctx context.Context, in *AuthorizeRequest, opts ...grpc.CallOption) (*AuthenticateResponse, error)
-	ScopeAuthorize(ctx context.Context, in *ScopeAuthorizeRequest, opts ...grpc.CallOption) (*ScopedAuthenticationResponse, error)
 	VerifyToken(ctx context.Context, in *VerifyTokenRequest, opts ...grpc.CallOption) (*VerifyTokenResponse, error)
 	ForgotPassword(ctx context.Context, in *ForgotPasswordRequest, opts ...grpc.CallOption) (*ForgotPasswordResponse, error)
 	CreatePassword(ctx context.Context, in *CreatePasswordRequest, opts ...grpc.CallOption) (*CreatePasswordResponse, error)
@@ -87,16 +85,6 @@ func (c *authenticationServiceClient) Authorize(ctx context.Context, in *Authori
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AuthenticateResponse)
 	err := c.cc.Invoke(ctx, AuthenticationService_Authorize_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *authenticationServiceClient) ScopeAuthorize(ctx context.Context, in *ScopeAuthorizeRequest, opts ...grpc.CallOption) (*ScopedAuthenticationResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ScopedAuthenticationResponse)
-	err := c.cc.Invoke(ctx, AuthenticationService_ScopeAuthorize_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +198,6 @@ type AuthenticationServiceServer interface {
 	Authenticate(context.Context, *AuthenticateRequest) (*AuthenticateResponse, error)
 	RegisterUser(context.Context, *RegisterUserRequest) (*AuthenticateResponse, error)
 	Authorize(context.Context, *AuthorizeRequest) (*AuthenticateResponse, error)
-	ScopeAuthorize(context.Context, *ScopeAuthorizeRequest) (*ScopedAuthenticationResponse, error)
 	VerifyToken(context.Context, *VerifyTokenRequest) (*VerifyTokenResponse, error)
 	ForgotPassword(context.Context, *ForgotPasswordRequest) (*ForgotPasswordResponse, error)
 	CreatePassword(context.Context, *CreatePasswordRequest) (*CreatePasswordResponse, error)
@@ -238,9 +225,6 @@ func (UnimplementedAuthenticationServiceServer) RegisterUser(context.Context, *R
 }
 func (UnimplementedAuthenticationServiceServer) Authorize(context.Context, *AuthorizeRequest) (*AuthenticateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Authorize not implemented")
-}
-func (UnimplementedAuthenticationServiceServer) ScopeAuthorize(context.Context, *ScopeAuthorizeRequest) (*ScopedAuthenticationResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ScopeAuthorize not implemented")
 }
 func (UnimplementedAuthenticationServiceServer) VerifyToken(context.Context, *VerifyTokenRequest) (*VerifyTokenResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyToken not implemented")
@@ -342,24 +326,6 @@ func _AuthenticationService_Authorize_Handler(srv interface{}, ctx context.Conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AuthenticationServiceServer).Authorize(ctx, req.(*AuthorizeRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AuthenticationService_ScopeAuthorize_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ScopeAuthorizeRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AuthenticationServiceServer).ScopeAuthorize(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AuthenticationService_ScopeAuthorize_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthenticationServiceServer).ScopeAuthorize(ctx, req.(*ScopeAuthorizeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -562,10 +528,6 @@ var AuthenticationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Authorize",
 			Handler:    _AuthenticationService_Authorize_Handler,
-		},
-		{
-			MethodName: "ScopeAuthorize",
-			Handler:    _AuthenticationService_ScopeAuthorize_Handler,
 		},
 		{
 			MethodName: "VerifyToken",
@@ -950,6 +912,7 @@ const (
 	ProjectService_ArchiveProject_FullMethodName          = "/web_api.ProjectService/ArchiveProject"
 	ProjectService_CreateProjectCredential_FullMethodName = "/web_api.ProjectService/CreateProjectCredential"
 	ProjectService_GetAllProjectCredential_FullMethodName = "/web_api.ProjectService/GetAllProjectCredential"
+	ProjectService_RevokeProjectCredential_FullMethodName = "/web_api.ProjectService/RevokeProjectCredential"
 )
 
 // ProjectServiceClient is the client API for ProjectService service.
@@ -965,6 +928,7 @@ type ProjectServiceClient interface {
 	ArchiveProject(ctx context.Context, in *ArchiveProjectRequest, opts ...grpc.CallOption) (*ArchiveProjectResponse, error)
 	CreateProjectCredential(ctx context.Context, in *CreateProjectCredentialRequest, opts ...grpc.CallOption) (*CreateProjectCredentialResponse, error)
 	GetAllProjectCredential(ctx context.Context, in *GetAllProjectCredentialRequest, opts ...grpc.CallOption) (*GetAllProjectCredentialResponse, error)
+	RevokeProjectCredential(ctx context.Context, in *RevokeProjectCredentialRequest, opts ...grpc.CallOption) (*RevokeProjectCredentialResponse, error)
 }
 
 type projectServiceClient struct {
@@ -1065,6 +1029,16 @@ func (c *projectServiceClient) GetAllProjectCredential(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *projectServiceClient) RevokeProjectCredential(ctx context.Context, in *RevokeProjectCredentialRequest, opts ...grpc.CallOption) (*RevokeProjectCredentialResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeProjectCredentialResponse)
+	err := c.cc.Invoke(ctx, ProjectService_RevokeProjectCredential_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProjectServiceServer is the server API for ProjectService service.
 // All implementations should embed UnimplementedProjectServiceServer
 // for forward compatibility.
@@ -1078,6 +1052,7 @@ type ProjectServiceServer interface {
 	ArchiveProject(context.Context, *ArchiveProjectRequest) (*ArchiveProjectResponse, error)
 	CreateProjectCredential(context.Context, *CreateProjectCredentialRequest) (*CreateProjectCredentialResponse, error)
 	GetAllProjectCredential(context.Context, *GetAllProjectCredentialRequest) (*GetAllProjectCredentialResponse, error)
+	RevokeProjectCredential(context.Context, *RevokeProjectCredentialRequest) (*RevokeProjectCredentialResponse, error)
 }
 
 // UnimplementedProjectServiceServer should be embedded to have
@@ -1113,6 +1088,9 @@ func (UnimplementedProjectServiceServer) CreateProjectCredential(context.Context
 }
 func (UnimplementedProjectServiceServer) GetAllProjectCredential(context.Context, *GetAllProjectCredentialRequest) (*GetAllProjectCredentialResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllProjectCredential not implemented")
+}
+func (UnimplementedProjectServiceServer) RevokeProjectCredential(context.Context, *RevokeProjectCredentialRequest) (*RevokeProjectCredentialResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RevokeProjectCredential not implemented")
 }
 func (UnimplementedProjectServiceServer) testEmbeddedByValue() {}
 
@@ -1296,6 +1274,24 @@ func _ProjectService_GetAllProjectCredential_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_RevokeProjectCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeProjectCredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).RevokeProjectCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_RevokeProjectCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).RevokeProjectCredential(ctx, req.(*RevokeProjectCredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProjectService_ServiceDesc is the grpc.ServiceDesc for ProjectService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1338,6 +1334,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAllProjectCredential",
 			Handler:    _ProjectService_GetAllProjectCredential_Handler,
+		},
+		{
+			MethodName: "RevokeProjectCredential",
+			Handler:    _ProjectService_RevokeProjectCredential_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

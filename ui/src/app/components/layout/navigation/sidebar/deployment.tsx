@@ -17,7 +17,7 @@ export const Deployment = memo(({ isLoading }: { isLoading?: boolean }) => {
         loading={isLoading}
       >
         <SidebarIconWrapper>
-          <ChatBot size={20} />
+          <ChatBot size={16} />
         </SidebarIconWrapper>
         <SidebarLabel isLoading={isLoading}>Assistants</SidebarLabel>
       </SidebarSimpleListItem>
@@ -27,7 +27,7 @@ export const Deployment = memo(({ isLoading }: { isLoading?: boolean }) => {
         loading={isLoading}
       >
         <SidebarIconWrapper>
-          <Connect size={20} />
+          <Connect size={16} />
         </SidebarIconWrapper>
         <SidebarLabel isLoading={isLoading}>Endpoints</SidebarLabel>
       </SidebarSimpleListItem>

@@ -16,9 +16,9 @@ import (
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 )
@@ -352,30 +352,30 @@ type recordingHTTPLogService struct {
 	calls []webhookHTTPLogCall
 }
 
-func (s *recordingAssistantConfigurationService) Get(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantConfiguration, error) {
+func (s *recordingAssistantConfigurationService) Get(context.Context, authentication.Principal, uint64, uint64) (*internal_assistant_entity.AssistantConfiguration, error) {
 	return nil, nil
 }
 
-func (s *recordingAssistantConfigurationService) GetAll(context.Context, *types.Authentication, uint64, string, string, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantConfiguration, error) {
+func (s *recordingAssistantConfigurationService) GetAll(context.Context, authentication.Principal, uint64, string, string, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantConfiguration, error) {
 	s.getAllCalls++
 	return int64(len(s.configurations)), s.configurations, nil
 }
 
-func (s *recordingAssistantConfigurationService) Create(context.Context, *types.Authentication, uint64, string, string, bool, []*protos.Metadata) (*internal_assistant_entity.AssistantConfiguration, error) {
+func (s *recordingAssistantConfigurationService) Create(context.Context, authentication.Principal, uint64, string, string, bool, []*protos.Metadata) (*internal_assistant_entity.AssistantConfiguration, error) {
 	return nil, nil
 }
 
-func (s *recordingAssistantConfigurationService) Update(context.Context, *types.Authentication, uint64, uint64, string, string, bool, []*protos.Metadata) (*internal_assistant_entity.AssistantConfiguration, error) {
+func (s *recordingAssistantConfigurationService) Update(context.Context, authentication.Principal, uint64, uint64, string, string, bool, []*protos.Metadata) (*internal_assistant_entity.AssistantConfiguration, error) {
 	return nil, nil
 }
 
-func (s *recordingAssistantConfigurationService) Delete(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantConfiguration, error) {
+func (s *recordingAssistantConfigurationService) Delete(context.Context, authentication.Principal, uint64, uint64) (*internal_assistant_entity.AssistantConfiguration, error) {
 	return nil, nil
 }
 
 func (s *recordingHTTPLogService) CreateLog(
 	_ context.Context,
-	_ *types.Authentication,
+	_ authentication.Principal,
 	source string,
 	sourceRefID uint64,
 	sourceEvent string,
@@ -406,19 +406,19 @@ func (s *recordingHTTPLogService) CreateLog(
 	return &internal_assistant_entity.AssistantHTTPLog{}, nil
 }
 
-func (s *recordingHTTPLogService) GetLog(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantHTTPLog, error) {
+func (s *recordingHTTPLogService) GetLog(context.Context, authentication.Principal, uint64, uint64) (*internal_assistant_entity.AssistantHTTPLog, error) {
 	return nil, nil
 }
 
-func (s *recordingHTTPLogService) GetAllLog(context.Context, *types.Authentication, uint64, []*protos.Criteria, *protos.Paginate, *protos.Ordering) (int64, []*internal_assistant_entity.AssistantHTTPLog, error) {
+func (s *recordingHTTPLogService) GetAllLog(context.Context, authentication.Principal, uint64, []*protos.Criteria, *protos.Paginate, *protos.Ordering) (int64, []*internal_assistant_entity.AssistantHTTPLog, error) {
 	return 0, nil, nil
 }
 
-func (s *recordingHTTPLogService) GetLogObject(context.Context, *types.Authentication, uint64) ([]byte, []byte, error) {
+func (s *recordingHTTPLogService) GetLogObject(context.Context, authentication.Principal, uint64) ([]byte, []byte, error) {
 	return nil, nil, nil
 }
 
-func (s *recordingHTTPLogService) RetryLog(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantHTTPLog, error) {
+func (s *recordingHTTPLogService) RetryLog(context.Context, authentication.Principal, uint64, uint64) (*internal_assistant_entity.AssistantHTTPLog, error) {
 	return nil, nil
 }
 
@@ -436,10 +436,14 @@ func testLogger(t *testing.T) commons.Logger {
 	return logger
 }
 
-func testServiceAuthentication(organizationID, projectID uint64) *types.Authentication {
-	return &types.Authentication{
-		AuthType:          types.AuthTypeService,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
+func testServiceAuthentication(organizationID, projectID uint64) authentication.Principal {
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityService, ID: 9007, Issuer: "assistant-api"},
+		authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID},
+		authentication.Proof{Method: authentication.AuthenticationServiceAssertion, Audience: authentication.AudienceRapidaInternal, Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "assistant-test-1"}}, nil,
+	)
+	if err != nil {
+		panic(err)
 	}
+	return principal
 }

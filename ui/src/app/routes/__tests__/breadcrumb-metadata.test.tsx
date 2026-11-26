@@ -45,6 +45,7 @@ describe('workspace route breadcrumb metadata', () => {
   it.each([
     ['/dashboard', ['Dashboard']],
     ['/organization/users', ['Organization', 'Users']],
+    ['/organization/roles/role-1', ['Organization', 'Role detail']],
     [
       '/integration/project-credential',
       ['Integrations', 'Project credentials'],
@@ -52,7 +53,7 @@ describe('workspace route breadcrumb metadata', () => {
     ['/logs/conversation', ['Logs', 'Conversations']],
     [
       '/deployment/assistant/create-assistant',
-      ['Deployment', 'Assistants', 'Create assistant'],
+      ['Deployment', 'Assistants', 'Create Assistant'],
     ],
   ])('declares static metadata for %s', (pathname, expectedLabels) => {
     const labels = getBreadcrumbs(pathname).map(definition =>
@@ -137,11 +138,7 @@ describe('workspace route breadcrumb metadata', () => {
     expect(screen.getByText('Knowledge unavailable')).toBeInTheDocument();
   });
 
-  it('uses explicit not-found metadata for unknown deployment routes', () => {
-    const labels = getBreadcrumbs('/deployment/missing').map(definition =>
-      'label' in definition! ? definition.label : 'dynamic',
-    );
-
-    expect(labels).toEqual(['Deployment', 'Not found']);
+  it('leaves unknown deployment routes to the top-level not-found page', () => {
+    expect(matchRoutes(workspaceRoutes, '/deployment/missing')).toBeNull();
   });
 });

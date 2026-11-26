@@ -9,15 +9,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"strings"
 	"time"
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	"gorm.io/gorm"
@@ -41,13 +42,13 @@ func NewAssistantConfigurationService(
 
 func (s *assistantConfigurationService) Get(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	configurationId uint64,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
@@ -74,16 +75,16 @@ func (s *assistantConfigurationService) Get(
 
 func (s *assistantConfigurationService) GetAll(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	configurationType string,
 	provider string,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 ) (int64, []*internal_assistant_entity.AssistantConfiguration, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return 0, nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return 0, nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
@@ -143,16 +144,16 @@ func (s *assistantConfigurationService) GetAll(
 
 func (s *assistantConfigurationService) Create(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantId uint64,
 	configurationType string,
 	provider string,
 	enabled bool,
 	options []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
@@ -172,12 +173,12 @@ func (s *assistantConfigurationService) Create(
 		},
 		Mutable: gorm_models.Mutable{
 			Status:           type_enums.RECORD_ACTIVE,
-			CreatedActorType: auth.Actor().Type.String(),
-			CreatedActorID:   auth.Actor().ID,
+			CreatedActorType: string(auth.Caller().Type),
+			CreatedActorID:   auth.Caller().ID,
 		},
 	}
 
-	err = db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.WithContext(ctx).Create(out).Error; err != nil {
 			return err
 		}
@@ -200,7 +201,7 @@ func (s *assistantConfigurationService) Create(
 
 func (s *assistantConfigurationService) Update(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	configurationId uint64,
 	assistantId uint64,
 	configurationType string,
@@ -208,9 +209,9 @@ func (s *assistantConfigurationService) Update(
 	enabled bool,
 	options []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
@@ -220,13 +221,13 @@ func (s *assistantConfigurationService) Update(
 	provider = strings.TrimSpace(provider)
 
 	var out *internal_assistant_entity.AssistantConfiguration
-	err = db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		patch := map[string]interface{}{
 			"configuration_type": internal_assistant_entity.AssistantConfigurationType(configurationType),
 			"provider":           provider,
 			"enabled":            enabled,
-			"updated_actor_type": auth.Actor().Type.String(),
-			"updated_actor_id":   auth.Actor().ID,
+			"updated_actor_type": string(auth.Caller().Type),
+			"updated_actor_id":   auth.Caller().ID,
 		}
 		query := tx.WithContext(ctx).
 			Model(&internal_assistant_entity.AssistantConfiguration{}).
@@ -271,20 +272,20 @@ func (s *assistantConfigurationService) Update(
 
 func (s *assistantConfigurationService) Delete(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	configurationId uint64,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return nil, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 
 	start := time.Now()
 	db := s.postgres.DB(ctx)
 
 	var out *internal_assistant_entity.AssistantConfiguration
-	err = db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.WithContext(ctx).
 			Preload("Options", "status = ?", type_enums.RECORD_ACTIVE).
 			Where("id = ? AND assistant_id = ? AND organization_id = ? AND project_id = ? AND status = ?",
@@ -308,8 +309,8 @@ func (s *assistantConfigurationService) Delete(
 			).
 			Updates(map[string]interface{}{
 				"status":             type_enums.RECORD_ARCHIEVE,
-				"updated_actor_type": auth.Actor().Type.String(),
-				"updated_actor_id":   auth.Actor().ID,
+				"updated_actor_type": string(auth.Caller().Type),
+				"updated_actor_id":   auth.Caller().ID,
 			})
 		if query.Error != nil {
 			return query.Error
@@ -331,7 +332,7 @@ func (s *assistantConfigurationService) Delete(
 func (s *assistantConfigurationService) archiveOptions(
 	ctx context.Context,
 	tx *gorm.DB,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	configurationId uint64,
 ) error {
 	return tx.WithContext(ctx).
@@ -339,15 +340,15 @@ func (s *assistantConfigurationService) archiveOptions(
 		Where("assistant_configuration_id = ? AND status = ?", configurationId, type_enums.RECORD_ACTIVE).
 		Updates(map[string]interface{}{
 			"status":             type_enums.RECORD_ARCHIEVE,
-			"updated_actor_type": auth.Actor().Type.String(),
-			"updated_actor_id":   auth.Actor().ID,
+			"updated_actor_type": string(auth.Caller().Type),
+			"updated_actor_id":   auth.Caller().ID,
 		}).Error
 }
 
 func (s *assistantConfigurationService) createOptions(
 	ctx context.Context,
 	tx *gorm.DB,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	configurationId uint64,
 	options []*protos.Metadata,
 ) ([]*internal_assistant_entity.AssistantConfigurationOption, error) {
@@ -365,8 +366,8 @@ func (s *assistantConfigurationService) createOptions(
 			},
 			Mutable: gorm_models.Mutable{
 				Status:           type_enums.RECORD_ACTIVE,
-				CreatedActorType: auth.Actor().Type.String(),
-				CreatedActorID:   auth.Actor().ID,
+				CreatedActorType: string(auth.Caller().Type),
+				CreatedActorID:   auth.Caller().ID,
 			},
 		})
 	}
@@ -381,8 +382,8 @@ func (s *assistantConfigurationService) createOptions(
 			"status",
 			"updated_date",
 		}),
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
-			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: string(auth.Caller().Type)},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Caller().ID},
 		),
 	}).Create(&out).Error; err != nil {
 		return nil, err

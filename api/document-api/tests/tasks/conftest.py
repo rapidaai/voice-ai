@@ -10,4 +10,6 @@ from unittest.mock import MagicMock
 if "app.celery_worker" not in sys.modules:
     _stub = MagicMock()
     _stub.celery_app = MagicMock()
+    _stub.web_service_assertion_issuer = MagicMock()
+    _stub.integration_service_assertion_issuer = MagicMock()
     sys.modules["app.celery_worker"] = _stub

@@ -54,16 +54,18 @@ test('new account completes onboarding before opening the dashboard', async ({
   ).toBeVisible();
 });
 
-test('organization-only account resumes at project creation', async ({
+test('organization-only account can use the shell before project selection', async ({
   page,
 }) => {
   await authenticatePage(page, { organization: true, project: false });
 
   await page.goto('/dashboard');
 
-  await expect(page).toHaveURL(/\/onboarding\/project$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
   await expect(
-    page.getByRole('heading', { name: 'Create your first project' }),
+    page.getByRole('button', {
+      name: /Current organization: E2E Organization\. No project selected\./,
+    }),
   ).toBeVisible();
 });
 

@@ -9,3 +9,6 @@ It provides a structured, reliable, and observable interface for interacting wit
  endpoint-api       # Webhooks, callbacks, external events
  integration-api    # Third-party integrations
  web-api            # Web dashboard and internal UI APIs
+
+The Web API permission-to-operation inventory is documented in
+[`web-api/README.md`](web-api/README.md).

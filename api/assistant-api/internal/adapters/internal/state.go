@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 )
@@ -85,7 +85,7 @@ func (gr *genericRequestor) textToSpeechTransformerConfig() (*internal_assistant
 	return nil, errors.New("audio is not enabled for the source")
 }
 
-func (dm *genericRequestor) Auth() *types.Authentication {
+func (dm *genericRequestor) Auth() authentication.Principal {
 	return dm.auth
 }
 

@@ -11,7 +11,7 @@ import (
 	internal_notification_service "github.com/rapidaai/api/web-api/internal/service/notification"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/pkg/utils"
 	protos "github.com/rapidaai/protos"
 )
@@ -46,21 +46,11 @@ func NewNotificationGRPC(config *config.WebAppConfig, logger commons.Logger, pos
 
 // GetNotificationSettting implements protos.NotificationServiceServer.
 func (nts *webNotificationGRPCApi) GetNotificationSettting(ctx context.Context, ir *protos.GetNotificationSettingRequest) (*protos.NotificationSettingResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	userContext, err := iAuth.UserContext()
-	if err != nil {
-		nts.logger.Errorf("unable to resolve user identity for GetNotificationSettting: %v", err)
-		return nil, err
-	}
-
-	settings, err := nts.notificationService.GetAllNotificationSetting(ctx, iAuth, userContext.UserID)
+	settings, err := nts.notificationService.GetAllNotificationSetting(ctx, principal, principal.Subject().ID)
 	if err != nil {
 		nts.logger.Errorf("vaultService.GetAll from grpc with err %v", err)
 		return utils.Error[protos.NotificationSettingResponse](
@@ -82,20 +72,11 @@ func (nts *webNotificationGRPCApi) GetNotificationSettting(ctx context.Context, 
 
 // UpdateNotificationSetting implements protos.NotificationServiceServer.
 func (nts *webNotificationGRPCApi) UpdateNotificationSetting(ctx context.Context, irequest *protos.UpdateNotificationSettingRequest) (*protos.NotificationSettingResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
-	}
-	userContext, err := iAuth.UserContext()
-	if err != nil {
-		nts.logger.Errorf("unable to resolve user identity for UpdateNotificationSetting: %v", err)
-		return nil, err
-	}
-	_, err = nts.notificationService.UpdateNotificationSetting(ctx, iAuth, userContext.UserID, irequest.GetSettings())
+	_, err := nts.notificationService.UpdateNotificationSetting(ctx, principal, principal.Subject().ID, irequest.GetSettings())
 	if err != nil {
 		return &protos.NotificationSettingResponse{
 			Code:    400,

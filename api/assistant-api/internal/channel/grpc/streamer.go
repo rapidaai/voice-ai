@@ -17,8 +17,8 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/webhook"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
 	"google.golang.org/grpc"
@@ -42,7 +42,7 @@ type unidirectionalStreamer struct {
 	flushedOutputIDs map[string]struct{}
 	pendingOutput    []*protos.ConversationAssistantMessage
 
-	auth                 *types.Authentication
+	auth                 authentication.Principal
 	configurationService internal_services.AssistantConfigurationService
 	httpLogService       internal_services.AssistantHTTPLogService
 	assistantToolService internal_services.AssistantToolService
@@ -53,7 +53,7 @@ type StreamerOptions struct {
 	Logger               commons.Logger
 	Server               protos.TalkService_AssistantTalkServer
 	Observer             observability.Recorder
-	Auth                 *types.Authentication
+	Auth                 authentication.Principal
 	ConfigurationService internal_services.AssistantConfigurationService
 	HTTPLogService       internal_services.AssistantHTTPLogService
 	AssistantToolService internal_services.AssistantToolService
@@ -85,7 +85,7 @@ func WithObserver(observer observability.Recorder) FuncOption {
 	}
 }
 
-func WithAuth(auth *types.Authentication) FuncOption {
+func WithAuth(auth authentication.Principal) FuncOption {
 	return func(options *StreamerOptions) {
 		options.Auth = auth
 	}

@@ -1,7 +1,5 @@
 import { Add, TrashCan } from '@carbon/icons-react';
 import {
-  Button,
-  Dropdown,
   Table,
   TableBody,
   TableCell,
@@ -10,12 +8,16 @@ import {
   TableHeader,
   TableRow,
 } from '@carbon/react';
-import { TertiaryButton } from '@/app/components/ui/primitives';
-import { tableFormContainerClassName } from '@/app/components/ui/table';
+import {
+  Dropdown,
+  IconOnlyButton,
+  MultiSelect,
+  TertiaryButton,
+} from '@/app/components/ui/primitives';
 
 export type ProjectRoleRow = {
   projectId: string;
-  projectRole: string;
+  roleDefinitionIds: string[];
 };
 
 type ProjectOption = {
@@ -50,16 +52,16 @@ export function ProjectRoleTable(props: ProjectRoleTableProps) {
     <div>
       <TableContainer
         title={props.title ? `${props.title} (${props.rows.length})` : ''}
-        className={tableFormContainerClassName}
+        className="![padding-block-start:0] border border-border-subtle"
       >
-        <Table size="sm" useZebraStyles={false}>
+        <Table className="w-full table-fixed" size="sm" useZebraStyles={false}>
           <TableHead>
             <TableRow>
               <TableHeader>Project</TableHeader>
-              <TableHeader>Role</TableHeader>
+              <TableHeader>Roles</TableHeader>
               {showRemoveColumn && (
                 <TableHeader className="!w-10 !text-center">
-                  Actions
+                  <span className="sr-only">Actions</span>
                 </TableHeader>
               )}
             </TableRow>
@@ -99,38 +101,42 @@ export function ProjectRoleTable(props: ProjectRoleTableProps) {
                       props.onChange(next);
                     }}
                     size="md"
-                    className="w-full"
+                    className="w-full min-w-0"
                   />
                 </TableCell>
                 <TableCell className="!p-0">
-                  <Dropdown
-                    autoAlign
+                  <MultiSelect
                     id={`project-role-role-${index}`}
-                    titleText=""
-                    label="Select role"
+                    autoAlign
+                    titleText="Roles"
+                    hideLabel
+                    label="Select roles"
                     items={props.roleOptions}
-                    selectedItem={
-                      props.roleOptions.find(
-                        role => role.value === row.projectRole,
-                      ) || null
-                    }
-                    itemToString={(item: RoleOption | null) => item?.name || ''}
-                    onChange={({ selectedItem }) => {
+                    clearSelectionDescription="Total items selected: "
+                    clearSelectionText="To clear selection, press Delete or Backspace."
+                    selectedItems={props.roleOptions.filter(role =>
+                      row.roleDefinitionIds.includes(role.value),
+                    )}
+                    selectionFeedback="top-after-reopen"
+                    itemToString={(item: RoleOption) => item?.name || ''}
+                    onChange={({ selectedItems }) => {
                       const next = [...props.rows];
                       next[index] = {
                         ...row,
-                        projectRole: selectedItem?.value || '',
+                        roleDefinitionIds: (selectedItems || []).map(
+                          role => role.value,
+                        ),
                       };
                       props.onChange(next);
                     }}
                     size="md"
-                    className="w-full"
+                    type="default"
+                    className="w-full min-w-0"
                   />
                 </TableCell>
                 {showRemoveColumn && (
                   <TableCell className="!w-10 !p-0 !text-center">
-                    <Button
-                      hasIconOnly
+                    <IconOnlyButton
                       renderIcon={TrashCan}
                       iconDescription="Remove project role"
                       kind="ghost"
@@ -161,7 +167,7 @@ export function ProjectRoleTable(props: ProjectRoleTableProps) {
                     props.defaultProjectId ||
                     props.projectOptions[0]?.value ||
                     '',
-                  projectRole: '',
+                  roleDefinitionIds: [],
                 },
               ])
             }

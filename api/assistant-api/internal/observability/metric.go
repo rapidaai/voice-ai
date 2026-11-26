@@ -52,8 +52,8 @@ const (
 
 	MetricSTTInitLatencyMs      = "stt.init_ms"
 	MetricSTTLatencyMs          = "stt.latency_ms"
-	MetricSTTTimeToFirstTokenMs = "stt.ttft_ms"
-	MetricSTTTimeToLastTokenMs  = "stt.ttlt_ms"
+	MetricSTTTimeToFirstTokenMs = "stt.ttft_ms" // #nosec G101, this is a metric name, not a token.
+	MetricSTTTimeToLastTokenMs  = "stt.ttlt_ms" // #nosec G101, this is a metric name, not a token.
 	MetricSTTError              = "stt.error"
 
 	MetricTTSInitLatencyMs  = "tts.init_ms"
@@ -89,12 +89,12 @@ const (
 	MetricAgentMessageCharCount   = "agent.message_char_count"
 	MetricAgentResponseCharCount  = "agent.response_char_count"
 	MetricAgentTotalToken         = "agent.total_token"
-	MetricAgentCachedContentToken = "agent.cached_content_token"
+	MetricAgentCachedContentToken = "agent.cached_content_token" // #nosec G101, this is a metric name, not a token.
 	MetricAgentCost               = "agent.cost"
 	MetricAgentInputCost          = "agent.input_cost"
 	MetricAgentOutputCost         = "agent.output_cost"
 	MetricAgentLLMRequestID       = "agent.llm_request_id"
-	MetricAgentTokenPerSecond     = "agent.token_pre_second"
+	MetricAgentTokenPerSecond     = "agent.token_pre_second" // #nosec G101, this is a metric name, not a token.
 )
 
 const (

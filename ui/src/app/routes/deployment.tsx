@@ -50,7 +50,6 @@ import {
 } from '@/app/pages/assistant';
 import { AssistantViewLayout } from '@/app/pages/assistant/view/assistant-view.layout';
 import { EndpointViewLayout } from '@/app/pages/endpoint/view/endpoint-view.layout';
-import { StaticPageNotFoundPage } from '@/app/pages/static-pages';
 import {
   PreviewPhoneAgentPage,
   PreviewVoiceAgentV2Page,
@@ -156,7 +155,7 @@ export const deploymentRoute: RouteObject = {
         {
           path: 'create-assistant',
           element: <DeploymentCreateAssistantPage />,
-          handle: breadcrumb('Create assistant'),
+          handle: breadcrumb('Create Assistant'),
         },
         {
           path: 'connect-websocket',
@@ -234,7 +233,7 @@ export const deploymentRoute: RouteObject = {
             {
               path: 'create-agentkit-version',
               element: <DeploymentCreateAgentKitVersionAssistantPage />,
-              handle: breadcrumb('Create AgentKit version'),
+              handle: breadcrumb('Create AgentKit Version'),
             },
             {
               path: 'create-agentflow-version',
@@ -454,11 +453,6 @@ export const deploymentRoute: RouteObject = {
           ],
         },
       ],
-    },
-    {
-      path: '*',
-      element: <StaticPageNotFoundPage />,
-      handle: breadcrumb('Not found'),
     },
   ],
 };

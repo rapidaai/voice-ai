@@ -31,10 +31,14 @@ import (
 	web_authenticators "github.com/rapidaai/api/web-api/authenticator"
 	"github.com/rapidaai/api/web-api/config"
 	web_router "github.com/rapidaai/api/web-api/router"
-	"github.com/rapidaai/pkg/authenticators"
+	"github.com/rapidaai/pkg/authentication/policy"
+	"github.com/rapidaai/pkg/authentication/resolver"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/middlewares"
+	"github.com/rapidaai/pkg/middlewares/authentication"
+	"github.com/rapidaai/pkg/utils"
 )
 
 // wrapper for gin engine
@@ -45,6 +49,7 @@ type AppRunner struct {
 	Logger    commons.Logger
 	Postgres  connectors.PostgresConnector
 	Redis     connectors.RedisConnector
+	Clients   *rapida_client.RapidaClient
 	Closeable []func(context.Context) error
 }
 
@@ -70,41 +75,49 @@ func main() {
 		appRunner.Logger.Errorf("Warning: Migration failed: %v", err)
 		panic(err)
 	}
+	if err := appRunner.Init(ctx); err != nil {
+		appRunner.Close(ctx)
+		panic(err)
+	}
+	defer appRunner.Close(ctx)
 
-	// init
-	userAuthenticator := web_authenticators.GetUserAuthenticator(appRunner.Logger, appRunner.Postgres)
-	projectAuthenticator := web_authenticators.GetProjectAuthenticator(appRunner.Logger, appRunner.Postgres)
-	organizationAuthenticator := web_authenticators.GetOrganizationAuthenticator(appRunner.Logger, appRunner.Postgres, appRunner.Cfg.Secret)
-	serviceAuthenticator := authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger)
+	authorizationPolicy, err := policy.NewWebAuthorizationPolicy()
+	if err != nil {
+		panic(err)
+	}
 	appRunner.S = grpc.NewServer(
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
-			middlewares.NewProjectAuthenticatorStreamServerMiddleware(projectAuthenticator, appRunner.Logger),
-			middlewares.NewOrganizationAuthenticatorStreamServerMiddleware(organizationAuthenticator, appRunner.Logger),
-			middlewares.NewServiceAuthenticatorStreamServerMiddleware(serviceAuthenticator, appRunner.Logger),
-			middlewares.NewAuthenticationStreamServerMiddleware(userAuthenticator, appRunner.Logger),
+			authentication.NewProjectStreamMiddleware(web_authenticators.NewProjectResolver(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
+			authentication.NewOrganizationStreamMiddleware(web_authenticators.NewOrganizationResolver(appRunner.Cfg.OrganizationCredentialFingerprintKey(), appRunner.Logger, appRunner.Postgres), appRunner.Logger),
+			authentication.NewUserStreamMiddleware(web_authenticators.NewUserResolver(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
+			authentication.NewServiceStreamMiddleware(resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, appRunner.Cfg.ServiceAuthenticationKey()), appRunner.Logger),
+			authentication.NewPolicyStreamMiddleware(authorizationPolicy, appRunner.Logger),
 		),
 		grpc.ChainUnaryInterceptor(
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
-			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(projectAuthenticator, appRunner.Logger),
-			middlewares.NewOrganizationAuthenticatorUnaryServerMiddleware(organizationAuthenticator, appRunner.Logger),
-			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(serviceAuthenticator, appRunner.Logger),
-			middlewares.NewAuthenticationUnaryServerMiddleware(userAuthenticator, appRunner.Logger),
+			authentication.NewProjectUnaryMiddleware(web_authenticators.NewProjectResolver(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
+			authentication.NewOrganizationUnaryMiddleware(web_authenticators.NewOrganizationResolver(appRunner.Cfg.OrganizationCredentialFingerprintKey(), appRunner.Logger, appRunner.Postgres), appRunner.Logger),
+			authentication.NewUserUnaryMiddleware(web_authenticators.NewUserResolver(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
+			authentication.NewServiceUnaryMiddleware(resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, appRunner.Cfg.ServiceAuthenticationKey()), appRunner.Logger),
+			authentication.NewPolicyUnaryMiddleware(authorizationPolicy, appRunner.Logger),
 		),
 		grpc.MaxRecvMsgSize(commons.MaxRecvMsgSize), // 10 MB
 		grpc.MaxSendMsgSize(commons.MaxSendMsgSize), // 10 MB
 	)
-	if err := appRunner.Init(ctx); err != nil {
-		panic(err)
-	}
-
 	// add all middleware depends on configurations
-	appRunner.AllMiddlewares()
+	appRunner.AllMiddlewares(
+		authentication.NewProjectHTTPMiddleware(web_authenticators.NewProjectResolver(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
+		authentication.NewOrganizationHTTPMiddleware(web_authenticators.NewOrganizationResolver(appRunner.Cfg.OrganizationCredentialFingerprintKey(), appRunner.Logger, appRunner.Postgres), appRunner.Logger),
+		authentication.NewUserHTTPMiddleware(web_authenticators.NewUserResolver(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
+		authentication.NewServiceHTTPMiddleware(resolver.NewServicePrincipalResolver(appRunner.Cfg.Name, appRunner.Cfg.ServiceAuthenticationKey()), appRunner.Logger),
+		authentication.NewPolicyHTTPMiddleware(authorizationPolicy, appRunner.Logger),
+	)
 
 	// all routers add all handlers which required to resolve the service request
-	appRunner.AllRouters()
+	appRunner.AllRouters(appRunner.Cfg.OrganizationCredentialFingerprintKey())
 	appRunner.AllProxyRouter()
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", appRunner.Cfg.Host, appRunner.Cfg.Port))
 	if err != nil {
@@ -112,7 +125,6 @@ func main() {
 		panic(err)
 	}
 
-	defer appRunner.Close(ctx)
 	cmuxListener := cmux.New(listener)
 
 	// if application json
@@ -140,7 +152,8 @@ func main() {
 		}
 
 		httpServer := http.Server{
-			Handler: http.HandlerFunc(handler),
+			Handler:           http.HandlerFunc(handler),
+			ReadHeaderTimeout: 10 * time.Second,
 		}
 		//
 		err = httpServer.Serve(grpcFilteredListener)
@@ -217,18 +230,29 @@ func (app *AppRunner) ResolveConfig() error {
 
 // init for app close
 func (app *AppRunner) Init(ctx context.Context) error {
-	err := app.Postgres.Connect(ctx)
-	if err != nil {
-		app.Logger.Error("error while connecting to postgres.", err)
-		return err
+	if app.Postgres != nil {
+		err := app.Postgres.Connect(ctx)
+		if err != nil {
+			app.Logger.Error("error while connecting to postgres.", err)
+			return err
+		}
+		app.Closeable = append(app.Closeable, app.Postgres.Disconnect)
 	}
-	err = app.Redis.Connect(ctx)
-	if err != nil {
-		app.Logger.Error("error while connecting to redis.", err)
-		return err
+	if app.Redis != nil {
+		err := app.Redis.Connect(ctx)
+		if err != nil {
+			app.Logger.Error("error while connecting to redis.", err)
+			return err
+		}
+		app.Closeable = append(app.Closeable, app.Redis.Disconnect)
 	}
-	app.Closeable = append(app.Closeable, app.Postgres.Disconnect)
-	app.Closeable = append(app.Closeable, app.Redis.Disconnect)
+
+	clients, err := rapida_client.New(&app.Cfg.AppConfig, app.Logger, app.Redis)
+	if err != nil {
+		return fmt.Errorf("initialize internal clients: %w", err)
+	}
+	app.Clients = clients
+	app.Closeable = append(app.Closeable, app.Clients.Close)
 	return nil
 }
 
@@ -246,25 +270,21 @@ func (app *AppRunner) Close(ctx context.Context) {
 }
 
 // all router initialize
-func (g *AppRunner) AllRouters() {
+func (g *AppRunner) AllRouters(organizationCredentialKey []byte) {
 	web_router.HealthCheckRoutes(g.Cfg, g.E, g.Logger, g.Postgres)
-	web_router.WebApiRoute(g.Cfg, g.E, g.S, g.Logger, g.Postgres, g.Redis)
+	web_router.WebApiRoute(g.Cfg, organizationCredentialKey, g.E, g.S, g.Logger, g.Postgres, g.Redis)
 }
 
 func (g *AppRunner) AllProxyRouter() {
-	web_router.ProxyApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis)
+	web_router.ProxyApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Clients)
 }
 
 // all middleware
-func (g *AppRunner) AllMiddlewares() {
+func (g *AppRunner) AllMiddlewares(handlers ...gin.HandlerFunc) {
 	g.RecoveryMiddleware()
 	g.CorsMiddleware()
 	g.RequestLoggerMiddleware()
-	g.E.Use(middlewares.NewProjectAuthenticatorMiddleware(web_authenticators.GetProjectAuthenticator(g.Logger, g.Postgres), g.Logger))
-	g.E.Use(middlewares.NewOrganizationAuthenticatorMiddleware(web_authenticators.GetOrganizationAuthenticator(g.Logger, g.Postgres, g.Cfg.Secret), g.Logger))
-	g.E.Use(middlewares.NewServiceAuthenticatorMiddleware(authenticators.NewServiceAuthenticator(&g.Cfg.AppConfig, g.Logger), g.Logger))
-	g.E.Use(middlewares.NewAuthenticationMiddleware(web_authenticators.GetUserAuthenticator(g.Logger, g.Postgres), g.Logger))
-
+	g.E.Use(handlers...)
 }
 
 // Recovery middleware
@@ -276,9 +296,13 @@ func (g *AppRunner) RecoveryMiddleware() {
 func (g *AppRunner) CorsMiddleware() {
 	g.Logger.Info("Added Default Cors middleware to the application.")
 	g.E.Use(cors.New(cors.Config{
-		AllowAllOrigins:  true,
-		AllowMethods:     []string{"GET", "PUT", "POST", "DELETE", "PATCH", "OPTIONS"},
-		AllowHeaders:     []string{"Content-Type", "Content-Length", "Accept-Encoding", "Authorization", "Cache-Control", "Access-Control-Allow-Origin", "X-Grpc-Web"},
+		AllowAllOrigins: true,
+		AllowMethods:    []string{"GET", "PUT", "POST", "DELETE", "PATCH", "OPTIONS"},
+		AllowHeaders: []string{
+			"Content-Type", "Content-Length", "Accept-Encoding", "Authorization", "Cache-Control",
+			"Access-Control-Allow-Origin", "X-Grpc-Web", "X-Auth-Id", "X-Organization-Id", "X-Project-Id", "X-Api-Key",
+			"X-Org-Key", "X-Internal-Service-Key",
+		},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
@@ -333,7 +357,14 @@ func (app *AppRunner) Migrate() error {
 	}
 	if dirty {
 		app.Logger.Warnf("Database is in a dirty state at version: %d. Forcing clean...", version)
-		if err := m.Force(int(version - 1)); err != nil {
+		if version == 0 {
+			return fmt.Errorf("cannot force migration below version zero")
+		}
+		previousVersion, conversionErr := utils.Uint64ToInt(uint64(version - 1))
+		if conversionErr != nil {
+			return fmt.Errorf("invalid migration version: %w", conversionErr)
+		}
+		if err := m.Force(previousVersion); err != nil {
 			return fmt.Errorf("failed to force migration version: %w", err)
 		}
 		app.Logger.Infof("Migration state forced to clean at version: %d. Proceeding with migration.", version-1)

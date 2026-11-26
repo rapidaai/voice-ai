@@ -22,8 +22,8 @@ import (
 	internal_telnyx "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/telnyx/internal"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
@@ -48,7 +48,7 @@ func NewTelnyxTelephony(config *config.AssistantConfig, logger commons.Logger) (
 
 // CatchAllStatusCallback handles catch-all event callbacks.
 func (tpc *telnyxTelephony) CatchAllStatusCallback(ctx *gin.Context) (*internal_type.StatusInfo, error) {
-	statusInfo, err := tpc.StatusCallback(ctx, nil, 0, 0)
+	statusInfo, err := tpc.StatusCallback(ctx, authentication.Principal{}, 0, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (tpc *telnyxTelephony) CatchAllStatusCallback(ctx *gin.Context) (*internal_
 
 // StatusCallback handles a status/event callback for a conversation.
 // Telnyx sends webhooks for call events like call.answered, call.hangup, etc.
-func (tpc *telnyxTelephony) StatusCallback(c *gin.Context, auth *types.Authentication, assistantId uint64, assistantConversationId uint64) (*internal_type.StatusInfo, error) {
+func (tpc *telnyxTelephony) StatusCallback(c *gin.Context, auth authentication.Principal, assistantId uint64, assistantConversationId uint64) (*internal_type.StatusInfo, error) {
 	body, err := c.GetRawData()
 	if err != nil {
 		tpc.logger.Errorf("failed to read request body with error %+v", err)
@@ -145,7 +145,7 @@ func (tpc *telnyxTelephony) ReceiveCall(c *gin.Context) (*internal_type.CallInfo
 // POST to /v2/calls with connection_id, to, from, and stream_url.
 func (tpc *telnyxTelephony) OutboundCall(
 	ctx context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	toPhone string,
 	fromPhone string,
 	assistant *internal_assistant_entity.Assistant,
@@ -352,7 +352,7 @@ func (tpc *telnyxTelephony) OutboundCall(
 
 // InboundCall instructs Telnyx to answer the inbound call and connect to our WebSocket.
 // Returns JSON response for Telnyx to execute streaming.start command.
-func (tpc *telnyxTelephony) InboundCall(c *gin.Context, auth *types.Authentication, assistantId uint64, clientNumber string, assistantConversationId uint64) error {
+func (tpc *telnyxTelephony) InboundCall(c *gin.Context, auth authentication.Principal, assistantId uint64, clientNumber string, assistantConversationId uint64) error {
 	contextID, _ := c.Get("contextId")
 	ctxID := fmt.Sprintf("%v", contextID)
 

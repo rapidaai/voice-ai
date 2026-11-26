@@ -20,7 +20,7 @@ const subjourneys = [
         .first()
         .click();
       await expect(
-        page.getByRole('heading', { name: 'Invite user to organization' }),
+        page.getByRole('heading', { name: 'Invite User to Organization' }),
       ).toBeVisible();
     },
   },

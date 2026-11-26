@@ -17,7 +17,7 @@ export function Knowledge({ isLoading }: { isLoading?: boolean }) {
         loading={isLoading}
       >
         <SidebarIconWrapper>
-          <Folders size={20} />
+          <Folders size={16} />
         </SidebarIconWrapper>
         <SidebarLabel isLoading={isLoading}>Knowledge</SidebarLabel>
       </SidebarSimpleListItem>

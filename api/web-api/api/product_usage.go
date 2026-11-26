@@ -8,7 +8,7 @@ import (
 	internal_productusage_service "github.com/rapidaai/api/web-api/internal/service/productusage"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"google.golang.org/grpc/codes"
@@ -30,15 +30,15 @@ func NewProductUsageGRPC(logger commons.Logger, postgres connectors.PostgresConn
 }
 
 func (api *webProductUsageGRPCApi) CreateProductUsage(ctx context.Context, request *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error) {
-	auth, err := authorizeProductUsage(ctx, types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if err != nil {
-		return nil, err
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	if _, err = auth.ProjectContext(); err != nil {
-		return nil, status.Error(codes.PermissionDenied, err.Error())
+	if principal.Tenant().ProjectID == 0 {
+		return nil, status.Error(codes.PermissionDenied, "project context is required")
 	}
 
-	usage, err := api.productUsageService.CreateProductUsage(ctx, auth, request)
+	usage, err := api.productUsageService.CreateProductUsage(ctx, principal, request)
 	if err != nil {
 		return nil, api.productUsageError("create", err)
 	}
@@ -46,15 +46,15 @@ func (api *webProductUsageGRPCApi) CreateProductUsage(ctx context.Context, reque
 }
 
 func (api *webProductUsageGRPCApi) GetProductUsages(ctx context.Context, request *protos.GetProductUsagesRequest) (*protos.GetUsagesResponse, error) {
-	auth, err := authorizeProductUsage(ctx, types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if err != nil {
-		return nil, err
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	if _, err = auth.ProjectContext(); err != nil {
-		return nil, status.Error(codes.PermissionDenied, err.Error())
+	if principal.Tenant().ProjectID == 0 {
+		return nil, status.Error(codes.PermissionDenied, "project context is required")
 	}
 
-	count, usages, err := api.productUsageService.GetProductUsages(ctx, auth, request.GetUsageType(), request.GetCriterias(), request.GetPaginate())
+	count, usages, err := api.productUsageService.GetProductUsages(ctx, principal, request.GetUsageType(), request.GetCriterias(), request.GetPaginate())
 	if err != nil {
 		return nil, api.productUsageError("get project", err)
 	}
@@ -62,31 +62,19 @@ func (api *webProductUsageGRPCApi) GetProductUsages(ctx context.Context, request
 }
 
 func (api *webProductUsageGRPCApi) GetOrganizationUsages(ctx context.Context, request *protos.GetOrganizationUsagesRequest) (*protos.GetUsagesResponse, error) {
-	auth, err := authorizeProductUsage(ctx, types.AuthTypeUser, types.AuthTypeOrg, types.AuthTypeService)
-	if err != nil {
-		return nil, err
+	principal, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
-	if _, err = auth.OrganizationContext(); err != nil {
-		return nil, status.Error(codes.PermissionDenied, err.Error())
+	if principal.Tenant().OrganizationID == 0 {
+		return nil, status.Error(codes.PermissionDenied, "organization context is required")
 	}
 
-	count, usages, err := api.productUsageService.GetOrganizationUsages(ctx, auth, request.GetCriterias(), request.GetPaginate())
+	count, usages, err := api.productUsageService.GetOrganizationUsages(ctx, principal, request.GetCriterias(), request.GetPaginate())
 	if err != nil {
 		return nil, api.productUsageError("get organization", err)
 	}
 	return productUsagesResponse(count, request.GetPaginate(), usages)
-}
-
-func authorizeProductUsage(ctx context.Context, allowed ...types.AuthType) (*types.Authentication, error) {
-	auth, err := types.Authorize(ctx)
-	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, err.Error())
-	}
-	auth, err = auth.Scope(allowed...)
-	if err != nil {
-		return nil, status.Error(codes.PermissionDenied, err.Error())
-	}
-	return auth, nil
 }
 
 func (api *webProductUsageGRPCApi) productUsageError(operation string, err error) error {

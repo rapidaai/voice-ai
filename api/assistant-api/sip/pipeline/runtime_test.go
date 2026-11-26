@@ -18,7 +18,7 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,7 +27,7 @@ type failingTalker struct {
 	err error
 }
 
-func (talker failingTalker) Talk(context.Context, *types.Authentication) error {
+func (talker failingTalker) Talk(context.Context, authentication.Principal) error {
 	return talker.err
 }
 

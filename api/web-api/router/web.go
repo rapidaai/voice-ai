@@ -5,9 +5,9 @@ import (
 	"google.golang.org/grpc"
 
 	webApi "github.com/rapidaai/api/web-api/api"
-	webDashboardApi "github.com/rapidaai/api/web-api/api/dashboard"
 	webProxyApi "github.com/rapidaai/api/web-api/api/proxy"
 	"github.com/rapidaai/api/web-api/config"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/protos"
@@ -15,6 +15,7 @@ import (
 
 func WebApiRoute(
 	Cfg *config.WebAppConfig,
+	organizationCredentialKey []byte,
 	E *gin.Engine,
 	S *grpc.Server,
 	Logger commons.Logger,
@@ -47,27 +48,29 @@ func WebApiRoute(
 	apiv1.GET("/connect-action/slack/", connectApi.SlackActionConnect)
 	apiv1.GET("/connect-crm/hubspot/", connectApi.HubspotCRMConnect)
 
-	protos.RegisterAuthenticationServiceServer(S, webApi.NewAuthGRPC(Cfg, &Cfg.OAuthConfig, Logger, Postgres))
+	protos.RegisterAuthenticationServiceServer(S, webApi.NewAuthGRPC(Cfg, &Cfg.OAuthConfig, organizationCredentialKey, Logger, Postgres))
 	protos.RegisterVaultServiceServer(S, webApi.NewVaultGRPC(Cfg, &Cfg.OAuthConfig, Logger, Postgres, Redis))
 	protos.RegisterOrganizationServiceServer(S, webApi.NewOrganizationGRPC(Cfg, Logger, Postgres, Redis))
 	protos.RegisterProjectServiceServer(S, webApi.NewProjectGRPC(Cfg, Logger, Postgres, Redis))
 	protos.RegisterConnectServiceServer(S, webApi.NewConnectGRPC(Cfg, &Cfg.OAuthConfig, Logger, Postgres))
 	protos.RegisterNotificationServiceServer(S, webApi.NewNotificationGRPC(Cfg, Logger, Postgres, Redis))
 	protos.RegisterProductUsageServiceServer(S, webApi.NewProductUsageGRPC(Logger, Postgres))
-	protos.RegisterDashboardServiceServer(S, webDashboardApi.NewDashboardGRPC(Cfg, Logger, Postgres, Redis))
+	protos.RegisterAccessManagementServiceServer(S, webApi.NewAccessManagementGRPC(Logger, Postgres))
+	protos.RegisterDashboardServiceServer(S, webApi.NewDashboardGRPC(Cfg, Logger, Postgres, Redis))
 }
 
 func ProxyApiRoute(Cfg *config.WebAppConfig,
 	S *grpc.Server,
 	Logger commons.Logger,
 	Postgres connectors.PostgresConnector,
-	Redis connectors.RedisConnector) {
-	protos.RegisterDeploymentServer(S, webProxyApi.NewInvokeGRPC(Cfg, Logger, Postgres, Redis))
-	protos.RegisterAuditLoggingServiceServer(S, webProxyApi.NewActivityGRPC(Cfg, Logger, Postgres, Redis))
-	protos.RegisterEndpointServiceServer(S, webProxyApi.NewEndpointGRPC(Cfg, Logger, Postgres, Redis))
-	protos.RegisterKnowledgeServiceServer(S, webProxyApi.NewKnowledgeGRPC(Cfg, Logger, Postgres, Redis))
-	protos.RegisterAssistantServiceServer(S, webProxyApi.NewAssistantGRPC(Cfg, Logger, Postgres, Redis))
-	protos.RegisterAssistantDeploymentServiceServer(S, webProxyApi.NewAssistantDeploymentGRPCApi(Cfg, Logger, Postgres, Redis))
-	protos.RegisterObservabilityServiceServer(S, webProxyApi.NewObservabilityGRPC(Cfg, Logger, Postgres, Redis))
-	protos.RegisterDocumentServiceServer(S, webProxyApi.NewDocumentGRPCApi(Cfg, Logger, Postgres, Redis))
+	Redis connectors.RedisConnector,
+	Clients *rapida_client.RapidaClient) {
+	protos.RegisterDeploymentServer(S, webProxyApi.NewInvokeGRPC(Cfg, Logger, Postgres, Redis, Clients.Deployment))
+	protos.RegisterAuditLoggingServiceServer(S, webProxyApi.NewActivityGRPC(Cfg, Logger, Postgres, Redis, Clients.Audit))
+	protos.RegisterEndpointServiceServer(S, webProxyApi.NewEndpointGRPC(Cfg, Logger, Postgres, Redis, Clients.Endpoint))
+	protos.RegisterKnowledgeServiceServer(S, webProxyApi.NewKnowledgeGRPC(Cfg, Logger, Postgres, Redis, Clients.Knowledge))
+	protos.RegisterAssistantServiceServer(S, webProxyApi.NewAssistantGRPC(Cfg, Logger, Postgres, Redis, Clients.Assistant))
+	protos.RegisterAssistantDeploymentServiceServer(S, webProxyApi.NewAssistantDeploymentGRPCApi(Cfg, Logger, Postgres, Redis, Clients.Assistant))
+	protos.RegisterObservabilityServiceServer(S, webProxyApi.NewObservabilityGRPC(Cfg, Logger, Postgres, Redis, Clients.Observability))
+	protos.RegisterDocumentServiceServer(S, webProxyApi.NewDocumentGRPCApi(Cfg, Logger, Postgres, Redis, Clients.Indexer))
 }

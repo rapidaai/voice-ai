@@ -186,6 +186,7 @@ jest.mock('@/app/components/ui/composites/create-full-page', () => ({
     return (
       <div>
         {errorMessage ? <div>{errorMessage}</div> : null}
+        {!active?.hideHeader ? <h2>{active?.name}</h2> : null}
         <div>{active?.body}</div>
         <div>
           {active?.actions?.map((action: React.ReactElement, idx: number) => (
@@ -315,6 +316,10 @@ describe('API deployment voice input intent actions', () => {
   it('Continue keeps existing voice input enabled', async () => {
     const user = userEvent.setup({ writeToClipboard: false });
     render(<ConfigureAssistantApiDeploymentPage />);
+
+    expect(
+      screen.queryByRole('heading', { name: 'General Experience' }),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() =>

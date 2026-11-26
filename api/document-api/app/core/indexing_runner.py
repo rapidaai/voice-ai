@@ -11,6 +11,7 @@ import time
 import traceback
 from typing import Optional, cast, List
 
+from app.authentication import ServiceAssertionIssuer
 from app.bridges.internals.integration_bridge import IntegrationBridge
 from app.bridges.internals.vault_bridge import VaultBridge
 from app.connectors.elstic_search_connector import ElasticSearchConnector
@@ -74,6 +75,8 @@ class IndexingRunner:
             integration_client: IntegrationBridge,
             vault_client: VaultBridge,
             actor: dict,
+            web_service_assertion_issuer: ServiceAssertionIssuer,
+            integration_service_assertion_issuer: ServiceAssertionIssuer,
             index_type="paragraph-index",
     ):
         """
@@ -109,6 +112,8 @@ class IndexingRunner:
                 "knowledge_id": self.knowledge.id,
                 "knowledge_document_id": self.knowledge_document.id,
             },
+            web_service_assertion_issuer=web_service_assertion_issuer,
+            integration_service_assertion_issuer=integration_service_assertion_issuer,
         )
         self.knowledge_document_store = PostgresKnowledgeDocumentStore(
             postgres=postgres,

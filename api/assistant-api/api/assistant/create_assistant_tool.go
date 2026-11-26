@@ -7,24 +7,21 @@ package assistant_api
 
 import (
 	"context"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/exceptions"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	assistant_api "github.com/rapidaai/protos"
 )
 
 func (assistantApi *assistantGrpcApi) CreateAssistantTool(ctx context.Context, atr *assistant_api.CreateAssistantToolRequest) (*assistant_api.GetAssistantToolResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
 	aT, err := assistantApi.
@@ -53,7 +50,7 @@ func (assistantApi *assistantGrpcApi) CreateAssistantTool(ctx context.Context, a
 }
 
 func (assistantApi *assistantGrpcApi) createAssistantTool(ctx context.Context,
-	iAuth *types.Authentication,
+	iAuth authentication.Principal,
 	assistantId uint64,
 	atr *assistant_api.CreateAssistantToolRequest) (*internal_assistant_entity.AssistantTool, error) {
 	return assistantApi.

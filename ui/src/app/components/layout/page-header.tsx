@@ -5,7 +5,8 @@ import {
   type HTMLAttributes,
   type ReactNode,
 } from 'react';
-import { Text } from '@/app/components/ui/primitives';
+import { Text, type TypographyVariant } from '@/app/components/ui/primitives';
+import { cn } from '@/utils';
 
 type PageHeaderState = {
   isCollapsed: boolean;
@@ -38,6 +39,11 @@ interface PageHeaderProps {
   contextualActions?: ReactNode;
   pageActions?: ReactNode | ((state: PageHeaderState) => ReactNode);
   className?: string;
+  contentClassName?: string;
+  descriptionClassName?: string;
+  titleClassName?: string;
+  titleVariant?: TypographyVariant;
+  showDivider?: boolean;
 }
 
 export function PageHeader({
@@ -48,6 +54,11 @@ export function PageHeader({
   contextualActions,
   pageActions,
   className,
+  contentClassName,
+  descriptionClassName = 'text-muted',
+  titleClassName = 'font-semibold!',
+  titleVariant = 'heading-03',
+  showDivider = true,
 }: PageHeaderProps) {
   const collapseSentinel = useRef<HTMLSpanElement>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -70,47 +81,52 @@ export function PageHeader({
     <>
       <header
         data-page-header
-        className={`relative shrink-0 border-b border-border-subtle bg-layer px-5 py-6 md:px-8 ${className || ''}`}
+        className={cn(
+          'relative shrink-0 bg-layer',
+          showDivider && 'border-b border-border-subtle',
+          className,
+        )}
       >
-        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0 max-w-2xl">
-            {eyebrow && <div className="mb-2">{eyebrow}</div>}
-            <div className="flex flex-wrap items-center gap-2 text-foreground">
-              {titleStart && (
-                <div data-page-header-icon className="shrink-0 pt-0.5">
-                  {titleStart}
-                </div>
+        <div
+          data-page-header-content
+          className={cn('relative px-5 py-6 md:px-8', contentClassName)}
+        >
+          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+            <div className="min-w-0 max-w-2xl">
+              {eyebrow && <div className="mb-2">{eyebrow}</div>}
+              <div className="flex flex-wrap items-center gap-2 text-foreground">
+                {titleStart && (
+                  <div data-page-header-icon className="shrink-0 pt-0.5">
+                    {titleStart}
+                  </div>
+                )}
+                <Text as="h1" variant={titleVariant} className={titleClassName}>
+                  {title}
+                </Text>
+                {contextualActions}
+              </div>
+              {description && (
+                <Text
+                  as="div"
+                  className={cn('mt-2', descriptionClassName)}
+                  variant="body-compact-01"
+                >
+                  {description}
+                </Text>
               )}
-              <Text
-                as="h1"
-                variant="heading-04"
-                className="text-[1.25rem]! leading-[1.75rem]! md:text-[1.75rem]! md:leading-[2.25rem]!"
-              >
-                {title}
-              </Text>
-              {contextualActions}
             </div>
-            {description && (
-              <Text
-                as="div"
-                className="mt-2 text-foreground"
-                variant="body-compact-01"
-              >
-                {description}
-              </Text>
+            {currentPageActions && !isCollapsed && (
+              <div className="w-full shrink-0 md:w-auto">
+                {currentPageActions}
+              </div>
             )}
           </div>
-          {currentPageActions && !isCollapsed && (
-            <div className="w-full shrink-0 md:w-auto">
-              {currentPageActions}
-            </div>
-          )}
+          <span
+            ref={collapseSentinel}
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-px"
+          />
         </div>
-        <span
-          ref={collapseSentinel}
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-px"
-        />
       </header>
 
       <div
@@ -120,29 +136,40 @@ export function PageHeader({
       >
         <div
           data-page-header-sticky-content
-          className={`flex h-10 items-center gap-4 border-b border-border-subtle bg-layer px-5 transition-[opacity,transform] duration-[240ms] ease-[cubic-bezier(0.2,0,0.38,0.9)] motion-reduce:transition-none md:px-8 ${
+          className={`h-10 border-b border-border-subtle bg-layer transition-[opacity,transform] duration-[240ms] ease-[cubic-bezier(0.2,0,0.38,0.9)] motion-reduce:transition-none ${
             isCollapsed
               ? 'visible translate-y-0 opacity-100'
               : 'invisible pointer-events-none -translate-y-4 opacity-0'
           }`}
         >
           <div
-            className={`${currentPageActions ? 'hidden md:flex' : 'flex'} min-w-0 items-center gap-2 text-foreground`}
+            data-page-header-sticky-container
+            className={cn(
+              'flex h-full items-center gap-4 px-5 md:px-8',
+              contentClassName,
+            )}
           >
-            {titleStart && (
-              <div className="shrink-0 [&_svg]:h-5 [&_svg]:w-5">
-                {titleStart}
+            <div
+              className={`${currentPageActions ? 'hidden md:flex' : 'flex'} min-w-0 items-center gap-2 text-foreground`}
+            >
+              {titleStart && (
+                <div className="shrink-0 [&_svg]:h-5 [&_svg]:w-5">
+                  {titleStart}
+                </div>
+              )}
+              <Text
+                variant="heading-compact-01"
+                className={cn('truncate', titleClassName)}
+              >
+                {title}
+              </Text>
+            </div>
+            {currentPageActions && isCollapsed && (
+              <div className="ml-auto w-full shrink-0 md:w-auto">
+                {currentPageActions}
               </div>
             )}
-            <Text variant="heading-compact-01" className="truncate">
-              {title}
-            </Text>
           </div>
-          {currentPageActions && isCollapsed && (
-            <div className="ml-auto w-full shrink-0 md:w-auto">
-              {currentPageActions}
-            </div>
-          )}
         </div>
       </div>
     </>

@@ -56,13 +56,13 @@ var (
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           AddUserToProjectsMissingProjectRolesCode,
 		Error:          "project role assignments are required",
-		ErrorMessage:   "Please select at least one project and role.",
+		ErrorMessage:   "Please select at least one project and one or more roles.",
 	}
 	AddUserToProjectsInvalidProjectRole = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           AddUserToProjectsInvalidProjectRoleCode,
 		Error:          "invalid project role",
-		ErrorMessage:   "Please select a valid project role for every selected project.",
+		ErrorMessage:   "Please select one or more valid roles for every selected project.",
 	}
 	AddUserToProjectsInvalidProjects = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,

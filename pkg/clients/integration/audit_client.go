@@ -14,16 +14,16 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
 
 type AuditServiceClient interface {
-	GetAuditLog(c context.Context, auth *types.Authentication, auditId uint64) (*protos.GetAuditLogResponse, error)
-	GetAllAuditLog(c context.Context, auth *types.Authentication, req *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error)
+	GetAuditLog(c context.Context, auth authentication.Principal, auditId uint64) (*protos.GetAuditLogResponse, error)
+	GetAllAuditLog(c context.Context, auth authentication.Principal, req *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error)
 }
 
 type auditServiceClient struct {
@@ -34,35 +34,37 @@ type auditServiceClient struct {
 }
 
 func NewAuditServiceClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector) AuditServiceClient {
-	grpcOpts := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(math.MaxInt64),
-			grpc.MaxCallSendMsgSize(math.MaxInt64),
-		),
-	}
+	grpcOpts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 	conn, err := grpc.NewClient(config.Integration.Host, grpcOpts...)
 	if err != nil {
 		logger.Errorf("Unable to create connection %v", err)
 	}
+	return NewAuditServiceClientWithClient(config, logger, redis, protos.NewAuditLoggingServiceClient(conn))
+}
+
+// NewAuditServiceClientWithClient constructs an audit client around the provided gRPC client.
+func NewAuditServiceClientWithClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, auditClient protos.AuditLoggingServiceClient) AuditServiceClient {
 	return &auditServiceClient{
-		InternalClient:     clients.NewInternalClient(config, logger, redis),
+		InternalClient:     clients.NewInternalClient(config, "integration-api", logger, redis),
 		cfg:                config,
 		logger:             logger,
-		auditLoggingClient: protos.NewAuditLoggingServiceClient(conn),
+		auditLoggingClient: auditClient,
 	}
 }
 
-func (client *auditServiceClient) GetAuditLog(c context.Context, auth *types.Authentication, auditId uint64) (*protos.GetAuditLogResponse, error) {
+func (client *auditServiceClient) GetAuditLog(c context.Context, auth authentication.Principal, auditId uint64) (*protos.GetAuditLogResponse, error) {
 	client.logger.Debugf("Calling to get audit log with org and project")
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, err
 	}
-	res, err := client.auditLoggingClient.GetAuditLog(authContext, &protos.GetAuditLogRequest{
-		Id: auditId,
-	})
+	res, err := client.auditLoggingClient.GetAuditLog(
+		authContext,
+		&protos.GetAuditLogRequest{Id: auditId},
+		grpc.MaxCallRecvMsgSize(math.MaxInt64),
+		grpc.MaxCallSendMsgSize(math.MaxInt64),
+	)
 	if err != nil {
 		client.logger.Errorf("error while getting audit log error %v", err)
 		return nil, err
@@ -70,14 +72,19 @@ func (client *auditServiceClient) GetAuditLog(c context.Context, auth *types.Aut
 	client.logger.Debugf("Benchmarking: auditServiceClient.GetAuditLog time taken %v", time.Since(start))
 	return res, nil
 }
-func (client *auditServiceClient) GetAllAuditLog(c context.Context, auth *types.Authentication, req *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error) {
+func (client *auditServiceClient) GetAllAuditLog(c context.Context, auth authentication.Principal, req *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error) {
 	client.logger.Debugf("Calling to get audit log with org and project")
 	start := time.Now()
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, err
 	}
-	res, err := client.auditLoggingClient.GetAllAuditLog(authContext, req)
+	res, err := client.auditLoggingClient.GetAllAuditLog(
+		authContext,
+		req,
+		grpc.MaxCallRecvMsgSize(math.MaxInt64),
+		grpc.MaxCallSendMsgSize(math.MaxInt64),
+	)
 	if err != nil {
 		client.logger.Errorf("error while getting audit log error %v", err)
 		return nil, err

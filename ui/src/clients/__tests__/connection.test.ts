@@ -1,15 +1,17 @@
 import { createApiMetadata, withConnection } from '@/clients';
 
 describe('createApiMetadata', () => {
-  it('maps project, token, and user values to API headers', () => {
+  it('maps organization, project, token, and user values to API headers', () => {
     expect(
       createApiMetadata({
+        organizationId: 'organization-1',
         projectId: 'project-1',
         token: 'token-1',
         userId: 'user-1',
       }),
     ).toEqual({
       authorization: 'token-1',
+      'x-organization-id': 'organization-1',
       'x-project-id': 'project-1',
       'x-auth-id': 'user-1',
     });

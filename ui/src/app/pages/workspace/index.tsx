@@ -32,3 +32,15 @@ export const OrganizationProjectPage = lazyLoad(
     fallback: <PageLoader />,
   },
 );
+
+export const OrganizationRoleCatalogPage = lazyLoad(
+  () => import('./role'),
+  module => module.RoleCatalogPage,
+  { fallback: <PageLoader /> },
+);
+
+export const OrganizationRoleDetailPage = lazyLoad(
+  () => import('./role/detail'),
+  module => module.RoleDetailPage,
+  { fallback: <PageLoader /> },
+);

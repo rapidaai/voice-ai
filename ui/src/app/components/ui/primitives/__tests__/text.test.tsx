@@ -105,4 +105,18 @@ describe('Text', () => {
 
     expect(screen.getByText('Unstyled content')).not.toHaveAttribute('class');
   });
+
+  it('supports semantic code and accessibility attributes', () => {
+    render(
+      <Text as="code" variant="code-01" role="status" aria-live="polite">
+        project.read
+      </Text>,
+    );
+
+    expect(screen.getByRole('status')).toHaveClass(
+      'font-mono',
+      'text-[0.75rem]',
+    );
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+  });
 });

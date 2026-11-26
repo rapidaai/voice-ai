@@ -5,6 +5,12 @@ import { FlexBox } from '../flex-box';
 import { MissionBox } from '../mission-box';
 import { useRapidaStore } from '@/stores/app';
 
+const mockDashboardInterfaceTour = {
+  step: 'theme' as const,
+  next: jest.fn(),
+  dismiss: jest.fn(),
+};
+
 jest.mock('@/app/components/layout/navigation/header', () => ({
   Header: ({ className }: { className?: string }) => (
     <header className={className} data-testid="shell-header">
@@ -18,11 +24,26 @@ jest.mock('@/app/components/layout/footer/general-footer', () => ({
 }));
 
 jest.mock('@/app/components/layout/navigation/actionable-header', () => ({
-  ActionableHeader: () => <header>Actionable header</header>,
+  ActionableHeader: ({ interfaceTour }: any) => (
+    <header data-tour-step={interfaceTour?.step}>Actionable header</header>
+  ),
 }));
 
 jest.mock('@/app/components/layout/navigation/sidebar', () => ({
-  SidebarNavigation: () => <aside>Sidebar</aside>,
+  SidebarNavigation: ({ interfaceTour }: any) => (
+    <aside data-tour-step={interfaceTour?.step}>Sidebar</aside>
+  ),
+}));
+
+jest.mock(
+  '@/app/components/layout/navigation/dashboard-interface-tour',
+  () => ({
+    useDashboardInterfaceTour: () => mockDashboardInterfaceTour,
+  }),
+);
+
+jest.mock('@/theme/theme-provider', () => ({
+  useTheme: () => ({ theme: { allowModeSelection: true } }),
 }));
 
 jest.mock('@/app/components/ui/feedback', () => ({
@@ -114,6 +135,14 @@ describe('layout container structure', () => {
     expect(screen.getByTestId('sidebar-context')).toBeInTheDocument();
     expect(screen.getByText('Sidebar')).toBeInTheDocument();
     expect(screen.getByText('Actionable header')).toBeInTheDocument();
+    expect(screen.getByText('Sidebar')).toHaveAttribute(
+      'data-tour-step',
+      'theme',
+    );
+    expect(screen.getByText('Actionable header')).toHaveAttribute(
+      'data-tour-step',
+      'theme',
+    );
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
     expect(screen.getByTestId('toast')).toBeInTheDocument();
     expect(screen.getByText('Workspace content')).toBeInTheDocument();

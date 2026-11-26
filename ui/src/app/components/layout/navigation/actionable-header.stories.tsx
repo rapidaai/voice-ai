@@ -4,9 +4,17 @@ import { AuthContext } from '@/context/auth-context';
 import { ActionableHeader } from './actionable-header';
 import { breadcrumb } from '@/app/routes/breadcrumb-handle';
 
-const projectRoles = [
-  { id: 'project-a', projectid: 'project-a', projectname: 'Project Alpha' },
-  { id: 'project-b', projectid: 'project-b', projectname: 'Project Beta' },
+const projects = [
+  { id: 'project-a', name: 'Project Alpha', rolesList: [] },
+  { id: 'project-b', name: 'Project Beta', rolesList: [] },
+] as any;
+const organizations = [
+  {
+    id: 'organization-a',
+    name: 'Organization Alpha',
+    projectsList: projects,
+    rolesList: [],
+  },
 ] as any;
 
 const meta = {
@@ -35,9 +43,11 @@ const meta = {
       return (
         <AuthContext.Provider
           value={{
-            projectRoles,
-            currentProjectRole: projectRoles[0],
-            setCurrentProjectRole: () => undefined,
+            getOrganizations: () => organizations,
+            getCurrentOrganization: () => organizations[0],
+            getProjects: () => projects,
+            getCurrentProject: () => projects[0],
+            setCurrentContext: () => true,
           }}
         >
           <RouterProvider router={router} />
@@ -49,7 +59,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Workspace header that renders route breadcrumbs, project selection, theme toggle, and account links.',
+          'Workspace header that renders route breadcrumbs, organization and project selection, theme toggle, and account links.',
       },
     },
   },

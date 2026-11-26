@@ -14,6 +14,7 @@ import (
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -146,7 +147,7 @@ func TestTalk_RecvErrorBeforeInitialization_ReturnsNil(t *testing.T) {
 		channels:         adapter_channel.NewRequestorChannels(),
 	}
 
-	err := r.Talk(context.Background(), nil)
+	err := r.Talk(context.Background(), authentication.Principal{})
 	require.NoError(t, err)
 	assert.Equal(t, 1, streamer.recvCall)
 }
@@ -227,7 +228,7 @@ func TestTalk_BuffersPacketsBeforeInitialization(t *testing.T) {
 		}(),
 	}
 
-	err := r.Talk(context.Background(), nil)
+	err := r.Talk(context.Background(), authentication.Principal{})
 	require.NoError(t, err)
 	assert.Equal(t, 0, r.channels.ControlChannel().Len())
 	assert.Equal(t, 1, r.channels.BootstrapChannel().Len())

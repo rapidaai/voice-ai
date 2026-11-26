@@ -9,6 +9,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	pkg_errors "github.com/rapidaai/pkg/errors"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"strconv"
@@ -17,8 +19,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/exceptions"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 )
@@ -123,10 +125,10 @@ type telemetryQueryParts struct {
 	timeRange map[string]interface{}
 }
 
-func newTelemetryQueryParts(auth *types.Authentication) (telemetryQueryParts, error) {
-	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return telemetryQueryParts{}, err
+func newTelemetryQueryParts(auth authentication.Principal) (telemetryQueryParts, error) {
+	projectContext := auth.Tenant()
+	if projectContext.ProjectID == 0 {
+		return telemetryQueryParts{}, pkg_errors.AuthenticationPrincipalInvalidError{}
 	}
 	return telemetryQueryParts{
 		indices: []string{"rapida-logs-*", "rapida-events-*", "rapida-metrics-*"},
@@ -214,13 +216,9 @@ func (api *observabilityGrpcApi) GetAllTelemetry(
 	ctx context.Context,
 	request *protos.GetAllTelemetryRequest,
 ) (*protos.GetAllTelemetryResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 
 	if api.opensearch == nil {
@@ -383,13 +381,21 @@ func (api *observabilityGrpcApi) GetAllTelemetry(
 		}
 	}
 
+	totalItem, err := utils.IntToUint32(hits.Hits.Total.Value)
+	if err != nil {
+		return nil, err
+	}
+	currentPage, err := utils.IntToUint32(page)
+	if err != nil {
+		return nil, err
+	}
 	return &protos.GetAllTelemetryResponse{
 		Code:    200,
 		Success: true,
 		Data:    records,
 		Paginated: &protos.Paginated{
-			TotalItem:   uint32(hits.Hits.Total.Value),
-			CurrentPage: uint32(page),
+			TotalItem:   totalItem,
+			CurrentPage: currentPage,
 		},
 	}, nil
 }

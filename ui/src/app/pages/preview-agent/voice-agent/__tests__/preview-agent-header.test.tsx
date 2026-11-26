@@ -28,7 +28,15 @@ const tenantTheme: ThemeManifest = {
 };
 
 jest.mock('@/app/components/layout/navigation/actionable-header', () => ({
-  CustomerOptions: () => <div>Customer options</div>,
+  CustomerOptions: ({
+    showContextSwitcher,
+  }: {
+    showContextSwitcher?: boolean;
+  }) => (
+    <div data-show-context-switcher={String(showContextSwitcher)}>
+      Customer options
+    </div>
+  ),
 }));
 
 describe('PreviewAgentHeader', () => {
@@ -55,6 +63,10 @@ describe('PreviewAgentHeader', () => {
       '/tenant/full-light.svg',
     );
     expect(screen.queryByAltText('Rapida AI')).not.toBeInTheDocument();
+    expect(screen.getByText('Customer options')).toHaveAttribute(
+      'data-show-context-switcher',
+      'false',
+    );
   });
 
   it('falls back to the configured brand name without logos', () => {

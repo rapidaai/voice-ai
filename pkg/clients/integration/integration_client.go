@@ -13,22 +13,22 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
 
 type IntegrationServiceClient interface {
 	Chat(c context.Context,
-		auth *types.Authentication,
+		auth authentication.Principal,
 		providerName string,
 		request *protos.ChatRequest) (*protos.ChatResponse, error)
-	StreamChat(c context.Context, auth *types.Authentication, providerName string) (grpc.BidiStreamingClient[protos.StreamChatRequest, protos.StreamChatResponse], error)
-	Embedding(ctx context.Context, auth *types.Authentication, providerName string, in *protos.EmbeddingRequest) (*protos.EmbeddingResponse, error)
-	Reranking(ctx context.Context, auth *types.Authentication, providerName string, in *protos.RerankingRequest) (*protos.RerankingResponse, error)
-	VerifyCredential(ctx context.Context, auth *types.Authentication, providerName string, in *protos.Credential) (*protos.VerifyCredentialResponse, error)
+	StreamChat(c context.Context, auth authentication.Principal, providerName string) (grpc.BidiStreamingClient[protos.StreamChatRequest, protos.StreamChatResponse], error)
+	Embedding(ctx context.Context, auth authentication.Principal, providerName string, in *protos.EmbeddingRequest) (*protos.EmbeddingResponse, error)
+	Reranking(ctx context.Context, auth authentication.Principal, providerName string, in *protos.RerankingRequest) (*protos.RerankingResponse, error)
+	VerifyCredential(ctx context.Context, auth authentication.Principal, providerName string, in *protos.Credential) (*protos.VerifyCredentialResponse, error)
 }
 
 type integrationServiceClient struct {
@@ -51,7 +51,7 @@ func NewIntegrationServiceClientGRPC(config *config.AppConfig, logger commons.Lo
 // NewIntegrationServiceClientWithClient creates an integration client using the provided gRPC client.
 func NewIntegrationServiceClientWithClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, unifiedClient protos.UnifiedProviderServiceClient) IntegrationServiceClient {
 	return &integrationServiceClient{
-		InternalClient: clients.NewInternalClient(config, logger, redis),
+		InternalClient: clients.NewInternalClient(config, "integration-api", logger, redis),
 		cfg:            config,
 		logger:         logger,
 		unifiedClient:  unifiedClient,
@@ -59,7 +59,7 @@ func NewIntegrationServiceClientWithClient(config *config.AppConfig, logger comm
 }
 
 func (client *integrationServiceClient) Embedding(c context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	providerName string,
 	request *protos.EmbeddingRequest) (*protos.EmbeddingResponse, error) {
 	request.ProviderName = strings.ToLower(providerName)
@@ -71,7 +71,7 @@ func (client *integrationServiceClient) Embedding(c context.Context,
 }
 
 func (client *integrationServiceClient) Reranking(c context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	providerName string,
 	request *protos.RerankingRequest) (*protos.RerankingResponse, error) {
 	request.ProviderName = strings.ToLower(providerName)
@@ -83,7 +83,7 @@ func (client *integrationServiceClient) Reranking(c context.Context,
 }
 
 func (client *integrationServiceClient) Chat(c context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	providerName string,
 	request *protos.ChatRequest) (*protos.ChatResponse, error) {
 	request.ProviderName = strings.ToLower(providerName)
@@ -96,7 +96,7 @@ func (client *integrationServiceClient) Chat(c context.Context,
 
 // StreamChat opens a bidirectional stream via the unified provider service.
 // The caller must set ProviderName on each ChatRequest before sending.
-func (client *integrationServiceClient) StreamChat(c context.Context, auth *types.Authentication, providerName string) (grpc.BidiStreamingClient[protos.StreamChatRequest, protos.StreamChatResponse], error) {
+func (client *integrationServiceClient) StreamChat(c context.Context, auth authentication.Principal, providerName string) (grpc.BidiStreamingClient[protos.StreamChatRequest, protos.StreamChatResponse], error) {
 	authContext, err := client.WithAuth(c, auth)
 	if err != nil {
 		return nil, err
@@ -105,7 +105,7 @@ func (client *integrationServiceClient) StreamChat(c context.Context, auth *type
 }
 
 func (client *integrationServiceClient) VerifyCredential(c context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	providerName string,
 	cr *protos.Credential) (*protos.VerifyCredentialResponse, error) {
 	request := &protos.VerifyCredentialRequest{

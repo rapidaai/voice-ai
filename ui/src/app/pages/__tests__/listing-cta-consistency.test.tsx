@@ -58,6 +58,10 @@ jest.mock('@/app/components/ui/feedback/loading', () => ({
   PageLoading: () => <div>Loading page</div>,
 }));
 
+jest.mock('@/app/components/ui/composites/coachmark', () => ({
+  Coachmark: ({ children }: any) => children,
+}));
+
 jest.mock('@/app/components/ui/primitives/modal', () => ({
   Modal: ({ children, open }: any) =>
     open ? <div role="dialog">{children}</div> : null,

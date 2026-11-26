@@ -1,5 +1,4 @@
 export * from './empty-state';
-export * from './error-container';
 export * from './error-message';
 export * from './icon-indicator';
 export * from './loader';
@@ -10,6 +9,7 @@ export * from './loaders/spinner';
 export * from './loading';
 export * from './notification';
 export * from './record-status-indicator';
+export * from './route-error-page';
 export * from './shape-indicator';
 export * from './status-indicator';
 export * from './toast';

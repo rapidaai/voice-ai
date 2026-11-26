@@ -12,7 +12,7 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/protos"
 )
 
@@ -36,7 +36,7 @@ type SIPAuthConfig struct {
 
 // MakeCallOptions carries application context into a primary outbound call leg.
 type MakeCallOptions struct {
-	Auth               *types.Authentication
+	Auth               authentication.Principal
 	Assistant          *internal_assistant_entity.Assistant
 	ConversationID     uint64
 	ContextID          string
@@ -53,7 +53,7 @@ type TransferBridgeCallOptions struct {
 	// TotalAttempts is the number of transfer targets available for this request.
 	TotalAttempts int
 	// Auth is the authenticated principal associated with the parent call.
-	Auth *types.Authentication
+	Auth authentication.Principal
 	// Assistant is the assistant resolved for the parent call.
 	Assistant *internal_assistant_entity.Assistant
 	// ConversationID is the active parent assistant conversation.

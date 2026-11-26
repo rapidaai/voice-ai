@@ -9,25 +9,26 @@ package observability_collector_conversationmetadata
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	internal_message_gorm "github.com/rapidaai/api/assistant-api/internal/entity/messages"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/protos"
 )
 
 type conversationMetadataServiceStub struct {
 	internal_services.AssistantConversationService
 
-	metadataAuth           *types.Authentication
+	metadataAuth           authentication.Principal
 	metadataAssistantID    uint64
 	metadataConversationID uint64
 	metadata               []*protos.Metadata
 
-	messageMetadataAuth           *types.Authentication
+	messageMetadataAuth           authentication.Principal
 	messageMetadataConversationID uint64
 	messageMetadataMessageID      string
 	messageMetadata               []*protos.Metadata
@@ -35,7 +36,7 @@ type conversationMetadataServiceStub struct {
 
 func (s *conversationMetadataServiceStub) CreateOrUpdateConversationMetadata(
 	_ context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	assistantID uint64,
 	conversationID uint64,
 	metadata []*protos.Metadata,
@@ -49,7 +50,7 @@ func (s *conversationMetadataServiceStub) CreateOrUpdateConversationMetadata(
 
 func (s *conversationMetadataServiceStub) CreateOrUpdateMessageMetadata(
 	_ context.Context,
-	auth *types.Authentication,
+	auth authentication.Principal,
 	conversationID uint64,
 	messageID string,
 	metadata []*protos.Metadata,
@@ -102,7 +103,7 @@ func TestCollectMetadata_ForwardsConversationScopedRecords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CollectMetadata returned error: %v", err)
 	}
-	if service.metadataAuth != auth || service.metadataAssistantID != 10 || service.metadataConversationID != 20 {
+	if !reflect.DeepEqual(service.metadataAuth, auth) || service.metadataAssistantID != 10 || service.metadataConversationID != 20 {
 		t.Fatalf("unexpected call: auth=%v assistant=%d conversation=%d", service.metadataAuth, service.metadataAssistantID, service.metadataConversationID)
 	}
 	if len(service.metadata) != 1 || service.metadata[0].Key != observability.MetadataLanguage {
@@ -132,7 +133,7 @@ func TestCollectMetadata_ForwardsMessageScopedRecords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CollectMetadata returned error: %v", err)
 	}
-	if service.messageMetadataAuth != auth || service.messageMetadataConversationID != 20 || service.messageMetadataMessageID != "user-user-ctx-1" {
+	if !reflect.DeepEqual(service.messageMetadataAuth, auth) || service.messageMetadataConversationID != 20 || service.messageMetadataMessageID != "user-user-ctx-1" {
 		t.Fatalf("unexpected message metadata call: auth=%v conversation=%d message=%s", service.messageMetadataAuth, service.messageMetadataConversationID, service.messageMetadataMessageID)
 	}
 }
@@ -148,11 +149,14 @@ func TestCollectMetadata_AssistantScopeUnsupported(t *testing.T) {
 	}
 }
 
-func testMetadataAuth() *types.Authentication {
-	return &types.Authentication{
-		AuthType:          types.AuthTypeService,
-		UserValue:         &types.UserContext{UserID: 99},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 1},
-		ProjectValue:      &types.ProjectContext{OrganizationID: 1, ProjectID: 2},
+func testMetadataAuth() authentication.Principal {
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityService, ID: 99, Issuer: "assistant-api"},
+		authentication.Tenant{OrganizationID: 1, ProjectID: 2},
+		authentication.Proof{Method: authentication.AuthenticationServiceAssertion, Audience: authentication.AudienceRapidaInternal, Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "assistant-test-1"}}, nil,
+	)
+	if err != nil {
+		panic(err)
 	}
+	return principal
 }

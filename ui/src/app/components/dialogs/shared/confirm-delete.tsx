@@ -52,10 +52,16 @@ export function ConfirmDeleteDialog({
   };
 
   return (
-    <Modal danger open={showing} onClose={closeDialog} size="sm">
+    <Modal
+      aria-label={title}
+      danger
+      open={showing}
+      onClose={closeDialog}
+      size="sm"
+    >
       <ModalHeader label="Confirm action" title={title} onClose={closeDialog} />
       <ModalBody hasForm>
-        <p className="text-sm text-foreground">{content}</p>
+        <p className="mb-4 text-sm text-foreground">{content}</p>
         <TextInput
           id="confirm-delete-input"
           labelText={`Type "${objectName}" to confirm`}

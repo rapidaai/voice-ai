@@ -26,6 +26,14 @@ function QuerySearchHarness({ initialValue = '' }: { initialValue?: string }) {
 }
 
 describe('QuerySearch', () => {
+  it('uses the shared bottom divider on the search input row', () => {
+    render(<QuerySearchHarness />);
+
+    expect(
+      screen.getByPlaceholderText('Filter conversations').parentElement,
+    ).toHaveClass('border-b', 'border-border-subtle');
+  });
+
   it('renders a completed query token as an editable filter chip', () => {
     render(<QuerySearchHarness initialValue={'name:"Alice" '} />);
 
@@ -42,8 +50,6 @@ describe('QuerySearch', () => {
       screen.getByRole('button', { name: 'Remove Name filter' }),
     );
 
-    expect(screen.getByPlaceholderText('Filter conversations')).toHaveValue(
-      '',
-    );
+    expect(screen.getByPlaceholderText('Filter conversations')).toHaveValue('');
   });
 });

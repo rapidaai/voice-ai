@@ -1,169 +1,79 @@
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
+
 package internal_callcontext
 
 import (
-	"fmt"
 	"math"
+	"reflect"
 	"testing"
 
-	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/authentication"
 )
 
 func TestCallContextAuthenticationSnapshotRoundTrip(t *testing.T) {
+	proof := authentication.Proof{
+		Method: authentication.AuthenticationServiceAssertion, Audience: authentication.AudienceRapidaInternal,
+		Reference: authentication.ProofReference{Type: authentication.ProofReferenceSigningKey, Value: "assistant-test-1"},
+	}
 	tests := []struct {
-		name string
-		auth *types.Authentication
+		name      string
+		principal authentication.Principal
 	}{
 		{
-			name: "user",
-			auth: &types.Authentication{
-				AuthType:          types.AuthTypeUser,
-				ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: 11},
-				UserValue:         &types.UserContext{UserID: 11},
-				OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
-				ProjectValue:      &types.ProjectContext{OrganizationID: 33, ProjectID: 22},
-			},
+			name: "direct service",
+			principal: mustCallContextPrincipal(authentication.NewDirectPrincipal(
+				authentication.Identity{Type: authentication.IdentityService, ID: 66, Issuer: "assistant-api"},
+				authentication.Tenant{OrganizationID: 33, ProjectID: 22}, proof, nil,
+			)),
 		},
 		{
-			name: "project",
-			auth: &types.Authentication{
-				AuthType:          types.AuthTypeProject,
-				ActorValue:        &types.ActorIdentity{Type: types.ActorTypeProject, ID: 44},
-				OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
-				ProjectValue:      &types.ProjectContext{OrganizationID: 33, ProjectID: 22},
-			},
-		},
-		{
-			name: "organization",
-			auth: &types.Authentication{
-				AuthType:          types.AuthTypeOrg,
-				ActorValue:        &types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 55},
-				OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
-			},
-		},
-		{
-			name: "service",
-			auth: &types.Authentication{
-				AuthType:          types.AuthTypeService,
-				ActorValue:        &types.ActorIdentity{Type: types.ActorTypeService, ID: 66},
-				OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
-				ProjectValue:      &types.ProjectContext{OrganizationID: 33, ProjectID: 22},
-			},
+			name: "delegated user with authorities",
+			principal: mustCallContextPrincipal(authentication.NewDelegatedPrincipal(
+				authentication.Identity{Type: authentication.IdentityUser, ID: 11},
+				authentication.ServiceActor{ID: 66, Issuer: "assistant-api"},
+				authentication.Tenant{OrganizationID: 33, ProjectID: 22}, proof,
+				[]authentication.PermissionKey{"project.read", "organization.read"},
+			)),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			callContext := &CallContext{}
-			if err := callContext.SetAuthentication(test.auth); err != nil {
+			if err := callContext.SetAuthentication(test.principal); err != nil {
 				t.Fatalf("SetAuthentication() error = %v", err)
 			}
 			reconstructed, err := callContext.ToAuthentication()
 			if err != nil {
 				t.Fatalf("ToAuthentication() error = %v", err)
 			}
-			if reconstructed.AuthType != test.auth.AuthType {
-				t.Fatalf("AuthType = %q, want %q", reconstructed.AuthType, test.auth.AuthType)
-			}
-			if test.auth.UserValue != nil {
-				userContext, err := reconstructed.UserContext()
-				if err != nil || userContext.UserID != test.auth.UserValue.UserID {
-					t.Fatalf("UserContext() = %+v, %v", userContext, err)
-				}
-			}
-			organizationContext, err := reconstructed.OrganizationContext()
-			if err != nil || organizationContext.OrganizationID != test.auth.OrganizationValue.OrganizationID {
-				t.Fatalf("OrganizationContext() = %+v, %v", organizationContext, err)
-			}
-			if test.auth.ProjectValue != nil {
-				projectContext, err := reconstructed.ProjectContext()
-				if err != nil || projectContext != *test.auth.ProjectValue {
-					t.Fatalf("ProjectContext() = %+v, %v", projectContext, err)
-				}
+			if !reflect.DeepEqual(reconstructed, test.principal) {
+				t.Fatalf("ToAuthentication() = %+v, want %+v", reconstructed, test.principal)
 			}
 		})
 	}
 }
 
-func TestCallContextRejectsActorlessAuthenticatedSnapshots(t *testing.T) {
-	tests := []struct {
-		name string
-		auth *types.Authentication
-	}{
-		{
-			name: "user",
-			auth: &types.Authentication{
-				AuthType:          types.AuthTypeUser,
-				UserValue:         &types.UserContext{UserID: 11},
-				OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
-			},
-		},
-		{
-			name: "project",
-			auth: &types.Authentication{
-				AuthType:          types.AuthTypeProject,
-				OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
-				ProjectValue:      &types.ProjectContext{OrganizationID: 33, ProjectID: 22},
-			},
-		},
-		{
-			name: "organization",
-			auth: &types.Authentication{
-				AuthType:          types.AuthTypeOrg,
-				OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
-			},
-		},
-		{
-			name: "service",
-			auth: &types.Authentication{
-				AuthType:          types.AuthTypeService,
-				OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if err := (&CallContext{}).SetAuthentication(test.auth); err == nil {
-				t.Fatal("SetAuthentication() error = nil, want actor error")
-			}
-		})
-	}
-}
-
-func TestCallContextStoredActorlessSnapshotsFailClosed(t *testing.T) {
-	userID := uint64(11)
+func TestCallContextAuthenticationSnapshotFailsClosed(t *testing.T) {
+	actorID := uint64(66)
 	tests := []struct {
 		name        string
 		callContext *CallContext
 	}{
+		{name: "nil", callContext: nil},
+		{name: "legacy snapshot", callContext: &CallContext{AuthType: "user", OrganizationID: 33}},
+		{name: "unsupported version", callContext: &CallContext{AuthPrincipalVersion: 2}},
 		{
-			name: "user",
+			name: "incomplete delegated actor",
 			callContext: &CallContext{
-				AuthType:       types.AuthTypeUser.String(),
-				AuthUserID:     &userID,
-				OrganizationID: 33,
-			},
-		},
-		{
-			name: "project",
-			callContext: &CallContext{
-				AuthType:       types.AuthTypeProject.String(),
-				OrganizationID: 33,
-				ProjectID:      22,
-			},
-		},
-		{
-			name: "organization",
-			callContext: &CallContext{
-				AuthType:       types.AuthTypeOrg.String(),
-				OrganizationID: 33,
-			},
-		},
-		{
-			name: "service",
-			callContext: &CallContext{
-				AuthType:       types.AuthTypeService.String(),
-				OrganizationID: 33,
+				AuthPrincipalVersion: 1, AuthSubjectType: string(authentication.IdentityUser), AuthSubjectID: 11,
+				OrganizationID: 33, AuthServiceActorID: &actorID,
+				AuthProofMethod: string(authentication.AuthenticationServiceAssertion), AuthProofAudience: string(authentication.AudienceRapidaInternal),
+				AuthProofReferenceType: string(authentication.ProofReferenceSigningKey), AuthProofReferenceValue: "assistant-test-1",
 			},
 		},
 	}
@@ -171,97 +81,40 @@ func TestCallContextStoredActorlessSnapshotsFailClosed(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			if _, err := test.callContext.ToAuthentication(); err == nil {
-				t.Fatal("ToAuthentication() error = nil, want actor error")
+				t.Fatal("ToAuthentication() error = nil")
 			}
 		})
 	}
 }
 
-func TestCallContextOldUserSnapshotWithoutUserIDFailsClosed(t *testing.T) {
-	callContext := &CallContext{
-		AuthType:       types.AuthTypeUser.String(),
-		OrganizationID: 33,
-		ProjectID:      22,
-	}
-
-	_, err := callContext.ToAuthentication()
-	if err == nil {
-		t.Fatal("ToAuthentication() error = nil, want incomplete actor error")
+func TestCallContextRejectsZeroPrincipal(t *testing.T) {
+	if err := (&CallContext{}).SetAuthentication(authentication.Principal{}); err == nil {
+		t.Fatal("SetAuthentication() error = nil")
 	}
 }
 
-func TestCallContextIncompleteActorFailsClosed(t *testing.T) {
-	actorType := string(types.ActorTypeService)
-	callContext := &CallContext{
-		AuthType:       types.AuthTypeService.String(),
-		OrganizationID: 33,
-		AuthActorType:  &actorType,
+func TestCallContextSupportsMaximumDatabaseIdentity(t *testing.T) {
+	principal := mustCallContextPrincipal(authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: math.MaxInt64},
+		authentication.Tenant{OrganizationID: 33},
+		authentication.Proof{Method: authentication.AuthenticationUserSession, Reference: authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: "session-max"}}, nil,
+	))
+	callContext := &CallContext{}
+	if err := callContext.SetAuthentication(principal); err != nil {
+		t.Fatalf("SetAuthentication() error = %v", err)
 	}
-
-	if _, err := callContext.ToAuthentication(); err == nil {
-		t.Fatal("ToAuthentication() error = nil, want incomplete actor error")
+	reconstructed, err := callContext.ToAuthentication()
+	if err != nil {
+		t.Fatalf("ToAuthentication() error = %v", err)
 	}
-}
-
-func TestCallContextActorRange(t *testing.T) {
-	tests := []struct {
-		name      string
-		actorID   uint64
-		wantError bool
-	}{
-		{name: "zero rejected", actorID: 0, wantError: true},
-		{name: "max bigint accepted", actorID: math.MaxInt64},
-		{name: "above max bigint rejected", actorID: uint64(math.MaxInt64) + 1, wantError: true},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			auth := &types.Authentication{
-				AuthType:          types.AuthTypeUser,
-				ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: test.actorID},
-				UserValue:         &types.UserContext{UserID: test.actorID},
-				OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
-			}
-			callContext := &CallContext{}
-
-			err := callContext.SetAuthentication(auth)
-			if test.wantError {
-				if err == nil {
-					t.Fatal("SetAuthentication() error = nil, want error")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("SetAuthentication() error = %v", err)
-			}
-			reconstructed, err := callContext.ToAuthentication()
-			if err != nil {
-				t.Fatalf("ToAuthentication() error = %v", err)
-			}
-			actor := reconstructed.Actor()
-			if actor.ID != test.actorID {
-				t.Fatalf("Actor() = %+v", actor)
-			}
-		})
+	if reconstructed.Subject().ID != math.MaxInt64 {
+		t.Fatalf("Subject().ID = %d", reconstructed.Subject().ID)
 	}
 }
 
-func TestCallContextStoredActorRangeFailsClosed(t *testing.T) {
-	for _, actorID := range []uint64{0, uint64(math.MaxInt64) + 1} {
-		t.Run(fmt.Sprintf("actor id %d", actorID), func(t *testing.T) {
-			actorType := string(types.ActorTypeUser)
-			userID := uint64(11)
-			callContext := &CallContext{
-				AuthType:       types.AuthTypeUser.String(),
-				AuthUserID:     &userID,
-				OrganizationID: 33,
-				AuthActorType:  &actorType,
-				AuthActorID:    &actorID,
-			}
-
-			if _, err := callContext.ToAuthentication(); err == nil {
-				t.Fatal("ToAuthentication() error = nil, want error")
-			}
-		})
+func mustCallContextPrincipal(principal authentication.Principal, err error) authentication.Principal {
+	if err != nil {
+		panic(err)
 	}
+	return principal
 }

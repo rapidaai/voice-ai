@@ -284,6 +284,19 @@ class StyleCheckTest(unittest.TestCase):
 
 
 class RequiredTestSelectionTest(unittest.TestCase):
+    def test_backend_dirs_skip_deleted_packages(self) -> None:
+        with TemporaryDirectory() as root:
+            existing = Path(root, "api/existing")
+            existing.mkdir(parents=True)
+            existing.joinpath("service.go").write_text("package existing\n")
+
+            self.assertEqual(
+                required_tests._backend_dirs(
+                    ["api/existing/service.go", "api/deleted/service.go"], root
+                ),
+                ["api/existing"],
+            )
+
     def test_compiles_integration_tag_only_go_directories_without_running_tests(self) -> None:
         with TemporaryDirectory() as root:
             directory = "api/example"

@@ -7,5 +7,6 @@ assistant-lifecycle
 assistant-components
 create-assistant-provider
 create-endpoint-provider
+project-api-key-invoke
 create-vault
 create-assistant-deployment-phone-call

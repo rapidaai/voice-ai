@@ -7,24 +7,20 @@ package assistant_api
 
 import (
 	"context"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"sync"
 
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 )
 
 // GetAllAssistantProviderModel implements protos.AssistantServiceServer.
 func (assistantApi *assistantGrpcApi) GetAllAssistantProvider(ctx context.Context, gaep *protos.GetAllAssistantProviderRequest) (*protos.GetAllAssistantProviderResponse, error) {
-	auth, authErr := types.Authorize(ctx)
-	if authErr != nil {
-		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	iAuth, ok := middleware_authentication.Principal(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "valid authentication is required")
 	}
 	combinedProviders := make([]*protos.GetAllAssistantProviderResponse_AssistantProvider, 0)
 	var wg sync.WaitGroup
@@ -142,12 +138,16 @@ func (assistantApi *assistantGrpcApi) GetAllAssistantProvider(ctx context.Contex
 	})
 
 	wg.Wait()
+	totalItem, err := utils.IntToUint32(len(combinedProviders))
+	if err != nil {
+		return nil, err
+	}
 	return &protos.GetAllAssistantProviderResponse{
 		Code:    200,
 		Success: true,
 		Paginated: &protos.Paginated{
 			CurrentPage: gaep.GetPaginate().GetPage(),
-			TotalItem:   uint32(len(combinedProviders)),
+			TotalItem:   totalItem,
 		},
 		Data: combinedProviders,
 	}, nil

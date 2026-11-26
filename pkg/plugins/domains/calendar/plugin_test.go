@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/rapidaai/pkg/authentication"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	plugins_types "github.com/rapidaai/pkg/plugins/types"
-	"github.com/rapidaai/pkg/types"
 	vault_api "github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,14 +20,14 @@ type mockVault struct {
 	err        error
 }
 
-func (m *mockVault) GetCredential(ctx context.Context, auth *types.Authentication, vaultId uint64) (*vault_api.VaultCredential, error) {
+func (m *mockVault) GetCredential(ctx context.Context, auth authentication.Principal, vaultId uint64) (*vault_api.VaultCredential, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
 	return m.credential, nil
 }
 
-func (m *mockVault) GetOauth2Credential(ctx context.Context, auth *types.Authentication, vaultId uint64) (*vault_api.VaultCredential, error) {
+func (m *mockVault) GetOauth2Credential(ctx context.Context, auth authentication.Principal, vaultId uint64) (*vault_api.VaultCredential, error) {
 	return nil, errors.New("not used")
 }
 
@@ -53,7 +53,7 @@ func TestPlugin_ExecuteCalComSuccess(t *testing.T) {
 			"email":      "user@example.com",
 		},
 		Config: map[string]interface{}{"provider": "cal.com", "credential_id": float64(10)},
-	}, plugins_types.ExecuteDeps{VaultClient: vault, Logger: testLogger(t), Auth: testAuthentication()})
+	}, plugins_types.ExecuteDeps{VaultClient: vault, Logger: testLogger(t), Auth: testAuthentication(t)})
 	require.NoError(t, err)
 	assert.Equal(t, plugins_types.StatusSuccess, result.Status)
 	assert.Equal(t, "cal.com", result.Provider)
@@ -69,16 +69,19 @@ func TestPlugin_ExecuteCalComMissingInput(t *testing.T) {
 		Provider:  "cal.com",
 		Input:     map[string]interface{}{"start_time": "2026-05-01T10:00:00Z"},
 		Config:    map[string]interface{}{"provider": "cal.com", "credential_id": float64(10)},
-	}, plugins_types.ExecuteDeps{VaultClient: vault, Logger: testLogger(t), Auth: testAuthentication()})
+	}, plugins_types.ExecuteDeps{VaultClient: vault, Logger: testLogger(t), Auth: testAuthentication(t)})
 	require.NoError(t, err)
 	assert.Equal(t, plugins_types.StatusFail, result.Status)
 }
 
-func testAuthentication() *types.Authentication {
-	return &types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		UserValue:         &types.UserContext{UserID: 1},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 1},
-		ProjectValue:      &types.ProjectContext{OrganizationID: 1, ProjectID: 1},
-	}
+func testAuthentication(t *testing.T) authentication.Principal {
+	t.Helper()
+	principal, err := authentication.NewDirectPrincipal(
+		authentication.Identity{Type: authentication.IdentityUser, ID: 1},
+		authentication.Tenant{OrganizationID: 1, ProjectID: 1},
+		authentication.Proof{Method: authentication.AuthenticationUserSession, Reference: authentication.ProofReference{Type: authentication.ProofReferenceUserSession, Value: "plugin-test"}},
+		nil,
+	)
+	require.NoError(t, err)
+	return principal
 }

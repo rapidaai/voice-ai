@@ -3,6 +3,8 @@ import {
   OrganizationUserPage,
   OrganizationProjectPage,
   OrganizationAccessSecurityPage,
+  OrganizationRoleCatalogPage,
+  OrganizationRoleDetailPage,
 } from '@/app/pages/workspace';
 import type { RouteObject } from 'react-router-dom';
 import { breadcrumb } from './breadcrumb-handle';
@@ -23,6 +25,16 @@ export const organizationRoute: RouteObject = {
       path: 'projects',
       element: <OrganizationProjectPage />,
       handle: breadcrumb('Projects'),
+    },
+    {
+      path: 'roles',
+      element: <OrganizationRoleCatalogPage />,
+      handle: breadcrumb('Roles & Permissions'),
+    },
+    {
+      path: 'roles/:roleDefinitionId',
+      element: <OrganizationRoleDetailPage />,
+      handle: breadcrumb('Role detail'),
     },
     {
       path: 'security',

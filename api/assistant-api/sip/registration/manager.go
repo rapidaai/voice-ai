@@ -18,10 +18,12 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/telemetry"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/authentication"
+	authentication_jwt "github.com/rapidaai/pkg/authentication/jwt"
+	authentication_resolver "github.com/rapidaai/pkg/authentication/resolver"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -41,14 +43,16 @@ type Manager interface {
 // only owns the DIDs it successfully claims; peers skip those records.
 // Ownership self-heals via TTL.
 type manager struct {
-	logger          commons.Logger
-	postgres        connectors.PostgresConnector
-	redis           *redis.Client
-	regClient       *sip_runtime.RegistrationClient
-	assistantConfig *config.AssistantConfig
-	sipConfig       sip_config.Resolver
-	instanceID      string
-	rapidaClient    *rapida_client.RapidaClient
+	logger                   commons.Logger
+	postgres                 connectors.PostgresConnector
+	redis                    *redis.Client
+	regClient                *sip_runtime.RegistrationClient
+	assistantConfig          *config.AssistantConfig
+	serviceAssertionIssuer   *authentication_jwt.Issuer
+	servicePrincipalResolver *authentication_resolver.ServicePrincipalResolver
+	sipConfig                sip_config.Resolver
+	instanceID               string
+	rapidaClient             *rapida_client.RapidaClient
 }
 
 // New wires the dependencies and resolves a stable instance identity
@@ -69,14 +73,16 @@ func New(options ...ManagerOption) Manager {
 	}
 	sipConfig := sip_config.NewResolver(appSIPConfig)
 	m := &manager{
-		logger:          managerOptions.Logger,
-		postgres:        managerOptions.Postgres,
-		redis:           managerOptions.Redis.GetConnection(),
-		regClient:       managerOptions.RegistrationClient,
-		instanceID:      sipConfig.InstanceID(),
-		assistantConfig: managerOptions.AssistantConfig,
-		sipConfig:       sipConfig,
-		rapidaClient:    managerOptions.RapidaClient,
+		logger:                   managerOptions.Logger,
+		postgres:                 managerOptions.Postgres,
+		redis:                    managerOptions.Redis.GetConnection(),
+		regClient:                managerOptions.RegistrationClient,
+		instanceID:               sipConfig.InstanceID(),
+		assistantConfig:          managerOptions.AssistantConfig,
+		serviceAssertionIssuer:   managerOptions.ServiceAssertionIssuer,
+		servicePrincipalResolver: managerOptions.ServicePrincipalResolver,
+		sipConfig:                sipConfig,
+		rapidaClient:             managerOptions.RapidaClient,
 	}
 	if managerOptions.RegistrationClient != nil {
 		managerOptions.RegistrationClient.SetObserver(m)
@@ -89,7 +95,7 @@ func New(options ...ManagerOption) Manager {
 	return m
 }
 
-func (m *manager) observer(ctx context.Context, auth *types.Authentication) observability.Recorder {
+func (m *manager) observer(ctx context.Context, auth authentication.Principal) observability.Recorder {
 	configuredCollectors := telemetry.NewWithAssistantConfig(ctx, m.logger, m.assistantConfig)
 	configuredCollectors = append(configuredCollectors, billing.New(billing.Config{
 		ProductUsageClient: m.rapidaClient.ProductUsage,
@@ -102,14 +108,28 @@ func (m *manager) observer(ctx context.Context, auth *types.Authentication) obse
 	)
 }
 
-func (m *manager) serviceAuthentication(organizationID, projectID uint64) *types.Authentication {
-	serviceActor := types.ActorIdentity{Type: types.ActorTypeService, ID: m.assistantConfig.ServiceID}
-	return &types.Authentication{
-		AuthType:          types.AuthTypeService,
-		ActorValue:        &serviceActor,
-		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
+func (m *manager) serviceAuthentication(ctx context.Context, organizationID, projectID uint64) authentication.Principal {
+	if m.serviceAssertionIssuer == nil || m.servicePrincipalResolver == nil {
+		m.logger.Error("unable to construct SIP service principal: service authentication is not configured")
+		return authentication.Principal{}
 	}
+	assertion, err := m.serviceAssertionIssuer.IssueService(
+		authentication.Tenant{OrganizationID: organizationID, ProjectID: projectID},
+	)
+	if err == nil {
+		var principal authentication.Principal
+		principal, err = m.servicePrincipalResolver.Resolve(
+			ctx,
+			authentication_resolver.ServiceAssertionCredential{Assertion: assertion},
+		)
+		if err == nil {
+			return principal
+		}
+	}
+	if err != nil {
+		m.logger.Errorf("unable to construct SIP service principal: %v", err)
+	}
+	return authentication.Principal{}
 }
 
 // Start blocks running the periodic reconcile loop until ctx is cancelled.

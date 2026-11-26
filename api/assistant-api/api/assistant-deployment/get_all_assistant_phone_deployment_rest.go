@@ -7,21 +7,21 @@ package assistant_deployment_api
 
 import (
 	"encoding/json"
+	middleware_authentication "github.com/rapidaai/pkg/middlewares/authentication"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/openapi"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	assistant_api "github.com/rapidaai/protos"
 )
 
 func (deploymentApi *AssistantDeploymentApi) GetAllAssistantPhoneDeploymentRest(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
-	if authErr != nil {
+	iAuth, ok := middleware_authentication.Principal(c.Request.Context())
+	if !ok {
 		c.JSON(pkg_errors.GetAllAssistantPhoneDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAllAssistantPhoneDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -29,19 +29,6 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantPhoneDeploymentRest(
 				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.GetAllAssistantPhoneDeploymentUnauthenticated.CodeString())),
 				ErrorMessage: utils.Ptr(pkg_errors.GetAllAssistantPhoneDeploymentUnauthenticated.Error),
 				HumanMessage: utils.Ptr(pkg_errors.GetAllAssistantPhoneDeploymentUnauthenticated.ErrorMessage),
-			},
-		})
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
-	if scopeErr != nil {
-		c.JSON(pkg_errors.GetAllAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
-			Code:    utils.Ptr(pkg_errors.GetAllAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
-			Success: utils.Ptr(false),
-			Error: &openapi.Error{
-				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.GetAllAssistantPhoneDeploymentMissingAuthScope.CodeString())),
-				ErrorMessage: utils.Ptr(pkg_errors.GetAllAssistantPhoneDeploymentMissingAuthScope.Error),
-				HumanMessage: utils.Ptr(pkg_errors.GetAllAssistantPhoneDeploymentMissingAuthScope.ErrorMessage),
 			},
 		})
 		return
@@ -226,7 +213,16 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantPhoneDeploymentRest(
 			IdealTimeoutMessage:   deployment.IdleTimeoutMessage,
 		})
 	}
-	totalItem := uint32(totalItems)
+	totalItem, err := utils.Int64ToUint32(totalItems)
+	if err != nil {
+		deploymentApi.logger.Errorf("unable to convert assistant phone deployment count: %v", err)
+		platformError := pkg_errors.GetAllAssistantPhoneDeploymentGetDeployment
+		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
+			Code: utils.Ptr(platformError.HTTPStatusCodeInt32()), Success: utils.Ptr(false),
+			Error: &openapi.Error{ErrorCode: utils.Ptr(openapi.Uint64String(platformError.CodeString())), ErrorMessage: utils.Ptr(platformError.Error), HumanMessage: utils.Ptr(platformError.ErrorMessage)},
+		})
+		return
+	}
 	currentPage := paginate.GetPage()
 	c.JSON(http.StatusOK, openapi.GetAllAssistantPhoneDeploymentResponse{
 		Code:    utils.Ptr(int32(http.StatusOK)),

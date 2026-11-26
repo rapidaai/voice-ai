@@ -16,17 +16,17 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/configs"
 	storage_files "github.com/rapidaai/pkg/storages/file-storage"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
 )
 
 const (
-	azureStorageOptionCredentialIDKey   = "rapida.credential_id"
+	azureStorageOptionCredentialIDKey   = "rapida.credential_id" // #nosec G101, this is a metadata key, not a secret.
 	azureStorageOptionContainerKey      = "container"
 	azureStorageOptionPrefixKey         = "prefix"
 	azureStorageOptionTimeoutSecondsKey = "timeout_seconds"
@@ -39,7 +39,7 @@ type azureStorageExecutor struct {
 	logger        commons.Logger
 	configuration *internal_assistant_entity.AssistantConfiguration
 	caller        internal_type.InternalCaller
-	auth          *types.Authentication
+	auth          authentication.Principal
 	onPacket      func(context.Context, ...internal_type.Packet) error
 }
 
@@ -69,7 +69,7 @@ func WithAzureStorageCaller(caller internal_type.InternalCaller) AzureStorageOpt
 	}
 }
 
-func WithAzureStorageAuth(auth *types.Authentication) AzureStorageOption {
+func WithAzureStorageAuth(auth authentication.Principal) AzureStorageOption {
 	return func(executor *azureStorageExecutor) {
 		executor.auth = auth
 	}
@@ -103,7 +103,7 @@ func NewAzureStorage(opts ...AzureStorageOption) (internal_type.ArtifactPushExec
 		if executor.caller == nil {
 			return nil, fmt.Errorf("artifact push storage azure: caller is required when rapida.credential_id is configured")
 		}
-		if executor.auth == nil {
+		if executor.auth.Subject().ID == 0 {
 			return nil, fmt.Errorf("artifact push storage azure: auth is required when rapida.credential_id is configured")
 		}
 	}

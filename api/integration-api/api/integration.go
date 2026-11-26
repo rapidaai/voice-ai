@@ -11,12 +11,12 @@ import (
 	config "github.com/rapidaai/api/integration-api/config"
 	internal_services "github.com/rapidaai/api/integration-api/internal/service"
 	internal_audit_service "github.com/rapidaai/api/integration-api/internal/service/audit"
+	"github.com/rapidaai/pkg/authentication"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_generator "github.com/rapidaai/pkg/models/gorm/generators"
 	"github.com/rapidaai/pkg/storages"
 	storage_files "github.com/rapidaai/pkg/storages/file-storage"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -52,7 +52,7 @@ type ProviderModelRequest interface {
 func (iApi *integrationApi) RequestId() uint64 {
 	return gorm_generator.ID()
 }
-func (iApi *integrationApi) PreHook(c context.Context, projectContext types.ProjectContext, irRequest ProviderModelRequest, requestId uint64, intName string) func(rst map[string]interface{}) {
+func (iApi *integrationApi) PreHook(c context.Context, projectContext authentication.Tenant, irRequest ProviderModelRequest, requestId uint64, intName string) func(rst map[string]interface{}) {
 	return func(rst map[string]interface{}) {
 		iApi.preHook(c,
 			projectContext,
@@ -64,7 +64,7 @@ func (iApi *integrationApi) PreHook(c context.Context, projectContext types.Proj
 	}
 }
 
-func (iApi *integrationApi) PostHook(c context.Context, projectContext types.ProjectContext, irRequest ProviderModelRequest, requestId uint64, intName string) func(rst map[string]interface{}, metrics []*protos.Metric) {
+func (iApi *integrationApi) PostHook(c context.Context, projectContext authentication.Tenant, irRequest ProviderModelRequest, requestId uint64, intName string) func(rst map[string]interface{}, metrics []*protos.Metric) {
 	return func(rst map[string]interface{}, metrics []*protos.Metric) {
 		iApi.postHook(c, projectContext,
 			irRequest.GetAdditionalData(),
@@ -76,7 +76,7 @@ func (iApi *integrationApi) PostHook(c context.Context, projectContext types.Pro
 	}
 }
 
-func (iApi *integrationApi) preHook(ctx context.Context, projectContext types.ProjectContext, extras map[string]string, credentialId, requestId uint64, intName string, request map[string]interface{}) {
+func (iApi *integrationApi) preHook(ctx context.Context, projectContext authentication.Tenant, extras map[string]string, credentialId, requestId uint64, intName string, request map[string]interface{}) {
 	keyPrefix := iApi.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID, credentialId)
 	start := time.Now()
 	go func(currentCtx context.Context, requestId uint64, s3Prefix string, additionalData map[string]string, _request map[string]interface{}) {
@@ -105,7 +105,7 @@ func (iApi *integrationApi) preHook(ctx context.Context, projectContext types.Pr
 		iApi.storage.Store(nCtx, key, _str)
 	}(ctx, requestId, keyPrefix, extras, request)
 }
-func (iApi *integrationApi) postHook(ctx context.Context, projectContext types.ProjectContext, extras map[string]string, credentialId, requestId uint64, intName string, response map[string]interface{}, metrics []*protos.Metric) {
+func (iApi *integrationApi) postHook(ctx context.Context, projectContext authentication.Tenant, extras map[string]string, credentialId, requestId uint64, intName string, response map[string]interface{}, metrics []*protos.Metric) {
 	iApi.logger.Debugf("Executing posthook for auditId %d", requestId)
 	start := time.Now()
 	keyPrefix := iApi.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID, credentialId)

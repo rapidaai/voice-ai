@@ -8,7 +8,8 @@ import { useParams } from 'react-router-dom';
 import { useCurrentCredential } from '@/hooks/use-credential';
 import type { AssistantConversation } from '@rapidaai/react';
 import { useRapidaStore } from '@/stores/app';
-import { ErrorContainer, PageLoader } from '@/app/components/ui/feedback';
+import { PageLoader } from '@/app/components/ui/feedback';
+import { ErrorContainer } from '@/app/components/ui/feedback/error-container';
 import {
   ArrowLeft,
   Renew,

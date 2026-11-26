@@ -16,7 +16,7 @@ export function Dashboard({ isLoading }: { isLoading?: boolean }) {
         loading={isLoading}
       >
         <SidebarIconWrapper>
-          <DashboardIcon size={20} />
+          <DashboardIcon size={16} />
         </SidebarIconWrapper>
         <SidebarLabel isLoading={isLoading}>Dashboard</SidebarLabel>
       </SidebarSimpleListItem>

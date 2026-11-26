@@ -2,13 +2,13 @@ package integration_client
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/rapidaai/config"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/protos"
 )
 
@@ -27,10 +27,10 @@ func TestNewIntegrationServiceClientWithClientUsesProvidedGRPCClient(t *testing.
 
 func TestIntegrationServiceClientStopsBeforeGRPCOnAuthError(t *testing.T) {
 	client := &integrationServiceClient{
-		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, nil, nil),
+		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, "test-api", nil, nil),
 	}
-	_, err := client.Chat(context.Background(), &types.Authentication{}, "provider", &protos.ChatRequest{})
-	if !errors.Is(err, types.ErrUnauthenticated) {
+	_, err := client.Chat(context.Background(), authentication.Principal{}, "provider", &protos.ChatRequest{})
+	if _, ok := err.(pkg_errors.AuthenticationPrincipalInvalidError); !ok {
 		t.Fatalf("Chat() error = %v", err)
 	}
 }
@@ -41,11 +41,11 @@ func TestAuditServiceClientStopsBeforeGRPCOnAuthError(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := &auditServiceClient{
-		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, nil, nil),
+		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, "test-api", nil, nil),
 		logger:         logger,
 	}
-	_, err = client.GetAuditLog(context.Background(), &types.Authentication{}, 1)
-	if !errors.Is(err, types.ErrUnauthenticated) {
+	_, err = client.GetAuditLog(context.Background(), authentication.Principal{}, 1)
+	if _, ok := err.(pkg_errors.AuthenticationPrincipalInvalidError); !ok {
 		t.Fatalf("GetAuditLog() error = %v", err)
 	}
 }

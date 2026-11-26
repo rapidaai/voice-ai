@@ -18,10 +18,10 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	"github.com/rapidaai/pkg/authentication"
 	"github.com/rapidaai/pkg/commons"
 	telemetry "github.com/rapidaai/pkg/telemetry"
 	"github.com/rapidaai/pkg/telemetry/providers"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
 )
@@ -36,7 +36,7 @@ type Config struct {
 	Providers                     Provider
 	Exporters                     telemetry.Exporter
 	Key                           string
-	Auth                          *types.Authentication
+	Auth                          authentication.Principal
 	AssistantID                   uint64
 	AssistantConfigurationService internal_services.AssistantConfigurationService
 }
@@ -48,7 +48,7 @@ type Collector struct {
 	initialized                   bool
 	mu                            sync.Mutex
 	key                           string
-	auth                          *types.Authentication
+	auth                          authentication.Principal
 	assistantID                   uint64
 	assistantConfigurationService internal_services.AssistantConfigurationService
 	assistantCollectors           *observability.Collectors
@@ -77,8 +77,9 @@ func NewWithAssistantConfig(ctx context.Context, logger commons.Logger, assistan
 }
 
 func New(ctx context.Context, cfg Config) (observability.Collector, error) {
-	if validator.NonNil(cfg.AssistantConfigurationService) || cfg.AssistantID != 0 || validator.NonNil(cfg.Auth) {
-		if !validator.NonNil(cfg.Auth) || cfg.AssistantID == 0 || !validator.NonNil(cfg.AssistantConfigurationService) {
+	hasAuthentication := validator.NonZero(cfg.Auth.Subject().ID)
+	if validator.NonNil(cfg.AssistantConfigurationService) || cfg.AssistantID != 0 || hasAuthentication {
+		if !hasAuthentication || cfg.AssistantID == 0 || !validator.NonNil(cfg.AssistantConfigurationService) {
 			return observability.NoopCollector{}, nil
 		}
 		return &Collector{

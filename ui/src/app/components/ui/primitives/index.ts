@@ -10,9 +10,11 @@ export * from './corner-border';
 export * from './custom-link';
 export * from './disclosure';
 export {
+  ComboBox,
   Dropdown,
   Dropdown as CarbonDropdown,
   MultiSelect,
+  type CarbonComboBoxProps,
   type CarbonDropdownProps,
   type CarbonMultiSelectProps,
 } from './dropdown';

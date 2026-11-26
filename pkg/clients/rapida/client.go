@@ -17,6 +17,7 @@ import (
 	endpoint_client "github.com/rapidaai/pkg/clients/endpoint"
 	integration_client "github.com/rapidaai/pkg/clients/integration"
 	web_client "github.com/rapidaai/pkg/clients/web"
+	workflow_client "github.com/rapidaai/pkg/clients/workflow"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/protos"
@@ -26,12 +27,17 @@ import (
 
 // RapidaClient owns the internal service clients and their connections.
 type RapidaClient struct {
-	Authentication web_client.AuthClient
+	Authentication web_client.AuthenticationClient
 	Vault          web_client.VaultClient
 	Project        web_client.ProjectClient
 	ProductUsage   web_client.ProductUsageClient
 	Integration    integration_client.IntegrationServiceClient
+	Audit          integration_client.AuditServiceClient
 	Deployment     endpoint_client.DeploymentServiceClient
+	Endpoint       endpoint_client.EndpointServiceClient
+	Assistant      workflow_client.AssistantServiceClient
+	Knowledge      workflow_client.KnowledgeServiceClient
+	Observability  workflow_client.ObservabilityServiceClient
 	Indexer        document_client.IndexerServiceClient
 
 	connections []*grpc.ClientConn
@@ -39,9 +45,9 @@ type RapidaClient struct {
 	closeErr    error
 }
 
-// New creates every internal service client with an independent connection.
+// New creates internal service clients with command-owned service connections.
 func New(cfg *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector) (*RapidaClient, error) {
-	client := &RapidaClient{connections: make([]*grpc.ClientConn, 0, 6)}
+	client := &RapidaClient{connections: make([]*grpc.ClientConn, 0, 7)}
 	var err error
 	defer func() {
 		if err != nil {
@@ -79,6 +85,18 @@ func New(cfg *config.AppConfig, logger commons.Logger, redis connectors.RedisCon
 	if err != nil {
 		return nil, err
 	}
+	assistantConnection, err := newConnection(
+		"assistant client",
+		cfg.Assistant.Host,
+		transportCredentials,
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(commons.MaxRecvMsgSize),
+			grpc.MaxCallSendMsgSize(commons.MaxSendMsgSize),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
 	deploymentConnection, err := newConnection(
 		"endpoint deployment client",
 		cfg.Endpoint.Host,
@@ -92,7 +110,7 @@ func New(cfg *config.AppConfig, logger commons.Logger, redis connectors.RedisCon
 		return nil, err
 	}
 
-	client.Authentication = web_client.NewAuthenticatorWithClient(
+	client.Authentication = web_client.NewAuthenticationClientWithClient(
 		cfg,
 		logger,
 		redis,
@@ -121,11 +139,42 @@ func New(cfg *config.AppConfig, logger commons.Logger, redis connectors.RedisCon
 		redis,
 		protos.NewUnifiedProviderServiceClient(integrationConnection),
 	)
+	client.Audit = integration_client.NewAuditServiceClientWithClient(
+		cfg,
+		logger,
+		redis,
+		protos.NewAuditLoggingServiceClient(integrationConnection),
+	)
 	client.Deployment = endpoint_client.NewDeploymentServiceClientWithClient(
 		cfg,
 		logger,
 		redis,
 		protos.NewDeploymentClient(deploymentConnection),
+	)
+	client.Endpoint = endpoint_client.NewEndpointServiceClientWithClient(
+		cfg,
+		logger,
+		redis,
+		protos.NewEndpointServiceClient(deploymentConnection),
+	)
+	client.Assistant = workflow_client.NewAssistantServiceClientWithClients(
+		cfg,
+		logger,
+		redis,
+		protos.NewAssistantServiceClient(assistantConnection),
+		protos.NewAssistantDeploymentServiceClient(assistantConnection),
+	)
+	client.Knowledge = workflow_client.NewKnowledgeServiceClientWithClient(
+		cfg,
+		logger,
+		redis,
+		protos.NewKnowledgeServiceClient(assistantConnection),
+	)
+	client.Observability = workflow_client.NewObservabilityServiceClientWithClient(
+		cfg,
+		logger,
+		redis,
+		protos.NewObservabilityServiceClient(assistantConnection),
 	)
 	client.Indexer = document_client.NewIndexerServiceClient(cfg, logger, redis)
 	return client, nil

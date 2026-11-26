@@ -29,7 +29,7 @@ func (d *Dispatcher) handleCallFailed(ctx context.Context, v CallFailedPipeline)
 		return
 	}
 	auth := v.Session.GetAuth()
-	if !validator.NonNil(auth) {
+	if !validator.NonZero(auth.Subject().ID) {
 		d.logger.Warnw("Cannot record failed SIP call",
 			"call_id", v.ID,
 			"missing", "authentication",
@@ -69,12 +69,9 @@ func (d *Dispatcher) handleCallFailed(ctx context.Context, v CallFailedPipeline)
 		ConversationID: conversationID,
 		Auth:           auth,
 	}
-	if projectContext, err := auth.ProjectContext(); err == nil {
-		callSetupResult.OrganizationID = projectContext.OrganizationID
-		callSetupResult.ProjectID = projectContext.ProjectID
-	} else if organizationContext, err := auth.OrganizationContext(); err == nil {
-		callSetupResult.OrganizationID = organizationContext.OrganizationID
-	}
+	tenant := auth.Tenant()
+	callSetupResult.OrganizationID = tenant.OrganizationID
+	callSetupResult.ProjectID = tenant.ProjectID
 
 	observer := d.createObserver(ctx, callSetupResult, auth)
 	contextID := v.Session.GetContextID()
