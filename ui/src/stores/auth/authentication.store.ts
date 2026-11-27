@@ -48,7 +48,7 @@ export const useAuthenticationStore = create<AuthenticationType>()(
           organizations.find(
             organization => organization.id === previousOrganizationID,
           ) ||
-          (organizations.length === 1 ? organizations[0] : undefined);
+          organizations[0];
         const selectedOrganizationID = currentOrganization?.id || '';
         const projects = currentOrganization?.projectsList || [];
         const principalProjectID =

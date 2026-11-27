@@ -1188,8 +1188,8 @@ export const HomePage = () => {
     contextKey: string;
     data: ProjectDashboard;
   } | null>(null);
-  const { authId, projectId, token } = useCurrentCredential();
-  const currentContextKey = `${projectId}:${dashboardRange}`;
+  const { authId, organizationId, projectId, token } = useCurrentCredential();
+  const currentContextKey = `${organizationId}:${projectId}:${dashboardRange}`;
   const isContextPending = dashboardContextKey.current !== currentContextKey;
   const dashboard =
     dashboardState?.contextKey === currentContextKey
@@ -1199,7 +1199,7 @@ export const HomePage = () => {
   const fetchDashboard = useCallback(() => {
     requestId.current += 1;
     const currentRequestId = requestId.current;
-    const contextKey = `${projectId}:${dashboardRange}`;
+    const contextKey = `${organizationId}:${projectId}:${dashboardRange}`;
     const isNewContext = dashboardContextKey.current !== contextKey;
 
     if (isNewContext) {
@@ -1223,7 +1223,7 @@ export const HomePage = () => {
       toDate: toTimestamp(toDate),
       assistantLimit: 3,
       recentFailureLimit: 5,
-      auth: { projectId, token, userId: authId },
+      auth: { organizationId, projectId, token, userId: authId },
     })
       .then(response => {
         if (currentRequestId !== requestId.current) return;
@@ -1243,7 +1243,7 @@ export const HomePage = () => {
       .finally(() => {
         if (currentRequestId === requestId.current) setLoading(false);
       });
-  }, [authId, dashboardRange, projectId, token]);
+  }, [authId, dashboardRange, organizationId, projectId, token]);
 
   useEffect(() => {
     fetchDashboard();
@@ -1287,7 +1287,7 @@ export const HomePage = () => {
       page: 1,
       pageSize: 1,
       criteria: [],
-      auth: { projectId, token, userId: authId },
+      auth: { organizationId, projectId, token, userId: authId },
     })
       .then(response => {
         if (!isCurrent || !response?.getSuccess()) return;
@@ -1304,6 +1304,7 @@ export const HomePage = () => {
     assistantLookupVersion,
     authId,
     isDashboardActivityEmpty,
+    organizationId,
     projectId,
     token,
   ]);

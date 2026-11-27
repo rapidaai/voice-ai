@@ -302,10 +302,15 @@ async function installDashboardClientMock(page) {
       body.subarray(5, 5 + messageLength),
     );
     const headers = request.headers();
+    const organizationID = headers['x-organization-id'];
+    const projectID = headers['x-project-id'];
+    const isExpectedContext =
+      (organizationID === '202' && projectID === '302') ||
+      (organizationID === '203' && projectID === '303');
     if (
       headers.authorization !== 'token-e2e' ||
       headers['x-auth-id'] !== '101' ||
-      headers['x-project-id'] !== '302'
+      !isExpectedContext
     ) {
       throw new Error('dashboard request did not include project metadata');
     }
@@ -330,7 +335,13 @@ async function installDashboardClientMock(page) {
         `dashboard request used unsupported duration ${durationMs}`,
       );
     }
-    dashboardRequests.get(page).push({ fromDate, toDate, durationMs });
+    dashboardRequests.get(page).push({
+      organizationID,
+      projectID,
+      fromDate,
+      toDate,
+      durationMs,
+    });
     return fulfillGrpcWeb(route, response);
   });
 }

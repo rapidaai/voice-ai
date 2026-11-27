@@ -26,6 +26,11 @@ const journeySubjourneys = [
     'journeys/auth/authentication.spec.js',
   ),
   covered(
+    'auth.signin.multipleOrganizations',
+    'auth.signin',
+    'journeys/auth/authentication.spec.js',
+  ),
+  covered(
     'auth.signup.submit',
     'auth.signup',
     'journeys/auth/authentication.spec.js',

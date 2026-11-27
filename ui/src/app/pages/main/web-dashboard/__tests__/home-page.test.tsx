@@ -51,11 +51,13 @@ jest.mock('@/theme/theme-provider', () => ({
 
 let mockCurrentCredential: {
   authId: string;
+  organizationId: string;
   projectId: string;
   token: string;
   user?: { name?: string };
 } = {
   authId: 'user-1',
+  organizationId: 'organization-1',
   projectId: 'project-1',
   token: 'token-1',
   user: { name: 'Jordan Lee' },
@@ -266,6 +268,7 @@ describe('Dashboard HomePage', () => {
     }) as unknown as typeof IntersectionObserver;
     mockCurrentCredential = {
       authId: 'user-1',
+      organizationId: 'organization-1',
       projectId: 'project-1',
       token: 'token-1',
       user: { name: 'Jordan Lee' },
@@ -337,6 +340,7 @@ describe('Dashboard HomePage', () => {
         assistantLimit: 3,
         recentFailureLimit: 5,
         auth: {
+          organizationId: 'organization-1',
           projectId: 'project-1',
           token: 'token-1',
           userId: 'user-1',
@@ -810,6 +814,16 @@ describe('Dashboard HomePage', () => {
     render(<HomePage />);
 
     await waitFor(() => expect(mockListAssistants).toHaveBeenCalledTimes(1));
+    expect(mockListAssistants).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auth: {
+          organizationId: 'organization-1',
+          projectId: 'project-1',
+          token: 'token-1',
+          userId: 'user-1',
+        },
+      }),
+    );
     await act(async () => {
       assistantLookup.resolve({
         getSuccess: () => true,
@@ -1009,6 +1023,7 @@ describe('Dashboard HomePage', () => {
     mockGetProjectDashboardRange.mockReturnValueOnce(nextRequest);
     mockCurrentCredential = {
       authId: 'user-1',
+      organizationId: 'organization-2',
       projectId: 'project-2',
       token: 'token-2',
       user: { name: 'Jordan Lee' },

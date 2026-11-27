@@ -22,7 +22,12 @@ const responseContracts = Object.freeze({
   createPassword: { includesAuthentication: false, errorField: 3 },
 });
 
-function authenticationMessage({ organization = true, project = true } = {}) {
+function authenticationMessage({
+  organization = true,
+  project = true,
+  multipleOrganizations = false,
+  selectedTenant = true,
+} = {}) {
   const hasProject = organization && project;
   const organizationPermissions = [
     'organization.members.read',
@@ -62,9 +67,11 @@ function authenticationMessage({ organization = true, project = true } = {}) {
     protobufString(5, 'project'),
     ...projectPermissions.map(permission => protobufBytes(8, permission)),
   ]);
-  const selectedTenant = Buffer.concat([
-    ...(organization ? [protobufUnsignedInteger(1, 202)] : []),
-    ...(hasProject ? [protobufUnsignedInteger(2, 302)] : []),
+  const selectedTenantValue = Buffer.concat([
+    ...(selectedTenant && organization
+      ? [protobufUnsignedInteger(1, 202)]
+      : []),
+    ...(selectedTenant && hasProject ? [protobufUnsignedInteger(2, 302)] : []),
   ]);
   const principal = Buffer.concat([
     protobufBytes(
@@ -74,7 +81,7 @@ function authenticationMessage({ organization = true, project = true } = {}) {
         protobufUnsignedInteger(2, 101),
       ]),
     ),
-    protobufBytes(3, selectedTenant),
+    protobufBytes(3, selectedTenantValue),
     protobufBytes(
       4,
       Buffer.concat([
@@ -94,18 +101,39 @@ function authenticationMessage({ organization = true, project = true } = {}) {
   ]);
   const projectValue = Buffer.concat([
     protobufUnsignedInteger(1, 302),
-    protobufString(2, 'E2E Project'),
+    protobufString(
+      2,
+      multipleOrganizations ? 'Customer Support' : 'E2E Project',
+    ),
     protobufBytes(3, projectRole),
   ]);
   const organizationValue = Buffer.concat([
     protobufUnsignedInteger(1, 202),
-    protobufString(2, 'E2E Organization'),
+    protobufString(
+      2,
+      multipleOrganizations ? 'Acme Corporation' : 'E2E Organization',
+    ),
     protobufBytes(3, organizationRole),
     ...(hasProject ? [protobufBytes(5, projectValue)] : []),
   ]);
+  const secondProjectValue = Buffer.concat([
+    protobufUnsignedInteger(1, 303),
+    protobufString(2, 'Sales Operations'),
+    protobufBytes(3, projectRole),
+  ]);
+  const secondOrganizationValue = Buffer.concat([
+    protobufUnsignedInteger(1, 203),
+    protobufString(2, 'Northwind Group'),
+    protobufBytes(3, organizationRole),
+    ...(hasProject ? [protobufBytes(5, secondProjectValue)] : []),
+  ]);
 
   const authentication = [protobufBytes(1, principal), protobufBytes(2, user)];
-  if (organization) authentication.push(protobufBytes(3, organizationValue));
+  if (organization) {
+    authentication.push(protobufBytes(3, organizationValue));
+    if (multipleOrganizations)
+      authentication.push(protobufBytes(3, secondOrganizationValue));
+  }
   return Buffer.concat(authentication);
 }
 
