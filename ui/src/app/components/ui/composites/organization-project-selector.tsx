@@ -1,18 +1,17 @@
 import { useMemo, useState, type Ref } from 'react';
-import {
-  ContainedList,
-  ContainedListItem,
-  Popover,
-  PopoverContent,
-  Search,
-} from '@carbon/react';
+import { ContainedList, ContainedListItem, Search } from '@carbon/react';
 import {
   Application,
   Checkmark,
   ChevronDown,
   Enterprise,
 } from '@carbon/icons-react';
-import { GhostButton, Text } from '@/app/components/ui/primitives';
+import {
+  GhostButton,
+  Popover,
+  PopoverContent,
+  Text,
+} from '@/app/components/ui/primitives';
 import { cn } from '@/utils';
 
 export interface OrganizationProjectSelectorProject {
@@ -87,7 +86,6 @@ export function OrganizationProjectSelector({
     <Popover
       align="bottom-end"
       autoAlign
-      caret={false}
       open={isOpen}
       onRequestClose={() => {
         setIsOpen(false);

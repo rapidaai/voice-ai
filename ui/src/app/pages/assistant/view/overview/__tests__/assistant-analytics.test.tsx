@@ -132,7 +132,11 @@ jest.mock('@carbon/react', () => ({
       style={{ width }}
     />
   ),
-  Toggletip: ({ children }: any) => <span>{children}</span>,
+  Toggletip: ({ align, children }: any) => (
+    <span data-align={align} data-testid="sessions-toggletip">
+      {children}
+    </span>
+  ),
   ToggletipButton: ({ label }: any) => <button type="button">{label}</button>,
   ToggletipContent: ({ children }: any) => {
     const nodes = require('react').Children.toArray(children);
@@ -163,6 +167,11 @@ describe('AssistantAnalytics sessions toggletip', () => {
     const user = userEvent.setup({ writeToClipboard: false });
     const assistant = { getId: () => 'assistant-1' } as any;
     render(<AssistantAnalytics assistant={assistant} />);
+
+    expect(screen.getByTestId('sessions-toggletip')).toHaveAttribute(
+      'data-align',
+      'bottom-start',
+    );
 
     expect(screen.getByTestId('assistant-overview-content')).toHaveClass(
       'mx-auto',

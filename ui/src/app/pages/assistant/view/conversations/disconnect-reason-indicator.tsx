@@ -29,7 +29,7 @@ export const DisconnectReasonIndicator = ({
           {display.label}
         </Tag>
       )}
-      <Toggletip align="bottom-left">
+      <Toggletip align="bottom-start">
         <ToggletipButton
           label="View disconnect details"
           title="View disconnect details"

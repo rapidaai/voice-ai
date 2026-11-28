@@ -4,11 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { Aside } from '../aside';
 
 let mockOpen = true;
+let mockLocked = false;
 const mockSetOpen = jest.fn();
 
 jest.mock('@/context/sidebar-context', () => ({
   useSidebar: () => ({
     open: mockOpen,
+    locked: mockLocked,
     setOpen: mockSetOpen,
   }),
 }));
@@ -16,6 +18,7 @@ jest.mock('@/context/sidebar-context', () => ({
 describe('Aside', () => {
   beforeEach(() => {
     mockOpen = true;
+    mockLocked = false;
     mockSetOpen.mockClear();
   });
 
@@ -82,5 +85,22 @@ describe('Aside', () => {
     expect(onMouseLeave).toHaveBeenCalledTimes(1);
     expect(mockSetOpen).toHaveBeenNthCalledWith(1, true);
     expect(mockSetOpen).toHaveBeenNthCalledWith(2, false);
+  });
+
+  it('does not request a close when the sidebar is locked', async () => {
+    const user = userEvent.setup({ writeToClipboard: false });
+    mockLocked = true;
+
+    render(
+      <Aside aria-label="Primary navigation" data-testid="aside">
+        Navigation
+      </Aside>,
+    );
+
+    await user.hover(screen.getByTestId('aside'));
+    mockSetOpen.mockClear();
+    await user.unhover(screen.getByTestId('aside'));
+
+    expect(mockSetOpen).not.toHaveBeenCalled();
   });
 });
