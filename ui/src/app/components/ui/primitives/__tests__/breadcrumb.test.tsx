@@ -12,17 +12,16 @@ jest.mock('@carbon/react', () => ({
     </span>
   ),
   BreadcrumbSkeleton: () => <div data-testid="breadcrumb-skeleton" />,
-  OverflowMenu: ({ children, iconDescription }: any) => (
+  OverflowMenu: ({ children, label }: any) => (
     <div data-carbon-breadcrumb-overflow>
-      <button type="button" aria-label={iconDescription} />
+      <button type="button" aria-label={label} />
       {children}
     </div>
   ),
-  OverflowMenuItem: ({ href, itemText }: any) => (
-    <a data-overflow-breadcrumb-item href={href}>
-      {itemText}
-    </a>
+  MenuItem: ({ label }: any) => (
+    <span data-overflow-breadcrumb-item>{label}</span>
   ),
+  MenuItemDivider: () => <hr />,
 }));
 
 describe('Breadcrumb', () => {
@@ -45,7 +44,6 @@ describe('Breadcrumb', () => {
     expect(screen.getByText('Workspace')).toHaveAttribute(
       'data-overflow-breadcrumb-item',
     );
-    expect(screen.getByText('Workspace')).toHaveAttribute('href', '/workspace');
     expect(screen.getByText('Home').closest('[data-breadcrumb-item]')).not.toBe(
       null,
     );

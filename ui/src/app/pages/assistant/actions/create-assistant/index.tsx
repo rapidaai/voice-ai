@@ -425,7 +425,8 @@ export function CreateAssistantPage() {
               onAction={interfaceTour.dismiss}
               onClose={interfaceTour.dismiss}
               open={interfaceTour.step === 'continue'}
-              targetClassName="flex w-full [&>.cds--popover-container>.cds--btn]:w-full [&>.cds--popover-container>.cds--btn]:max-w-none!"
+              targetClassName="flex w-full [&_.cds--btn]:w-full [&_.cds--btn]:max-w-none!"
+              targetWrapperClassName="flex w-full"
               title="Continue your setup"
             >
               {action}
@@ -451,6 +452,7 @@ export function CreateAssistantPage() {
               onClose={interfaceTour.dismiss}
               open={interfaceTour.step === 'template'}
               targetClassName="block w-full"
+              targetWrapperClassName="w-full"
               title="Choose a usecase template"
             >
               <div
@@ -493,6 +495,7 @@ export function CreateAssistantPage() {
               onClose={interfaceTour.dismiss}
               open={interfaceTour.step === 'model'}
               targetClassName="block w-full"
+              targetWrapperClassName="w-full"
               title="Select a model and credential"
             >
               <div

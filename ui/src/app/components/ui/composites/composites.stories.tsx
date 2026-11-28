@@ -3,7 +3,7 @@ import { Button, Stack } from '@carbon/react';
 import { useState } from 'react';
 import { DateFilter } from './date-filter';
 import { SearchIconInput } from './icon-input';
-import { CardOptionMenu, OptionMenu, OptionMenuItem } from './menu';
+import { CardOptionMenu, OptionMenu } from './menu';
 import { QuerySearch, type QuerySearchField } from './query-search';
 import { CreateFullPageWithHeader } from './create-full-page';
 import { TableToolbarFilter } from './table-toolbar-filter';
@@ -63,17 +63,18 @@ export const SearchAndMenus: Story = {
       <div className="flex items-center gap-3">
         <OptionMenu
           options={[
-            { option: <span>Open</span>, onActionClick: () => {} },
+            { label: 'Open', onActionClick: () => {} },
             {
-              option: <OptionMenuItem type="danger">Delete</OptionMenuItem>,
+              label: 'Delete',
+              kind: 'danger',
               onActionClick: () => {},
             },
           ]}
         />
         <CardOptionMenu
           options={[
-            { option: <span>Rename</span>, onActionClick: () => {} },
-            { option: <span>Archive</span>, onActionClick: () => {} },
+            { label: 'Rename', onActionClick: () => {} },
+            { label: 'Archive', onActionClick: () => {} },
           ]}
         />
       </div>

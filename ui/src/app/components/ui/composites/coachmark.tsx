@@ -40,6 +40,7 @@ export function Coachmark({
   onClose,
   open,
   targetClassName,
+  targetWrapperClassName,
   title,
 }: {
   actionLabel: string;
@@ -51,6 +52,7 @@ export function Coachmark({
   onClose: () => void;
   open: boolean;
   targetClassName?: string;
+  targetWrapperClassName?: string;
   title: string;
 }) {
   if (!open) return children;
@@ -69,6 +71,7 @@ export function Coachmark({
             '[&>.cds--popover-container]:w-full',
             targetClassName,
           )}
+          targetWrapperClassName={targetWrapperClassName}
           title={title}
         >
           {children}

@@ -116,7 +116,7 @@ export interface CarbonDropdownProps<T> {
 /** Carbon Dropdown: single-select dropdown list. */
 export function Dropdown<T>({
   id,
-  autoAlign = false,
+  autoAlign,
   'aria-label': ariaLabel,
   titleText,
   label,
@@ -209,7 +209,7 @@ export interface CarbonMultiSelectProps<T> {
 /** Carbon MultiSelect: multi-select dropdown with checkboxes. */
 export function MultiSelect<T>({
   id,
-  autoAlign = false,
+  autoAlign,
   titleText,
   label,
   items,

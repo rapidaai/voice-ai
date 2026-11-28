@@ -13,8 +13,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  OverflowMenu,
-  OverflowMenuItem,
 } from '@carbon/react';
 import { Add } from '@carbon/icons-react';
 import toast from 'react-hot-toast/headless';
@@ -41,6 +39,7 @@ import {
   updateAssistantConfigurationEnabled,
 } from '@/clients/assistant.client';
 import { AssistantSettingsShellHeader } from '@/app/pages/assistant/components/settings-shell-header';
+import { OverflowMenu, OverflowMenuItem } from '@/app/components/ui/primitives';
 
 const authenticationConfigurationType = 'authentication';
 

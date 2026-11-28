@@ -837,9 +837,14 @@ export function validateCarbonPropertyCoverage(repoRoot = DEFAULT_REPO_ROOT) {
   const diagnostics = [];
   const brandOverrides = THEME_CONTRACT.carbonProperties?.brandOverrides;
   const presetOwned = THEME_CONTRACT.carbonProperties?.presetOwned;
-  if (!isPlainObject(brandOverrides) || !Array.isArray(presetOwned)) {
+  const componentOwned = THEME_CONTRACT.carbonProperties?.componentOwned;
+  if (
+    !isPlainObject(brandOverrides) ||
+    !Array.isArray(presetOwned) ||
+    !Array.isArray(componentOwned)
+  ) {
     return [
-      `${THEME_CONTRACT_PATH}: carbonProperties must classify brand overrides and preset-owned properties`,
+      `${THEME_CONTRACT_PATH}: carbonProperties must classify brand overrides, preset-owned properties, and component-owned properties`,
     ];
   }
 
@@ -886,6 +891,7 @@ export function validateCarbonPropertyCoverage(repoRoot = DEFAULT_REPO_ROOT) {
     }
   }
   for (const property of presetOwned) classify(property, 'carbon-preset');
+  for (const property of componentOwned) classify(property, 'app-component');
 
   let carbonAdapter = '';
   try {

@@ -1,5 +1,6 @@
 const {
   AUTHENTICATION_PATHS,
+  COLOR_MODES,
   checkA11y,
   expect,
   gotoJourney,
@@ -7,6 +8,7 @@ const {
   setColorMode,
   test,
 } = require('../../fixtures');
+const { getDashboardRequests } = require('../../mocks/clients/dashboard');
 const { routeJourneys } = require('../../route-manifest');
 const themeContract = require('../../../src/theme/theme-contract.json');
 
@@ -678,6 +680,90 @@ test('sign-in submits through the authentication client and opens the dashboard'
   await request;
   await expect(page).toHaveURL(/\/dashboard$/);
 });
+
+for (const colorMode of COLOR_MODES) {
+  test(`multi-organization sign-in defaults context and supports switching in ${colorMode} mode`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await setColorMode(page, colorMode);
+    await mockAuthenticationOperation(page, 'signIn', {
+      success: true,
+      authentication: {
+        multipleOrganizations: true,
+        selectedTenant: false,
+      },
+    });
+    await gotoJourney(page, authJourney('signin'));
+
+    await submitSignIn(page);
+
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(
+      page.getByText('Top Assistants', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', {
+        name: /Current organization: Acme Corporation\. Current project: Customer Support\./,
+      }),
+    ).toBeVisible();
+    await expect.poll(() => getDashboardRequests(page)).toHaveLength(1);
+    expect(getDashboardRequests(page)[0]).toMatchObject({
+      organizationID: '202',
+      projectID: '302',
+    });
+    await page.evaluate(() => document.fonts.ready);
+    await expect(page).toHaveScreenshot(
+      [
+        'auth',
+        'multi-organization-signin',
+        'defaulted',
+        `lg-${colorMode}.png`,
+      ],
+      { maxDiffPixelRatio: 0.01 },
+    );
+
+    await page.getByRole('button', { name: 'Close tour' }).click();
+    await page
+      .getByRole('button', {
+        name: /Current organization: Acme Corporation\. Current project: Customer Support\./,
+      })
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Switch context' }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Acme Corporation', { exact: true }),
+    ).toHaveCount(2);
+    await expect(
+      page.getByText('Northwind Group', { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByLabel('Selected project')).toBeVisible();
+    await expect(page).toHaveScreenshot(
+      ['auth', 'multi-organization-signin', 'selector', `lg-${colorMode}.png`],
+      { maxDiffPixelRatio: 0.01 },
+    );
+
+    await page.getByText('Sales Operations', { exact: true }).click();
+    await expect(
+      page.getByText('Top Assistants', { exact: true }),
+    ).toBeVisible();
+    await expect.poll(() => getDashboardRequests(page)).toHaveLength(2);
+    expect(getDashboardRequests(page)[1]).toMatchObject({
+      organizationID: '203',
+      projectID: '303',
+    });
+    await expect(
+      page.getByRole('button', {
+        name: /Current organization: Northwind Group\. Current project: Sales Operations\./,
+      }),
+    ).toBeVisible();
+    await expect(page).toHaveScreenshot(
+      ['auth', 'multi-organization-signin', 'switched', `lg-${colorMode}.png`],
+      { maxDiffPixelRatio: 0.01 },
+    );
+  });
+}
 
 test('sign-in displays the authentication client error', async ({ page }) => {
   await mockAuthenticationOperation(page, 'signIn', {

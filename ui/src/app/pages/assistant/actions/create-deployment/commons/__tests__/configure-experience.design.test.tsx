@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import developmentConfig from '@/configs/config.development.json';
 import { ThemeProvider } from '@/theme/theme-provider';
 import { ThemeManifest } from '@/theme/types';
@@ -42,7 +42,11 @@ jest.mock('@carbon/react', () => ({
       />
     );
   },
-  Toggletip: ({ children }: any) => <div>{children}</div>,
+  Toggletip: ({ align, children }: any) => (
+    <div data-align={align} data-testid="experience-toggletip">
+      {children}
+    </div>
+  ),
   ToggletipActions: ({ children }: any) => <div>{children}</div>,
   ToggletipButton: ({ children, label }: any) => (
     <button aria-label={label}>{children}</button>
@@ -86,6 +90,12 @@ describe('ConfigureExperience', () => {
       max: 120,
       value: 10,
     });
+    expect(screen.getAllByTestId('experience-toggletip')).not.toHaveLength(0);
+    screen
+      .getAllByTestId('experience-toggletip')
+      .forEach(toggletip =>
+        expect(toggletip).toHaveAttribute('data-align', 'bottom-start'),
+      );
   });
 
   it('shows zero as unlimited without replacing the saved count', () => {

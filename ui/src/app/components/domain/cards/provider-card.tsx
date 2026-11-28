@@ -25,7 +25,6 @@ function ProviderCardComponent({ provider, className }: ProviderCardProps) {
   const { providerCredentials } = useAllProviderCredentials();
   const [createProviderModalOpen, setCreateProviderModalOpen] = useState(false);
   const [viewProviderModalOpen, setViewProviderModalOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const isConnected = useMemo(
     () =>
@@ -60,25 +59,16 @@ function ProviderCardComponent({ provider, className }: ProviderCardProps) {
               className="h-8 w-8 object-contain"
             />
           </div>
-          <OverflowMenu
-            size="sm"
-            flipped
-            iconDescription="Actions"
-            open={menuOpen}
-            onOpen={() => setMenuOpen(true)}
-            onClose={() => setMenuOpen(false)}
-          >
+          <OverflowMenu size="sm" flipped iconDescription="Actions">
             <OverflowMenuItem
               itemText="Create a credential"
               onClick={() => {
-                setMenuOpen(false);
                 setCreateProviderModalOpen(true);
               }}
             />
             <OverflowMenuItem
               itemText="View credential"
               onClick={() => {
-                setMenuOpen(false);
                 setViewProviderModalOpen(true);
               }}
             />

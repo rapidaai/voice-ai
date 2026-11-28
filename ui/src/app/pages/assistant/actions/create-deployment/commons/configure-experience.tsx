@@ -90,7 +90,7 @@ export const ConfigureExperience: FC<{
   ) => (
     <div className="form-wrapper">
       <FormLabel id={labelId}>{label}</FormLabel>
-      <Toggletip align="bottom-left">
+      <Toggletip align="bottom-start">
         <ToggletipButton
           label={`${label} information`}
           title={`${label} information`}

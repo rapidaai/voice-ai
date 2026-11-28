@@ -76,7 +76,8 @@
       "--cds-text-placeholder",
       "--cds-text-primary",
       "--cds-text-secondary"
-    ]
+    ],
+    "componentOwned": ["--cds-popover-offset"]
   },
   "carbonThemes": {
     "light": {

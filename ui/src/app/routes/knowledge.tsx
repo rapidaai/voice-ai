@@ -37,7 +37,12 @@ export const knowledgeRoute: RouteObject = {
     {
       path: ':id',
       element: <KnowledgeViewLayout />,
-      handle: { breadcrumb: { render: KnowledgeBreadcrumbLabel } },
+      handle: {
+        breadcrumb: {
+          render: KnowledgeBreadcrumbLabel,
+          overflowLabel: 'Knowledge',
+        },
+      },
       children: [
         { index: true, element: <KnowledgeViewKnowledgePage /> },
         {

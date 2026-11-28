@@ -110,7 +110,12 @@ export const deploymentRoute: RouteObject = {
         {
           path: ':endpointId',
           element: <EndpointViewLayout />,
-          handle: { breadcrumb: { render: EndpointBreadcrumbLabel } },
+          handle: {
+            breadcrumb: {
+              render: EndpointBreadcrumbLabel,
+              overflowLabel: 'Endpoint',
+            },
+          },
           children: [
             { index: true, element: <Navigate to="overview" replace /> },
             {
@@ -175,7 +180,12 @@ export const deploymentRoute: RouteObject = {
         {
           path: ':assistantId',
           element: <AssistantViewLayout />,
-          handle: { breadcrumb: { render: AssistantBreadcrumbLabel } },
+          handle: {
+            breadcrumb: {
+              render: AssistantBreadcrumbLabel,
+              overflowLabel: 'Assistant',
+            },
+          },
           children: [
             { index: true, element: <Navigate to="overview" replace /> },
             {

@@ -290,6 +290,15 @@ describe('activity log modal content', () => {
     expect(screen.getByText('null')).toHaveAttribute('data-language', 'json');
   });
 
+  it('renders serialized code as JSON', () => {
+    render(<LogCodePanel value={{ status: 'ok' }} />);
+
+    expect(screen.getByText(/"status": "ok"/)).toHaveAttribute(
+      'data-language',
+      'json',
+    );
+  });
+
   it('falls back to null JSON when a value cannot be serialized', () => {
     render(<LogCodePanel value={() => undefined} />);
 

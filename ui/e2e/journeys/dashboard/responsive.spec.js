@@ -160,6 +160,25 @@ test('header presents organization and project as one searchable hierarchy', asy
       name: 'Search organizations or projects',
     }),
   ).toBeVisible();
+  const popover = page
+    .locator('.app-popover--without-caret')
+    .filter({ has: contextSwitcher });
+  await expect(
+    popover.locator(
+      ':scope > .cds--popover > .cds--popover-content > .cds--popover-caret',
+    ),
+  ).toHaveCSS('display', 'none');
+  await expect
+    .poll(() =>
+      popover.evaluate(element => {
+        const offset = getComputedStyle(element)
+          .getPropertyValue('--cds-popover-offset')
+          .trim();
+        const value = Number.parseFloat(offset);
+        return offset.endsWith('rem') ? value * 16 : value;
+      }),
+    )
+    .toBe(4);
   const selector = page.locator('.cds--popover-content');
   const organizationLabel = selector.getByText('E2E Organization', {
     exact: true,

@@ -106,7 +106,7 @@ jest.mock('@/app/components/ui/composites', () => ({
     <div>
       {options.map((option: any, index: number) => (
         <button key={index} type="button" onClick={option.onActionClick}>
-          {option.option}
+          {option.label}
         </button>
       ))}
     </div>
@@ -326,7 +326,7 @@ describe('domain cards', () => {
           knowledge={makeKnowledge()}
           knowledgeOptions={[
             {
-              option: 'Archive',
+              label: 'Archive',
               onActionClick,
             },
           ]}

@@ -91,9 +91,6 @@ export const ConfigureAssistantDeploymentPage = () => {
   const [isWidgetExpanded, setIsWidgetExpanded] = useState(false);
   const [isAddDeploymentOpen, setIsAddDeploymentOpen] = useState(false);
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
-  const [openActionsMenu, setOpenActionsMenu] = useState<DeploymentType | null>(
-    null,
-  );
   const [versionType, setVersionType] =
     useState<AssistantDeploymentType | null>(null);
 
@@ -510,18 +507,10 @@ export const ConfigureAssistantDeploymentPage = () => {
                                   size="md"
                                   flipped
                                   iconDescription={`Actions for ${row.name}`}
-                                  open={openActionsMenu === row.type}
-                                  onOpen={() => setOpenActionsMenu(row.type)}
-                                  onClose={() =>
-                                    setOpenActionsMenu(current =>
-                                      current === row.type ? null : current,
-                                    )
-                                  }
                                 >
                                   <OverflowMenuItem
                                     itemText="View deployment details"
                                     onClick={() => {
-                                      setOpenActionsMenu(null);
                                       row.onDetails();
                                     }}
                                   />
@@ -538,7 +527,6 @@ export const ConfigureAssistantDeploymentPage = () => {
                                   <OverflowMenuItem
                                     itemText="View all versions"
                                     onClick={() => {
-                                      setOpenActionsMenu(null);
                                       setVersionType(row.type);
                                       setIsVersionsOpen(true);
                                     }}

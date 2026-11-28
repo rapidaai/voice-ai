@@ -32,7 +32,11 @@ import type {
 } from 'reactflow';
 import { Helmet } from '@/app/components/app-shell/helmet';
 import { ConfigPrompt } from '@/app/components/domain/configuration/config-prompt';
-import { FormLabel } from '@/app/components/ui/primitives';
+import {
+  FormLabel,
+  OverflowMenu,
+  OverflowMenuItem,
+} from '@/app/components/ui/primitives';
 import { TagInput } from '@/app/components/ui/composites';
 import { TableForm } from '@/app/components/ui/table';
 import { AssistantTag } from '@/app/components/domain/tags/assistant-tags';
@@ -57,8 +61,6 @@ import {
   Button,
   Checkbox,
   ContentSwitcher,
-  OverflowMenu,
-  OverflowMenuItem,
   StructuredListBody,
   StructuredListCell,
   StructuredListRow,
@@ -445,7 +447,7 @@ const NODE_TOOLBAR_CLASS =
 const NODE_TOOLBAR_BUTTON_CLASS =
   '!inline-flex !h-7 !min-h-7 !items-center !gap-1.5 !px-2 !text-xs !font-normal !text-foreground hover:!bg-layer hover:!text-foreground [&_svg]:!fill-current';
 const NODE_TOOLBAR_MENU_CLASS =
-  '!h-7 !w-7 !text-foreground hover:!bg-layer [&_svg]:!fill-current';
+  '[&_.cds--overflow-menu]:!h-7 [&_.cds--overflow-menu]:!w-7 [&_.cds--overflow-menu]:!text-foreground [&_.cds--overflow-menu:hover]:!bg-layer [&_.cds--overflow-menu_svg]:!fill-current';
 const NODE_TOOLBAR_MENU_ITEM_CLASS = '!text-xs !text-foreground ';
 const INPUT_CONNECTOR_CLASS = 'z-20 h-2.5 w-2.5 rounded-full border-none';
 const OUTPUT_CONNECTOR_CLASS = 'z-20 h-2.5 w-2.5 rounded-full border-none';

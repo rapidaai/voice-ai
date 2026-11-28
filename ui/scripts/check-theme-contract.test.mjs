@@ -137,10 +137,18 @@ const createFixtureRepo = context => {
   const presetReferences = THEME_CONTRACT.carbonProperties.presetOwned.map(
     property => `color: var(${property});`,
   );
+  const componentDeclarations =
+    THEME_CONTRACT.carbonProperties.componentOwned.map(
+      property => `${property}: 0.25rem;`,
+    );
   writeFixtureFile(
     repoRoot,
     'ui/src/styles/carbon.scss',
-    `:root {\n${[...brandMappings, ...presetReferences].join('\n')}\n}\n`,
+    `:root {\n${[
+      ...brandMappings,
+      ...presetReferences,
+      ...componentDeclarations,
+    ].join('\n')}\n}\n`,
   );
   writeFixtureFile(
     repoRoot,

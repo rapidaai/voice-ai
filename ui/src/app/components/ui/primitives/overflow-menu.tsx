@@ -1,43 +1,56 @@
-import type { ElementType, MouseEventHandler, ReactNode } from 'react';
+import type {
+  ComponentType,
+  ElementType,
+  KeyboardEvent,
+  MouseEvent,
+  MouseEventHandler,
+  ReactNode,
+} from 'react';
 import {
   OverflowMenu as CarbonOverflowMenu,
-  OverflowMenuItem as CarbonOverflowMenuItem,
+  MenuItem as CarbonMenuItem,
+  MenuItemDivider,
 } from '@carbon/react';
 import { cn } from '@/utils';
 
 type OverflowMenuSize = 'xs' | 'sm' | 'md' | 'lg';
 type MenuDirection = 'top' | 'bottom';
+type MenuAlignment = 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end';
+
+interface CarbonV12OverflowMenuProps {
+  children: ReactNode;
+  className?: string;
+  label: string;
+  menuAlignment: MenuAlignment;
+  renderIcon?: ElementType;
+  size: OverflowMenuSize;
+}
+
+const CarbonV12OverflowMenu =
+  CarbonOverflowMenu as ComponentType<CarbonV12OverflowMenuProps>;
 
 export interface OverflowMenuProps {
   children: ReactNode;
+  /** Styles the v12 menu container. Target descendant `.cds--overflow-menu` for trigger styles. */
   className?: string;
   size: OverflowMenuSize;
   iconDescription?: string;
   renderIcon?: ElementType;
   direction?: MenuDirection;
   flipped?: boolean;
-  open?: boolean;
-  onClick?: MouseEventHandler;
-  onClose?: () => void;
-  onOpen?: () => void;
   'aria-label'?: string;
-  id?: string;
-  menuOptionsClass?: string;
-  selectorPrimaryFocus?: string;
 }
 
 export interface OverflowMenuItemProps {
   className?: string;
-  itemText: ReactNode;
+  itemText: string;
   disabled?: boolean;
   isDelete?: boolean;
   hasDivider?: boolean;
   href?: string;
   onClick?: MouseEventHandler;
   dangerDescription?: string;
-  requireTitle?: boolean;
-  title?: string;
-  wrapperClassName?: string;
+  renderIcon?: ElementType;
 }
 
 /**
@@ -51,34 +64,22 @@ export function OverflowMenu({
   renderIcon,
   direction = 'bottom',
   flipped = false,
-  open,
-  onClick,
-  onClose,
-  onOpen,
-  id,
-  menuOptionsClass,
-  selectorPrimaryFocus,
-  ...rest
+  'aria-label': ariaLabel,
 }: OverflowMenuProps) {
+  const menuAlignment: MenuAlignment = `${direction}-${
+    flipped ? 'end' : 'start'
+  }`;
+
   return (
-    <CarbonOverflowMenu
+    <CarbonV12OverflowMenu
       className={cn(className)}
       size={size}
-      iconDescription={iconDescription}
+      label={ariaLabel ?? iconDescription}
       renderIcon={renderIcon}
-      direction={direction}
-      flipped={flipped}
-      open={open}
-      onClick={onClick}
-      onClose={onClose}
-      onOpen={onOpen}
-      id={id}
-      menuOptionsClass={menuOptionsClass}
-      selectorPrimaryFocus={selectorPrimaryFocus}
-      {...rest}
+      menuAlignment={menuAlignment}
     >
       {children}
-    </CarbonOverflowMenu>
+    </CarbonV12OverflowMenu>
   );
 }
 
@@ -95,23 +96,29 @@ export function OverflowMenuItem({
   href,
   onClick,
   dangerDescription,
-  requireTitle,
-  title,
-  wrapperClassName,
+  renderIcon,
 }: OverflowMenuItemProps) {
+  const handleClick = (
+    event: KeyboardEvent<HTMLLIElement> | MouseEvent<HTMLLIElement>,
+  ) => {
+    onClick?.(event as unknown as MouseEvent<HTMLElement>);
+    if (href && !event.defaultPrevented) {
+      window.location.assign(href);
+    }
+  };
+
   return (
-    <CarbonOverflowMenuItem
-      className={cn(className)}
-      itemText={itemText}
-      disabled={disabled}
-      isDelete={isDelete}
-      hasDivider={hasDivider}
-      href={href}
-      onClick={onClick}
-      dangerDescription={dangerDescription}
-      requireTitle={requireTitle}
-      title={title}
-      wrapperClassName={wrapperClassName}
-    />
+    <>
+      {hasDivider && <MenuItemDivider />}
+      <CarbonMenuItem
+        className={cn(className)}
+        label={itemText}
+        disabled={disabled}
+        kind={isDelete ? 'danger' : 'default'}
+        onClick={handleClick}
+        dangerDescription={dangerDescription}
+        renderIcon={renderIcon}
+      />
+    </>
   );
 }

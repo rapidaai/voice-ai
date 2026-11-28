@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Filter } from '@carbon/icons-react';
-import { Button, Checkbox, Popover, PopoverContent } from '@carbon/react';
+import { Button, Checkbox } from '@carbon/react';
+import { Popover, PopoverContent } from '@/app/components/ui/primitives';
 import { cn } from '@/utils';
 
 export interface FilterOption {
@@ -67,7 +68,6 @@ export function TableToolbarFilter({
     <Popover
       as="div"
       align="bottom-end"
-      caret={false}
       className={cn('relative flex items-center', className)}
       onRequestClose={() => setOpen(false)}
       open={open}

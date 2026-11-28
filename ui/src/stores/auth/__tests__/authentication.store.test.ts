@@ -15,16 +15,20 @@ const emptyAuthenticationState = {
 function authenticationFields({
   organizationID = 'organization-2',
   projectID = 'project-2',
+  firstOrganizationHasProject = true,
 }: {
   organizationID?: string;
   projectID?: string;
+  firstOrganizationHasProject?: boolean;
 } = {}) {
   const organizations = [
     {
       id: 'organization-1',
       name: 'First organization',
       rolesList: [],
-      projectsList: [],
+      projectsList: firstOrganizationHasProject
+        ? [{ id: 'project-0', name: 'Default project', rolesList: [] }]
+        : [],
     },
     {
       id: 'organization-2',
@@ -98,7 +102,7 @@ describe('useAuthenticationStore', () => {
     expect(onStored).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps a tenantless multi-organization authentication unselected', () => {
+  it('defaults a tenantless multi-organization authentication to its first context', () => {
     const { authentication, token } = authenticationFields({
       organizationID: '',
       projectID: '',
@@ -110,7 +114,22 @@ describe('useAuthenticationStore', () => {
     const state = useAuthenticationStore.getState();
     expect(stored).toBe(true);
     expect(state.hasOrganizations()).toBe(true);
-    expect(state.getCurrentOrganization()).toBeUndefined();
+    expect(state.getCurrentOrganization()?.id).toBe('organization-1');
+    expect(state.getCurrentProject()?.id).toBe('project-0');
+  });
+
+  it('keeps a tenantless projectless first organization at organization scope', () => {
+    const { authentication, token } = authenticationFields({
+      organizationID: '',
+      projectID: '',
+      firstOrganizationHasProject: false,
+    });
+    useAuthenticationStore
+      .getState()
+      .setAuthentication(authentication as never, token as never, jest.fn());
+
+    const state = useAuthenticationStore.getState();
+    expect(state.getCurrentOrganization()?.id).toBe('organization-1');
     expect(state.getCurrentProject()).toBeUndefined();
 
     const secondOrganization = state.getOrganizations()[1];
@@ -121,6 +140,46 @@ describe('useAuthenticationStore', () => {
     expect(useAuthenticationStore.getState().getCurrentProject()?.id).toBe(
       'project-1',
     );
+  });
+
+  it('keeps a valid prior context ahead of the tenantless fallback', () => {
+    useAuthenticationStore.setState({
+      selectedOrganizationID: 'organization-2',
+      selectedProjectID: 'project-2',
+    });
+    const { authentication, token } = authenticationFields({
+      organizationID: '',
+      projectID: '',
+    });
+
+    useAuthenticationStore
+      .getState()
+      .setAuthentication(authentication as never, token as never, jest.fn());
+
+    expect(useAuthenticationStore.getState()).toMatchObject({
+      selectedOrganizationID: 'organization-2',
+      selectedProjectID: 'project-2',
+    });
+  });
+
+  it('ignores stale prior context and uses the first verified context', () => {
+    useAuthenticationStore.setState({
+      selectedOrganizationID: 'stale-organization',
+      selectedProjectID: 'stale-project',
+    });
+    const { authentication, token } = authenticationFields({
+      organizationID: '',
+      projectID: '',
+    });
+
+    useAuthenticationStore
+      .getState()
+      .setAuthentication(authentication as never, token as never, jest.fn());
+
+    expect(useAuthenticationStore.getState()).toMatchObject({
+      selectedOrganizationID: 'organization-1',
+      selectedProjectID: 'project-0',
+    });
   });
 
   it('changes organization and project together only for a valid pair', () => {

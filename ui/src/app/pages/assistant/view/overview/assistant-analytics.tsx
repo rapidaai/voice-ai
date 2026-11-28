@@ -301,7 +301,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
   const emptyDashboardCaption = 'Dashboard data not loaded';
 
   const sessionsAction = (
-    <Toggletip align="bottom-left">
+    <Toggletip align="bottom-start">
       <ToggletipButton label="Sessions actions" title="Sessions actions">
         <Information size={16} className="text-muted " />
       </ToggletipButton>

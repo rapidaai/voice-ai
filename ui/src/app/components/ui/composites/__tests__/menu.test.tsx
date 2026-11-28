@@ -3,41 +3,40 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
-import { CardOptionMenu, OptionMenu, OptionMenuItem } from '../menu';
+import { CardOptionMenu, OptionMenu } from '../menu';
 
 jest.mock('@carbon/react', () => ({
   OverflowMenu: ({
     children,
     className,
-    direction,
-    flipped,
-    iconDescription,
+    label,
+    menuAlignment,
     renderIcon: Icon,
     size,
   }: any) => (
     <div
+      className={className}
       data-design-system-overflow-menu
-      data-direction={direction}
-      data-flipped={String(flipped)}
+      data-menu-alignment={menuAlignment}
       data-size={size}
     >
-      <button type="button" aria-label={iconDescription} className={className}>
+      <button type="button" aria-label={label}>
         {Icon ? <Icon /> : null}
       </button>
       <div>{children}</div>
     </div>
   ),
-  OverflowMenuItem: ({ itemText, isDelete, hasDivider, onClick }: any) => (
+  MenuItem: ({ label, kind, onClick }: any) => (
     <button
       type="button"
       data-design-system-overflow-menu-item
-      data-has-divider={String(hasDivider)}
-      data-is-delete={String(isDelete)}
+      data-kind={kind}
       onClick={onClick}
     >
-      {itemText}
+      {label}
     </button>
   ),
+  MenuItemDivider: () => <hr data-menu-item-divider />,
 }));
 
 jest.mock('@carbon/icons-react', () => ({
@@ -54,7 +53,7 @@ describe('Menu', () => {
       <OptionMenu
         options={[
           {
-            option: <span>Open</span>,
+            label: 'Open',
             onActionClick,
           },
         ]}
@@ -73,10 +72,10 @@ describe('Menu', () => {
   it('keeps CardOptionMenu trigger classes and icon', () => {
     render(
       <CardOptionMenu
-        classNames="w-9 h-9"
+        classNames="menu-container [&_.cds--overflow-menu]:w-9 [&_.cds--overflow-menu]:h-9"
         options={[
           {
-            option: <span>Re-index</span>,
+            label: 'Re-index',
             onActionClick: jest.fn(),
           },
         ]}
@@ -84,8 +83,13 @@ describe('Menu', () => {
     );
 
     expect(screen.getByTestId('chevron-down-icon')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Menu' })).toHaveClass('w-9');
-    expect(screen.getByRole('button', { name: 'Menu' })).toHaveClass('h-9');
+    expect(
+      document.querySelector('[data-design-system-overflow-menu]'),
+    ).toHaveClass(
+      'menu-container',
+      '[&_.cds--overflow-menu]:w-9',
+      '[&_.cds--overflow-menu]:h-9',
+    );
   });
 
   it('maps danger options to Carbon delete menu items with a divider', () => {
@@ -93,7 +97,8 @@ describe('Menu', () => {
       <OptionMenu
         options={[
           {
-            option: <OptionMenuItem type="danger">Delete</OptionMenuItem>,
+            label: 'Delete',
+            kind: 'danger',
             onActionClick: jest.fn(),
           },
         ]}
@@ -101,7 +106,7 @@ describe('Menu', () => {
     );
 
     const action = screen.getByRole('button', { name: 'Delete' });
-    expect(action).toHaveAttribute('data-is-delete', 'true');
-    expect(action).toHaveAttribute('data-has-divider', 'true');
+    expect(action).toHaveAttribute('data-kind', 'danger');
+    expect(document.querySelector('[data-menu-item-divider]')).not.toBeNull();
   });
 });

@@ -51,8 +51,11 @@ describe('OrganizationProjectSelector', () => {
     expect(trigger.closest('.cds--popover-container')).toHaveClass(
       'cds--popover--auto-align',
     );
-    expect(trigger.closest('.cds--popover-container')).not.toHaveClass(
-      'cds--popover--caret',
+    expect(trigger.closest('.cds--popover-container')).toHaveClass(
+      'app-popover--without-caret',
+      '[--cds-popover-offset:0.25rem]!',
+      '[&>.cds--popover>.cds--popover-caret]:!hidden',
+      '[&>.cds--popover>.cds--popover-content>.cds--popover-caret]:!hidden',
     );
     expect(
       document.querySelector('.cds--contained-list--md'),

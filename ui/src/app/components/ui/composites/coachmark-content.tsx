@@ -1,11 +1,17 @@
 import {
   useRef,
+  type ComponentType,
   type ComponentProps,
   type ReactElement,
   type RefObject,
 } from 'react';
 import { Button } from '@carbon/react';
 import { Coachmark as CarbonCoachmark } from '@carbon/ibm-products/lib/components/Coachmark/next/Coachmark/Coachmark';
+import { cn } from '@/utils';
+
+const CarbonV12Coachmark = CarbonCoachmark as ComponentType<
+  ComponentProps<typeof CarbonCoachmark> & { autoAlign?: boolean }
+>;
 
 export function CoachmarkContent({
   actionLabel,
@@ -16,6 +22,7 @@ export function CoachmarkContent({
   onAction,
   onClose,
   targetClassName,
+  targetWrapperClassName,
   title,
 }: {
   actionLabel: string;
@@ -26,6 +33,7 @@ export function CoachmarkContent({
   onAction: () => void;
   onClose: () => void;
   targetClassName?: string;
+  targetWrapperClassName?: string;
   title: string;
 }) {
   const hasClosedRef = useRef(false);
@@ -51,9 +59,11 @@ export function CoachmarkContent({
     restoreLauncherFocus();
   };
 
+  // Guided tours require stable authored placement around covered targets.
   return (
-    <CarbonCoachmark
+    <CarbonV12Coachmark
       align={align}
+      autoAlign={false}
       className={targetClassName}
       dropShadow
       launcherButtonRef={launcherButtonRef}
@@ -62,7 +72,12 @@ export function CoachmarkContent({
       preventCloseOnClickOutside
       selectorPrimaryFocus=".app-coachmark__action"
     >
-      {children}
+      <div
+        className={cn('app-coachmark__target', targetWrapperClassName)}
+        style={{ display: 'inherit' }}
+      >
+        {children}
+      </div>
       <CarbonCoachmark.Content
         aria-label={`${title} coachmark`}
         className="app-coachmark__content"
@@ -80,6 +95,6 @@ export function CoachmarkContent({
           </Button>
         </CarbonCoachmark.ContentBody>
       </CarbonCoachmark.Content>
-    </CarbonCoachmark>
+    </CarbonV12Coachmark>
   );
 }

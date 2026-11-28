@@ -15,7 +15,7 @@ export const DurationBreakdownToggletip = ({
   const rows = getDurationBreakdownRows(conversation);
 
   return (
-    <Toggletip align="bottom-left">
+    <Toggletip align="bottom-start">
       <ToggletipButton
         label="View duration breakdown"
         title="View duration breakdown"

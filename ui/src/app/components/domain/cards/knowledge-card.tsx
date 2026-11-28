@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from 'react';
+import type { HTMLAttributes } from 'react';
 import {
   Card,
   CardDescription,
@@ -7,13 +7,16 @@ import {
 } from '@/app/components/ui/primitives';
 import type { Knowledge } from '@rapidaai/react';
 import { cn } from '@/utils';
-import { CardOptionMenu } from '@/app/components/ui/composites';
+import {
+  CardOptionMenu,
+  type OptionMenuOption,
+} from '@/app/components/ui/composites';
 import { formatHumanReadableNumber } from '@/utils/format';
 import { Folders } from '@carbon/icons-react';
 
 interface KnowledgeCardProps extends HTMLAttributes<HTMLDivElement> {
   knowledge: Knowledge;
-  knowledgeOptions?: { option: ReactNode; onActionClick: () => void }[];
+  knowledgeOptions?: OptionMenuOption[];
   iconClasss?: string;
   titleClass?: string;
   descriptionClass?: string;
@@ -32,7 +35,7 @@ export function SelectKnowledgeCard({
           {knowledgeOptions && (
             <CardOptionMenu
               options={knowledgeOptions}
-              classNames="h-8 w-8 p-1 opacity-60"
+              classNames="[&_.cds--overflow-menu]:h-8 [&_.cds--overflow-menu]:w-8 [&_.cds--overflow-menu]:p-1 [&_.cds--overflow-menu]:opacity-60"
             />
           )}
         </header>

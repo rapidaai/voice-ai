@@ -4,9 +4,8 @@ import {
   Button,
   DatePicker as CarbonDatePicker,
   DatePickerInput,
-  Popover,
-  PopoverContent,
 } from '@carbon/react';
+import { Popover, PopoverContent } from '@/app/components/ui/primitives';
 import { cn } from '@/utils';
 
 export interface DateFilterProps {
@@ -36,7 +35,6 @@ export function DateFilter({ onApply, onReset, className }: DateFilterProps) {
     <Popover
       as="div"
       align="bottom-end"
-      caret={false}
       className={cn('relative flex items-center', className)}
       onRequestClose={() => setOpen(false)}
       open={open}

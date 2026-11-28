@@ -12,7 +12,7 @@ export function Aside({
   style,
   ...attributes
 }: AsideProps) {
-  const { open, setOpen } = useSidebar();
+  const { locked, open, setOpen } = useSidebar();
 
   const handleMouseEnter = (event: MouseEvent<HTMLElement>) => {
     onMouseEnter?.(event);
@@ -21,7 +21,7 @@ export function Aside({
 
   const handleMouseLeave = (event: MouseEvent<HTMLElement>) => {
     onMouseLeave?.(event);
-    setOpen(false);
+    if (!locked) setOpen(false);
   };
 
   return (

@@ -26,6 +26,11 @@ const journeySubjourneys = [
     'journeys/auth/authentication.spec.js',
   ),
   covered(
+    'auth.signin.multipleOrganizations',
+    'auth.signin',
+    'journeys/auth/authentication.spec.js',
+  ),
+  covered(
     'auth.signup.submit',
     'auth.signup',
     'journeys/auth/authentication.spec.js',
@@ -384,6 +389,11 @@ const journeySubjourneys = [
     'account.notifications',
     'account.settings',
     'journeys/account/settings.spec.js',
+  ),
+  covered(
+    'logs.llm.activityDetail',
+    'logs.llm',
+    'journeys/observability/activity-log-code-panel.spec.js',
   ),
   ...[
     'list',

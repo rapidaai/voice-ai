@@ -31,6 +31,7 @@ export * from './modal';
 export * from './overflow-menu';
 export * from './pagination';
 export * from './pill';
+export * from './popover';
 export * from './portal-to-follow-elem';
 export * from './select';
 export * from './slider';

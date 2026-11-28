@@ -70,7 +70,7 @@ export const KnowledgeCards: Story = {
         knowledge={knowledge as never}
         knowledgeOptions={[
           {
-            option: 'Archive',
+            label: 'Archive',
             onActionClick: () => undefined,
           },
         ]}

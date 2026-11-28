@@ -18,12 +18,8 @@ export function DocumentOption(props: {
 }) {
   const options = [
     {
-      option: (
-        <div className="flex items-center text-sm">
-          <span>Re-index the document</span>
-          <Renew className="w-4 h-4 ml-2" />
-        </div>
-      ),
+      label: 'Re-index the document',
+      renderIcon: Renew,
       onActionClick: () => {
         props.onReloadIndex(
           props.document.getKnowledgeid(),
@@ -35,7 +31,12 @@ export function DocumentOption(props: {
   ];
   return (
     <>
-      <CardOptionMenu classNames={cn('w-9 h-9')} options={options} />
+      <CardOptionMenu
+        classNames={cn(
+          '[&_.cds--overflow-menu]:h-9 [&_.cds--overflow-menu]:w-9',
+        )}
+        options={options}
+      />
     </>
   );
 }

@@ -156,7 +156,7 @@ const ConfigureAssistantKnowledge: FC<{ assistantId: string }> = ({
                 key={`knolwedge-card-${idx}`}
                 knowledgeOptions={[
                   {
-                    option: 'Update knowledge',
+                    label: 'Update knowledge',
                     onActionClick: () => {
                       navigation.goToEditAssistantKnowledge(
                         assistantId,
@@ -165,11 +165,8 @@ const ConfigureAssistantKnowledge: FC<{ assistantId: string }> = ({
                     },
                   },
                   {
-                    option: (
-                      <span className="text-support-error">
-                        Delete knowledge
-                      </span>
-                    ),
+                    label: 'Delete knowledge',
+                    kind: 'danger',
                     onActionClick: () => {
                       showDialog(() => {
                         deleteAssistantKnowledge(assistantId, itm.getId());
