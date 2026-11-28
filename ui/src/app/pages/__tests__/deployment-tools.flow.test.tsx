@@ -409,19 +409,42 @@ jest.mock('@/app/components/domain/tools/common', () => ({
   ),
 }));
 
-jest.mock('@/app/components/ui/primitives/overflow-menu', () => ({
-  OverflowMenu: ({ children, iconDescription, onOpen, open }: any) => (
-    <div data-menu-open={String(Boolean(open))}>
-      <button aria-label={iconDescription} onClick={onOpen}>
-        Open actions
-      </button>
-      {children}
-    </div>
-  ),
-  OverflowMenuItem: ({ itemText, onClick }: any) => (
-    <button onClick={onClick}>{itemText}</button>
-  ),
-}));
+jest.mock('@/app/components/ui/primitives/overflow-menu', () => {
+  const React = jest.requireActual('react');
+  const CloseMenuContext = React.createContext(() => {});
+
+  return {
+    OverflowMenu: ({ children, iconDescription }: any) => {
+      const [open, setOpen] = React.useState(false);
+      return (
+        <div data-menu-open={String(open)}>
+          <button
+            aria-label={iconDescription}
+            onClick={() => setOpen((current: boolean) => !current)}
+          >
+            Open actions
+          </button>
+          <CloseMenuContext.Provider value={() => setOpen(false)}>
+            {children}
+          </CloseMenuContext.Provider>
+        </div>
+      );
+    },
+    OverflowMenuItem: ({ itemText, onClick }: any) => {
+      const closeMenu = React.useContext(CloseMenuContext);
+      return (
+        <button
+          onClick={(event: React.MouseEvent) => {
+            onClick?.(event);
+            closeMenu();
+          }}
+        >
+          {itemText}
+        </button>
+      );
+    },
+  };
+});
 
 jest.mock('@/app/components/app-shell/helmet', () => ({ Helmet: () => null }));
 jest.mock('@/app/components/layout/compact-page-header', () => ({

@@ -96,6 +96,39 @@ describe('Coachmark', () => {
       'flex-1',
       '[&>.cds--popover-container]:w-full',
     );
+    expect(
+      screen.getByRole('button', { name: 'Target' }).parentElement,
+    ).toHaveClass('app-coachmark__target');
+    expect(
+      screen.getByRole('button', { name: 'Target' }).parentElement,
+    ).not.toHaveClass('h-full', 'w-full');
+  });
+
+  it('sizes the target wrapper only when the caller requests it', async () => {
+    const launcherButtonRef = createRef<HTMLButtonElement>();
+
+    render(
+      <Coachmark
+        actionLabel="Done"
+        align="right-start"
+        description="Description"
+        launcherButtonRef={launcherButtonRef}
+        onAction={jest.fn()}
+        onClose={jest.fn()}
+        open
+        targetWrapperClassName="h-full w-full"
+        title="Navigation"
+      >
+        <button ref={launcherButtonRef} type="button">
+          Navigation target
+        </button>
+      </Coachmark>,
+    );
+
+    await screen.findByRole('region', { name: 'Navigation coachmark' });
+    expect(
+      screen.getByRole('button', { name: 'Navigation target' }).parentElement,
+    ).toHaveClass('app-coachmark__target', 'h-full', 'w-full');
   });
 
   it('renders only its target while closed', () => {

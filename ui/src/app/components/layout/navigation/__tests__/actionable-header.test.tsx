@@ -127,17 +127,18 @@ jest.mock('@carbon/react', () => {
     BreadcrumbSkeleton: ({ className }: any) => (
       <div className={className} data-testid="breadcrumb-skeleton" />
     ),
-    OverflowMenu: ({ children, iconDescription }: any) => (
+    OverflowMenu: ({ children, label }: any) => (
       <div>
-        <button type="button" aria-label={iconDescription} />
+        <button type="button" aria-label={label} />
         {children}
       </div>
     ),
-    OverflowMenuItem: ({ href, itemText, onClick }: any) => (
-      <a href={href} onClick={onClick}>
-        {itemText}
-      </a>
+    MenuItem: ({ label, onClick }: any) => (
+      <button type="button" role="menuitem" onClick={onClick}>
+        {label}
+      </button>
     ),
+    MenuItemDivider: () => <hr />,
     HeaderGlobalBar: ({ children }: any) => <div>{children}</div>,
     HeaderGlobalAction: mockReact.forwardRef(
       ({ children, tooltipAlignment, isActive, ...props }: any, ref: any) => (
@@ -419,7 +420,12 @@ describe('Actionable header project switcher', () => {
               children: [
                 {
                   path: ':assistantId',
-                  handle: { breadcrumb: { render: AssistantName } },
+                  handle: {
+                    breadcrumb: {
+                      render: AssistantName,
+                      overflowLabel: 'Assistant',
+                    },
+                  },
                   children: [
                     {
                       path: 'create-new-version',
@@ -440,10 +446,9 @@ describe('Actionable header project switcher', () => {
     expect(
       screen.getByRole('button', { name: 'Show hidden breadcrumb items' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Assistants' })).toHaveAttribute(
-      'href',
-      '/deployment/assistant',
-    );
+    expect(
+      screen.getByRole('menuitem', { name: 'Assistants' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Support bot' })).toHaveAttribute(
       'href',
       '/deployment/assistant/2301664620831571968',
@@ -456,7 +461,7 @@ describe('Actionable header project switcher', () => {
       screen.queryByRole('link', { name: 'Create version' }),
     ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('link', { name: 'Assistants' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Assistants' }));
     expect(navigate).toHaveBeenCalledWith(
       '/deployment/assistant',
       expect.objectContaining({ fromRouteId: expect.any(String) }),
@@ -474,7 +479,12 @@ describe('Actionable header project switcher', () => {
           children: [
             {
               path: ':assistantId',
-              handle: { breadcrumb: { render: AssistantName } },
+              handle: {
+                breadcrumb: {
+                  render: AssistantName,
+                  overflowLabel: 'Assistant',
+                },
+              },
               element: <ActionableHeader />,
             },
           ],

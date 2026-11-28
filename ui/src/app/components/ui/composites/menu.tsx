@@ -1,4 +1,4 @@
-import { isValidElement, type ReactNode } from 'react';
+import type { ElementType } from 'react';
 import { cn } from '@/utils';
 import { ChevronDown, OverflowMenuHorizontal } from '@carbon/icons-react';
 import {
@@ -6,28 +6,31 @@ import {
   OverflowMenuItem,
 } from '@/app/components/ui/primitives/overflow-menu';
 
+export interface OptionMenuOption {
+  label: string;
+  kind?: 'default' | 'danger';
+  onActionClick: () => void;
+  renderIcon?: ElementType;
+}
+
 interface OptionMenuProps {
-  options: { option: ReactNode; onActionClick: () => void }[];
+  options: OptionMenuOption[];
   classNames?: string;
   activeClassName?: string;
 }
 
-const isDangerOption = (option: ReactNode) =>
-  isValidElement<{ type?: string }>(option) &&
-  option.type === OptionMenuItem &&
-  option.props.type === 'danger';
-
 function renderMenuItems(options: OptionMenuProps['options']) {
   return options.map((opt, idx) => {
-    const isDanger = isDangerOption(opt.option);
+    const isDanger = opt.kind === 'danger';
 
     return (
       <OverflowMenuItem
         key={`opt-menu-${idx}`}
-        itemText={opt.option}
+        itemText={opt.label}
         isDelete={isDanger}
         hasDivider={isDanger}
         onClick={opt.onActionClick}
+        renderIcon={opt.renderIcon}
       />
     );
   });
@@ -60,16 +63,5 @@ export function CardOptionMenu({ options, classNames }: OptionMenuProps) {
     >
       {renderMenuItems(options)}
     </OverflowMenu>
-  );
-}
-
-export function OptionMenuItem(props: {
-  type: 'danger' | 'info';
-  children?: ReactNode;
-}) {
-  return props.type === 'danger' ? (
-    <span className="text-support-error ">{props.children}</span>
-  ) : (
-    <></>
   );
 }

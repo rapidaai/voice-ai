@@ -70,6 +70,8 @@ export function ActionableHeader({
 
     return {
       label,
+      overflowLabel:
+        'label' in definition ? definition.label : definition.overflowLabel,
       href: match.pathname,
       isCurrentPage,
       onClick: (event: MouseEvent<HTMLElement>) => {

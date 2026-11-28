@@ -7,7 +7,10 @@ export interface BreadcrumbLabelProps {
 
 export type BreadcrumbDefinition =
   | { label: string }
-  | { render: ComponentType<BreadcrumbLabelProps> };
+  | {
+      render: ComponentType<BreadcrumbLabelProps>;
+      overflowLabel: string;
+    };
 
 export interface AppRouteHandle {
   breadcrumb?: BreadcrumbDefinition;

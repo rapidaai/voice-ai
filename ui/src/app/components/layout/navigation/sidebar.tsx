@@ -121,6 +121,7 @@ export function SidebarNavigation({
               onClose={interfaceTour.dismiss}
               open
               targetClassName="h-full w-full [&>.cds--popover-container]:h-full [&>.cds--popover-container]:w-full"
+              targetWrapperClassName="h-full w-full"
               title="Explore the side navigation"
             >
               <span
@@ -152,6 +153,7 @@ export function SidebarNavigation({
               onClose={interfaceTour?.dismiss ?? (() => undefined)}
               open={interfaceTour?.step === 'sidebar-toggle'}
               targetClassName="h-full w-full"
+              targetWrapperClassName="h-full w-full"
               title="Collapse or expand the side navigation"
             >
               <span

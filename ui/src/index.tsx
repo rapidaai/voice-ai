@@ -10,6 +10,7 @@ import {
 } from '@/theme/theme-provider';
 import { CONFIG } from '@/configs';
 import { parseThemeManifest } from '@/theme/theme-config';
+import { CarbonFeatureFlags } from '@/app/components/app-shell/carbon-feature-flags';
 
 const rootElement = document.getElementById('root') as HTMLElement;
 const themeResult = parseThemeManifest(CONFIG.theme);
@@ -26,9 +27,11 @@ if (!themeResult.ok) {
   ReactDOM.createRoot(rootElement).render(
     <HelmetProvider>
       <React.StrictMode>
-        <ThemeProvider theme={theme}>
-          <App />
-        </ThemeProvider>
+        <CarbonFeatureFlags>
+          <ThemeProvider theme={theme}>
+            <App />
+          </ThemeProvider>
+        </CarbonFeatureFlags>
       </React.StrictMode>
     </HelmetProvider>,
   );

@@ -3,13 +3,13 @@ import {
   Breadcrumb as CarbonBreadcrumb,
   BreadcrumbItem as CarbonBreadcrumbItem,
   BreadcrumbSkeleton,
-  OverflowMenu as CarbonOverflowMenu,
-  OverflowMenuItem as CarbonOverflowMenuItem,
 } from '@carbon/react';
 import { cn } from '@/utils';
+import { OverflowMenu, OverflowMenuItem } from './overflow-menu';
 
 export interface BreadcrumbItemData {
   label: ReactNode;
+  overflowLabel?: string;
   href?: string;
   className?: string;
   isCurrentPage?: boolean;
@@ -62,20 +62,25 @@ export function Breadcrumb({
         >
           {shouldOverflow && idx === 1 && (
             <CarbonBreadcrumbItem>
-              <CarbonOverflowMenu
+              <OverflowMenu
                 size="sm"
                 iconDescription="Show hidden breadcrumb items"
               >
                 {overflowItems.map((overflowItem, overflowIdx) => (
-                  <CarbonOverflowMenuItem
+                  <OverflowMenuItem
                     key={overflowIdx}
                     className={overflowItem.className}
                     href={overflowItem.href}
-                    itemText={overflowItem.label}
+                    itemText={
+                      overflowItem.overflowLabel ??
+                      (typeof overflowItem.label === 'string'
+                        ? overflowItem.label
+                        : 'Breadcrumb')
+                    }
                     onClick={overflowItem.onClick}
                   />
                 ))}
-              </CarbonOverflowMenu>
+              </OverflowMenu>
             </CarbonBreadcrumbItem>
           )}
           <CarbonBreadcrumbItem
